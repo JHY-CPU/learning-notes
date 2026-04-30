@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express Mongoose 深入</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🍃 Express Mongoose 深入</h2><p>Mongoose Schema 设计、虚拟属性、中间件 (pre/post hooks)、查询优化 (select/populate/lean)、索引策略、事务、聚合管道、连接池配置、插件机制。</p></div>
+    <div class="card">
+        <h2>Mongoose 连接与配置</h2>
+        <div class="code">// ========== Mongoose 深入 ==========
+// 基于 MongoDB 的 ODM
+
+// 安装:
+// npm install mongoose
+
+const mongoose = require('mongoose');
+
+// ========== 连接配置 ==========
+const connectDB = async () => {
+    try {
+        const conn = await mongoose.connect(process.env.MONGODB_URI, {
+            // 连接池
+            maxPoolSize: 10,
+            minPoolSize: 2,
+
+            // 超时
+            serverSelectionTimeoutMS: 5000,
+            socketTimeoutMS: 45000,
+            heartbeatFrequencyMS: 10000,
+
+            // 重试
+            retryWrites: true,
+            retryReads: true,
+
+            // 自动创建索引 (生产关掉)
+            autoIndex: process.env.NODE_ENV !== 'production',
+        });
+
+        logger.info(`MongoDB connected: ${conn.connection.host}`);
+
+        // 连接事件
+        mongoose.connection.on('error', (err) => {
+            logger.error('MongoDB error', { err });
+        });
+
+        mongoose.connection.on('disconnected', () => {
+            logger.warn('MongoDB disconnected');
+        });
+
+        return conn;
+    } catch (err) {
+        logger.error('MongoDB connection failed', { err });
+        process.exit(1);
+    }
+};
+
+// ========== 优雅关闭 ==========
+process.on('SIGTERM', async () => {
+    await mongoose.connection.close();
+    process.exit(0);
+});
+
+// ========== Schema 选项 ==========
+const userSchema = new mongoose.Schema({
+    name: { type: String, required: true, trim: true },
+    email: { type: String, required: true, unique: true, lowercase: true },
+    password: { type: String, required: true, select: false },
+    role: { type: String, enum: ['user', 'admin'], default: 'user' },
+    settings: {
+        theme: { type: String, default: 'light' },
+        notifications: { type: Boolean, default: true },
+    },
+}, {
+    timestamps: true,        // createdAt + updatedAt
+    toJSON: { virtuals: true },  // 虚拟属性序列化
+    toObject: { virtuals: true },
+    optimisticConcurrency: true,  // 乐观并发
+});</div>
+    </div>
+    <div class="card">
+        <h2>虚拟属性与中间件</h2>
+        <div class="code">// ========== 虚拟属性 (Virtual) ==========
+// 不存储在数据库, 由其他字段计算
+
+// 虚拟: 全名
+userSchema.virtual('fullName').get(function() {
+    return `${this.firstName} ${this.lastName}`;
+});
+
+// 虚拟: 文章数
+userSchema.virtual('postCount', {
+    ref: 'Post',
+    localField: '_id',
+    foreignField: 'author',
+    count: true,  // 只返回数量
+});
+
+// 虚拟: 关联文章
+userSchema.virtual('posts', {
+    ref: 'Post',
+    localField: '_id',
+    foreignField: 'author',
+    options: { sort: { createdAt: -1 }, limit: 10 },
+});
+
+// 使用 populate 加载虚拟:
+// const user = await User.findById(id).populate('postCount');
+
+// ========== 中间件 (Hooks) ==========
+// pre: 操作前执行
+// post: 操作后执行
+
+// ——— 保存前自动哈希密码 ———
+userSchema.pre('save', async function(next) {
+    if (!this.isModified('password')) return next();
+    this.password = await bcrypt.hash(this.password, 12);
+    next();
+});
+
+// ——— 更新前 ———
+userSchema.pre('findOneAndUpdate', async function(next) {
+    const update = this.getUpdate();
+    if (update.password) {
+        update.password = await bcrypt.hash(update.password, 12);
+    }
+    next();
+});
+
+// ——— 查询后 ———
+userSchema.post('find', function(docs) {
+    // 查询后处理
+    docs.forEach(doc => {
+        doc.lastAccessed = new Date();
+    });
+});
+
+// ——— 错误处理 ———
+userSchema.post('save', function(error, doc, next) {
+    if (error.code === 11000) {
+        next(new ConflictError('Email already exists'));
+    } else {
+        next(error);
+    }
+});
+
+// ——— 删除后级联删除 ———
+userSchema.pre('deleteOne', { document: true, query: false }, async function(next) {
+    await Post.deleteMany({ author: this._id });
+    next();
+});
+
+// ========== 实例方法 ==========
+userSchema.methods.comparePassword = async function(candidatePassword) {
+    return bcrypt.compare(candidatePassword, this.password);
+};
+
+userSchema.methods.toPublicJSON = function() {
+    const obj = this.toObject();
+    delete obj.password;
+    delete obj.__v;
+    return obj;
+};
+
+// ========== 静态方法 ==========
+userSchema.statics.findByEmail = function(email) {
+    return this.findOne({ email: email.toLowerCase() });
+};
+
+userSchema.statics.findActive = function() {
+    return this.find({ isActive: true }).select('-password');
+};</div>
+    </div>
+    <div class="card">
+        <h2>查询优化</h2>
+        <div class="code">// ========== 查询优化技术 ==========
+
+// ========== 1. select 字段选择 ==========
+// 只取需要的字段, 减少数据传输
+const user = await User.findById(id)
+    .select('name email role createdAt');
+
+// 排除字段:
+User.findById(id).select('-password -__v');
+
+// ========== 2. lean() 轻量查询 ==========
+// 返回普通 JS 对象 (不是 Mongoose Document)
+// 性能提升 5-10x!
+const users = await User.find({ isActive: true })
+    .lean()  // 关键!
+    .limit(50);
+
+// lean() vs 非 lean:
+// Document: 有方法, 有变更追踪, 占用大
+// POJO:     ️ 纯数据, 无方法, 轻量
+
+// lean + populate:
+const orders = await Order.find()
+    .populate('userId', 'name email')
+    .lean();
+
+// ========== 3. 索引策略 ==========
+userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ role: 1, createdAt: -1 });  // 复合索引
+userSchema.index({ name: 'text', email: 'text' });  // 全文索引
+userSchema.index({ location: '2dsphere' });  // 地理空间
+
+// 索引创建 (生产手动管理):
+// User.createIndexes();
+
+// 慢查询监控:
+mongoose.set('debug', process.env.NODE_ENV === 'development');
+// 或只监控慢查询:
+// mongoose.set('debug', (collection, method, query, doc, options) => {
+//     if (options && options.slow) {
+//         logger.warn('Slow query', { collection, method, query });
+//     }
+// });
+
+// ========== 4. 批量操作 ==========
+// 批量插入:
+await User.insertMany(usersArray, { ordered: false });
+
+// 批量更新:
+await User.updateMany(
+    { role: 'inactive' },
+    { $set: { isActive: false } }
+);
+
+// 批量删除:
+await User.deleteMany({ status: 'deleted', createdAt: { $lt: cutoffDate } });
+
+// ========== 5. 分页 ==========
+// 游标分页 (推荐):
+const page = await User.find({
+    _id: { $gt: lastId },  // 游标
+    isActive: true,
+})
+    .sort({ _id: 1 })
+    .limit(20)
+    .lean();
+
+// 传统分页:
+const [users, total] = await Promise.all([
+    User.find().skip(skip).limit(limit).lean(),
+    User.countDocuments(),
+]);</div>
+    </div>
+    <div class="card">
+        <h2>事务与聚合</h2>
+        <div class="code">// ========== MongoDB 事务 ==========
+// 需要副本集
+
+// ========== 事务 ==========
+async function createOrder(userId, items) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        // 计算总价
+        let total = 0;
+        for (const item of items) {
+            const product = await Product.findById(item.productId).session(session);
+            if (!product || product.stock < item.quantity) {
+                throw new Error(`Insufficient stock for ${item.productId}`);
+            }
+            total += product.price * item.quantity;
+
+            // 扣库存
+            await Product.updateOne(
+                { _id: item.productId },
+                { $inc: { stock: -item.quantity } },
+                { session }
+            );
+        }
+
+        // 创建订单
+        const [order] = await Order.create([{
+            userId,
+            items,
+            total,
+            status: 'confirmed',
+        }], { session });
+
+        await session.commitTransaction();
+        return order;
+    } catch (err) {
+        await session.abortTransaction();
+        throw err;
+    } finally {
+        session.endSession();
+    }
+}
+
+// ========== 聚合管道 ==========
+const stats = await Order.aggregate([
+    // 1. 过滤
+    { $match: { status: 'completed', createdAt: { $gte: startDate } } },
+
+    // 2. 分组统计
+    { $group: {
+        _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+        totalOrders: { $sum: 1 },
+        totalRevenue: { $sum: '$total' },
+        avgOrderValue: { $avg: '$total' },
+    }},
+
+    // 3. 排序
+    { $sort: { _id: 1 } },
+
+    // 4. 计算累计
+    {
+        $setWindowFields: {
+            sortBy: { _id: 1 },
+            output: {
+                cumulativeRevenue: {
+                    $sum: '$totalRevenue',
+                    window: { documents: ['unbounded', 'current'] },
+                },
+            },
+        },
+    },
+]);
+
+// ========== 插件 ==========
+// 封装可复用逻辑
+const mongoosePaginate = require('mongoose-paginate-v2');
+userSchema.plugin(mongoosePaginate);
+
+// 自定义插件:
+function softDeletePlugin(schema) {
+    schema.add({ deletedAt: Date });
+
+    schema.methods.softDelete = function() {
+        this.deletedAt = new Date();
+        return this.save();
+    };
+
+    schema.methods.restore = function() {
+        this.deletedAt = undefined;
+        return this.save();
+    };
+
+    // 自动过滤已删除
+    schema.pre(/^find/, function() {
+        this.where({ deletedAt: null });
+    });
+}
+
+userSchema.plugin(softDeletePlugin);
+
+// ========== 连接池监控 ==========
+setInterval(() => {
+    const pool = mongoose.connection.client?.topology;
+    if (pool) {
+        logger.info('MongoDB pool state', {
+            connections: pool.connections,
+            pending: pool.pending,
+            closed: pool.closed,
+        });
+    }
+}, 60000);</div>
+        <div class="note">💡 Mongoose 深入要点: 连接池 maxPoolSize 配置; 虚拟属性 Virtual (get/ref); pre/post 中间件 (密码哈希/级联删除); lean() 提升 5-10x 性能; select 字段限制; 复合索引设计; 事务 session; 聚合管道 Aggregation; 插件机制抽离可复用逻辑; 软删除模式; 游标分页优于 skip。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoVirtual()">虚拟属性</button>
+        <button onclick="demoOptimize()">查询优化</button>
+        <button onclick="demoAgg()">聚合管道</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoVirtual() {
+            result.innerHTML = '';
+            log('# 虚拟属性 & 中间件');
+            log('');
+            log('Virtual:');
+            log('schema.virtual("postCount", {');
+            log('  ref: "Post", count: true');
+            log('});');
+            log('.populate("postCount")');
+            log('');
+            log('Pre-hook:');
+            log('schema.pre("save", async function() {');
+            log('  this.password = await bcrypt.hash(this.password, 12);');
+            log('});');
+        }
+
+        function demoOptimize() {
+            result.innerHTML = '';
+            log('# Mongoose 查询优化');
+            log('');
+            log('1. .select("name email") 只取需要字段');
+            log('2. .lean() 返回 POJO (5-10x 快)');
+            log('3. 复合索引 { role: 1, createdAt: -1 }');
+            log('4. 游标分页 _id > lastId');
+            log('5. insertMany 批量插入');
+            log('');
+            log('对比:');
+            log('  Document: 有方法, 占内存');
+            log('  POJO:     纯数据, 轻量');
+        }
+
+        function demoAgg() {
+            result.innerHTML = '';
+            log('# 聚合管道');
+            log('');
+            log('Order.aggregate([');
+            log('  { $match: { status: "completed" } },');
+            log('  { $group: {');
+            log('    _id: { $dateToString:... },');
+            log('    totalOrders: { $sum: 1 },');
+            log('    totalRevenue: { $sum: "$total" },');
+            log('  }},');
+            log('  { $sort: { _id: 1 } },');
+            log(']);');
+            log('');
+            log('常用阶段:');
+            log('$match $group $sort $project $lookup');
+            log('$unwind $setWindowFields $facet');
+        }
+    </script>
+</body>
+</html>

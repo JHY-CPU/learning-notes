@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoSQL 对比与选型</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📊 NoSQL 对比与选型</h2><p>MongoDB vs PostgreSQL 场景对比、Redis 典型用例、NoSQL 选型决策树、混合持久化策略、事务场景 vs 分析场景、多语言持久化 (Polyglot Persistence)。</p></div>
+    <div class="card">
+        <h2>MongoDB vs PostgreSQL</h2>
+        <div class="code">// ========== MongoDB vs PostgreSQL ==========
+// ┌──────────────┬─────────────────┬──────────────────┐
+// │ 特性          │ MongoDB         │ PostgreSQL       │
+// ├──────────────┼─────────────────┼──────────────────┤
+// │ 类型          │ 文档数据库      │ 关系型数据库      │
+// │ 数据模型      │ JSON 文档       │ 表 + JSONB       │
+// │ Schema        │ 无 Schema       │ 固定 Schema      │
+// │ 事务          │ 4.0+ 多文档事务 │ 完整 ACID        │
+// │ JOIN          │ $lookup         │ JOIN ✅          │
+// │ 索引          │ B-Tree + 文本   │ B-Tree + GIN/GiST│
+// │ 水平扩展      │ 原生分片        │ 需要中间件       │
+// │ JSON 查询     │ 一般            │ JSONB 强大       │
+// │ 全文搜索      │ 文本索引 (一般) │ tsvector (强)    │
+// │ 主从复制      │ 副本集          │ 流复制           │
+// │ 学习曲线      │ 低              │ 中               │
+// └──────────────┴─────────────────┴──────────────────┘
+
+// ========== 何时用 MongoDB ==========
+// ✅ 灵活 Schema (数据结构频繁变化)
+// ✅ 快速原型开发
+// ✅ 文档数据 (日志/CMS/用户资料)
+// ✅ 嵌入式数据 (地址/标签)
+// ✅ 需要原生分片 (大数据量)
+// ✅ Node.js + JSON 生态
+
+// ========== 何时用 PostgreSQL ==========
+// ✅ 数据完整性要求高 (金融)
+// ✅ 复杂查询/JOIN/分析
+// ✅ JSONB 需要高级查询
+// ✅ GIS 地理空间数据
+// ✅ 全文搜索
+// ✅ 事务强一致要求</div>
+    </div>
+    <div class="card">
+        <h2>Redis 典型用例</h2>
+        <div class="code">// ========== Redis 典型用例 ==========
+
+// ┌────────────────┬─────────────────────────────┐
+// │ 场景            │ Redis 方案                  │
+// ├────────────────┼─────────────────────────────┤
+// │ 缓存            │ SET/GET + EXPIRE            │
+// │ Session 共享    │ SET session:id data EX 86400│
+// │ 计数器          │ INCR page:views             │
+// │ 限流            │ INCR + EXPIRE / ZSet 滑动   │
+// │ 排行榜          │ ZADD/ZREVRANGE              │
+// │ 消息队列        │ LPUSH + BRPOP / Stream      │
+// │ 分布式锁        │ SET key uuid NX EX 10       │
+// │ UV 统计         │ PFADD/PFCOUNT (HyperLogLog) │
+// │ 日活统计        │ SETBIT/BITCOUNT             │
+// │ 自动补全        │ RediSearch SUGADD/SUGGET    │
+// │ 地理位置        │ GEOADD/GEOSEARCH            │
+// │ 布隆过滤        │ BF.ADD/BF.EXISTS            │
+// │ 延迟队列        │ ZSet 按时间分数轮询         │
+// │ 实时 Feed       │ LPUSH + LTRIM 固定长度      │
+// └────────────────┴─────────────────────────────┘
+
+// ========== Redis 不适合 ==========
+// ❌ 数据量大 (内存贵)
+// ❌ 复杂查询 (无 SQL/JOIN)
+// ❌ 数据持久化要求高 (虽然能持久, 但不是最优)
+// ❌ 海量长期存储 (磁盘数据库更合适)
+
+// ========== 最佳实践: Redis + SQL + MongoDB ==========
+// Redis:    缓存/计数器/队列 (热数据)
+// PostgreSQL: 核心业务数据 (用户/订单)
+// MongoDB:  日志/非结构化数据 (灵活 Schema)</div>
+    </div>
+    <div class="card">
+        <h2>Polyglot Persistence</h2>
+        <div class="code">// ========== 多语言持久化 ==========
+// 不同类型的数据用不同的数据库
+
+// ┌─────────────┬───────────────────┬──────────┐
+// │ 数据层       │ 技术              │ 用途     │
+// ├─────────────┼───────────────────┼──────────┤
+// │ 缓存层       │ Redis             │ 热点数据 │
+// │ 核心业务     │ PostgreSQL        │ 用户/订单│
+// │ 非结构化     │ MongoDB           │ 日志/CMS │
+// │ 搜索         │ Elasticsearch     │ 全文搜索 │
+// │ 时序         │ InfluxDB/Timescale│ 监控/指标│
+// │ 图数据       │ Neo4j             │ 社交关系 │
+// │ 队列         │ RabbitMQ/Kafka    │ 消息流   │
+// │ 对象存储     │ S3/MinIO          │ 文件/图片│
+// └─────────────┴───────────────────┴──────────┘
+
+// ========== 电商系统典型架构 ==========
+// ┌─── 用户请求 ─────────────────────────┐
+// │  ↓                                    │
+// │  CDN (静态资源)                       │
+// │  ↓                                    │
+// │  Nginx (反向代理)                     │
+// │  ↓                                    │
+// │  应用服务                             │
+// │  ├── Redis (缓存/会话)                │
+// │  ├── PostgreSQL (订单/用户/商品)      │
+// │  ├── MongoDB (评论/日志)              │
+// │  └── Elasticsearch (商品搜索)         │
+// └────────────────────────────────────────┘
+
+// ========== 选型决策树 ==========
+// 1. 需要 ACID 事务? → PostgreSQL / MySQL
+// 2. 数据量大且需要灵活 Schema? → MongoDB
+// 3. 需要极高性能缓存? → Redis
+// 4. 需要全文搜索? → Elasticsearch
+// 5. 需要图关系分析? → Neo4j
+// 6. 时序数据? → InfluxDB / TimescaleDB</div>
+    </div>
+    <div class="card">
+        <h2>事务场景 vs 分析场景</h2>
+        <div class="code">// ========== OLTP vs OLAP ==========
+
+// OLTP (在线事务处理) — 日常业务
+// OLAP (在线分析处理) — 数据分析
+
+// ┌──────────────┬──────────────────┬──────────────────┐
+// │ 特性          │ OLTP (事务)     │ OLAP (分析)      │
+// ├──────────────┼──────────────────┼──────────────────┤
+// │ 典型操作      │ 增删改查         │ 聚合报表         │
+// │ 读写模式      │ 短查询, 频繁     │ 长查询, 少       │
+// │ 数据量        │ GB ~ TB         │ TB ~ PB          │
+// │ 响应时间      │ 毫秒级           │ 秒~分钟         │
+// │ 并发          │ 高 (千/万)      │ 低 (十/百)       │
+// │ 一致性        │ 强一致           │ 最终一致可接受   │
+// ├──────────────┼──────────────────┼──────────────────┤
+// │ 数据库        │ PostgreSQL/MySQL │ ClickHouse/Redshift│
+// │ NoSQL 方案    │ MongoDB/Redis    │ MongoDB 聚合     │
+// └──────────────┴──────────────────┴──────────────────┘
+
+// ========== 混合方案 ==========
+// 同一数据同时支撑事务和分析
+
+// 1. PostgreSQL + TimescaleDB 超表
+// 2. MongoDB 事务(OLTP) + 聚合管道(OLAP)
+// 3. MySQL + ClickHouse (物化视图同步)
+// 4. Kafka + 流处理 (实时分析)
+
+// ========== 选型最终建议 ==========
+// 新项目: PostgreSQL (功能全面, 省心)
+// 简单 CRUD: MySQL (生态成熟)
+// 灵活 Schema: MongoDB (快速迭代)
+// 缓存: Redis (热数据加速)
+// 搜索: Elasticsearch (全文搜索)
+// 时序: TimescaleDB / InfluxDB
+// 社交图: Neo4j
+// 海量分析: ClickHouse</div>
+        <div class="note">💡 选型要点: PostgreSQL 适合复杂查询/事务; MongoDB 适合灵活 Schema/文档; Redis 适合缓存/计数器/队列; 现代架构通常混合多种数据库; OLTP 用 PostgreSQL, OLAP 用 ClickHouse; 不需要过早优化, 先用默认方案。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCompare()">MongoDB vs PG</button>
+        <button onclick="demoRedis()">Redis 用例</button>
+        <button onclick="demoPoly()">混合架构</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCompare() {
+            result.innerHTML = '';
+            log('# MongoDB vs PostgreSQL');
+            log('');
+            log('MongoDB: 灵活 Schema, 分片');
+            log('  适合: 文档/日志/快速原型');
+            log('');
+            log('PostgreSQL: 事务/复杂查询');
+            log('  适合: 金融/分析/GIS/全文搜索');
+        }
+
+        function demoRedis() {
+            result.innerHTML = '';
+            log('# Redis 用例');
+            log('');
+            log('缓存: SET/GET + EXPIRE');
+            log('计数器: INCR');
+            log('排行榜: ZSet');
+            log('队列: List/Stream');
+            log('日活: SETBIT/BITCOUNT');
+        }
+
+        function demoPoly() {
+            result.innerHTML = '';
+            log('# 混合架构');
+            log('');
+            log('Redis — 缓存/会话');
+            log('PostgreSQL — 核心业务');
+            log('MongoDB — 日志/CMS');
+            log('ES — 全文搜索');
+            log('ClickHouse — 分析');
+            log('');
+            log('选型: 根据场景选最合适的');
+        }
+    </script>
+</body>
+</html>

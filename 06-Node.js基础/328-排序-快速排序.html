@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排序-快速排序</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>排序-快速排序</h2><p>分区(Hoare/Lomuto)、递归、随机 pivot、尾递归优化、性能。</p></div>
+    <div class="card">
+        <h2>快速排序实现</h2>
+        <div class="code">// ========== 快速排序 (Lomuto 分区) ==========
+function quickSort(arr, left = 0, right = arr.length - 1) {
+    if (left >= right) return;
+    const pivot = partition(arr, left, right);
+    quickSort(arr, left, pivot - 1);
+    quickSort(arr, pivot + 1, right);
+    return arr;
+}
+
+// Lomuto 分区方案
+function partition(arr, left, right) {
+    const pivot = arr[right]; // 选最后一个元素
+    let i = left;
+    for (let j = left; j < right; j++) {
+        if (arr[j] < pivot) {
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+            i++;
+        }
+    }
+    [arr[i], arr[right]] = [arr[right], arr[i]];
+    return i;
+}
+
+// ========== 随机 pivot (避免最坏情况) ==========
+function randomPartition(arr, left, right) {
+    const rand = left + Math.floor(Math.random() * (right - left + 1));
+    [arr[rand], arr[right]] = [arr[right], arr[rand]];
+    return partition(arr, left, right);
+}
+
+// ========== 三路快排 (处理重复元素) ==========
+function quickSort3Way(arr, left = 0, right = arr.length - 1) {
+    if (left >= right) return;
+    const [lt, gt] = partition3Way(arr, left, right);
+    quickSort3Way(arr, left, lt - 1);
+    quickSort3Way(arr, gt + 1, right);
+    return arr;
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：快速排序</h2>
+        <button onclick="demoQuick()">快速排序</button>
+        <button onclick="demoRandomPivot()">随机 pivot</button>
+        <button onclick="demo3Way()">三路快排</button>
+        <button onclick="demoPerf()">性能测试</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoQuick() {
+            result.innerHTML = '';
+            log('⚡ 快速排序 (Lomuto 分区):');
+            log('');
+
+            function quickSort(arr, left = 0, right = arr.length - 1) {
+                if (left >= right) return;
+                const pivotIdx = partition(arr, left, right);
+                log(`   分区 [${left}..${right}], pivot=${arr[pivotIdx]} @ ${pivotIdx}`);
+                log(`   结果: [${arr.slice(left, right + 1)}]`);
+                quickSort(arr, left, pivotIdx - 1);
+                quickSort(arr, pivotIdx + 1, right);
+            }
+
+            function partition(arr, left, right) {
+                const pivot = arr[right]; // 选最后一个元素
+                let i = left;
+                for (let j = left; j < right; j++) {
+                    if (arr[j] < pivot) {
+                        [arr[i], arr[j]] = [arr[j], arr[i]];
+                        i++;
+                    }
+                }
+                [arr[i], arr[right]] = [arr[right], arr[i]];
+                return i;
+            }
+
+            const data = [7, 2, 9, 1, 5, 8, 3];
+            log(`原始数组: [${data}]`);
+            log('');
+            quickSort(data);
+            log('');
+            log(`排序结果: [${data}]`);
+            log('');
+
+            log('📌 快速排序特点:');
+            log('   • 平均 O(n log n), 最坏 O(n²)');
+            log('   • 不稳定排序');
+            log('   • 原地排序 O(log n) 栈空间');
+        }
+
+        function demoRandomPivot() {
+            result.innerHTML = '';
+            log('🎲 随机 pivot 优化:');
+            log('');
+
+            // 最坏情况: 已排序数组 + 固定选最后一个
+            function quickSortFixed(arr, left = 0, right = arr.length - 1) {
+                if (left >= right) return;
+                let i = left;
+                const pivot = arr[right];
+                for (let j = left; j < right; j++) {
+                    if (arr[j] < pivot) {
+                        [arr[i], arr[j]] = [arr[j], arr[i]];
+                        i++;
+                    }
+                }
+                [arr[i], arr[right]] = [arr[right], arr[i]];
+                quickSortFixed(arr, left, i - 1);
+                quickSortFixed(arr, i + 1, right);
+            }
+
+            function quickSortRandom(arr, left = 0, right = arr.length - 1) {
+                if (left >= right) return;
+                const rand = left + Math.floor(Math.random() * (right - left + 1));
+                [arr[rand], arr[right]] = [arr[right], arr[rand]];
+                let i = left;
+                const pivot = arr[right];
+                for (let j = left; j < right; j++) {
+                    if (arr[j] < pivot) { [arr[i], arr[j]] = [arr[j], arr[i]]; i++; }
+                }
+                [arr[i], arr[right]] = [arr[right], arr[i]];
+                quickSortRandom(arr, left, i - 1);
+                quickSortRandom(arr, i + 1, right);
+            }
+
+            const size = 500;
+            const sortedData = Array.from({ length: size }, (_, i) => i);
+            const sortedData2 = Array.from({ length: size }, (_, i) => i);
+
+            log(`测试: 已排序数组 (${size} 元素)`);
+            log('');
+
+            try {
+                let start = performance.now();
+                quickSortFixed(sortedData);
+                log(`固定 pivot (最后一个): ${(performance.now() - start).toFixed(2)}ms (可能很慢)`);
+            } catch (e) {
+                log(`固定 pivot: 栈溢出! (O(n²) 递归过深)`);
+            }
+
+            let start = performance.now();
+            quickSortRandom(sortedData2);
+            log(`随机 pivot:          ${(performance.now() - start).toFixed(2)}ms (O(n log n))`);
+
+            log('');
+            log('📌 随机 pivot 效果:');
+            log('   • 避免对已排序数组的 O(n²)');
+            log('   • 使算法期望复杂度 O(n log n)');
+            log('   • 几乎不增加额外开销');
+        }
+
+        function demo3Way() {
+            result.innerHTML = '';
+            log('🔀 三路快排 (处理重复元素):');
+            log('');
+
+            function quickSort3Way(arr, left = 0, right = arr.length - 1) {
+                if (left >= right) return;
+                const pivot = arr[left];
+                let lt = left;  // arr[left+1..lt] < pivot
+                let gt = right; // arr[gt..right] > pivot
+                let i = left + 1;
+
+                while (i <= gt) {
+                    if (arr[i] < pivot) {
+                        [arr[lt], arr[i]] = [arr[i], arr[lt]];
+                        lt++; i++;
+                    } else if (arr[i] > pivot) {
+                        [arr[i], arr[gt]] = [arr[gt], arr[i]];
+                        gt--;
+                    } else {
+                        i++;
+                    }
+                }
+                log(`   区间 [${left}..${right}]: <${pivot}[${left}..${lt-1}] =${pivot}[${lt}..${gt}] >${pivot}[${gt+1}..${right}]`);
+                quickSort3Way(arr, left, lt - 1);
+                quickSort3Way(arr, gt + 1, right);
+            }
+
+            const data = [3, 1, 4, 1, 5, 9, 2, 6, 5, 3, 5];
+            log(`原始数组 (含重复): [${data}]`);
+            log('');
+            quickSort3Way(data);
+            log('');
+            log(`排序结果: [${data}]`);
+            log('');
+
+            log('📌 三路快排优势:');
+            log('   • 大量重复元素时性能好');
+            log('   • 从 O(n log n) 降到接近 O(n)');
+            log('   • 荷兰国旗问题 (Dutch National Flag)');
+        }
+
+        function demoPerf() {
+            result.innerHTML = '';
+            log('⚡ 排序算法性能对比:');
+            log('');
+
+            const sizes = [100, 1000, 5000];
+            const results = {};
+
+            // 各排序实现
+            function quickSort(arr) {
+                if (arr.length <= 1) return arr;
+                const pivot = arr[Math.floor(arr.length / 2)];
+                const left = [], right = [], equal = [];
+                for (const v of arr) {
+                    if (v < pivot) left.push(v);
+                    else if (v > pivot) right.push(v);
+                    else equal.push(v);
+                }
+                return [...quickSort(left), ...equal, ...quickSort(right)];
+            }
+
+            function nativeSort(arr) { return [...arr].sort((a, b) => a - b); }
+
+            sizes.forEach(size => {
+                const data = Array.from({ length: size }, () => Math.random() * 10000);
+
+                // 原生排序
+                let start = performance.now();
+                nativeSort(data);
+                const nativeTime = performance.now() - start;
+
+                // 快速排序 (函数式)
+                start = performance.now();
+                quickSort(data);
+                const quickTime = performance.now() - start;
+
+                // 插入排序
+                function insertionSort(arr) {
+                    const a = [...arr];
+                    for (let i = 1; i < a.length; i++) {
+                        const key = a[i]; let j = i - 1;
+                        while (j >= 0 && a[j] > key) { a[j + 1] = a[j]; j--; }
+                        a[j + 1] = key;
+                    }
+                    return a;
+                }
+
+                start = performance.now();
+                insertionSort(data);
+                const insertTime = performance.now() - start;
+
+                log(`📊 N=${size}:`);
+                log(`   原生 sort:  ${nativeTime.toFixed(2)}ms`);
+                log(`   快速排序:   ${quickTime.toFixed(2)}ms`);
+                log(`   插入排序:   ${insertTime.toFixed(2)}ms`);
+                log('');
+            });
+
+            log('📌 选型建议:');
+            log('   • 日常使用: 原生 sort (TimSort)');
+            log('   • 大数据量: 快排 / 归并');
+            log('   • 小数据量: 插入排序 (n < 50)');
+            log('   • 重复元素多: 三路快排');
+        }
+
+        console.log('=== 排序-快速排序 ===');
+        document.getElementById('output').textContent = `快速排序: Lomuto/Hoare分区 / 随机pivot / 三路快排 / 性能\n✅ 快速排序演示完成！`;
+    </script>
+</body>
+</html>

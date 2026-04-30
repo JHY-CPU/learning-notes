@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python pytest-asyncio与异步测试</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🧪 pytest-asyncio 与异步测试</h2><p>pytest-asyncio 标记、异步 fixture、异步 HTTP 测试 (httpx)、超时测试、FastAPI 异步测试实践。</p></div>
+    <div class="card">
+        <h2>pytest-asyncio 基础</h2>
+        <div class="code">// ========== 异步测试 ==========
+# pip install pytest-asyncio
+
+import pytest
+
+# @pytest.mark.asyncio: 标记异步测试函数
+
+@pytest.mark.asyncio
+async def test_async_function():
+    """测试异步函数"""
+    result = await async_add(1, 2)
+    assert result == 3
+
+@pytest.mark.asyncio
+async def test_async_with_sleep():
+    """异步等待测试"""
+    start = asyncio.get_event_loop().time()
+    await asyncio.sleep(0.1)
+    elapsed = asyncio.get_event_loop().time() - start
+    assert elapsed >= 0.1
+
+# ========== 异步 fixture ==========
+import asyncio
+
+@pytest.fixture
+def event_loop():
+    """自定义事件循环 (scope 与 fixture 一致)"""
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    yield loop
+    loop.close()
+
+@pytest.fixture
+async def async_data():
+    """异步 fixture (需要 pytest-asyncio)"""
+    await asyncio.sleep(0.1)  # 模拟异步设置
+    return {"key": "value", "number": 42}
+
+@pytest.mark.asyncio
+async def test_with_async_fixture(async_data):
+    """使用异步 fixture"""
+    assert async_data["number"] == 42</div>
+    </div>
+    <div class="card">
+        <h2>异步 Fixture 进阶</h2>
+        <div class="code">// ========== Scope 与清理 ==========
+import pytest
+import asyncio
+
+@pytest.fixture(scope="module")
+def event_loop():
+    """模块级别事件循环"""
+    loop = asyncio.new_event_loop()
+    yield loop
+    loop.close()
+
+@pytest.fixture(scope="module")
+async def async_client():
+    """模块级别的异步客户端"""
+    import httpx
+    async with httpx.AsyncClient() as client:
+        yield client  # 测试结束后自动关闭
+
+@pytest.mark.asyncio
+async def test_get(async_client):
+    resp = await async_client.get("https://httpbin.org/get")
+    assert resp.status_code == 200
+
+# ========== 多个异步 fixture ==========
+@pytest.fixture
+async def db():
+    """模拟异步数据库连接"""
+    conn = {"connected": True, "data": []}
+    yield conn
+    conn["connected"] = False
+
+@pytest.fixture
+async def cache():
+    """模拟异步缓存"""
+    return {"redis": True}
+
+@pytest.mark.asyncio
+async def test_with_many_fixtures(db, cache):
+    assert db["connected"]
+    assert cache["redis"]
+
+# ========== autouse 异步 fixture ==========
+@pytest.fixture(autouse=True)
+async def auto_setup():
+    """每个异步测试自动执行"""
+    # 设置: 清理数据库,准备数据
+    yield
+    # 清理: 回滚事务</div>
+    </div>
+    <div class="card">
+        <h2>异步 HTTP 测试</h2>
+        <div class="code">// ========== httpx AsyncClient 测试 ==========
+import pytest
+import httpx
+import asyncio
+
+# 测试外部 API
+@pytest.mark.asyncio
+async def test_external_api():
+    async with httpx.AsyncClient() as client:
+        resp = await client.get("https://httpbin.org/json")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "slideshow" in data
+
+# ========== 测试 FastAPI (ASGI) ==========
+from fastapi import FastAPI
+from httpx import AsyncClient, ASGITransport
+
+app = FastAPI()
+
+@app.get("/hello/{name}")
+async def hello(name: str):
+    return {"message": f"Hello {name}"}
+
+# 方式 1: ASGITransport (无需运行服务器)
+@pytest.mark.asyncio
+async def test_fastapi_asgi():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        resp = await ac.get("/hello/World")
+    assert resp.status_code == 200
+    assert resp.json() == {"message": "Hello World"}
+
+# 方式 2: fixture 封装
+@pytest.fixture
+async def async_client():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        yield client
+
+@pytest.mark.asyncio
+async def test_multiple(async_client):
+    resp1 = await async_client.get("/hello/Alice")
+    resp2 = await async_client.get("/hello/Bob")
+    assert resp1.json()["message"] == "Hello Alice"
+    assert resp2.json()["message"] == "Hello Bob"</div>
+    </div>
+    <div class="card">
+        <h2>异步模拟 (mock + asyncio)</h2>
+        <div class="code">// ========== 模拟异步函数 ==========
+from unittest.mock import AsyncMock, patch, MagicMock
+import pytest
+
+# AsyncMock (Python 3.8+): 模拟异步函数
+
+# 基本使用:
+async def fetch_data():
+    pass  # 真实实现
+
+@pytest.mark.asyncio
+async def test_async_mock():
+    mock = AsyncMock()
+    mock.return_value = {"data": "模拟数据"}
+
+    result = await mock()
+    assert result["data"] == "模拟数据"
+
+# ========== 模拟协程 ==========
+class DataService:
+    async def get_user(self, user_id):
+        # 真实 API 调用
+        pass
+
+@pytest.mark.asyncio
+async def test_data_service():
+    service = DataService()
+    service.get_user = AsyncMock(return_value={"id": 1, "name": "Alice"})
+
+    user = await service.get_user(1)
+    assert user["name"] == "Alice"
+    service.get_user.assert_awaited_once_with(1)
+
+# ========== @patch + AsyncMock ==========
+import httpx
+
+class WeatherClient:
+    async def fetch(self, city):
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(f"https://api.weather.com/{city}")
+            return resp.json()
+
+@patch("httpx.AsyncClient.get", new_callable=AsyncMock)
+@pytest.mark.asyncio
+async def test_weather(mock_get):
+    mock_response = AsyncMock()
+    mock_response.status_code = 200
+    mock_response.json = MagicMock(return_value={"temp": 22})
+    mock_get.return_value = mock_response
+
+    client = WeatherClient()
+    result = await client.fetch("Beijing")
+
+    assert result["temp"] == 22
+    mock_get.assert_awaited_once()
+
+# ========== side_effect with coroutine ==========
+@pytest.mark.asyncio
+async def test_async_side_effect():
+    mock = AsyncMock()
+
+    async def side_effect(url):
+        if "error" in url:
+            raise ValueError("bad url")
+        return {"ok": True}
+
+    mock.side_effect = side_effect
+    result = await mock("https://ok.com")
+    assert result["ok"]</div>
+    </div>
+    <div class="card">
+        <h2>超时与异常测试</h2>
+        <div class="code">// ========== 异步超时测试 ==========
+import pytest
+import asyncio
+
+# 测试超时场景
+
+async def slow_operation():
+    await asyncio.sleep(10)
+    return "完成"
+
+@pytest.mark.asyncio
+async def test_timeout():
+    """测试异步操作超时"""
+    with pytest.raises(asyncio.TimeoutError):
+        async with asyncio.timeout(1):
+            await slow_operation()
+
+# ========== 测试 CancelledError ==========
+async def cancellable_work():
+    try:
+        await asyncio.sleep(10)
+    except asyncio.CancelledError:
+        raise
+
+@pytest.mark.asyncio
+async def test_cancellation():
+    task = asyncio.create_task(cancellable_work())
+    await asyncio.sleep(0.1)
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+# ========== 测试并发行为 ==========
+@pytest.mark.asyncio
+async def test_concurrent():
+    """验证并发执行的时间"""
+    start = asyncio.get_event_loop().time()
+
+    async def worker(delay):
+        await asyncio.sleep(delay)
+        return delay
+
+    results = await asyncio.gather(
+        worker(0.5), worker(0.3), worker(0.4)
+    )
+    elapsed = asyncio.get_event_loop().time() - start
+
+    assert results == [0.5, 0.3, 0.4]
+    assert elapsed < 0.7  # 并发执行,小于总和 1.2</div>
+    </div>
+    <div class="card">
+        <h2>完整示例: 异步 CRUD 测试</h2>
+        <div class="code">// ========== 异步 CRUD 服务测试 ==========
+import pytest
+from unittest.mock import AsyncMock, MagicMock
+
+class AsyncUserService:
+    """异步用户服务"""
+
+    def __init__(self, db, cache):
+        self.db = db
+        self.cache = cache
+
+    async def get_user(self, user_id):
+        # 先查缓存
+        cached = await self.cache.get(f"user:{user_id}")
+        if cached:
+            return cached
+
+        # 再查数据库
+        user = await self.db.fetchone(
+            "SELECT * FROM users WHERE id = ?", [user_id]
+        )
+        if user:
+            await self.cache.set(f"user:{user_id}", user, ttl=300)
+        return user
+
+    async def create_user(self, name, email):
+        user_id = await self.db.execute(
+            "INSERT INTO users (name, email) VALUES (?, ?)", [name, email]
+        )
+        return {"id": user_id, "name": name, "email": email}
+
+# ========== 完整测试 ==========
+@pytest.fixture
+def mock_db():
+    db = MagicMock()
+    db.fetchone = AsyncMock()
+    db.execute = AsyncMock()
+    return db
+
+@pytest.fixture
+def mock_cache():
+    cache = MagicMock()
+    cache.get = AsyncMock()
+    cache.set = AsyncMock()
+    return cache
+
+@pytest.fixture
+def service(mock_db, mock_cache):
+    return AsyncUserService(mock_db, mock_cache)
+
+@pytest.mark.asyncio
+async def test_get_user_cached(service, mock_cache, mock_db):
+    """缓存命中,不查数据库"""
+    mock_cache.get.return_value = {"id": 1, "name": "Cached"}
+
+    user = await service.get_user(1)
+
+    assert user["name"] == "Cached"
+    mock_cache.get.assert_awaited_once_with("user:1")
+    mock_db.fetchone.assert_not_called()  # 没查数据库
+
+@pytest.mark.asyncio
+async def test_get_user_db(service, mock_cache, mock_db):
+    """缓存未命中,查数据库并回填缓存"""
+    mock_cache.get.return_value = None
+    mock_db.fetchone.return_value = {"id": 2, "name": "FromDB"}
+
+    user = await service.get_user(2)
+
+    assert user["name"] == "FromDB"
+    mock_cache.set.assert_awaited_once()
+
+@pytest.mark.asyncio
+async def test_create_user(service, mock_db):
+    mock_db.execute.return_value = 100
+
+    user = await service.create_user("New", "new@test.com")
+
+    assert user["id"] == 100
+    mock_db.execute.assert_awaited_once()</div>
+        <div class="note">💡 异步测试要点: @pytest.mark.asyncio 标记异步测试; 异步 fixture 用 async def; AsyncMock 模拟协程; httpx.AsyncClient + ASGITransport 测试 FastAPI; 测试超时和取消。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoAsync()">异步测试演示</button>
+        <button onclick="demoMock()">AsyncMock 演示</button>
+        <button onclick="demoFastAPI()">FastAPI 测试演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoAsync() {
+            result.innerHTML = '';
+            log('# pytest-asyncio');
+            log('');
+            log('@pytest.mark.asyncio');
+            log('async def test_async():');
+            log('    result = await async_func()');
+            log('    assert result == 42');
+            log('');
+            log('异步 fixture:');
+            log('  @pytest.fixture');
+            log('  async def data():');
+            log('      await setup()');
+            log('      yield value');
+        }
+
+        function demoMock() {
+            result.innerHTML = '';
+            log('# AsyncMock');
+            log('');
+            log('from unittest.mock import AsyncMock');
+            log('');
+            log('mock = AsyncMock()');
+            log('mock.return_value = {"ok": True}');
+            log('await mock()  # {"ok": True}');
+            log('');
+            log('mock.assert_awaited()');
+            log('mock.assert_awaited_once()');
+            log('mock.assert_awaited_with(args)');
+        }
+
+        function demoFastAPI() {
+            result.innerHTML = '';
+            log('# FastAPI 异步测试');
+            log('');
+            log('from httpx import AsyncClient, ASGITransport');
+            log('');
+            log('transport = ASGITransport(app=app)');
+            log('async with AsyncClient(');
+            log('    transport=transport,');
+            log('    base_url="http://test"');
+            log(') as ac:');
+            log('    resp = await ac.get("/")');
+            log('');
+            log('无需启动服务器,直接测试');
+        }
+    </script>
+</body>
+</html>

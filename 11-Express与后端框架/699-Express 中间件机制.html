@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express 中间件机制</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔗 Express 中间件机制</h2><p>中间件概念与执行流程、应用级 vs 路由级中间件、内置中间件 (express.json/static/urlencoded)、第三方中间件 (morgan/cors/helmet)、错误处理中间件、异步中间件错误捕获、中间件顺序最佳实践。</p></div>
+    <div class="card">
+        <h2>中间件概念</h2>
+        <div class="code">// ========== 中间件 ==========
+// 函数, 访问 req/res, 执行逻辑, 调用 next()
+
+// ========== 中间件签名 ==========
+function middleware(req, res, next) {
+    // 1. 执行逻辑 (日志/认证/解析)
+    // 2. 修改 req/res (添加属性/数据)
+    // 3. 结束响应 (res.send/json) 或
+    // 4. 调用 next() 传递到下一个
+}
+
+// ========== 中间件执行流程 ==========
+// ┌────────────────────────────────────────┐
+// │  请求进入                                │
+// │    ↓                                     │
+// │  中间件 1 (日志)                         │
+// │    ↓ next()                              │
+// │  中间件 2 (解析 JSON)                    │
+// │    ↓ next()                              │
+// │  中间件 3 (CORS)                         │
+// │    ↓ next()                              │
+// │  路由处理函数 (业务逻辑)                 │
+// │    ↓                                     │
+// │  响应返回客户端                          │
+// └────────────────────────────────────────┘
+
+// ========== 创建自定义中间件 ==========
+// 请求计时器:
+app.use((req, res, next) => {
+    const start = Date.now();
+    res.on('finish', () => {
+        const duration = Date.now() - start;
+        console.log(`${req.method} ${req.path} ${duration}ms`);
+    });
+    next();
+});
+
+// 请求日志:
+app.use((req, res, next) => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+    next();
+});</div>
+    </div>
+    <div class="card">
+        <h2>中间件类型</h2>
+        <div class="code">// ========== 1. 应用级中间件 ==========
+// 绑定到 app 实例
+
+// 全局 (所有请求):
+app.use(middleware);
+
+// 路径前缀 (匹配 /api 开头的请求):
+app.use('/api', middleware);
+
+// 条件路径 (多个路径):
+app.use(['/admin', '/dashboard'], authMiddleware);
+
+// ========== 2. 路由级中间件 ==========
+// 绑定到 Router 实例
+
+const router = express.Router();
+
+// 所有 /users 请求:
+router.use(authMiddleware);
+
+// 特定路由:
+router.get('/:id', validateId, getUser);
+
+// ========== 3. 内置中间件 ==========
+// Express 自带:
+express.json()                    // 解析 JSON body
+express.urlencoded({ extended: true }) // 解析表单
+express.static('public')          // 静态文件
+express.Router()                  // 路由模块
+
+// ========== 4. 第三方中间件 ==========
+const morgan = require('morgan');     // 请求日志
+const cors = require('cors');         // 跨域
+const helmet = require('helmet');     // 安全头
+const compression = require('compression'); // 压缩
+const cookieParser = require('cookie-parser');
+const rateLimit = require('express-rate-limit');
+
+// 使用:
+app.use(morgan('combined'));          // 日志格式
+app.use(cors({ origin: 'https://example.com' }));
+app.use(helmet());
+app.use(compression());
+app.use(cookieParser());</div>
+    </div>
+    <div class="card">
+        <h2>错误处理中间件</h2>
+        <div class="code">// ========== 错误处理中间件 ==========
+// 4 个参数: (err, req, res, next)
+// 必须放在所有路由和其他中间件之后!
+
+app.use((err, req, res, next) => {
+    console.error('Error:', err);
+
+    // 区分已知和未知错误
+    const status = err.status || 500;
+    const message = err.message || 'Internal Server Error';
+
+    // 生产环境不暴露错误详情
+    const error = process.env.NODE_ENV === 'production'
+        ? { message: 'Internal Server Error' }
+        : { message, stack: err.stack };
+
+    res.status(status).json({
+        code: status,
+        message: error.message,
+        ...(error.stack && { stack: error.stack })
+    });
+});
+
+// ========== 自定义错误类 ==========
+class AppError extends Error {
+    constructor(message, status = 400) {
+        super(message);
+        this.status = status;
+        this.isOperational = true;  // 可预知的错误
+    }
+}
+
+class NotFoundError extends AppError {
+    constructor(message = 'Resource not found') {
+        super(message, 404);
+    }
+}
+
+class ValidationError extends AppError {
+    constructor(message = 'Validation failed') {
+        super(message, 422);
+    }
+}
+
+// 使用:
+app.get('/users/:id', async (req, res, next) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) throw new NotFoundError('User not found');
+        res.json(user);
+    } catch (err) {
+        next(err);  // 传给错误处理中间件
+    }
+});
+
+// ========== 404 处理 ==========
+// 必须放在所有路由之后!
+app.use((req, res, next) => {
+    res.status(404).json({
+        code: 404,
+        message: `Route ${req.method} ${req.url} not found`
+    });
+});</div>
+    </div>
+    <div class="card">
+        <h2>异步中间件与最佳实践</h2>
+        <div class="code">// ========== 异步中间件 ==========
+// Express 5 原生支持 async/await
+// Express 4 需要手动捕获错误
+
+// 方案 1: try/catch + next:
+app.get('/users/:id', async (req, res, next) => {
+    try {
+        const user = await User.findById(req.params.id);
+        res.json(user);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// 方案 2: 封装 asyncHandler:
+function asyncHandler(fn) {
+    return (req, res, next) => {
+        Promise.resolve(fn(req, res, next)).catch(next);
+    };
+}
+
+// 使用:
+app.get('/users/:id', asyncHandler(async (req, res) => {
+    const user = await User.findById(req.params.id);
+    if (!user) throw new NotFoundError();
+    res.json(user);
+}));
+
+// ========== 中间件顺序 (重要!) ==========
+// 正确的顺序决定了应用行为:
+
+const express = require('express');
+const app = express();
+
+// 1. 安全与解析 (最先)
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// 2. 日志
+app.use(morgan('dev'));
+
+// 3. 静态文件
+app.use(express.static('public'));
+
+// 4. 请求级中间件 (认证/限流)
+app.use('/api', rateLimit({ windowMs: 15 * 60 * 1000, max: 100 }));
+app.use('/api', authMiddleware);
+
+// 5. 路由
+app.use('/api/users', usersRouter);
+app.use('/api/posts', postsRouter);
+
+// 6. 404 处理
+app.use((req, res) => {
+    res.status(404).json({ message: 'Not Found' });
+});
+
+// 7. 全局错误处理 (最后!)
+app.use((err, req, res, next) => {
+    console.error(err);
+    res.status(err.status || 500).json({
+        message: err.message || 'Internal Error'
+    });
+});</div>
+        <div class="note">💡 中间件是 Express 的核心, 本质是函数链。顺序决定行为: 安全→解析→日志→静态→认证→路由→404→错误。错误处理中间件必须有 4 个参数。异步中间件必须捕获错误传给 next()。第三方中间件 morgan/cors/helmet 是生产必备。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoFlow()">执行流程</button>
+        <button onclick="demoError()">错误处理</button>
+        <button onclick="demoOrder()">中间件顺序</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoFlow() {
+            result.innerHTML = '';
+            log('# 中间件执行流程');
+            log('');
+            log('请求 → Logger → Parser → CORS → Route → 响应');
+            log('                            ↓');
+            log('                        Error Handler');
+            log('');
+            log('next() 传递到下一个');
+            log('res.send/json 结束请求');
+        }
+
+        function demoError() {
+            result.innerHTML = '';
+            log('# 错误处理');
+            log('');
+            log('// 自定义错误类');
+            log('class AppError extends Error {');
+            log('  constructor(msg, status) {');
+            log('    super(msg);');
+            log('    this.status = status;');
+            log('  }');
+            log('}');
+            log('');
+            log('// 异步 handler');
+            log('function asyncHandler(fn) {');
+            log('  return (req,res,next) => {');
+            log('    Promise.resolve(fn(req,res,next)).catch(next)');
+            log('  };');
+            log('}');
+        }
+
+        function demoOrder() {
+            result.innerHTML = '';
+            log('# 中间件推荐顺序');
+            log('');
+            log('1. helmet (安全头)');
+            log('2. cors (跨域)');
+            log('3. express.json (解析)');
+            log('4. morgan (日志)');
+            log('5. express.static (静态)');
+            log('6. rateLimit (限流)');
+            log('7. auth (认证)');
+            log('8. routes (路由)');
+            log('9. 404 handler');
+            log('10. error handler (最后!)');
+        }
+    </script>
+</body>
+</html>

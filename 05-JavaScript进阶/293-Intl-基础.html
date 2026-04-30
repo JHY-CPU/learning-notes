@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intl-基础</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #intl-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Intl 基础</h2><p>Intl 对象、locale 字符串、语言标签解析。</p></div>
+    <div class="card">
+        <h2>Intl 简介</h2>
+        <div class="code">// ========== Intl 国际化 API ==========
+// Intl 是 JS 内置的国际化对象
+// 提供日期、数字、排序、复数等本地化功能
+
+// ========== Locale 语言标签 ==========
+// 格式: language[-script][-region][-extensions]
+// 'zh'           — 中文
+// 'zh-CN'        — 中文 (中国)
+// 'zh-Hans-CN'   — 中文 (简体, 中国)
+// 'en'           — 英语
+// 'en-US'        — 英语 (美国)
+// 'en-GB'        — 英语 (英国)
+// 'ja-JP'        — 日语 (日本)
+// 'de-DE'        — 德语 (德国)
+// 'ar-EG'        — 阿拉伯语 (埃及)
+
+// ========== Intl 主要构造器 ==========
+Intl.DateTimeFormat   // 日期格式化
+Intl.NumberFormat     // 数字格式化
+Intl.Collator         // 字符串排序/比较
+Intl.ListFormat       // 列表连接 (ES2021)
+Intl.RelativeTimeFormat // 相对时间 (ES2020)
+Intl.PluralRules      // 复数规则
+Intl.Segmenter        // 文本分割 (ES2022)
+
+// ========== 基本用法 ==========
+// 所有 Intl 构造器用法一致:
+const formatter = new Intl.XXX(locale, options);
+formatter.format(value);
+
+// ========== 检测支持 ==========
+if (Intl) console.log('Intl 支持');
+if (typeof Intl.DateTimeFormat !== 'undefined') {
+    // 浏览器支持
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：Intl 基础</h2>
+        <button onclick="demoLocales()">语言标签</button>
+        <button onclick="demoIntlOverview()">Intl 总览</button>
+        <div id="intl-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const intlResult = document.getElementById('intl-result');
+
+        function log(msg) {
+            intlResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoLocales() {
+            intlResult.innerHTML = '';
+            log('🌍 Locale 语言标签:');
+            log('');
+
+            const locales = [
+                { code: 'zh-CN', name: '简体中文(中国)' },
+                { code: 'zh-TW', name: '繁体中文(台湾)' },
+                { code: 'en-US', name: '英语(美国)' },
+                { code: 'en-GB', name: '英语(英国)' },
+                { code: 'ja-JP', name: '日语(日本)' },
+                { code: 'ko-KR', name: '韩语(韩国)' },
+                { code: 'fr-FR', name: '法语(法国)' },
+                { code: 'de-DE', name: '德语(德国)' },
+                { code: 'ar-SA', name: '阿拉伯语(沙特)' },
+            ];
+
+            const testDate = new Date(2024, 0, 15);
+            const testNum = 1234567.89;
+
+            log('日期格式化对比:');
+            locales.forEach(({ code, name }) => {
+                const formatted = new Intl.DateTimeFormat(code).format(testDate);
+                log(`   ${name} (${code}): ${formatted}`);
+            });
+
+            log('');
+            log('数字格式化对比:');
+            locales.slice(0, 6).forEach(({ code, name }) => {
+                const formatted = new Intl.NumberFormat(code).format(testNum);
+                log(`   ${name} (${code}): ${formatted}`);
+            });
+
+            log('');
+            log('📌 Locale 格式: language[-script][-region]');
+            log('📌 Intl 自动 fallback (如 zh-CN → zh → 默认)');
+        }
+
+        function demoIntlOverview() {
+            intlResult.innerHTML = '';
+            log('📋 Intl API 总览:');
+            log('');
+
+            const date = new Date(2024, 5, 15, 14, 30, 0);
+            const num = 1234567.89;
+            const items = ['苹果', '香蕉', '橙子'];
+
+            log('1️⃣ Intl.DateTimeFormat:');
+            const df = new Intl.DateTimeFormat('zh-CN', {
+                year: 'numeric', month: 'long', day: 'numeric',
+                weekday: 'long', hour: '2-digit', minute: '2-digit'
+            });
+            log(`   ${df.format(date)}`);
+
+            log('2️⃣ Intl.NumberFormat:');
+            const nf1 = new Intl.NumberFormat('zh-CN');
+            const nf2 = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: 'CNY' });
+            log(`   普通: ${nf1.format(num)}`);
+            log(`   货币: ${nf2.format(num)}`);
+
+            log('3️⃣ Intl.Collator (排序):');
+            const names = ['张三', '李四', '王五', '赵六', '陈七'];
+            const collator = new Intl.Collator('zh-CN');
+            const sorted = names.sort(collator.compare);
+            log(`   原始: ${names.join(', ')}`);
+            log(`   排序: ${sorted.join(', ')}`);
+
+            log('4️⃣ Intl.ListFormat:');
+            try {
+                const lf = new Intl.ListFormat('zh-CN', { style: 'long', type: 'conjunction' });
+                log(`   ${lf.format(items)}`);
+            } catch (e) {
+                log('   ⚠️ ListFormat 需要 ES2021');
+            }
+
+            log('5️⃣ Intl.RelativeTimeFormat:');
+            try {
+                const rtf = new Intl.RelativeTimeFormat('zh-CN', { numeric: 'auto' });
+                log(`   -1天: ${rtf.format(-1, 'day')}`);
+                log(`   3月: ${rtf.format(3, 'month')}`);
+            } catch (e) {
+                log('   ⚠️ RelativeTimeFormat 需要 ES2020');
+            }
+
+            log('');
+            log('📌 Intl 优势: 原生支持、自动本地化、无外部依赖');
+        }
+
+        console.log('=== Intl 基础 ===');
+
+        document.getElementById('output').textContent =
+            `Intl 基础: Intl 国际化 API / locale 标签 / 主要构造器\n` +
+            `DateTimeFormat / NumberFormat / Collator / ListFormat / RelativeTimeFormat\n` +
+            `✅ Intl 基础演示完成！`;
+    </script>
+</body>
+</html>

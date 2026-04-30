@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>class-getter-setter</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #d35400; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>class getter/setter</h2><p>用 get/set 定义访问器属性，在读写时执行逻辑。</p></div>
+    <div class="card">
+        <h2>getter 基本用法</h2>
+        <div class="code">class Person {
+    constructor(firstName, lastName) {
+        this.firstName = firstName;
+        this.lastName = lastName;
+    }
+
+    // getter — 像属性一样读取
+    get fullName() {
+        return this.firstName + ' ' + this.lastName;
+    }
+
+    get initials() {
+        return this.firstName[0] + '.' + this.lastName[0] + '.';
+    }
+}
+
+const p = new Person('Alice', 'Wang');
+console.log(p.fullName);   // 'Alice Wang'（像属性一样，不是方法）
+console.log(p.initials);   // 'A.W.'
+
+// ⚠️ 不加括号！
+// p.fullName()  // ❌ TypeError（getter 不是函数）
+
+// ⚠️ 不能手动赋值（如果没有 setter）
+// p.fullName = 'Bob Li';  // 静默失败（严格模式报错）</div>
+    </div>
+    <div class="card">
+        <h2>setter 基本用法</h2>
+        <div class="code">class Person {
+    constructor(firstName, lastName) {
+        this.firstName = firstName;
+        this.lastName = lastName;
+    }
+
+    get fullName() {
+        return this.firstName + ' ' + this.lastName;
+    }
+
+    set fullName(val) {
+        const parts = val.split(' ');
+        this.firstName = parts[0];
+        this.lastName = parts.slice(1).join(' ');
+    }
+}
+
+const p = new Person('Alice', 'Wang');
+console.log(p.fullName);   // 'Alice Wang'
+p.fullName = 'Bob Li';
+console.log(p.firstName);  // 'Bob'
+console.log(p.lastName);   // 'Li'
+
+// 读写看起来和普通属性一样
+// 但背后执行了额外的逻辑</div>
+    </div>
+    <div class="card">
+        <h2>验证逻辑</h2>
+        <div class="code">class User {
+    constructor(email) {
+        this._email = email;
+    }
+
+    get email() {
+        return this._email;
+    }
+
+    set email(val) {
+        if (!val || !val.includes('@')) {
+            throw new Error('邮箱必须包含 @');
+        }
+        if (!val.includes('.')) {
+            throw new Error('邮箱必须包含域名');
+        }
+        this._email = val.toLowerCase();
+    }
+}
+
+const user = new User('alice@example.com');
+console.log(user.email);  // 'alice@example.com'
+
+// user.email = 'invalid';     // ❌ Error: 邮箱必须包含 @
+// user.email = 'test@test';   // ❌ Error: 邮箱必须包含域名
+user.email = 'BOB@EXAMPLE.COM';
+console.log(user.email);  // 'bob@example.com'（自动转小写）
+
+// 使用 _ 前缀表示"内部属性"，但这不是真正的私有
+// ES2022 可以用 # 私有字段 + getter/setter 实现真正的私有</div>
+    </div>
+    <div class="card">
+        <h2>计算属性与只读属性</h2>
+        <div class="code">class Rectangle {
+    constructor(width, height) {
+        this.width = width;
+        this.height = height;
+    }
+
+    // 只读 getter（没有 setter）
+    get area() {
+        return this.width * this.height;
+    }
+
+    get perimeter() {
+        return 2 * (this.width + this.height);
+    }
+
+    // 计算属性名
+    get ['type']() {
+        if (this.width === this.height) return '正方形';
+        return '长方形';
+    }
+
+    // 依赖多个属性的计算
+    get aspectRatio() {
+        return this.width / this.height;
+    }
+
+    get landscape() {
+        return this.width >= this.height;
+    }
+}
+
+const rect = new Rectangle(10, 5);
+console.log(rect.area);        // 50
+console.log(rect.perimeter);   // 30
+console.log(rect.type);        // '长方形'
+console.log(rect.landscape);   // true
+
+// 只读属性不能赋值
+// rect.area = 100;  // 静默失败（严格模式报错）
+
+// 计算属性 setter
+class Circle {
+    constructor(radius) {
+        this._radius = radius;
+    }
+    get radius() { return this._radius; }
+    set radius(val) { this._radius = val; }
+
+    get area() { return Math.PI * this._radius ** 2; }
+    // set area(val) {
+    //     this._radius = Math.sqrt(val / Math.PI);  // 反向计算
+    // }
+}</div>
+    </div>
+    <div class="card">
+        <h2>getter/setter 在对象字面量中使用</h2>
+        <div class="code">// 不只在 class 中能用，对象字面量也可以
+const user = {
+    _name: 'Alice',
+    _age: 25,
+
+    get name() {
+        return this._name;
+    },
+    set name(val) {
+        if (!val) throw '名字不能为空';
+        this._name = val;
+    },
+
+    get age() {
+        return this._age;
+    },
+    set age(val) {
+        if (val < 0 || val > 150) throw '年龄不合法';
+        this._age = val;
+    },
+
+    get isAdult() {
+        return this._age >= 18;
+    }
+};
+
+console.log(user.name);    // 'Alice'
+console.log(user.isAdult); // true
+user.age = 30;
+console.log(user.age);     // 30
+
+// defineProperty 方式
+const obj = {};
+Object.defineProperty(obj, 'data', {
+    get() { return this._data; },
+    set(val) { this._data = val.toUpperCase(); }
+});
+obj.data = 'hello';
+console.log(obj.data);  // 'HELLO'</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== getter/setter ===');
+        class Person {
+            constructor(first, last) {
+                this.first = first;
+                this.last = last;
+            }
+            get fullName() {
+                return this.first + ' ' + this.last;
+            }
+            set fullName(val) {
+                const parts = val.split(' ');
+                this.first = parts[0];
+                this.last = parts.slice(1).join(' ');
+            }
+        }
+        const p = new Person('Alice', 'Wang');
+        console.log('get:', p.fullName);
+        p.fullName = 'Bob Li';
+        console.log('set后:', p.first, p.last);
+
+        console.log('=== 验证逻辑 ===');
+        class Temperature {
+            constructor(c) { this._celsius = c; }
+            get celsius() { return this._celsius; }
+            set celsius(val) {
+                if (val < -273.15) throw '温度不能低于绝对零度';
+                this._celsius = val;
+            }
+            get fahrenheit() {
+                return this._celsius * 9/5 + 32;
+            }
+        }
+        const t = new Temperature(25);
+        console.log('摄氏度:', t.celsius, '华氏度:', t.fahrenheit);
+        try { t.celsius = -300; } catch(e) { console.log('验证:', e.message); }
+
+        console.log('=== 只读计算属性 ===');
+        class Rect {
+            constructor(w, h) { this.w = w; this.h = h; }
+            get area() { return this.w * this.h; }
+            get isSquare() { return this.w === this.h; }
+        }
+        const r = new Rect(5, 5);
+        console.log('面积:', r.area, '正方形:', r.isSquare);
+
+        console.log('=== 对象字面量 getter/setter ===');
+        const obj = {
+            _val: 0,
+            get value() { return this._val; },
+            set value(v) { this._val = Math.max(0, v); }
+        };
+        obj.value = -5;
+        console.log('最小值限制:', obj.value);
+        obj.value = 42;
+        console.log('设置后:', obj.value);
+
+        document.getElementById('output').textContent =
+            `fullName: ${p.fullName}\n` +
+            `面积: ${r.area}\n` +
+            `温度: ${t.celsius}°C = ${t.fahrenheit.toFixed(1)}°F\n` +
+            `✅ class getter/setter 演示完成！`;
+    </script>
+</body>
+</html>

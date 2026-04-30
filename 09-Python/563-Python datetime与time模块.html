@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python datetime与time模块</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📅 Python datetime 与 time 模块</h2><p>datetime 模块的 date/time/datetime/timedelta 类、时间格式化 strftime/strptime、时区处理、time 模块的 sleep/perf_counter、时间戳转换。</p></div>
+    <div class="card">
+        <h2>datetime 模块: date 类</h2>
+        <div class="code">// ========== datetime.date ==========
+from datetime import date
+
+# 创建日期:
+d = date(2024, 12, 25)
+print(d)                          # 2024-12-25
+
+# 获取当前日期:
+today = date.today()
+print(today)                      # 2024-12-20 (示例)
+
+# 日期属性:
+print(d.year)                     # 2024
+print(d.month)                    # 12
+print(d.day)                      # 25
+print(d.weekday())                # 2 (周一=0, 周日=6)
+print(d.isoweekday())             # 3 (周一=1, 周日=7)
+
+# 日期构造:
+d2 = date.fromisoformat("2024-12-25")  # 从 ISO 字符串
+d3 = date.fromtimestamp(1703462400)    # 从时间戳
+
+# 日期比较:
+print(d == d2)                    # True
+print(d < today)                  # True/False</div>
+    </div>
+    <div class="card">
+        <h2>time 类</h2>
+        <div class="code">// ========== datetime.time ==========
+from datetime import time
+
+# 创建时间:
+t = time(14, 30, 45, 123456)
+print(t)                          # 14:30:45.123456
+
+# 时间属性:
+print(t.hour)                     # 14
+print(t.minute)                   # 30
+print(t.second)                   # 45
+print(t.microsecond)              # 123456
+
+# 时分秒 (无微秒):
+t2 = time(8, 15)                  # 08:15:00
+t3 = time(8, 15, 30)             # 08:15:30
+
+# 时间比较:
+print(t2 < t3)                    # True
+
+# 时区感知:
+from datetime import timezone, timedelta
+tz_utc8 = timezone(timedelta(hours=8))
+t_utc8 = time(14, 30, tzinfo=tz_utc8)
+print(t_utc8)                     # 14:30:00+08:00</div>
+    </div>
+    <div class="card">
+        <h2>datetime 类</h2>
+        <div class="code">// ========== datetime.datetime ==========
+from datetime import datetime, date, time
+
+# 创建 datetime:
+dt = datetime(2024, 12, 25, 14, 30, 45)
+print(dt)                         # 2024-12-25 14:30:45
+
+# 从 date+time 组合:
+d = date(2024, 12, 25)
+t = time(14, 30)
+dt = datetime.combine(d, t)
+print(dt)                         # 2024-12-25 14:30:00
+
+# 获取当前时间:
+now = datetime.now()              # 本地时间
+utc_now = datetime.utcnow()       # UTC 时间 (naive)
+print(now)
+
+# 从时间戳:
+dt = datetime.fromtimestamp(1703463045)
+
+# 属性:
+print(dt.year, dt.month, dt.day)
+print(dt.hour, dt.minute, dt.second, dt.microsecond)
+
+# 替换部分字段:
+dt2 = dt.replace(year=2025, hour=0)
+print(dt2)                        # 替换后的新 datetime
+
+# 星期:
+print(dt.weekday())               # 周一=0
+print(dt.isoweekday())            # 周一=1</div>
+    </div>
+    <div class="card">
+        <h2>timedelta 时间差</h2>
+        <div class="code">// ========== timedelta ==========
+from datetime import timedelta, datetime
+
+# 创建时间差:
+delta = timedelta(days=7, hours=3, minutes=30)
+print(delta)                      # 7 days, 3:30:00
+
+# 常用参数: days, seconds, microseconds,
+#            milliseconds, minutes, hours, weeks
+
+# 日期运算:
+now = datetime.now()
+tomorrow = now + timedelta(days=1)
+yesterday = now - timedelta(days=1)
+next_week = now + timedelta(weeks=1)
+two_hours_later = now + timedelta(hours=2)
+
+print(f"明天: {tomorrow}")
+print(f"昨天: {yesterday}")
+
+# 计算两个日期的时间差:
+start = datetime(2024, 1, 1)
+end = datetime(2024, 12, 31)
+diff = end - start
+print(diff.days)                  # 365
+print(diff.total_seconds())       # 31536000.0
+
+# timedelta 属性:
+print(delta.days)                 # 7
+print(delta.seconds)              # 12600 (3.5 小时)
+print(delta.total_seconds())      # 653400 (全部转秒)
+
+# 比较:
+print(timedelta(days=1) > timedelta(hours=23))  # True</div>
+    </div>
+    <div class="card">
+        <h2>时间格式化: strftime / strptime</h2>
+        <div class="code">// ========== 格式化指令 ==========
+# %Y — 四位数年份     2024
+# %y — 两位数年份     24
+# %m — 月份 (01-12)
+# %d — 日 (01-31)
+# %H — 时 (00-23)
+# %I — 时 (01-12, 12小时制)
+# %M — 分 (00-59)
+# %S — 秒 (00-59)
+# %f — 微秒 (6位数)
+# %p — AM/PM
+# %a — 星期简写       Mon
+# %A — 星期全称       Monday
+# %b — 月份简写       Dec
+# %B — 月份全称       December
+# %z — 时区偏移       +0800
+# %% — 字面 %
+
+// ========== strftime: datetime → 字符串 ==========
+from datetime import datetime
+
+now = datetime.now()
+
+print(now.strftime("%Y-%m-%d %H:%M:%S"))       # 2024-12-20 14:30:45
+print(now.strftime("%Y/%m/%d"))                # 2024/12/20
+print(now.strftime("%B %d, %Y"))               # December 20, 2024
+print(now.strftime("%A, %H:%M"))               # Friday, 14:30
+print(now.strftime("%I:%M %p"))                # 02:30 PM
+
+# 常见格式:
+print(now.isoformat())                         # 2024-12-20T14:30:45
+
+// ========== strptime: 字符串 → datetime ==========
+from datetime import datetime
+
+date_str = "2024-12-25 14:30:00"
+dt = datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S")
+print(dt)                          # 2024-12-25 14:30:00
+
+# 解析常见格式:
+dt1 = datetime.strptime("2024/12/25", "%Y/%m/%d")
+dt2 = datetime.strptime("Dec 25, 2024", "%b %d, %Y")
+dt3 = datetime.strptime("14:30:45", "%H:%M:%S")</div>
+    </div>
+    <div class="card">
+        <h2>时区处理</h2>
+        <div class="code">// ========== 时区 (Python 3.9+) ==========
+from datetime import datetime, timezone, timedelta
+
+# UTC 时间:
+utc_now = datetime.now(timezone.utc)
+print(utc_now)                     # 2024-12-20 06:30:00+00:00
+
+# 特定时区:
+tz_utc8 = timezone(timedelta(hours=8))
+now_beijing = datetime.now(tz_utc8)
+print(now_beijing)                 # 2024-12-20 14:30:00+08:00
+
+# 时区转换:
+from_utc = utc_now.astimezone(tz_utc8)
+print(from_utc)                    # 2024-12-20 14:30:00+08:00
+
+# 格式化带时区:
+print(now_beijing.strftime("%Y-%m-%d %H:%M:%S %z"))
+# 2024-12-20 14:30:00 +0800
+
+# ========== zoneinfo (Python 3.9+) ==========
+# 需要 pip install tzdata (Windows)
+try:
+    from zoneinfo import ZoneInfo
+    tokyo = datetime.now(ZoneInfo("Asia/Tokyo"))
+    print(tokyo)                   # 2024-12-20 15:30:00+09:00
+except ImportError:
+    print("zoneinfo 需要 Python 3.9+")
+
+# ========== pytz (第三方,旧项目) ==========
+# pip install pytz
+# from pytz import timezone</div>
+    </div>
+    <div class="card">
+        <h2>time 模块</h2>
+        <div class="code">// ========== time 模块 ==========
+import time
+
+# ========== 时间获取 ==========
+# 时间戳 (Unix epoch 以来的秒数):
+ts = time.time()
+print(ts)                          # 1734689045.123
+
+# 结构化时间:
+lt = time.localtime()              # 本地时间
+print(lt.tm_year, lt.tm_mon, lt.tm_mday)
+
+ut = time.gmtime()                 # UTC 时间
+
+# 时间戳 ↔ 结构化:
+ts = time.mktime(lt)               # struct_time → 时间戳
+
+# 格式化:
+s = time.strftime("%Y-%m-%d %H:%M:%S", lt)
+print(s)
+
+# 解析:
+struct = time.strptime("2024-12-25", "%Y-%m-%d")
+
+# ========== 休眠 ==========
+print("开始...")
+time.sleep(2)                      # 暂停 2 秒
+print("2 秒后继续")
+
+# ========== 计时 ==========
+# perf_counter: 高精度计时 (推荐)
+start = time.perf_counter()
+total = sum(range(1000000))
+end = time.perf_counter()
+print(f"运行时间: {end - start:.4f} 秒")
+
+# time.time() 用于计时 (精度较低):
+start = time.time()
+# ... 操作 ...
+end = time.time()
+
+# ========== 其他 ==========
+print(time.ctime())                # 'Fri Dec 20 14:30:00 2024'
+print(time.asctime())              # 同上
+
+# 进程时间 (CPU 时间):
+print(time.process_time())</div>
+        <div class="note">💡 日期时间要点: (1) datetime.date/time/datetime/timedelta 核心类; (2) strftime 格式化 datetime→字符串,strptime 反向解析; (3) timedelta 做日期算术; (4) Python 3.9+ 用 zoneinfo 处理时区,旧项目用 pytz; (5) time.perf_counter() 高精度计时,time.sleep() 暂停。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoDateTime()">datetime 演示</button>
+        <button onclick="demoFormat()">格式化演示</button>
+        <button onclick="demoTimer()">计时器演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoDateTime() {
+            result.innerHTML = '';
+            log('# datetime 演示');
+            log('');
+            const d = new Date();
+            log('当前日期: ' + d.toLocaleDateString());
+            log('当前时间: ' + d.toLocaleTimeString());
+            log('');
+            log('date: 2024-12-25');
+            log('time: 14:30:45');
+            log('datetime: 2024-12-25 14:30:45');
+            log('');
+            log('timedelta 运算:');
+            log('  今天 + 1天 = 明天');
+            log('  今天 - 7天 = 上周');
+            log('  日期间隔 = end - start');
+        }
+
+        function demoFormat() {
+            result.innerHTML = '';
+            log('# strftime / strptime');
+            log('');
+            log('格式化指令:');
+            log('  %Y = 2024     %y = 24');
+            log('  %m = 12       %d = 25');
+            log('  %H = 14       %M = 30');
+            log('  %S = 45       %f = 微秒');
+            log('');
+            log('strftime (datetime→字符串):');
+            log('  %Y-%m-%d → 2024-12-25');
+            log('  %B %d, %Y → December 25, 2024');
+            log('');
+            log('strptime (字符串→datetime):');
+            log("  datetime.strptime('2024-12-25', '%Y-%m-%d')");
+        }
+
+        function demoTimer() {
+            result.innerHTML = '';
+            log('# 计时器演示');
+            log('');
+            log('time.perf_counter():');
+            log('  高精度计时器,适合性能测量');
+            log('');
+            log('time.sleep(秒):');
+            log('  暂停当前线程指定秒数');
+            log('');
+            log('time.time():');
+            log('  Unix 时间戳 (1970-01-01 以来的秒数)');
+            log('');
+            const now = Math.floor(Date.now() / 1000);
+            log('当前时间戳: ' + now);
+            log('time.ctime(): ' + new Date().toString());
+        }
+    </script>
+</body>
+</html>

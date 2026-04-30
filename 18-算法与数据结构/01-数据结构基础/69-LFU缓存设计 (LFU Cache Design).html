@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>69-LFU缓存设计 (LFU Cache Design)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>LFU Cache Design</h2>
+  <div class="code">LFU 缓存淘汰最不经常使用的数据，每个元素有使用频率计数。</div>
+  <pre>class LFUCache {
+  constructor(cap) {
+    this.cap = cap;
+    this.cache = new Map(); // key -> {val, freq}
+    this.freqMap = new Map(); // freq -> Set<key>
+    this.minFreq = 0;
+  }
+  _updateFreq(key) {
+    const {val, freq} = this.cache.get(key);
+    this.freqMap.get(freq).delete(key);
+    if (this.freqMap.get(freq).size === 0) {
+      this.freqMap.delete(freq);
+      if (this.minFreq === freq) this.minFreq++;
+    }
+    this.cache.set(key, {val, freq: freq+1});
+    if (!this.freqMap.has(freq+1)) this.freqMap.set(freq+1, new Set());
+    this.freqMap.get(freq+1).add(key);
+  }
+  get(key) {
+    if (!this.cache.has(key)) return -1;
+    this._updateFreq(key);
+    return this.cache.get(key).val;
+  }
+  // put similar
+}</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  // LFU simplified
+  class LFU {
+    constructor(c){this.cap=c;this.cache=new Map();this.freq=new Map();}
+    put(k,v){if(this.cache.has(k)){this.cache.set(k,{val:v,freq:this.cache.get(k).freq});return;}if(this.cache.size>=this.cap){let min=Infinity,lru=null;for(const[kk,vv]of this.cache){if(vv.freq<min){min=vv.freq;lru=kk;}}this.cache.delete(lru);}this.cache.set(k,{val:v,freq:1});}
+  }
+  const lfu=new LFU(3);
+  lfu.put('A',1);lfu.put('B',2);lfu.put('C',3);lfu.put('D',4);
+  document.getElementById('result').textContent = `LFU: D 插入后淘汰了最不常用的 A/B/C 中的一个`;
+}
+</script>
+</body>
+</html>

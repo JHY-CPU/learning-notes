@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>06-归并排序基础 (Merge Sort Basics)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+.tree { font-family: monospace; white-space: pre; line-height: 1.6; }
+</style></head>
+<body>
+<div class="card">
+  <h2>归并排序基础 (Merge Sort Basics)</h2>
+  <p>归并排序是建立在归并操作上的一种有效排序算法。它采用<strong>分治策略</strong>（Divide and Conquer），将已有序的子序列合并，得到完全有序的序列。</p>
+  <div class="note">
+    <strong>核心思想：</strong>分而治之 — 先将数组不断二分，直到每个子序列只有一个元素（天然有序），再两两合并成有序序列。
+  </div>
+</div>
+
+<div class="card">
+  <h2>分治过程</h2>
+  <div class="tree">[38, 27, 43, 3, 9, 82, 10]
+        /              \
+[38, 27, 43, 3]    [9, 82, 10]
+   /       \          /      \
+[38, 27]  [43, 3]  [9, 82]  [10]
+ /    \    /    \   /    \
+[38] [27] [43] [3] [9] [82]
+  \   /    \   /     \   /
+[27, 38]  [3, 43]  [9, 82]
+   \       /          |
+  [3, 27, 38, 43]    [9, 10, 82]
+        \              /
+     [3, 9, 10, 27, 38, 43, 82]</div>
+</div>
+
+<div class="card">
+  <h2>归并操作详解</h2>
+  <p>归并操作将两个有序数组合并为一个有序数组：</p>
+  <ol>
+    <li>同时遍历两个有序数组，比较当前元素</li>
+    <li>将较小的元素放入结果数组</li>
+    <li>指针后移，继续比较</li>
+    <li>将剩余元素全部追加到结果数组</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h2>复杂度分析</h2>
+  <table style="border-collapse:collapse;width:100%">
+    <tr><th>指标</th><th>值</th></tr>
+    <tr><td>平均时间复杂度</td><td>O(n log n)</td></tr>
+    <tr><td>最坏时间复杂度</td><td>O(n log n)</td></tr>
+    <tr><td>最优时间复杂度</td><td>O(n log n)</td></tr>
+    <tr><td>空间复杂度</td><td>O(n)</td></tr>
+    <tr><td>稳定性</td><td>稳定</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>交互演示：归并过程</h2>
+  <p>点击下方按钮查看两个有序数组合并的过程：</p>
+  <button onclick="mergeDemo()">演示合并过程</button>
+  <div id="result"></div>
+</div>
+
+<script>
+function mergeDemo() {
+  const left = [3, 27, 38, 43];
+  const right = [9, 10, 82];
+  const result = [];
+  let i = 0, j = 0;
+  const steps = [];
+
+  while (i < left.length && j < right.length) {
+    if (left[i] <= right[j]) {
+      result.push(left[i]);
+      steps.push(`比较 ${left[i]} ≤ ${right[j]}，取左侧: [${result.join(', ')}]`);
+      i++;
+    } else {
+      result.push(right[j]);
+      steps.push(`比较 ${left[i]} > ${right[j]}，取右侧: [${result.join(', ')}]`);
+      j++;
+    }
+  }
+  while (i < left.length) {
+    result.push(left[i]);
+    steps.push(`左侧剩余，取 ${left[i]}: [${result.join(', ')}]`);
+    i++;
+  }
+  while (j < right.length) {
+    result.push(right[j]);
+    steps.push(`右侧剩余，取 ${right[j]}: [${result.join(', ')}]`);
+    j++;
+  }
+
+  const el = document.getElementById('result');
+  el.innerHTML = '<strong>左数组:</strong> [' + left.join(', ') + ']<br>' +
+    '<strong>右数组:</strong> [' + right.join(', ') + ']<br><br>' +
+    '<strong>合并过程：</strong><br>' +
+    steps.map(s => '&emsp;' + s).join('<br>') +
+    '<br><br><strong>最终结果:</strong> [' + result.join(', ') + ']';
+}
+</script>
+</body></html>

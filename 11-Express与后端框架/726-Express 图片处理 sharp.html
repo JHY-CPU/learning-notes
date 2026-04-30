@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express 图片处理 sharp</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🖼️ Express 图片处理 sharp</h2><p>sharp 图片处理库、resize/format/裁剪/旋转/圆角、上传时自动处理、图片水印、生成缩略图、响应式图片、WebP 转换、Stream 流式处理。</p></div>
+    <div class="card">
+        <h2>sharp 基础</h2>
+        <div class="code">// ========== sharp 图片处理 ==========
+// 高性能 Node.js 图片处理库 (基于 libvips)
+// 比 ImageMagick 快 4-5 倍
+
+// 安装:
+// npm install sharp
+
+const sharp = require('sharp');
+const path = require('path');
+
+// ========== 基础用法 ==========
+// 打开图片 → 处理 → 输出
+
+async function processImage() {
+    // 读取 → resize → 保存
+    await sharp('input.jpg')
+        .resize(800, 600)     // 调整尺寸
+        .toFile('output.jpg');
+
+    // 或输出 Buffer
+    const buffer = await sharp('input.jpg')
+        .resize(400)
+        .jpeg({ quality: 80 })
+        .toBuffer();
+
+    // 或输出到 Stream
+    const readStream = sharp('input.jpg')
+        .resize(200)
+        .png();
+}
+
+// ========== resize 选项 ==========
+await sharp('input.jpg')
+    .resize({
+        width: 800,
+        height: 600,
+        fit: 'cover',        // cover/contain/fill/inside/outside
+        position: 'center',  // 裁剪位置: center/top/left/right/bottom/entropy/attention
+        background: { r: 255, g: 255, b: 255 },  // 填充色 (contain 时)
+        withoutEnlargement: true,  // 不放大
+    })
+    .toFile('output.jpg');
+
+// fit 模式:
+// cover   — 覆盖 (裁剪多余部分)
+// contain — 包含 (留白)
+// fill    — 拉伸 (变形)
+// inside  — 缩小到完全适合
+// outside — 放大到完全覆盖
+
+// ========== 格式转换 ==========
+// JPEG
+await sharp('input.png')
+    .jpeg({ quality: 80, progressive: true, chromaSubsampling: '4:4:4' })
+    .toFile('output.jpg');
+
+// PNG
+await sharp('input.jpg')
+    .png({ palette: true, quality: 90, compressionLevel: 9 })
+    .toFile('output.png');
+
+// WebP (更小体积)
+await sharp('input.jpg')
+    .webp({ quality: 75, effort: 6 })  // effort 0-6, 越高越小
+    .toFile('output.webp');
+
+// AVIF (最新格式)
+await sharp('input.jpg')
+    .avif({ quality: 70 })
+    .toFile('output.avif');
+
+// TIFF
+await sharp('input.jpg')
+    .tiff({ quality: 90 })
+    .toFile('output.tiff');
+
+// ========== 获取图片信息 ==========
+const metadata = await sharp('input.jpg').metadata();
+// {
+//   format: 'jpeg',
+//   width: 1920,
+//   height: 1080,
+//   space: 'srgb',
+//   channels: 3,
+//   density: 72,
+//   hasAlpha: false,
+//   hasProfile: true,
+//   hasMetadata: true,
+// }</div>
+    </div>
+    <div class="card">
+        <h2>高级操作</h2>
+        <div class="code">// ========== 裁剪 ==========
+// 1. 按像素裁剪
+await sharp('input.jpg')
+    .extract({ left: 100, top: 100, width: 300, height: 300 })
+    .toFile('cropped.jpg');
+
+// 2. 按比例裁剪 (先 resize 再 extract)
+// 提取中央正方形
+await sharp('input.jpg')
+    .resize(400, 400, { fit: 'cover', position: 'center' })
+    .toFile('square.jpg');
+
+// ========== 旋转与翻转 ==========
+await sharp('input.jpg')
+    .rotate(90, { background: { r: 0, g: 0, b: 0 } })  // 顺时针 90°
+    .toFile('rotated.jpg');
+
+// 自动旋转 (根据 EXIF 方向)
+await sharp('input.jpg')
+    .rotate()  // 无参数 = 读取 EXIF 自动旋转
+    .toFile('auto-rotated.jpg');
+
+// 翻转
+await sharp('input.jpg')
+    .flip()   // 垂直翻转
+    .flop()   // 水平翻转
+    .toFile('flipped.jpg');
+
+// ========== 圆角与合成 ==========
+// 圆角 (通过 SVG 叠加)
+const roundedCorners = Buffer.from(
+    `<svg><rect x="0" y="0" width="300" height="300" rx="50" ry="50"/></svg>`
+);
+
+await sharp('input.jpg')
+    .resize(300, 300)
+    .composite([{
+        input: roundedCorners,
+        blend: 'dest-in',  // 仅在圆角内显示
+    }])
+    .png()
+    .toFile('rounded.png');
+
+// ========== 水印 ==========
+// 文字水印 (通过 SVG)
+const svgText = Buffer.from(`
+    <svg width="800" height="600">
+        <text x="50%" y="50%" text-anchor="middle"
+              font-size="48" fill="rgba(255,255,255,0.3)"
+              transform="rotate(-30, 400, 300)">
+            © My Watermark
+        </text>
+    </svg>
+`);
+
+await sharp('input.jpg')
+    .resize(800)
+    .composite([{
+        input: svgText,
+        top: 0,
+        left: 0,
+    }])
+    .toFile('watermarked.jpg');
+
+// ========== 图片水印叠加 ==========
+await sharp('input.jpg')
+    .composite([{
+        input: 'logo.png',
+        top: 20,         // 位置
+        left: 20,
+        gravity: 'southeast',  // 或使用 gravity(东南)
+    }])
+    .toFile('with-logo.jpg');
+
+// ========== 灰度与模糊 ==========
+await sharp('input.jpg')
+    .grayscale()        // 黑白
+    .blur(3)            // 高斯模糊 (sigma 1-1000)
+    .toFile('blur.jpg');
+
+await sharp('input.jpg')
+    .modulate({
+        brightness: 1.2,  // 亮度
+        saturation: 1.5,  // 饱和度
+        hue: 30,          // 色相偏移
+    })
+    .toFile('filtered.jpg');</div>
+    </div>
+    <div class="card">
+        <h2>上传时自动处理</h2>
+        <div class="code">// ========== 上传 + 自动处理 ==========
+// 用户上传 → sharp 处理 → 保存
+
+const multer = require('multer');
+const sharp = require('sharp');
+const path = require('path');
+
+// ========== 内存上传 + 处理 ==========
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 20 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        if (!file.mimetype.startsWith('image/')) {
+            return cb(new Error('Only images allowed'));
+        }
+        cb(null, true);
+    },
+});
+
+app.post('/upload/image', upload.single('image'), async (req, res, next) => {
+    try {
+        const { buffer, originalname } = req.file;
+        const name = Date.now() + '-' + Math.round(Math.random() * 1E9);
+
+        // ========== 生成多种尺寸 ==========
+        const sizes = [
+            { width: 1920, suffix: '-lg' },
+            { width: 800,  suffix: '-md' },
+            { width: 400,  suffix: '-sm' },
+            { width: 150,  suffix: '-thumb' },
+        ];
+
+        const results = await Promise.all(sizes.map(async ({ width, suffix }) => {
+            const filename = `${name}${suffix}.webp`;
+            await sharp(buffer)
+                .resize(width, undefined, {
+                    fit: 'inside',
+                    withoutEnlargement: true,
+                })
+                .webp({ quality: 80 })
+                .toFile(path.join('uploads', filename));
+
+            return { width, filename, url: `/uploads/${filename}` };
+        }));
+
+        res.success({
+            original: originalname,
+            sizes: results,
+        });
+    } catch (err) {
+        next(err);
+    }
+}, errorHandler);
+
+// ========== 头像裁剪专用 ==========
+app.post('/upload/avatar', upload.single('avatar'), async (req, res) => {
+    const { buffer } = req.file;
+    const name = Date.now() + '-avatar';
+
+    // 400x400 居中裁剪 + WebP
+    await sharp(buffer)
+        .resize(400, 400, { fit: 'cover', position: 'center' })
+        .webp({ quality: 85 })
+        .toFile(path.join('uploads', name + '.webp'));
+
+    // 50x50 缩略图
+    await sharp(buffer)
+        .resize(50, 50, { fit: 'cover', position: 'center' })
+        .webp({ quality: 70 })
+        .toFile(path.join('uploads', name + '-thumb.webp'));
+
+    res.success({
+        url: `/uploads/${name}.webp`,
+        thumb: `/uploads/${name}-thumb.webp`,
+    });
+});
+
+// ========== Stream 管道模式 (大文件) ==========
+// 大文件直接用 stream, 避免内存占用
+
+const fs = require('fs');
+
+app.post('/upload/stream', (req, res, next) => {
+    const uploadStream = multer({ storage: multer.memoryStorage() })
+        .single('file')(req, res, async (err) => {
+            if (err) return next(err);
+
+            const readStream = sharp(req.file.buffer)
+                .resize(1200)
+                .webp({ quality: 75 });
+
+            const writeStream = fs.createWriteStream(
+                path.join('uploads', `${Date.now()}.webp`)
+            );
+
+            // 直接管道输出到响应 (动态图片处理 API)
+            // readStream.pipe(res);  // 直接返回给客户端
+
+            readStream.pipe(writeStream);
+            writeStream.on('finish', () => {
+                res.success({ message: 'Stream processed' });
+            });
+        });
+});
+
+// ========== 动态图片处理 API ==========
+// /images/:filename?w=400&f=webp&q=80
+app.get('/images/:filename', async (req, res) => {
+    const { filename } = req.params;
+    const { w = 800, f = 'webp', q = 80 } = req.query;
+
+    const inputPath = path.join('uploads', filename);
+    const width = parseInt(w);
+    const quality = parseInt(q);
+
+    res.set('Content-Type', `image/${f}`);
+    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+
+    await sharp(inputPath)
+        .resize(width, undefined, { withoutEnlargement: true })
+        .toFormat(f, { quality })
+        .pipe(res);  // 流式输出到响应
+});</div>
+        <div class="note">💡 sharp 要点: libvips 高性能; resize 多种 fit 模式 (cover/contain/inside/outside); 格式转换 (WebP 比 JPEG 小 30%); 多尺寸生成 (lg/md/sm/thumb); 水印 composite; 圆角通过 SVG blend; 上传时自动处理; Stream 管道处理大文件; 动态图片处理 API (resize on-the-fly); 缓存控制 Cache-Control immutable。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoResize()">resize 与 fit</button>
+        <button onclick="demoConvert()">格式转换</button>
+        <button onclick="demoUpload()">上传处理</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoResize() {
+            result.innerHTML = '';
+            log('# sharp resize 模式');
+            log('');
+            log('fit: "cover"   — 裁剪多余 (头像/缩略图)');
+            log('fit: "contain" — 留白 (展示完整)');
+            log('fit: "fill"    — 拉伸 (变形)');
+            log('fit: "inside"  — 缩小到内部 (长边适配)');
+            log('fit: "outside" — 放大到覆盖 (短边适配)');
+            log('');
+            log('position: center/entropy/attention');
+            log('withoutEnlargement: true (不放大)');
+        }
+
+        function demoConvert() {
+            result.innerHTML = '';
+            log('# 图片格式对比');
+            log('');
+            log('JPEG: .jpeg({ quality: 80, progressive: true })');
+            log('  → 有损, 不支持透明');
+            log('');
+            log('PNG: .png({ palette: true, compressionLevel: 9 })');
+            log('  → 无损, 支持透明');
+            log('');
+            log('WebP: .webp({ quality: 75 })');
+            log('  → 比 JPEG 小 30%, 支持透明 + 动画');
+            log('');
+            log('AVIF: .avif({ quality: 70 })');
+            log('  → 比 WebP 再小 20%, 兼容性较低');
+        }
+
+        function demoUpload() {
+            result.innerHTML = '';
+            log('# 上传 + 自动处理');
+            log('');
+            log('1. 用户上传图片');
+            log('2. multer memoryStorage 接收');
+            log('3. sharp 处理:');
+            log('   - 多种尺寸 (lg/md/sm/thumb)');
+            log('   - WebP 格式转换');
+            log('   - 裁剪/水印/圆角');
+            log('4. 保存到磁盘/S3');
+            log('5. 返回 URL 数组');
+            log('');
+            log('动态 API:');
+            log('GET /images/:file?w=400&f=webp&q=80');
+            log('  → 实时 resize + 格式转换');
+        }
+    </script>
+</body>
+</html>

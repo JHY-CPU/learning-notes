@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python MRO与方法解析顺序</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📐 Python MRO 与方法解析顺序</h2><p>MRO 概念、C3 线性化算法、__mro__ 属性、super() 与 MRO、菱形继承问题、常见多重继承模式。</p></div>
+    <div class="card">
+        <h2>MRO 基础</h2>
+        <div class="code">// ========== 什么是 MRO ==========
+// MRO (Method Resolution Order) 方法解析顺序
+// 决定了当调用 obj.method() 时,Python 按什么顺序查找方法
+
+// ========== __mro__ 属性 ==========
+// 每个类都有 __mro__ 属性,显示方法查找顺序
+
+class A:
+    def method(self):
+        return "A"
+
+class B(A):
+    def method(self):
+        return "B"
+
+class C(A):
+    def method(self):
+        return "C"
+
+class D(B, C):
+    pass
+
+print(D.__mro__)
+// (&lt;class 'D'&gt;, &lt;class 'B'&gt;, &lt;class 'C'&gt;, &lt;class 'A'&gt;, &lt;class 'object'&gt;)
+
+// D → B → C → A → object
+// 方法调用顺序: 先找 D,再 B,再 C,再 A,最后 object
+
+d = D()
+print(d.method())            # "B" (B 在 MRO 中最先找到)
+
+// ========== mro() 方法 ==========
+// 也可以调用类方法:
+print(D.mro())
+// [D, B, C, A, object]
+
+// 或者 help():
+// help(D) 会显示 Method resolution order:</div>
+    </div>
+    <div class="card">
+        <h2>C3 线性化算法</h2>
+        <div class="code">// ========== C3 线性化 ==========
+// Python 使用 C3 线性化算法计算 MRO
+// 三个原则:
+// 1. 子类优先于父类
+// 2. 父类按定义顺序
+// 3. 保持单调性 (MRO 的一致性)
+
+// ========== 简单继承 ==========
+class A: pass
+class B(A): pass    # MRO: B → A → object
+
+// ========== 多继承 ==========
+class A: pass
+class B: pass
+class C(A, B): pass  # MRO: C → A → B → object
+
+// 父类 A 先于 B (因为 class C(A, B))
+
+// ========== 复杂菱形 ==========
+class O: pass
+class A(O): pass
+class B(O): pass
+class C(A, B): pass  # MRO: C → A → B → O
+
+// C3 算法保证了:
+// - A 在 B 前 (定义顺序)
+// - O 在最后 (所有类都继承 object)
+
+// ========== 查看 MRO 的几种方式 ==========
+class X: pass
+class Y: pass
+class Z(X, Y): pass
+
+print(Z.__mro__)              # 元组形式
+print(Z.mro())                # 列表形式
+// import inspect
+// print(inspect.getmro(Z))   # 同样结果
+
+// ========== C3 失败的情况 ==========
+// 某些继承关系 C3 无法线性化
+
+class A: pass
+class B(A): pass
+class C(A): pass
+
+# 这样可以:
+class D(B, C): pass     # MRO: D → B → C → A
+
+# 但这样不行 (矛盾):
+# class E(A, B): pass  # TypeError! B 是 A 的子类
+// 因为: E 的父类顺序是 A → B
+// 但 B 继承 A, B 应该在 A 后面
+// 定义的顺序和继承关系冲突</div>
+    </div>
+    <div class="card">
+        <h2>super() 与 MRO</h2>
+        <div class="code">// ========== super() 在 MRO 中的作用 ==========
+// super() 不是调用"父类",而是调用 MRO 中的下一个类
+// 这让多重继承中的协作成为可能
+
+class A:
+    def __init__(self):
+        print(f"A.__init__ ({id(self)})")
+        super().__init__()    # 调用 MRO 中 A 的下一个
+
+class B:
+    def __init__(self):
+        print(f"B.__init__ ({id(self)})")
+        super().__init__()    # 调用 MRO 中 B 的下一个
+
+class C(A, B):
+    def __init__(self):
+        print(f"C.__init__ ({id(self)})")
+        super().__init__()    # 调用 MRO 中 C 的下一个
+
+print(C.__mro__)
+// C → A → B → object
+
+c = C()
+// C.__init__
+// A.__init__
+// B.__init__
+
+// super() 沿着 MRO 链调用!
+// C.__init__ → super() → A.__init__ → super() → B.__init__ → super() → object.__init__
+
+// ========== 如果不调用 super() ==========
+class A:
+    def __init__(self):
+        print("A.__init__")
+        # 没有 super().__init__()
+
+class B:
+    def __init__(self):
+        print("B.__init__")
+        super().__init__()
+
+class C(A, B):
+    def __init__(self):
+        print("C.__init__")
+        super().__init__()
+
+c = C()
+// C.__init__
+// A.__init__
+// 链断了! B.__init__ 没有被调用!
+
+// 关键: 在协作多重继承中,
+// 所有类都应该调用 super().__init__()
+// 确保 MRO 链完整执行
+
+// ========== super() 的完整形式 ==========
+// super() 完整写法: super(class, instance)
+// 省略形式: super() == super(当前类, self)
+
+class A:
+    def method(self):
+        return "A"
+
+class B(A):
+    def method(self):
+        return "B:" + super(B, self).method()
+
+class C(A):
+    def method(self):
+        return "C:" + super(C, self).method()
+
+class D(B, C):
+    def method(self):
+        return "D:" + super(D, self).method()
+
+print(D().method())            # D:B:C:A</div>
+    </div>
+    <div class="card">
+        <h2>多重继承模式与实践</h2>
+        <div class="code">// ========== 菱形继承问题 ==========
+// 菱形继承: D 继承 B 和 C, B 和 C 都继承 A
+// 如果不用 super(), 会导致 A 被初始化两次!
+
+class A:
+    def __init__(self):
+        print("A.__init__")
+
+class B(A):
+    def __init__(self):
+        print("B.__init__")
+        A.__init__(self)       # ❌ 直接调用父类
+
+class C(A):
+    def __init__(self):
+        print("C.__init__")
+        A.__init__(self)       # ❌ A 被调两次!
+
+class D(B, C):
+    def __init__(self):
+        print("D.__init__")
+        B.__init__(self)       # B.__init__ → A.__init__
+        C.__init__(self)       # C.__init__ → A.__init__ (重复!)
+
+d = D()
+// D.__init__
+// B.__init__
+// A.__init__
+// C.__init__
+// A.__init__  ← A 被初始化了两次!
+
+// ✅ 用 super() 修复:
+class A:
+    def __init__(self):
+        print("A.__init__")
+        super().__init__()     # → object
+
+class B(A):
+    def __init__(self):
+        print("B.__init__")
+        super().__init__()     # → A → object
+
+class C(A):
+    def __init__(self):
+        print("C.__init__")
+        super().__init__()     # → A → object
+
+class D(B, C):
+    def __init__(self):
+        print("D.__init__")
+        super().__init__()     # → B → C → A → object
+
+d = D()
+// D.__init__
+// B.__init__
+// C.__init__
+// A.__init__  ← 只一次! 完美!
+
+// ========== 实用建议 ==========
+// 1. 尽量少用多重继承
+// 2. 如果必须用,使用 Mixin 模式
+// 3. 确保 MRO 链中所有类都调用 super().__init__
+// 4. 用 __mro__ 调试继承问题
+// 5. 考虑用组合替代多重继承</div>
+        <div class="note">💡 MRO 要点: (1) MRO 决定方法查找顺序,用 __mro__ 查看; (2) Python 3 使用 C3 线性化算法; (3) super() 按 MRO 调用下一个类,不是简单调用父类; (4) 多重继承中所有类都应调用 super().__init__() 确保链完整; (5) 尽量用组合/Mixin 替代复杂多重继承。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoMRO()">MRO 演示</button>
+        <button onclick="demoSuper()">super() 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoMRO() {
+            result.innerHTML = '';
+            log('# MRO 方法解析顺序演示');
+            log('');
+            log('class A: def method(self): return "A"');
+            log('class B(A): def method(self): return "B"');
+            log('class C(A): def method(self): return "C"');
+            log('class D(B, C): pass');
+            log('');
+            log('D.__mro__:');
+            log('  D → B → C → A → object');
+            log('');
+            log('D().method() → B (B 在 MRO 中最先)');
+            log('');
+            log('MRO 原则:');
+            log('  1. 子类优先于父类');
+            log('  2. 父类按定义顺序');
+            log('  3. 保持单调性');
+        }
+
+        function demoSuper() {
+            result.innerHTML = '';
+            log('# super() 与 MRO 演示');
+            log('');
+            log('class A:');
+            log('    def __init__(self):');
+            log('        print("A")');
+            log('        super().__init__()');
+            log('');
+            log('class B(A):');
+            log('    def __init__(self):');
+            log('        print("B")');
+            log('        super().__init__()');
+            log('');
+            log('class C(B):');
+            log('    def __init__(self):');
+            log('        print("C")');
+            log('        super().__init__()');
+            log('');
+            log('执行 C()');
+            log('输出: C → B → A');
+            log('');
+            log('super() 沿 MRO 链调用!');
+            log('super() = super(当前类, self)');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>30-优先级队列 (Priority Queue)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Priority Queue</h2>
+  <div class="code">优先级队列中每个元素都有优先级，高优先级元素先出队。通常用堆实现。</div>
+  <pre>// 最小堆实现优先级队列
+class MinPQ {
+  constructor() { this.heap = []; }
+  push(x) {
+    this.heap.push(x);
+    let i = this.heap.length - 1;
+    while (i > 0) {
+      const p = Math.floor((i-1)/2);
+      if (this.heap[p] <= this.heap[i]) break;
+      [this.heap[p], this.heap[i]] = [this.heap[i], this.heap[p]];
+      i = p;
+    }
+  }
+  pop() {
+    if (!this.heap.length) return null;
+    const r = this.heap[0];
+    const last = this.heap.pop();
+    if (this.heap.length) {
+      this.heap[0] = last;
+      let i = 0;
+      while (true) {
+        let smallest = i;
+        const l = 2*i+1, r2 = 2*i+2;
+        if (l < this.heap.length && this.heap[l] < this.heap[smallest]) smallest = l;
+        if (r2 < this.heap.length && this.heap[r2] < this.heap[smallest]) smallest = r2;
+        if (smallest === i) break;
+        [this.heap[i], this.heap[smallest]] = [this.heap[smallest], this.heap[i]];
+        i = smallest;
+      }
+    }
+    return r;
+  }
+}</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  class MinPQ {
+    constructor(){this.heap=[];}
+    push(x){this.heap.push(x);let i=this.heap.length-1;while(i>0){const p=Math.floor((i-1)/2);if(this.heap[p]<=this.heap[i])break;[this.heap[p],this.heap[i]]=[this.heap[i],this.heap[p]];i=p;}}
+    pop(){if(!this.heap.length)return null;const r=this.heap[0];const last=this.heap.pop();if(this.heap.length){this.heap[0]=last;let i=0;while(true){let s=i;const l=2*i+1,r2=2*i+2;if(l<this.heap.length&&this.heap[l]<this.heap[s])s=l;if(r2<this.heap.length&&this.heap[r2]<this.heap[s])s=r2;if(s===i)break;[this.heap[i],this.heap[s]]=[this.heap[s],this.heap[i]];i=s;}}return r;}
+  }
+  const pq = new MinPQ();
+  pq.push(5);pq.push(3);pq.push(7);pq.push(1);
+  const out = [];
+  while(pq.heap.length) out.push(pq.pop());
+  document.getElementById('result').textContent = `依次弹出: ${out.join(', ')}`;
+}
+</script>
+</body>
+</html>

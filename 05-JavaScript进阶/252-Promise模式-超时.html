@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Promise模式-超时</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #timeout-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Promise 模式 — 超时</h2><p>Promise.race 超时、AbortSignal 超时、超时与清理。</p></div>
+    <div class="card">
+        <h2>超时实现</h2>
+        <div class="code">// ========== Promise.race 超时 ==========
+function withTimeout(promise, ms) {
+    const timeout = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('请求超时')), ms);
+    });
+    return Promise.race([promise, timeout]);
+}
+
+// 使用
+try {
+    const data = await withTimeout(fetch('/api/data'), 5000);
+} catch (err) {
+    if (err.message === '请求超时') {
+        // 处理超时
+    }
+}
+
+// ========== AbortController 超时 ==========
+function withAbortTimeout(promise, ms) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), ms);
+    // 包装原 Promise 以支持 signal
+    const wrapped = promise.catch(err => {
+        if (err.name === 'AbortError') throw new Error('请求超时');
+        throw err;
+    });
+    return Promise.race([
+        wrapped,
+        new Promise((_, reject) => {
+            controller.signal.addEventListener('abort', () => {
+                reject(new Error('请求超时'));
+            });
+        })
+    ]).finally(() => clearTimeout(timeoutId));
+}
+
+// ========== AbortSignal.timeout() (ES2022) ==========
+// 浏览器原生支持
+const response = await fetch('/api/data', {
+    signal: AbortSignal.timeout(5000)
+});
+
+// ========== 超时+重试组合 ==========
+async function fetchWithTimeoutRetry(url, options = {}) {
+    const { timeout = 5000, retries = 3 } = options;
+    for (let i = 0; i < retries; i++) {
+        try {
+            const res = await fetch(url, {
+                signal: AbortSignal.timeout(timeout)
+            });
+            return res;
+        } catch (err) {
+            if (i === retries - 1) throw err;
+        }
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：Promise 超时</h2>
+        <button onclick="demoTimeout()">Promise.race 超时</button>
+        <button onclick="demoAbortSignal()">AbortSignal 超时</button>
+        <div id="timeout-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const timeoutResult = document.getElementById('timeout-result');
+
+        function log(msg) {
+            timeoutResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function slowTask(ms, name = '慢任务') {
+            return new Promise((resolve) => {
+                log(`   ⏳ ${name} 开始 (需要 ${ms}ms)...`);
+                setTimeout(() => {
+                    log(`   ✅ ${name} 完成`);
+                    resolve(`${name} 结果`);
+                }, ms);
+            });
+        }
+
+        function demoTimeout() {
+            timeoutResult.innerHTML = '';
+            log('⏱️ Promise.race 超时模式:');
+            log('');
+
+            async function run() {
+                // 任务 2000ms，超时 1000ms
+                try {
+                    const result = await Promise.race([
+                        slowTask(2000, 'API 请求'),
+                        new Promise((_, reject) =>
+                            setTimeout(() => reject(new Error('⏰ 请求超时')), 1000)
+                        )
+                    ]);
+                    log(`🎉 ${result}`);
+                } catch (err) {
+                    log(`❌ ${err.message}`);
+                }
+                log('');
+                log('📌 Promise.race 超时:');
+                log('   • 简单易用');
+                log('   • 无法取消原 Promise (仍在后台运行)');
+                log('   • 适合快速实现超时');
+            }
+            run();
+        }
+
+        function demoAbortSignal() {
+            timeoutResult.innerHTML = '';
+            log('🚦 AbortSignal 超时模式:');
+            log('');
+
+            async function run() {
+                // 模拟 fetch 风格的可中止任务
+                function createAbortableTask(ms, signal) {
+                    return new Promise((resolve, reject) => {
+                        if (signal.aborted) {
+                            reject(new Error('已中止'));
+                            return;
+                        }
+                        const timer = setTimeout(() => resolve('任务结果'), ms);
+                        signal.addEventListener('abort', () => {
+                            clearTimeout(timer);
+                            reject(new Error('⏰ 请求超时 (已中止)'));
+                            log('   🛑 底层任务已取消');
+                        });
+                        log(`   ⏳ 任务已启动 (需 ${ms}ms)...`);
+                    });
+                }
+
+                try {
+                    const controller = new AbortController();
+                    const signal = controller.signal;
+
+                    // 设置 800ms 超时
+                    const timeoutId = setTimeout(() => controller.abort(), 800);
+
+                    const result = await createAbortableTask(1500, signal);
+                    log(`🎉 ${result}`);
+                    clearTimeout(timeoutId);
+                } catch (err) {
+                    log(`❌ ${err.message}`);
+                }
+
+                log('');
+                log('📌 AbortSignal 优势:');
+                log('   • 可取消底层任务');
+                log('   • 释放资源');
+                log('   • fetch 原生支持');
+                log('   • AbortSignal.timeout(ms) 简写');
+            }
+            run();
+        }
+
+        console.log('=== Promise 模式: 超时 ===');
+
+        document.getElementById('output').textContent =
+            `Promise 超时模式: Promise.race / AbortController / AbortSignal.timeout\n` +
+            `超时+重试组合 / 资源清理 / 原生 fetch 支持\n` +
+            `✅ Promise 超时模式演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>27-查找算法对比 (Search Comparison)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; white-space: pre-wrap; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+th { background: #2c3e50; color: white; }
+tr:nth-child(even) { background: #f2f2f2; }
+</style></head>
+<body>
+<div class="card">
+  <h2>查找算法对比 (Search Comparison)</h2>
+  <p>对各种查找算法进行全面对比，包括时间复杂度、适用条件和实际性能测试。</p>
+</div>
+
+<div class="card">
+  <h2>理论对比</h2>
+  <table>
+    <tr><th>算法</th><th>平均</th><th>最坏</th><th>空间</th><th>数据要求</th></tr>
+    <tr><td>顺序查找</td><td>O(n)</td><td>O(n)</td><td>O(1)</td><td>无要求</td></tr>
+    <tr><td>二分查找</td><td>O(log n)</td><td>O(log n)</td><td>O(1)</td><td>有序</td></tr>
+    <tr><td>插值查找</td><td>O(log log n)</td><td>O(n)</td><td>O(1)</td><td>有序且均匀分布</td></tr>
+    <tr><td>斐波那契查找</td><td>O(log n)</td><td>O(log n)</td><td>O(1)</td><td>有序</td></tr>
+    <tr><td>指数查找</td><td>O(log n)</td><td>O(log n)</td><td>O(1)</td><td>有序</td></tr>
+    <tr><td>分块查找</td><td>O(√n)</td><td>O(n)</td><td>O(√n)</td><td>块间有序</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>选择建议</h2>
+  <ul>
+    <li><strong>无序数据：</strong>只能使用顺序查找</li>
+    <li><strong>有序 + 小规模：</strong>二分查找简单可靠</li>
+    <li><strong>有序 + 均匀分布：</strong>插值查找最快</li>
+    <li><strong>有序 + 目标靠前：</strong>指数查找优势明显</li>
+    <li><strong>有序 + 仅需加减法：</strong>斐波那契查找（嵌入式环境）</li>
+    <li><strong>动态数据 + 块间有序：</strong>分块查找（易于插入删除）</li>
+    <li><strong>大规模静态数据：</strong>二分查找或插值查找</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>性能基准测试</h2>
+  <button onclick="runBenchmark()">运行基准测试</button>
+  <div id="result"></div>
+</div>
+
+<script>
+function linearSearch(arr, target) {
+  for (let i = 0; i < arr.length; i++) if (arr[i] === target) return i;
+  return -1;
+}
+
+function binarySearch(arr, target) {
+  let l = 0, r = arr.length - 1;
+  while (l <= r) {
+    const m = Math.floor((l + r) / 2);
+    if (arr[m] === target) return m;
+    if (arr[m] < target) l = m + 1;
+    else r = m - 1;
+  }
+  return -1;
+}
+
+function interpolationSearch(arr, target) {
+  let l = 0, r = arr.length - 1;
+  while (l <= r && target >= arr[l] && target <= arr[r]) {
+    if (l === r) return arr[l] === target ? l : -1;
+    const p = l + Math.floor(((target - arr[l]) / (arr[r] - arr[l])) * (r - l));
+    if (arr[p] === target) return p;
+    if (arr[p] < target) l = p + 1;
+    else r = p - 1;
+  }
+  return -1;
+}
+
+function exponentialSearch(arr, target) {
+  const n = arr.length;
+  if (arr[0] === target) return 0;
+  let i = 1;
+  while (i < n && arr[i] <= target) i *= 2;
+  let l = Math.floor(i / 2), r = Math.min(i, n - 1);
+  while (l <= r) {
+    const m = Math.floor((l + r) / 2);
+    if (arr[m] === target) return m;
+    if (arr[m] < target) l = m + 1;
+    else r = m - 1;
+  }
+  return -1;
+}
+
+function runBenchmark() {
+  const size = 50000;
+  const arr = Array.from({length: size}, (_, i) => i * 2 + Math.floor(Math.random() * 3));
+  const targets = [
+    arr[0],                         // 开头
+    arr[Math.floor(size / 4)],      // 1/4
+    arr[Math.floor(size / 2)],      // 中间
+    arr[Math.floor(size * 3 / 4)],  // 3/4
+    arr[size - 1],                  // 末尾
+    -5                              // 不存在
+  ];
+
+  const algos = [
+    { name: '二分查找', fn: binarySearch },
+    { name: '插值查找', fn: interpolationSearch },
+    { name: '指数查找', fn: exponentialSearch },
+  ];
+
+  let html = '<strong>数据规模：</strong>' + size + ' 个有序元素<br><br>';
+  html += '<table><tr><th>算法</th><th>开头</th><th>1/4处</th><th>中间</th><th>3/4处</th><th>末尾</th><th>不存在</th><th>总耗时</th></tr>';
+
+  for (const algo of algos) {
+    let totalTime = 0;
+    let times = [];
+    for (let t = 0; t < targets.length; t++) {
+      const start = performance.now();
+      // 运行多次取平均
+      for (let iter = 0; iter < 1000; iter++) algo.fn(arr, targets[t]);
+      const elapsed = (performance.now() - start).toFixed(3);
+      times.push(elapsed);
+      totalTime += parseFloat(elapsed);
+    }
+    html += `<tr><td>${algo.name}</td>`;
+    times.forEach(t => { html += `<td>${t}ms</td>`; });
+    html += `<td>${totalTime.toFixed(3)}ms</td></tr>`;
+  }
+
+  html += '</table><br>';
+  html += '<strong>说明：</strong>各数值为执行 1000 次查找的总耗时。数据为等差数列加微小随机扰动，近似均匀分布。';
+
+  document.getElementById('result').innerHTML = html;
+}
+</script>
+</body></html>

@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>动态规划入门</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>动态规划入门</h2><p>重叠子问题、最优子结构、背包问题、最长公共子序列、状态转移。</p></div>
+    <div class="card">
+        <h2>DP 核心概念</h2>
+        <div class="code">// ========== 斐波那契 (DP) ==========
+function fibDP(n) {
+    const dp = [0, 1];
+    for (let i = 2; i <= n; i++) {
+        dp[i] = dp[i - 1] + dp[i - 2];
+    }
+    return dp[n];
+}
+
+// ========== 爬楼梯 ==========
+// 每次可以爬 1 或 2 阶
+function climbStairs(n) {
+    const dp = [1, 1];
+    for (let i = 2; i <= n; i++) {
+        dp[i] = dp[i - 1] + dp[i - 2];
+    }
+    return dp[n];
+}
+
+// ========== 0/1 背包 ==========
+function knapsack(weights, values, capacity) {
+    const n = weights.length;
+    const dp = Array(n + 1).fill(0).map(() => Array(capacity + 1).fill(0));
+    for (let i = 1; i <= n; i++) {
+        for (let w = 1; w <= capacity; w++) {
+            if (weights[i - 1] <= w) {
+                dp[i][w] = Math.max(
+                    dp[i - 1][w],
+                    dp[i - 1][w - weights[i - 1]] + values[i - 1]
+                );
+            } else {
+                dp[i][w] = dp[i - 1][w];
+            }
+        }
+    }
+    return dp[n][capacity];
+}
+
+// ========== 最长公共子序列 (LCS) ==========
+function lcs(text1, text2) {
+    const m = text1.length, n = text2.length;
+    const dp = Array(m + 1).fill(0).map(() => Array(n + 1).fill(0));
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            if (text1[i - 1] === text2[j - 1]) {
+                dp[i][j] = dp[i - 1][j - 1] + 1;
+            } else {
+                dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+            }
+        }
+    }
+    return dp[m][n];
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：动态规划</h2>
+        <button onclick="demoIntro()">DP 概念</button>
+        <button onclick="demoKnapsack()">0/1 背包</button>
+        <button onclick="demoLCS()">最长公共子序列</button>
+        <button onclick="demoCoin()">零钱兑换</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoIntro() {
+            result.innerHTML = '';
+            log('🧩 动态规划入门:');
+            log('');
+
+            log('DP 三要素:');
+            log('   1. 重叠子问题');
+            log('   2. 最优子结构');
+            log('   3. 状态转移方程');
+            log('');
+
+            log('爬楼梯问题:');
+            log('   每次爬 1 或 2 阶, 到 n 阶有几种方法?');
+            log('');
+
+            function climbStairs(n) {
+                const dp = [1, 1];
+                for (let i = 2; i <= n; i++) {
+                    dp[i] = dp[i - 1] + dp[i - 2];
+                }
+                return dp[n];
+            }
+
+            log('状态转移: dp[i] = dp[i-1] + dp[i-2]');
+            log('');
+            log('演示:');
+            for (let i = 1; i <= 10; i++) {
+                log(`   n=${i} → ${climbStairs(i).toString().padStart(3)} 种方法`);
+            }
+
+            log('');
+            log('最大子数组和 (Kadane 算法):');
+            function maxSubArray(nums) {
+                let maxEnd = nums[0], maxSoFar = nums[0];
+                for (let i = 1; i < nums.length; i++) {
+                    maxEnd = Math.max(nums[i], maxEnd + nums[i]);
+                    maxSoFar = Math.max(maxSoFar, maxEnd);
+                }
+                return maxSoFar;
+            }
+            const arr = [-2, 1, -3, 4, -1, 2, 1, -5, 4];
+            log(`   数组: [${arr}]`);
+            log(`   最大子数组和: ${maxSubArray(arr)}`);
+        }
+
+        function demoKnapsack() {
+            result.innerHTML = '';
+            log('🎒 0/1 背包问题:');
+            log('');
+
+            const weights = [2, 3, 4, 5];
+            const values = [3, 4, 5, 6];
+            const capacity = 8;
+
+            log('物品:');
+            log(`   重量: [${weights}]`);
+            log(`   价值: [${values}]`);
+            log(`   背包容量: ${capacity}`);
+            log('');
+
+            function knapsack(weights, values, capacity) {
+                const n = weights.length;
+                const dp = Array(n + 1).fill(0).map(() => Array(capacity + 1).fill(0));
+
+                for (let i = 1; i <= n; i++) {
+                    for (let w = 1; w <= capacity; w++) {
+                        if (weights[i - 1] <= w) {
+                            dp[i][w] = Math.max(dp[i - 1][w], dp[i - 1][w - weights[i - 1]] + values[i - 1]);
+                        } else {
+                            dp[i][w] = dp[i - 1][w];
+                        }
+                    }
+                }
+
+                return dp[n][capacity];
+            }
+
+            log('DP 表格:');
+            log('   i\\w  ' + Array.from({ length: capacity + 1 }, (_, i) => i.toString().padStart(3)).join(''));
+            const dp = Array(weights.length + 1).fill(0).map(() => Array(capacity + 1).fill(0));
+            for (let i = 1; i <= weights.length; i++) {
+                for (let w = 1; w <= capacity; w++) {
+                    if (weights[i - 1] <= w) {
+                        dp[i][w] = Math.max(dp[i - 1][w], dp[i - 1][w - weights[i - 1]] + values[i - 1]);
+                    } else {
+                        dp[i][w] = dp[i - 1][w];
+                    }
+                }
+            }
+            for (let i = 0; i <= weights.length; i++) {
+                let row = `   ${i}  `;
+                for (let w = 0; w <= capacity; w++) {
+                    row += dp[i][w].toString().padStart(3);
+                }
+                log(row);
+            }
+
+            log('');
+            log(`最大价值: ${knapsack(weights, values, capacity)}`);
+
+            // 一维优化
+            function knapsack1D(weights, values, capacity) {
+                const dp = Array(capacity + 1).fill(0);
+                for (let i = 0; i < weights.length; i++) {
+                    for (let w = capacity; w >= weights[i]; w--) {
+                        dp[w] = Math.max(dp[w], dp[w - weights[i]] + values[i]);
+                    }
+                }
+                return dp[capacity];
+            }
+            log(`一维优化: ${knapsack1D(weights, values, capacity)} (空间 O(capacity))`);
+        }
+
+        function demoLCS() {
+            result.innerHTML = '';
+            log('📝 最长公共子序列 (LCS):');
+            log('');
+
+            function lcs(text1, text2) {
+                const m = text1.length, n = text2.length;
+                const dp = Array(m + 1).fill(0).map(() => Array(n + 1).fill(0));
+
+                for (let i = 1; i <= m; i++) {
+                    for (let j = 1; j <= n; j++) {
+                        if (text1[i - 1] === text2[j - 1]) {
+                            dp[i][j] = dp[i - 1][j - 1] + 1;
+                        } else {
+                            dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                        }
+                    }
+                }
+                return { length: dp[m][n], dp };
+            }
+
+            function getLCS(text1, text2, dp) {
+                let i = text1.length, j = text2.length;
+                let result = '';
+                while (i > 0 && j > 0) {
+                    if (text1[i - 1] === text2[j - 1]) {
+                        result = text1[i - 1] + result;
+                        i--; j--;
+                    } else if (dp[i - 1][j] >= dp[i][j - 1]) {
+                        i--;
+                    } else {
+                        j--;
+                    }
+                }
+                return result;
+            }
+
+            const s1 = 'ABCBDAB', s2 = 'BDCAB';
+            log(`字符串1: ${s1}`);
+            log(`字符串2: ${s2}`);
+
+            const { length, dp } = lcs(s1, s2);
+            log(`LCS 长度: ${length}`);
+            log(`LCS 序列: ${getLCS(s1, s2, dp)}`);
+
+            log('');
+            log('DP 表格:');
+            log('     ' + s2.split('').map(c => c.padStart(3)).join(''));
+            for (let i = 0; i <= s1.length; i++) {
+                let row = (i > 0 ? s1[i - 1] : ' ') + ' ';
+                for (let j = 0; j <= s2.length; j++) {
+                    row += dp[i][j].toString().padStart(3);
+                }
+                log(row);
+            }
+
+            log('');
+            log('📌 LCS 应用:');
+            log('   • 文件 diff (git diff)');
+            log('   • DNA 序列比对');
+            log('   • 拼写检查');
+            log('   时间复杂度 O(mn), 空间 O(mn)');
+        }
+
+        function demoCoin() {
+            result.innerHTML = '';
+            log('🪙 零钱兑换 (完全背包):');
+            log('');
+
+            function coinChange(coins, amount) {
+                const dp = Array(amount + 1).fill(Infinity);
+                dp[0] = 0;
+                for (let i = 1; i <= amount; i++) {
+                    for (const coin of coins) {
+                        if (i >= coin) {
+                            dp[i] = Math.min(dp[i], dp[i - coin] + 1);
+                        }
+                    }
+                }
+                return dp[amount] === Infinity ? -1 : dp[amount];
+            }
+
+            function coinChangeWays(coins, amount) {
+                const dp = Array(amount + 1).fill(0);
+                dp[0] = 1;
+                for (const coin of coins) {
+                    for (let i = coin; i <= amount; i++) {
+                        dp[i] += dp[i - coin];
+                    }
+                }
+                return dp[amount];
+            }
+
+            const coins = [1, 2, 5];
+            const amount = 11;
+
+            log(`硬币面额: [${coins}]`);
+            log(`目标金额: ${amount}`);
+            log('');
+
+            log('1️⃣ 最少硬币数:');
+            log(`   coinChange(${amount}) = ${coinChange(coins, amount)} (5+5+1)`);
+
+            log('');
+            log('2️⃣ 凑成金额的方式数:');
+            for (let a = 1; a <= 10; a++) {
+                const ways = coinChangeWays(coins, a);
+                log(`   金额 ${a}: ${ways} 种方式`);
+            }
+
+            log('');
+            log('3️⃣ DP 表格 (最少硬币数):');
+            const dp = Array(amount + 1).fill(Infinity);
+            dp[0] = 0;
+            log(`   金额: ${Array.from({ length: amount + 1 }, (_, i) => i.toString().padStart(3)).join('')}`);
+            for (let i = 0; i <= amount; i++) {
+                for (const coin of coins) {
+                    if (i >= coin) dp[i] = Math.min(dp[i], dp[i - coin] + 1);
+                }
+            }
+            log(`   dp:  ${dp.map(v => v === Infinity ? '∞'.padStart(3) : v.toString().padStart(3)).join('')}`);
+
+            log('');
+            log('📌 DP 问题分类:');
+            log('   • 背包 DP: 0/1 背包, 完全背包, 多重背包');
+            log('   • 区间 DP: LCS, 回文子串');
+            log('   • 树形 DP: 树上最大独立集');
+            log('   • 状态压缩 DP: 旅行商问题');
+        }
+
+        console.log('=== 动态规划入门 ===');
+        document.getElementById('output').textContent = `动态规划: 重叠子问题 / 最优子结构 / 背包 / LCS / 零钱兑换\n✅ 动态规划演示完成！`;
+    </script>
+</body>
+</html>

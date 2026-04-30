@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>表单验证</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        .form-group { margin: 12px 0; }
+        .form-group label { display: block; font-size: 14px; color: #555; margin-bottom: 4px; }
+        .form-group input { padding: 8px 12px; border: 2px solid #ddd; border-radius: 4px; font-size: 14px; width: 250px; transition: border-color 0.3s; }
+        .form-group input:focus { outline: none; border-color: #3498db; }
+        .form-group input.error { border-color: #e74c3c; background: #fdf0ef; }
+        .form-group input.valid { border-color: #2ecc71; background: #f0faf4; }
+        .form-group .error-msg { color: #e74c3c; font-size: 12px; margin-top: 2px; min-height: 18px; }
+        .form-group .hint { color: #95a5a6; font-size: 12px; margin-top: 2px; }
+        button { padding: 10px 20px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-size: 14px; }
+        button:hover { opacity: 0.9; }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+        #form-result { margin-top: 10px; padding: 10px; border-radius: 4px; font-size: 14px; display: none; }
+        #form-result.success { display: block; background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        #form-result.error { display: block; background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>表单验证</h2><p>HTML5 内置验证 + JavaScript 自定义验证。</p></div>
+    <div class="card">
+        <h2>HTML5 内置验证</h2>
+        <div class="code">// HTML5 为 input 提供了多种验证属性：
+
+// 必填
+// &lt;input required&gt;
+
+// 类型
+// &lt;input type="email"&gt;
+// &lt;input type="url"&gt;
+// &lt;input type="number"&gt;
+// &lt;input type="tel"&gt;
+
+// 长度限制
+// &lt;input minlength="3" maxlength="20"&gt;
+
+// 数值范围
+// &lt;input type="number" min="0" max="100"&gt;
+
+// 模式匹配
+// &lt;input pattern="[A-Za-z]+"&gt;
+
+// ⚠️ HTML5 验证在 submit 时自动触发
+// ⚠️ 不满足约束时会显示浏览器默认提示
+// ⚠️ 可以通过 novalidate 属性禁用</div>
+    </div>
+    <div class="card">
+        <h2>验证 API</h2>
+        <div class="code">// checkValidity() — 检查元素是否通过验证
+const isValid = input.checkValidity();
+// 返回 true/false，不合法时触发 invalid 事件
+
+// reportValidity() — 检查并显示错误提示
+input.reportValidity();
+
+// validationMessage — 获取错误消息
+console.log(input.validationMessage);
+
+// validity 对象（ValidityState）
+input.validity.valueMissing    // 必填但为空
+input.validity.typeMismatch    // 类型不匹配（email/url）
+input.validity.patternMismatch // 模式不匹配
+input.validity.tooLong         // 太长
+input.validity.tooShort        // 太短
+input.validity.rangeUnderflow  // 小于最小值
+input.validity.rangeOverflow   // 大于最大值
+input.validity.stepMismatch    // step 不匹配
+input.validity.badInput        // 输入格式错
+input.validity.valid           // 是否有效（true/false）
+
+// setCustomValidity() — 自定义错误消息
+input.setCustomValidity('自定义错误消息');
+// 设置非空字符串 → 验证不通过
+// 设置空字符串 → 清除自定义错误
+
+// invalid 事件
+input.addEventListener('invalid', function() {
+    console.log('验证失败:', this.validationMessage);
+});</div>
+    </div>
+    <div class="card">
+        <h2>实时验证模式</h2>
+        <div class="code">// 实时验证 — 用户输入时立即检查
+input.addEventListener('input', function() {
+    if (this.validity.valid) {
+        this.classList.remove('error');
+        this.classList.add('valid');
+        errorMsg.textContent = '';
+    } else {
+        this.classList.remove('valid');
+        this.classList.add('error');
+        if (this.validity.valueMissing) {
+            errorMsg.textContent = '此项不能为空';
+        } else if (this.validity.patternMismatch) {
+            errorMsg.textContent = '格式不正确';
+        }
+    }
+});
+
+// 失去焦点时验证
+input.addEventListener('blur', function() {
+    if (this.value && !this.validity.valid) {
+        // 显示错误
+    }
+});
+
+// 提交时全面验证
+form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    if (!this.checkValidity()) {
+        // 有错误，显示所有错误
+    } else {
+        // 全部通过，提交
+    }
+});
+
+// ⚠️ 注意：用 novalidate 禁用 HTML5 默认气泡
+// 改用自定义错误显示</div>
+    </div>
+    <div class="card">
+        <h2>验证演示</h2>
+        <form id="valid-form" novalidate>
+            <div class="form-group">
+                <label>用户名（必填，3-12位字母）</label>
+                <input type="text" id="v-username" required pattern="[A-Za-z]{3,12}" placeholder="例如: Alice">
+                <div class="error-msg" id="username-error"></div>
+                <div class="hint">3-12个英文字母</div>
+            </div>
+
+            <div class="form-group">
+                <label>邮箱（必填）</label>
+                <input type="email" id="v-email" required placeholder="example@mail.com">
+                <div class="error-msg" id="email-error"></div>
+            </div>
+
+            <div class="form-group">
+                <label>年龄（18-120）</label>
+                <input type="number" id="v-age" min="18" max="120" placeholder="18-120">
+                <div class="error-msg" id="age-error"></div>
+            </div>
+
+            <div class="form-group">
+                <label>密码（6-20位）</label>
+                <input type="password" id="v-password" required minlength="6" maxlength="20" placeholder="至少6位">
+                <div class="error-msg" id="password-error"></div>
+            </div>
+
+            <div class="form-group">
+                <label>确认密码</label>
+                <input type="password" id="v-confirm" placeholder="再次输入密码">
+                <div class="error-msg" id="confirm-error"></div>
+            </div>
+
+            <button type="submit" id="submit-btn">提交</button>
+            <button type="reset" style="background:#95a5a6;margin-left:10px;">重置</button>
+        </form>
+        <div id="form-result"></div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const form2 = document.getElementById('valid-form');
+        const username2 = document.getElementById('v-username');
+        const email = document.getElementById('v-email');
+        const age = document.getElementById('v-age');
+        const password = document.getElementById('v-password');
+        const confirmPwd = document.getElementById('v-confirm');
+        const result = document.getElementById('form-result');
+
+        const errors = {
+            username: document.getElementById('username-error'),
+            email: document.getElementById('email-error'),
+            age: document.getElementById('age-error'),
+            password: document.getElementById('password-error'),
+            confirm: document.getElementById('confirm-error'),
+        };
+
+        console.log('=== HTML5 验证 API ===');
+
+        function validateField(input, errorEl, customCheck) {
+            input.addEventListener('input', function() {
+                let msg = '';
+                if (this.validity.valueMissing) {
+                    msg = '此项为必填';
+                } else if (this.validity.patternMismatch) {
+                    msg = '格式不正确，需要' + this.pattern;
+                } else if (this.validity.typeMismatch) {
+                    msg = '请输入正确的格式';
+                } else if (this.validity.tooShort) {
+                    msg = `至少需要 ${this.minLength} 个字符`;
+                } else if (this.validity.tooLong) {
+                    msg = `最多 ${this.maxLength} 个字符`;
+                } else if (this.validity.rangeUnderflow) {
+                    msg = `最小值为 ${this.min}`;
+                } else if (this.validity.rangeOverflow) {
+                    msg = `最大值为 ${this.max}`;
+                } else if (customCheck) {
+                    msg = customCheck(this);
+                }
+
+                if (msg) {
+                    this.classList.add('error');
+                    this.classList.remove('valid');
+                    errorEl.textContent = msg;
+                    console.log(`验证失败 [${this.name || this.id}]: ${msg}`);
+                } else {
+                    this.classList.remove('error');
+                    this.classList.add('valid');
+                    errorEl.textContent = '';
+                }
+            });
+
+            input.addEventListener('blur', function() {
+                if (this.value) {
+                    // 触发验证显示
+                    this.dispatchEvent(new Event('input'));
+                }
+            });
+        }
+
+        // 各字段验证
+        validateField(username2, errors.username);
+        validateField(email, errors.email);
+        validateField(age, errors.age);
+        validateField(password, errors.password);
+
+        // 自定义验证：确认密码
+        confirmPwd.addEventListener('input', function() {
+            if (this.value && this.value !== password.value) {
+                this.classList.add('error');
+                this.classList.remove('valid');
+                errors.confirm.textContent = '两次密码不一致';
+                console.log('验证失败 [confirm]: 两次密码不一致');
+            } else {
+                this.classList.remove('error');
+                if (this.value) this.classList.add('valid');
+                errors.confirm.textContent = '';
+            }
+        });
+
+        // 密码变化时重新验证确认密码
+        password.addEventListener('input', function() {
+            if (confirmPwd.value) {
+                confirmPwd.dispatchEvent(new Event('input'));
+            }
+        });
+
+        // 提交验证
+        form2.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            // 触发所有字段验证
+            const fields = [username2, email, age, password, confirmPwd];
+            fields.forEach(f => f.dispatchEvent(new Event('input')));
+
+            // 检查是否全部有效
+            const allValid = fields.every(f => f.classList.contains('valid') || (f === age && !f.value));
+            const hasErrors = fields.some(f => f.classList.contains('error'));
+
+            if (hasErrors) {
+                result.className = 'error';
+                result.textContent = '❌ 表单有错误，请修正后重新提交';
+                result.style.display = 'block';
+                console.log('提交失败: 表单有验证错误');
+            } else {
+                const formData = {
+                    username: username2.value,
+                    email: email.value,
+                    age: age.value || '(未填)',
+                };
+                result.className = 'success';
+                result.textContent = `✅ 提交成功！数据: ${JSON.stringify(formData)}`;
+                result.style.display = 'block';
+                console.log('提交成功:', formData);
+            }
+        });
+
+        form2.addEventListener('reset', function() {
+            result.style.display = 'none';
+            document.querySelectorAll('#valid-form input').forEach(i => {
+                i.classList.remove('error', 'valid');
+            });
+            Object.values(errors).forEach(e => e.textContent = '');
+            console.log('表单已重置');
+        });
+
+        console.log('=== ValidityState 属性 ===');
+        const state = username2.validity;
+        const props = [
+            'valueMissing', 'typeMismatch', 'patternMismatch',
+            'tooLong', 'tooShort', 'rangeUnderflow', 'rangeOverflow',
+            'stepMismatch', 'badInput', 'customError', 'valid'
+        ];
+        console.log('ValidityState 属性:');
+        props.forEach(p => console.log(`  ${p}: ${state[p]}`));
+
+        console.log('=== setCustomValidity ===');
+        // 自定义验证示例
+        function customAgeCheck(input) {
+            const val = parseInt(input.value);
+            if (val < 18) return '未满18岁不能注册';
+            if (val > 120) return '年龄不合法';
+            return '';
+        }
+
+        age.addEventListener('input', function() {
+            if (this.value) {
+                const msg = customAgeCheck(this);
+                if (msg) {
+                    this.setCustomValidity(msg);
+                } else {
+                    this.setCustomValidity('');
+                }
+            }
+        });
+
+        document.getElementById('output').textContent =
+            `HTML5 验证: required, pattern, min/max, minlength\n` +
+            `验证API: checkValidity, validity, validationMessage\n` +
+            `✅ 表单验证演示完成！\n` +
+            `(在表单中操作体验实时验证)`;
+    </script>
+</body>
+</html>

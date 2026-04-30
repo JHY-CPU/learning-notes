@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSRF防护</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        .diagram { font-family: monospace; font-size: 13px; line-height: 1.6; background: #f8f9fa; padding: 12px; border-radius: 4px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>CSRF 防护</h2><p>CSRF 原理、SameSite Cookie、Token 验证(CSRF Token)、Referer 头。</p></div>
+    <div class="card">
+        <h2>CSRF API</h2>
+        <div class="code">// ========== CSRF 攻击流程 ==========
+// 用户已登录 bank.com (有 Cookie)
+// 用户访问恶意网站 attacker.com
+// 恶意网站发起请求 bank.com/transfer?to=attacker
+// Cookie 自动携带 → 请求通过
+
+// ========== 防御方案 ==========
+// 1. SameSite Cookie (Lax/Strict)
+// 2. CSRF Token (双重提交)
+// 3. Referer/Origin 验证
+// 4. 自定义 Header (X-Requested-With)
+// 5. 验证码 / 二次确认</div>
+    </div>
+    <div class="card">
+        <h2>演示：CSRF</h2>
+        <button onclick="demoCSRF()">CSRF 原理</button>
+        <button onclick="demoSameSite()">SameSite Cookie</button>
+        <button onclick="demoToken()">CSRF Token</button>
+        <button onclick="demoHeaders()">Header 验证</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoCSRF() {
+            result.innerHTML = '';
+            log('🔄 CSRF 攻击原理:');
+            log('');
+
+            log('1️⃣ 攻击流程:');
+            log('');
+            log('   正常网站 (bank.com)         恶意网站 (attacker.com)');
+            log('   ┌─────────────────┐         ┌─────────────────┐');
+            log('   │ 用户已登录       │         │ 隐藏的请求表单  │');
+            log('   │ Cookie: session │         │ <form action="  │');
+            log('   │                 │         │  bank.com/      │');
+            log('   │                 │         │   transfer">   │');
+            log('   └─────────────────┘         │   <input        │');
+            log('         ▲                     │    hidden...>   │');
+            log('         │ Cookie 自动携带      │ </form>        │');
+            log('         └─────────────────────┘                 │');
+            log('                            │    │              │');
+            log('                            ▼    ▼              │');
+            log('                       ┌────────────────┐       │');
+            log('                       │ POST /transfer  │       │');
+            log('                       │ 金额: 10000     │       │');
+            log('                       │ 收款: attacker  │       │');
+            log('                       │ Cookie: ✅      │       │');
+            log('                       │ → 转账成功! ❌  │       │');
+            log('                       └────────────────┘       │');
+            log('');
+
+            log('2️⃣ 攻击条件:');
+            log('   • 用户已登录目标网站');
+            log('   • 目标网站仅用 Cookie 验证身份');
+            log('   • 请求可被跨域构造 (form/img/script)');
+            log('');
+
+            log('3️⃣ CSRF vs XSS:');
+            log('   CSRF: 利用用户身份发起请求');
+            log('   XSS:  在用户页面执行脚本');
+            log('   关系: XSS 可绕过 CSRF 防御');
+        }
+
+        function demoSameSite() {
+            result.innerHTML = '';
+            log('🍪 SameSite Cookie:');
+            log('');
+
+            log('1️⃣ SameSite 属性:');
+            log('   Set-Cookie: session=abc; SameSite=Lax');
+            log('');
+            log('   • Strict — 完全禁止跨站发送');
+            log('              (从外部链接访问也不带)');
+            log('   • Lax    — 部分允许 (默认值)');
+            log('              (GET + 顶层导航可带)');
+            log('   • None   — 允许跨站发送');
+            log('              (需同时设置 Secure)');
+            log('');
+
+            log('2️⃣ Lax 模式下允许的请求:');
+            log('   ✅ <a href="...">              — 链接');
+            log('   ✅ <form method="GET">         — GET 表单');
+            log('   ✅ window.location.href        — 导航');
+            log('   ❌ <form method="POST">        — POST 表单');
+            log('   ❌ <img src="...">              — 图片');
+            log('   ❌ <script src="...">           — 脚本');
+            log('   ❌ <iframe src="...">           — 框架');
+            log('   ❌ fetch/XMLHttpRequest         — AJAX');
+            log('');
+
+            log('3️⃣ 设置方式:');
+            log('   // 服务端设置');
+            log('   Set-Cookie: session=abc; SameSite=Lax');
+            log('   Set-Cookie: session=abc; SameSite=Strict; Secure');
+            log('   Set-Cookie: session=abc; SameSite=None; Secure');
+            log('');
+            log('   // 兼容方案 (同时设置旧版)');
+            log('   Set-Cookie: session=abc; SameSite=None; Secure');
+            log('   Set-Cookie: session=abc; Secure');  // 旧浏览器 fallback
+
+            log('');
+
+            log('4️⃣ 浏览器兼容性:');
+            log('   Chrome 80+ (2020): Lax 为默认');
+            log('   Firefox 69+: 支持');
+            log('   Safari 13+: 支持');
+            log('   旧浏览器: 忽略 SameSite (需 fallback)');
+        }
+
+        function demoToken() {
+            result.innerHTML = '';
+            log('🎫 CSRF Token 验证:');
+            log('');
+
+            log('1️⃣ Token 流程:');
+            log('   ┌──────────────┐     ┌──────────────┐');
+            log('   │    客户端     │     │    服务器     │');
+            log('   └──────┬───────┘     └──────┬───────┘');
+            log('          │                    │');
+            log('          │   GET /form        │');
+            log('          │───────────────────→│');
+            log('          │                    │');
+            log('          │   <form>           │');
+            log('          │   <input hidden    │');
+            log('          │    name="_token"   │');
+            log('          │    value="RANDOM"> │');
+            log('          │────────────────────│');
+            log('          │                    │');
+            log('          │   POST /action     │');
+            log('          │   _token=RANDOM    │');
+            log('          │───────────────────→│');
+            log('          │                    │ 验证 Token');
+            log('          │   200 OK           │ ✅');
+            log('          │←───────────────────│');
+            log('');
+
+            log('2️⃣ 服务器生成 Token:');
+            log('   // Token 可以:');
+            log('   • 存储在 Session');
+            log('   • 加密后发给客户端');
+            log('   • 包含时间戳 (防复用)');
+            log('');
+
+            log('3️⃣ 前端发送 Token:');
+            log('   // 方式1: 表单隐藏字段');
+            log('   <input type="hidden" name="_token" value="csrf-token-value">');
+            log('');
+            log('   // 方式2: 自定义请求头');
+            log('   fetch("/api/transfer", {');
+            log('     method: "POST",');
+            log('     headers: {');
+            log('       "X-CSRF-Token": csrfToken,');
+            log('       "Content-Type": "application/json"');
+            log('     },');
+            log('     body: JSON.stringify({ amount: 1000 })');
+            log('   });');
+            log('');
+
+            log('4️⃣ 双重提交 Cookie (Double Submit):');
+            log('   ① 服务器设置 Cookie: csrf=random-value');
+            log('   ② 客户端读取 Cookie 值');
+            log('   ③ 在请求头中携带 X-CSRF: random-value');
+            log('   ④ 服务器比较 Cookie 值 == Header 值');
+            log('   优点: 无需服务端存储 Token');
+        }
+
+        function demoHeaders() {
+            result.innerHTML = '';
+            log('📋 Referer/Origin 验证:');
+            log('');
+
+            log('1️⃣ Referer 头:');
+            log('   请求来源页面的 URL');
+            log('   服务器验证 Referer 是否来自本站');
+            log('');
+
+            log('2️⃣ Origin 头:');
+            log('   仅包含协议+域名+端口 (不含路径)');
+            log('   比 Referer 更安全 (不泄露 URL)');
+            log('   POST 请求自动携带');
+            log('');
+
+            log('3️⃣ 服务端验证:');
+            log('   function validateOrigin(req) {');
+            log('     const origin = req.headers.origin;');
+            log('     const referer = req.headers.referer;');
+            log('     const allowed = [');
+            log('       "https://bank.com",');
+            log('       "https://www.bank.com"');
+            log('     ];');
+            log('     if (origin && !allowed.includes(origin)) {');
+            log('       return false;  // ❌ 非法来源');
+            log('     }');
+            log('     if (referer && !referer.startsWith("https://bank.com")) {');
+            log('       return false;  // ❌');
+            log('     }');
+            log('     return true;');
+            log('   }');
+            log('');
+
+            log('4️⃣ 自定义 Header:');
+            log('   // 所有 AJAX 请求携带自定义头');
+            log('   X-Requested-With: XMLHttpRequest');
+            log('');
+            log('   // 浏览器限制: 跨域请求不能设置自定义头');
+            log('   // 除非先 OPTIONS 预检');
+            log('');
+
+            log('5️⃣ 其他防御措施:');
+            log('   • 验证码: 关键操作二次确认');
+            log('   • 二次确认: "确认删除?"');
+            log('   • 生物识别: 指纹/人脸');
+            log('   • 多因素认证 (MFA)');
+            log('');
+
+            log('6️⃣ 防御方案对比:');
+            log('   ┌─────────────┬────────┬────────┬────────┐');
+            log('   │ 方案         │ 易用性 │ 安全性 │ 兼容性 │');
+            log('   ├─────────────┼────────┼────────┼────────┤');
+            log('   │ SameSite=Lax│ 高     │ 中    │ 中    │');
+            log('   │ CSRF Token  │ 中     │ 高    │ 高    │');
+            log('   │ Origin 验证 │ 高     │ 中    │ 高    │');
+            log('   │ 验证码      │ 低     │ 高    │ 高    │');
+            log('   └─────────────┴────────┴────────┴────────┘');
+        }
+
+        console.log('=== CSRF 防护 ===');
+        document.getElementById('output').textContent =
+            `CSRF 防护: 攻击原理 / SameSite Cookie / CSRF Token / Referer验证 / 防御对比\n` +
+            `✅ CSRF 防护演示完成！`;
+    </script>
+</body>
+</html>

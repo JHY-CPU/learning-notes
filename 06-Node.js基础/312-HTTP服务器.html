@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTTP服务器</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #http-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>HTTP 服务器</h2><p>http.createServer、req/res 对象、状态码、响应头、静态文件。</p></div>
+    <div class="card">
+        <h2>HTTP 服务器 API</h2>
+        <div class="code">// ========== 创建 HTTP 服务器 ==========
+const http = require('http');
+
+const server = http.createServer((req, res) => {
+    // req — IncomingMessage (可读流)
+    // res — ServerResponse (可写流)
+
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'text/html');
+    res.end('<h1>Hello World</h1>');
+});
+
+server.listen(3000, () => {
+    console.log('服务器运行在 http://localhost:3000');
+});
+
+// ========== 请求对象 req ==========
+req.method      // 'GET' / 'POST' / 'PUT' / 'DELETE'
+req.url         // '/path?query=string'
+req.headers     // { 'content-type': 'application/json' }
+req.socket      // 底层 socket
+
+// ========== 响应对象 res ==========
+res.statusCode = 200;
+res.statusMessage = 'OK';
+res.setHeader('Content-Type', 'application/json');
+res.writeHead(200, 'OK', { 'Content-Type': 'text/plain' });
+res.write('partial data');
+res.end('final data');
+
+// ========== 静态文件服务 ==========
+const fs = require('fs');
+const path = require('path');
+
+const filePath = path.join(__dirname, 'public', req.url);
+const stream = fs.createReadStream(filePath);
+stream.pipe(res);
+// 错误处理
+stream.on('error', () => {
+    res.statusCode = 404;
+    res.end('Not Found');
+});</div>
+    </div>
+    <div class="card">
+        <h2>演示：HTTP 服务器</h2>
+        <button onclick="demoHTTPServer()">模拟 HTTP 服务器</button>
+        <button onclick="demoRequest()">请求处理</button>
+        <div id="http-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const httpResult = document.getElementById('http-result');
+
+        function log(msg) {
+            httpResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // 模拟 HTTP 服务器
+        function simulateRequest(method, url, body = null) {
+            log(`\n📡 ${method} ${url}`);
+
+            const req = {
+                method,
+                url,
+                headers: {
+                    'content-type': body ? 'application/json' : 'text/plain',
+                    'user-agent': 'Mozilla/5.0',
+                    'accept': '*/*',
+                },
+            };
+
+            const res = {
+                statusCode: 200,
+                headers: {},
+                setHeader(name, value) {
+                    this.headers[name] = value;
+                },
+                writeHead(code, statusMsg, headers) {
+                    this.statusCode = code;
+                    if (headers) Object.assign(this.headers, headers);
+                },
+                end(data) {
+                    log(`   ← ${this.statusCode} ${data}`);
+                    log(`   响应头: ${JSON.stringify(this.headers)}`);
+                },
+            };
+
+            // 路由处理
+            const urlObj = new URL(url, 'http://localhost');
+            const pathname = urlObj.pathname;
+
+            if (pathname === '/' || pathname === '/index.html') {
+                res.setHeader('Content-Type', 'text/html');
+                res.end('<h1>Home Page</h1>');
+            } else if (pathname === '/api/users') {
+                res.setHeader('Content-Type', 'application/json');
+                if (method === 'GET') {
+                    res.end(JSON.stringify([{ id: 1, name: 'Alice' }, { id: 2, name: 'Bob' }]));
+                } else if (method === 'POST') {
+                    res.statusCode = 201;
+                    res.end(JSON.stringify({ created: true, data: body }));
+                }
+            } else if (pathname.startsWith('/static/')) {
+                const filename = pathname.replace('/static/', '');
+                res.setHeader('Content-Type', 'text/plain');
+                res.end(`Static file: ${filename}`);
+            } else {
+                res.statusCode = 404;
+                res.end('404 Not Found');
+            }
+
+            return { req, res };
+        }
+
+        function demoHTTPServer() {
+            httpResult.innerHTML = '';
+            log('🌐 HTTP 服务器模拟:');
+            log('');
+
+            log('服务器已启动 (模拟 localhost:3000):');
+            log('   http://localhost:3000');
+            log('   http://localhost:3000/api/users');
+            log('   http://localhost:3000/static/app.js');
+            log('');
+
+            // 模拟请求
+            simulateRequest('GET', '/');
+            simulateRequest('GET', '/api/users');
+            simulateRequest('POST', '/api/users', { name: 'Charlie' });
+            simulateRequest('GET', '/static/style.css');
+            simulateRequest('GET', '/not-found');
+
+            log('');
+            log('📌 Node http 模块:');
+            log('   • 无需框架即可运行');
+            log('   • req/res 是流 (Stream)');
+            log('   • 适合: API/代理/静态文件');
+            log('   • 生产: Express/Koa/Fastify');
+        }
+
+        function demoRequest() {
+            httpResult.innerHTML = '';
+            log('📨 请求处理详解:');
+            log('');
+
+            const req = {
+                method: 'POST',
+                url: '/api/data?lang=zh',
+                headers: {
+                    'content-type': 'application/json',
+                    'content-length': '27',
+                    'authorization': 'Bearer token123',
+                    'accept-language': 'zh-CN,zh;q=0.9',
+                },
+                socket: { remoteAddress: '192.168.1.1', remotePort: 54321 },
+            };
+
+            log('请求属性:');
+            log(`   方法: ${req.method}`);
+            log(`   URL: ${req.url}`);
+            log(`   Content-Type: ${req.headers['content-type']}`);
+            log(`   Authorization: ${req.headers['authorization']}`);
+            log(`   客户端: ${req.socket.remoteAddress}:${req.socket.remotePort}`);
+            log('');
+
+            const url = new URL(req.url, 'http://localhost');
+            log('URL 解析:');
+            log(`   pathname: ${url.pathname}`);
+            log(`   查询参数: ${url.searchParams.toString()}`);
+            log(`   lang: ${url.searchParams.get('lang')}`);
+        }
+
+        console.log('=== HTTP 服务器 ===');
+
+        document.getElementById('output').textContent =
+            `HTTP 服务器: createServer / req / res / 状态码 / 响应头\n` +
+            `静态文件服务: createReadStream + pipe\n` +
+            `✅ HTTP 服务器演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字符串方法-格式转换</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #9b59b6; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>字符串方法(三) — 格式与转换</h2>
+        <p>大小写转换、去空格、填充等。</p>
+    </div>
+
+    <div class="card">
+        <h2>大小写转换</h2>
+        <div class="code">
+'Hello World'.toUpperCase();    // "HELLO WORLD"
+'Hello World'.toLowerCase();    // "hello world"
+
+// 常用于校验（不区分大小写）
+'admin@email.com'.toLowerCase() === 'Admin@Email.com'.toLowerCase(); // true
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>trim() — 去除首尾空格</h2>
+        <div class="code">
+'   hello   '.trim();           // "hello"
+'   hello   '.trimStart();      // "hello   "
+'   hello   '.trimEnd();        // "   hello"
+'hello'.trim();                 // "hello"（无变化）
+
+// 常用于用户输入处理
+let input = '  user@example.com  ';
+let email = input.trim();  // "user@example.com"
+        </div>
+        <div class="note">💡 处理表单输入时一定要 trim()，用户可能不小心打了空格。</div>
+    </div>
+
+    <div class="card">
+        <h2>padStart() / padEnd() — 填充</h2>
+        <div class="code">
+// padStart(目标长度, 填充字符)
+'5'.padStart(3, '0');           // "005"
+'123'.padStart(5, '0');         // "00123"
+'hello'.padStart(10, '-');      // "-----hello"
+'hello'.padStart(3, '-');       // "hello"（原长度超过目标长度）
+
+// padEnd
+'5'.padEnd(3, '0');             // "500"
+'hello'.padEnd(8, '.');         // "hello..."
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>repeat() — 重复</h2>
+        <div class="code">
+'*'.repeat(5);              // "*****"
+'abc'.repeat(3);            // "abcabcabc"
+'😀'.repeat(2);             // "😀😀"
+''.repeat(5);               // ""
+'x'.repeat(0);              // ""
+// 'x'.repeat(-1);          // ❌ 报错
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>localeCompare() — 本地化比较</h2>
+        <div class="code">
+// 按字典顺序比较字符串，考虑本地语言规则
+'ä'.localeCompare('z');     // -1（ä 在德语中排在 z 前）
+
+// 比 < > 更可靠，考虑本地语言规则
+['ä', 'a', 'z'].sort();                     // ["a", "z", "ä"]
+['ä', 'a', 'z'].sort((a, b) => a.localeCompare(b));  // ["a", "ä", "z"]
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>实用组合</h2>
+        <div class="code">
+// 生成唯一ID
+function genId() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2);
+}
+
+// 隐藏邮箱中间部分
+function maskEmail(email) {
+    let [name, domain] = email.split('@');
+    return name[0] + '*'.repeat(name.length - 2) + name.slice(-1) + '@' + domain;
+}
+console.log(maskEmail('alice@example.com')); // "a***e@example.com"
+        </div>
+    </div>
+
+    <pre id="output"></pre>
+
+    <script>
+        // ====================
+        // 格式方法演示
+        // ====================
+
+        console.log('=== 大小写 ===');
+        console.log("'Hello'.toUpperCase():", 'Hello'.toUpperCase());
+        console.log("'Hello'.toLowerCase():", 'Hello'.toLowerCase());
+
+        console.log('=== trim ===');
+        console.log("'  hi  '.trim():", '  hi  '.trim());
+        console.log("'  hi  '.trimStart():", '  hi  '.trimStart());
+        console.log("'  hi  '.trimEnd():", '  hi  '.trimEnd());
+
+        console.log('=== padStart / padEnd ===');
+        console.log("'5'.padStart(3, '0'):", '5'.padStart(3, '0'));
+        console.log("'123'.padStart(6, '-'):", '123'.padStart(6, '-'));
+        console.log("'5'.padEnd(3, '0'):", '5'.padEnd(3, '0'));
+
+        console.log('=== repeat ===');
+        console.log("'*'.repeat(5):", '*'.repeat(5));
+        console.log("'abc'.repeat(3):", 'abc'.repeat(3));
+
+        // 实用：生成分隔线
+        console.log('分隔线:', '='.repeat(30));
+
+        // 邮箱脱敏
+        function maskEmail(email) {
+            let [name, domain] = email.split('@');
+            if (name.length <= 2) return name[0] + '***@' + domain;
+            return name[0] + '*'.repeat(name.length - 2) + name.slice(-1) + '@' + domain;
+        }
+        console.log('邮箱脱敏:', maskEmail('alice@example.com'));
+
+        document.getElementById('output').textContent =
+            `"  hi  ".trim() = "${'  hi  '.trim()}"\n` +
+            `'5'.padStart(3, '0') = ${'5'.padStart(3, '0')}\n` +
+            `'*'.repeat(20) = ${'*'.repeat(20)}\n` +
+            `邮箱脱敏: ${maskEmail('alice@example.com')}\n` +
+            `✅ 字符串方法(三)演示完成！`;
+    </script>
+</body>
+</html>

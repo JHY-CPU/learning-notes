@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 数据库安全</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔒 SQL 数据库安全</h2><p>SQL 注入防御、传输加密 (SSL/TLS)、静态加密 (TDE)、审计日志、安全配置、密码策略、最小权限、备份加密、GDPR 合规、安全检查清单。</p></div>
+    <div class="card">
+        <h2>SQL 注入防御</h2>
+        <div class="code">// ========== SQL 注入 ==========
+-- SQL 注入: 最危险的数据库安全威胁
+
+-- ❌ 易注入代码 (字符串拼接):
+const sql = `SELECT * FROM users WHERE email = '${userInput}'`;
+-- 输入: ' OR '1'='1
+-- 结果: SELECT * FROM users WHERE email = '' OR '1'='1' (返回所有用户!)
+
+-- ✅ 参数化查询 (Prepared Statement):
+-- Python:
+cursor.execute("SELECT * FROM users WHERE email = %s", (user_input,))
+
+-- Node.js:
+-- connection.query('SELECT * FROM users WHERE email = ?', [userInput])
+
+-- Java:
+-- PreparedStatement stmt = conn.prepareStatement("SELECT * FROM users WHERE email = ?");
+-- stmt.setString(1, userInput);
+
+-- ========== 存储过程防注入 ==========
+-- 使用存储过程也可以减少注入风险
+CREATE PROCEDURE get_user_by_email(IN p_email VARCHAR(100))
+BEGIN
+    SELECT * FROM users WHERE email = p_email;
+END;
+
+-- ========== 输入验证 ==========
+-- 1. 白名单验证 (推荐)
+--    只允许特定字符: [a-zA-Z0-9_@.]
+-- 2. 黑名单过滤 (不推荐,总有遗漏)
+-- 3. 类型检查: 整数用 intval(), 日期用 date_parse()
+
+-- ========== 其他注入防御 ==========
+-- 1. 最小权限: 应用用户只有 CRUD 权限, 没有 DDL
+-- 2. 隐藏错误信息: 不要暴露数据库错误给用户
+-- 3. WAF (Web Application Firewall): 过滤恶意请求
+-- 4. 定期安全扫描: 自动化工具检测注入漏洞</div>
+    </div>
+    <div class="card">
+        <h2>传输与存储加密</h2>
+        <div class="code">// ========== SSL/TLS 传输加密 ==========
+
+-- 1. 检查是否启用 SSL
+SHOW VARIABLES LIKE '%ssl%';
+
+-- 2. 强制使用 SSL (MySQL)
+-- GRANT ALL ON mydb.* TO 'user'@'host' REQUIRE SSL;
+
+-- 3. 配置 SSL (my.cnf)
+-- [mysqld]
+-- ssl_ca = /etc/mysql/ssl/ca.pem
+-- ssl_cert = /etc/mysql/ssl/server-cert.pem
+-- ssl_key = /etc/mysql/ssl/server-key.pem
+
+-- 4. PostgreSQL SSL 配置 (postgresql.conf)
+-- ssl = on
+-- ssl_cert_file = 'server.crt'
+-- ssl_key_file = 'server.key'
+
+-- ========== 静态加密 (TDE) ==========
+
+-- 1. MySQL 企业版 TDE
+-- 表空间加密:
+-- CREATE TABLE t (id INT) ENCRYPTION='Y';
+
+-- 2. PostgreSQL 透明数据加密
+-- 通过 pg_tde 扩展或磁盘加密 (LUKS)
+
+-- 3. 列级加密
+-- 应用层加密敏感数据:
+-- INSERT INTO users (ssn) VALUES (AES_ENCRYPT('123-45-6789', 'key'));
+
+-- PostgreSQL:
+-- 使用 pgcrypto 扩展:
+-- INSERT INTO users (ssn) VALUES (PGP_SYM_ENCRYPT('123-45-6789', 'key'));
+
+-- ========== 数据脱敏 ==========
+
+-- 生产数据脱敏后给开发/测试使用
+SELECT
+    id,
+    CONCAT(LEFT(name, 1), '***') AS name_masked,
+    CONCAT(LEFT(email, 1), '***@***', SUBSTRING_INDEX(email, '.', -1)) AS email_masked,
+    CONCAT('***', RIGHT(phone, 4)) AS phone_masked
+FROM users;</div>
+    </div>
+    <div class="card">
+        <h2>审计日志</h2>
+        <div class="code">// ========== MySQL 审计 ==========
+
+-- 1. MySQL Enterprise Audit
+-- 安装: INSTALL PLUGIN audit_log SONAME 'audit_log.so';
+-- 配置: SET GLOBAL audit_log_policy = 'ALL';
+
+-- 2. 通用查询日志 (开发环境)
+SET GLOBAL general_log = ON;
+SET GLOBAL general_log_file = '/var/log/mysql/query.log';
+
+-- 3. 二进制日志 (用于审计)
+-- 查看 binlog 事件:
+-- SHOW BINLOG EVENTS IN 'mysql-bin.000001' FROM 120;
+
+-- 4. 触发器审计 (自定义)
+-- 自己建 audit_log 表 + 触发器
+CREATE TABLE audit_log (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    table_name VARCHAR(50),
+    action VARCHAR(10),
+    record_id INT,
+    old_data JSON,
+    new_data JSON,
+    changed_by VARCHAR(50),
+    changed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 在敏感表上建触发器记录变更
+
+-- ========== PostgreSQL 审计 ==========
+-- pgAudit 扩展:
+-- CREATE EXTENSION IF NOT EXISTS pgaudit;
+
+-- 配置 (postgresql.conf):
+-- shared_preload_libraries = 'pgaudit'
+-- pgaudit.log = 'write,ddl'
+-- pgaudit.log_level = 'notice'
+
+-- ========== 安全配置清单 ==========
+-- ✅ 移除匿名用户
+-- ✅ root 仅限本地登录
+-- ✅ 应用用户最小权限
+-- ✅ 密码强度策略
+-- ✅ SSL/TLS 加密连接
+-- ✅ 审计日志开启
+-- ✅ 备份加密
+-- ✅ 错误信息不暴露给用户
+-- ✅ 定期安全评估
+-- ✅ 及时更新补丁</div>
+        <div class="note">💡 安全要点: 参数化查询防注入 (最重要!); SSL/TLS 加密传输; 敏感列加密存储; 数据脱敏给开发测试; 审计日志记录变更; 最小权限原则; 定期安全检查; 备份加密存储。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoInject()">注入防御</button>
+        <button onclick="demoEncrypt()">加密演示</button>
+        <button onclick="demoAudit()">审计演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoInject() {
+            result.innerHTML = '';
+            log('# SQL 注入防御');
+            log('');
+            log('❌ 拼接:');
+            log("  SELECT * FROM users WHERE email = '" + userInput + "'");
+            log('');
+            log('✅ 参数化:');
+            log('  cursor.execute("SELECT * FROM users WHERE email = %s", (email,))');
+            log('');
+            log('防御: 参数化 + 最小权限 + 输入验证');
+        }
+
+        function demoEncrypt() {
+            result.innerHTML = '';
+            log('# 数据加密');
+            log('');
+            log('传输加密:');
+            log('  REQUIRE SSL;  -- 强制 SSL 连接');
+            log('');
+            log('存储加密:');
+            log("  AES_ENCRYPT('sensitive', 'key')");
+            log('');
+            log('数据脱敏:');
+            log("  CONCAT(LEFT(name, 1), '***')");
+        }
+
+        function demoAudit() {
+            result.innerHTML = '';
+            log('# 审计日志');
+            log('');
+            log('CREATE TABLE audit_log (');
+            log('    table_name VARCHAR(50),');
+            log('    action VARCHAR(10),');
+            log('    old_data JSON,');
+            log('    new_data JSON,');
+            log('    changed_by VARCHAR(50),');
+            log('    changed_at DATETIME');
+            log(');');
+            log('');
+            log('用触发器记录敏感表的变更');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>正则基础</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #regex-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; margin: 5px 0; width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>正则基础</h2><p>/pattern/flags 创建、test/exec 方法、常用 flag。</p></div>
+    <div class="card">
+        <h2>正则创建与基础方法</h2>
+        <div class="code">// ========== 创建正则 ==========
+// 字面量语法（推荐）
+const re1 = /hello/;
+const re2 = /hello/gi;    // g全局 i不区分大小写
+
+// 构造函数（支持变量）
+const pattern = 'hello';
+const re3 = new RegExp(pattern, 'gi');
+
+// ========== 实例方法 ==========
+// test() — 是否匹配（返回 boolean）
+/hello/.test('hello world');     // true
+/hello/.test('hi world');        // false
+
+// exec() — 返回匹配结果数组（或 null）
+const match = /l{2}/.exec('hello');
+// ['ll', index: 2, input: 'hello', groups: undefined]
+
+// 全局模式下 exec 会记住 lastIndex
+const globalRe = /l/g;
+globalRe.exec('hello'); // ['l', index: 2]
+globalRe.exec('hello'); // ['l', index: 3]
+globalRe.exec('hello'); // null
+
+// ========== 字符串的正则方法 ==========
+'Hello World'.match(/l/g);    // ['l', 'l', 'l']
+'Hello World'.search(/W/);    // 6 (索引)
+'Hello World'.replace(/l/g, 'L'); // 'HeLLo WorLd'
+'a,b,c'.split(/,/);           // ['a', 'b', 'c']
+
+// ========== 常用 flag ==========
+// g — 全局匹配 (global)
+// i — 不区分大小写 (ignoreCase)
+// m — 多行模式 (multiline)
+// s — dotAll (. 匹配换行)
+// u — Unicode 模式
+// y — 粘性匹配 (sticky)
+// d — 匹配索引 (hasIndices)</div>
+    </div>
+    <div class="card">
+        <h2>演示：正则基础</h2>
+        <p>输入文本测试正则匹配：</p>
+        <input id="testText" value="Hello World 123" placeholder="输入文本">
+        <p>正则: <input id="testPattern" value="/[A-Z]\w+/g" placeholder="/pattern/flags"></p>
+        <button onclick="testRegex()">测试匹配</button>
+        <button onclick="testExec()">exec 逐次匹配</button>
+        <div id="regex-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const regexResult = document.getElementById('regex-result');
+
+        function log(msg) {
+            regexResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function testRegex() {
+            regexResult.innerHTML = '';
+            const text = document.getElementById('testText').value;
+            const patternStr = document.getElementById('testPattern').value;
+
+            try {
+                // 从 /pattern/flags 字符串中解析
+                const match = patternStr.match(/^\/(.+)\/([gimsuyd]*)$/);
+                let re;
+                if (match) {
+                    re = new RegExp(match[1], match[2]);
+                } else {
+                    re = new RegExp(patternStr);
+                }
+
+                log(`📋 文本: "${text}"`);
+                log(`🔍 正则: ${re}`);
+                log('');
+
+                // test
+                log(`test(): ${re.test(text)}`);
+
+                // match
+                const matches = text.match(re);
+                if (matches) {
+                    log(`match(): ${JSON.stringify(matches)}`);
+                    if (matches.length > 1) log(`  捕获组: ${matches.slice(1).join(', ')}`);
+                } else {
+                    log('match(): null (无匹配)');
+                }
+
+                // 全局 match
+                if (re.global) {
+                    const allMatches = text.match(re);
+                    log(`match(全局): ${allMatches ? allMatches.join(', ') : '无匹配'}`);
+                }
+
+                // 索引
+                const idx = text.search(re);
+                log(`search(): ${idx === -1 ? '未找到' : idx}`);
+            } catch (err) {
+                log(`❌ 正则错误: ${err.message}`);
+            }
+        }
+
+        function testExec() {
+            regexResult.innerHTML = '';
+            const text = document.getElementById('testText').value;
+            const patternStr = document.getElementById('testPattern').value;
+
+            try {
+                const match = patternStr.match(/^\/(.+)\/([gimsuyd]*)$/);
+                let re;
+                if (match) {
+                    re = new RegExp(match[1], match[2]);
+                } else {
+                    re = new RegExp(patternStr, 'g');
+                }
+
+                log(`📋 exec() 逐次匹配 (${re.global ? '全局模式' : '非全局'}):`);
+                log('');
+
+                let i = 0;
+                let result;
+                while ((result = re.exec(text)) !== null && i < 10) {
+                    log(`  匹配 #${i + 1}: ${JSON.stringify(result[0])}`);
+                    log(`    index: ${result.index}, lastIndex: ${re.lastIndex}`);
+                    if (result.length > 1) {
+                        log(`    捕获组: ${result.slice(1).join(', ')}`);
+                    }
+                    i++;
+                    if (!re.global) break;
+                }
+                if (i === 0) log('  无匹配结果');
+                log('');
+                log('💡 lastIndex 在全局模式下会逐次更新');
+            } catch (err) {
+                log(`❌ 错误: ${err.message}`);
+            }
+        }
+
+        console.log('=== 正则基础 ===');
+
+        document.getElementById('output').textContent =
+            `正则基础: /pattern/flags / test() / exec() / match() / search()\n` +
+            `flag: g/i/m/s/u/y/d\n` +
+            `✅ 正则基础演示完成！`;
+    </script>
+</body>
+</html>

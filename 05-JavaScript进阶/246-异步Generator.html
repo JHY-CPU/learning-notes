@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>异步Generator</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #asyncGen-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>异步 Generator</h2><p>async function*、for await...of、异步数据流、分页生成。</p></div>
+    <div class="card">
+        <h2>异步 Generator 语法</h2>
+        <div class="code">// ========== 异步 Generator ==========
+async function* asyncGen() {
+    const data1 = await fetch('/api/data1').then(r => r.json());
+    yield data1;
+    const data2 = await fetch('/api/data2').then(r => r.json());
+    yield data2;
+}
+
+// ========== for await...of ==========
+for await (const value of asyncGen()) {
+    console.log(value);
+}
+
+// ========== 异步可迭代对象 ==========
+const asyncIterable = {
+    [Symbol.asyncIterator]() {
+        let i = 0;
+        return {
+            async next() {
+                await new Promise(r => setTimeout(r, 500));
+                if (i < 3) return { value: i++, done: false };
+                return { value: undefined, done: true };
+            }
+        };
+    }
+};
+
+for await (const val of asyncIterable) {
+    console.log(val); // 0, 1, 2（间隔 500ms）
+}
+
+// ========== 应用场景 ==========
+// ✅ 分页数据加载 (每页请求一次 API)
+// ✅ 异步事件流 (WebSocket / SSE)
+// ✅ 大文件逐行处理
+// ✅ 定时数据轮询</div>
+    </div>
+    <div class="card">
+        <h2>演示：异步 Generator</h2>
+        <button onclick="demoAsyncGen()">异步 Generator 基础</button>
+        <button onclick="demoPagination()">模拟分页加载</button>
+        <div id="asyncGen-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const asyncGenResult = document.getElementById('asyncGen-result');
+
+        function log(msg) {
+            asyncGenResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // 模拟异步 Generator
+        async function* createAsyncGen(delay = 500) {
+            for (let i = 1; i <= 5; i++) {
+                await new Promise(r => setTimeout(r, delay));
+                yield `数据包 #${i} (${new Date().toLocaleTimeString()})`;
+            }
+        }
+
+        // 模拟分页 API
+        async function fetchPage(page, pageSize = 3) {
+            await new Promise(r => setTimeout(r, 600));
+            const totalPages = 4;
+            if (page > totalPages) return { items: [], hasMore: false };
+            const items = Array.from({ length: pageSize }, (_, i) => ({
+                id: (page - 1) * pageSize + i + 1,
+                name: `项目 ${(page - 1) * pageSize + i + 1}`,
+            }));
+            return { items, hasMore: page < totalPages, nextPage: page + 1 };
+        }
+
+        async function* paginationGen(initialPage = 1) {
+            let page = initialPage;
+            while (true) {
+                const result = await fetchPage(page);
+                yield result.items;
+                if (!result.hasMore) break;
+                page = result.nextPage;
+            }
+        }
+
+        async function demoAsyncGen() {
+            asyncGenResult.innerHTML = '';
+            log('⏳ 异步 Generator 开始 (每 300ms 产生一个值)...');
+            log('');
+
+            const gen = createAsyncGen(300);
+            let count = 0;
+            // 模拟 for await...of
+            for await (const val of gen) {
+                log(`  收到: ${val}`);
+                count++;
+            }
+            log('');
+            log(`✅ 共收到 ${count} 个数据包`);
+            log('');
+            log('📌 异步 Generator 特点:');
+            log('   • async function* 定义');
+            log('   • yield 前可 await');
+            log('   • for await...of 消费');
+            log('   • 支持异步数据流');
+        }
+
+        async function demoPagination() {
+            asyncGenResult.innerHTML = '';
+            log('📄 模拟分页加载 (每页 500ms 延迟):');
+            log('');
+
+            let pageNum = 1;
+            let totalItems = 0;
+            for await (const items of paginationGen()) {
+                log(`📦 第 ${pageNum} 页: [${items.map(i => i.name).join(', ')}]`);
+                totalItems += items.length;
+                pageNum++;
+            }
+            log('');
+            log(`✅ 共加载 ${pageNum - 1} 页，${totalItems} 条数据`);
+            log('');
+            log('📌 分页 Generator 优势:');
+            log('   • 按需加载，不一次加载所有数据');
+            log('   • 逻辑封装在 Generator 内');
+            log('   • 消费端代码简洁 (for await...of)');
+        }
+
+        console.log('=== 异步 Generator ===');
+
+        document.getElementById('output').textContent =
+            `异步 Generator: async function* / for await...of\n` +
+            `异步数据流: 分页加载 / 事件流 / 定时轮询\n` +
+            `✅ 异步 Generator 演示完成！`;
+    </script>
+</body>
+</html>

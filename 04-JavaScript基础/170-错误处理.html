@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>错误处理</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #c0392b; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>错误处理（try/catch/finally/throw）</h2><p>捕获和处理运行时错误，防止程序崩溃。</p></div>
+    <div class="card">
+        <h2>try/catch 基本用法</h2>
+        <div class="code">try {
+    // 可能出错的代码
+    const result = JSON.parse('{invalid json}');
+    console.log(result);
+} catch (error) {
+    // 出错时执行
+    console.log('捕获到错误:', error.message);
+}
+
+// 无论是否出错都继续执行后面的代码
+console.log('程序继续运行...');
+
+// catch 可以省略括号（ES2022+，单个错误对象时）
+try {
+    throw new Error('出错了');
+} catch {
+    console.log('发生了错误');
+    // 可以不使用 error 对象
+}</div>
+    </div>
+    <div class="card">
+        <h2>finally — 无论是否出错都执行</h2>
+        <div class="code">// finally 在 try/catch 之后执行
+// 不论是否出错，finally 一定会执行
+
+function processFile(path) {
+    console.log('打开文件:', path);
+    try {
+        if (!path) throw new Error('路径不能为空');
+        console.log('读取文件...');
+        return '文件内容';  // 即使 return，finally 也会执行
+    } catch (error) {
+        console.log('出错:', error.message);
+        return '默认内容';
+    } finally {
+        console.log('关闭文件（finally）');  // 总是执行
+    }
+}
+
+processFile('test.txt');
+// 打开文件: test.txt
+// 读取文件...
+// 关闭文件（finally）
+// 返回: 文件内容
+
+// finally 中的 return 会覆盖 try/catch 的 return
+function test() {
+    try {
+        return 'try 的返回值';
+    } finally {
+        return 'finally 的返回值';  // 覆盖！
+    }
+}
+console.log(test());  // 'finally 的返回值'</div>
+    </div>
+    <div class="card">
+        <h2>throw — 手动抛出错误</h2>
+        <div class="code">// 可以抛出任何值
+throw new Error('错误消息');            // 最常用
+throw '字符串错误';
+throw 42;
+throw true;
+throw { code: 404, message: 'Not Found' };
+// ⚠️ 如果不 catch，程序会中止
+
+// 推荐使用 Error 对象（有堆栈跟踪）
+function divide(a, b) {
+    if (b === 0) {
+        throw new Error('除数不能为 0');
+    }
+    if (typeof a !== 'number' || typeof b !== 'number') {
+        throw new TypeError('参数必须是数字');
+    }
+    return a / b;
+}
+
+try {
+    divide(10, 0);
+} catch (e) {
+    console.log(e.name + ':', e.message);  // 'Error: 除数不能为 0'
+    console.log(e.stack);  // 堆栈跟踪
+}</div>
+    </div>
+    <div class="card">
+        <h2>错误类型</h2>
+        <div class="code">// JavaScript 内置错误类型
+// Error          — 基础错误（通常用这个）
+// SyntaxError    — 语法错误（代码解析阶段）
+// ReferenceError — 引用不存在的变量
+// TypeError      — 值不是预期类型
+// RangeError     — 值超出范围
+// URIError       — encodeURI/decodeURI 错误
+// EvalError      — eval 错误
+
+// SyntaxError（语法错误不能被 catch 捕获，因为发生在解析阶段）
+// 但 eval 中的 SyntaxError 可以被捕获
+try {
+    eval('if (true) {');
+} catch (e) {
+    console.log(e.name);  // SyntaxError
+}
+
+// ReferenceError
+try {
+    console.log(nonExistentVar);
+} catch (e) {
+    console.log(e.name);  // ReferenceError
+}
+
+// TypeError
+try {
+    null.method();
+} catch (e) {
+    console.log(e.name);  // TypeError
+}
+
+// RangeError
+try {
+    new Array(-1);
+} catch (e) {
+    console.log(e.name);  // RangeError
+}
+
+// 自定义错误类型
+class ValidationError extends Error {
+    constructor(message, field) {
+        super(message);
+        this.name = 'ValidationError';
+        this.field = field;
+    }
+}
+try {
+    throw new ValidationError('邮箱格式错误', 'email');
+} catch (e) {
+    if (e instanceof ValidationError) {
+        console.log('验证错误:', e.field, e.message);
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>最佳实践</h2>
+        <div class="code">// 1. 只在需要时捕获
+// ❌ 不要吞掉错误
+try {
+    doSomething();
+} catch (e) {}  // 静默吞掉（糟糕）
+
+// ✅ 要处理或重新抛出
+try {
+    doSomething();
+} catch (e) {
+    console.error('操作失败:', e.message);
+    throw e;  // 重新抛出
+}
+
+// 2. 区分错误类型
+try {
+    riskyOperation();
+} catch (e) {
+    if (e instanceof TypeError) {
+        console.log('类型错误:', e.message);
+    } else if (e instanceof RangeError) {
+        console.log('范围错误:', e.message);
+    } else {
+        throw e;  // 未知错误，重新抛出
+    }
+}
+
+// 3. 异步错误用 .catch() 或 try/catch + async/await
+// Promise
+fetchData()
+    .then(data => console.log(data))
+    .catch(err => console.error('获取数据失败:', err));
+
+// async/await
+async function loadData() {
+    try {
+        const data = await fetchData();
+        console.log(data);
+    } catch (err) {
+        console.error('获取数据失败:', err);
+    }
+}
+
+// 4. 全局未捕获错误
+// window.onerror = function(message, source, line, col, error) {}
+// window.addEventListener('unhandledrejection', event => {
+//     console.error('未处理的 Promise 拒绝:', event.reason);
+// });</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== try/catch ===');
+        try {
+            const data = JSON.parse('{"name": "Alice"}');
+            console.log('解析成功:', data.name);
+        } catch (e) {
+            console.log('解析失败:', e.message);
+        }
+
+        console.log('=== finally ===');
+        function test() {
+            try {
+                console.log('  try 执行');
+                return 'try返回值';
+            } catch (e) {
+                console.log('  catch 执行');
+            } finally {
+                console.log('  finally 执行（总是）');
+            }
+        }
+        console.log('返回值:', test());
+
+        console.log('=== throw ===');
+        function checkAge(age) {
+            if (age < 0) throw new RangeError('年龄不能为负数');
+            if (age > 150) throw new RangeError('年龄不合法');
+            if (typeof age !== 'number') throw new TypeError('年龄必须是数字');
+            return '年龄有效';
+        }
+        try {
+            checkAge(-5);
+        } catch (e) {
+            console.log(e.name + ':', e.message);
+        }
+
+        console.log('=== 自定义错误 ===');
+        class AuthError extends Error {
+            constructor(message, code) {
+                super(message);
+                this.name = 'AuthError';
+                this.code = code;
+            }
+        }
+        try {
+            throw new AuthError('登录已过期', 401);
+        } catch (e) {
+            if (e instanceof AuthError) {
+                console.log('权限错误:', e.code, e.message);
+            }
+        }
+
+        console.log('=== 重新抛出 ===');
+        function process(data) {
+            try {
+                JSON.parse(data);
+            } catch (e) {
+                if (e instanceof SyntaxError) {
+                    console.log('JSON 格式错误:', e.message);
+                } else {
+                    throw e;
+                }
+            }
+        }
+        process('{"valid": true}');
+        process('invalid json');
+
+        document.getElementById('output').textContent =
+            `try/catch 正常执行\n` +
+            `finally 总是执行\n` +
+            `自定义错误已演示\n` +
+            `✅ 错误处理演示完成！`;
+    </script>
+</body>
+</html>

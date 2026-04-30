@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>边界与锚点</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #anchor-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; margin: 5px 0; width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>边界与锚点</h2><p>^ $ 开头结尾、\b \B 单词边界、前瞻/后顾。</p></div>
+    <div class="card">
+        <h2>边界与锚点</h2>
+        <div class="code">// ========== 锚点 ==========
+// ^  — 字符串开头 (多行模式: 行开头)
+// $  — 字符串结尾 (多行模式: 行结尾)
+
+// ========== 单词边界 ==========
+// \b — 单词边界 (单词字符与非单词字符之间)
+// \B — 非单词边界
+
+// 示例:
+/\bword\b/.test('a word a')   // true
+/\bword\b/.test('a wordy a')  // false
+/\bword\b/.test('aswording')  // false
+
+// \B 匹配非边界位置
+/\Bword\B/.test('aswordas')   // true (word 在中间)
+
+// ========== 前瞻 Lookahead ==========
+// (?=...)  — 正向前瞻 (后面是...)
+// (?!...)  — 负向前瞻 (后面不是...)
+
+// 示例:
+/\d(?=px)/  // 后面的数字('5px' ⇒ 5)
+/\d(?!px)/  // 后面不是 px 的数字
+
+// ========== 后顾 Lookbehind (ES2018) ==========
+// (?<=...) — 正向后顾 (前面是...)
+// (?<!...) — 负向后顾 (前面不是...)
+
+// 示例:
+/(?<=\$)\d+/ // 美元符号后的数字 ('$100' ⇒ 100)
+/(?<!-)\d+/  // 负号后面的数字 ('5' 和 '-3' ⇒ 5)
+
+// ========== 应用 ==========
+// 完整单词匹配
+/\bhello\b/i         // 匹配完整单词 hello
+// 负向前瞻排除
+/\b(?!js\b)\w+/     // 不是 'js' 的单词</div>
+    </div>
+    <div class="card">
+        <h2>演示：边界与前瞻</h2>
+        <input id="anchorInput" value="hello world, hello123 js" placeholder="输入文本">
+        <button onclick="demoAnchors()">边界与锚点</button>
+        <button onclick="demoLookahead()">前瞻后顾</button>
+        <div id="anchor-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const anchorResult = document.getElementById('anchor-result');
+
+        function log(msg) {
+            anchorResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoAnchors() {
+            anchorResult.innerHTML = '';
+            const text = document.getElementById('anchorInput').value;
+            log(`📋 文本: "${text}"`);
+            log('');
+
+            log('1️⃣ 锚点 ^ 和 $:');
+            log(`   ^hello: ${/^hello/.test(text) ? '✅' : '❌'}`);
+            log(`   js$: ${/js$/.test(text) ? '✅' : '❌'}`);
+            log(`   ^hello.*js$: ${/^hello.*js$/.test(text) ? '✅' : '❌'}`);
+            log('');
+
+            log('2️⃣ 单词边界 \\b:');
+            log(`   \\bhello\\b: ${/\bhello\b/.test(text) ? '✅' : '❌'}`);
+            log(`   \\bworld\\b: ${/\bworld\b/.test(text) ? '✅' : '❌'}`);
+            log(`   \\bjs\\b: ${/\bjs\b/.test(text) ? '✅' : '❌'}`);
+            log('');
+
+            log('3️⃣ 非单词边界 \\B:');
+            const matches = text.match(/\B\w+/g);
+            log(`   \\B\\w+: ${matches ? `[${matches.join(', ')}]` : '无'}`);
+            log('');
+
+            log('4️⃣ 完整单词匹配:');
+            const words = text.match(/\b\w+\b/g);
+            log(`   所有单词: ${words ? `[${words.join(', ')}]` : '无'}`);
+        }
+
+        function demoLookahead() {
+            anchorResult.innerHTML = '';
+            log('👁️ 前瞻与后顾演示:');
+            log('');
+
+            const text1 = '5px, 10px, 3em, 2rem, 100%';
+            log(`📋 文本: "${text1}"`);
+            log('');
+
+            log('1️⃣ 正向前瞻 (?=):');
+            const pxNums = text1.match(/\d+(?=px)/g);
+            log(`   \\d+(?=px): ${pxNums ? `[${pxNums}]` : '无'} (px 前的数字)`);
+            log('');
+
+            log('2️⃣ 负向前瞻 (?!):');
+            const notPx = text1.match(/\d+(?!px)/g);
+            log(`   \\d+(?!px): ${notPx ? `[${notPx}]` : '无'} (后面不是 px 的数字)`);
+
+            const text2 = '$100, €50, $200, ¥300';
+            log(`\n📋 文本: "${text2}"`);
+            log('');
+
+            log('3️⃣ 正向后顾 (?<=):');
+            try {
+                const afterDollar = text2.match(/(?<=\$)\d+/g);
+                log(`   (?<=\\$)\\d+: ${afterDollar ? `[${afterDollar}]` : '无'} ($ 后的数字)`);
+
+                const afterSymbol = text2.match(/(?<=[€\$¥])\d+/g);
+                log(`   (?<=[€\\$¥])\\d+: ${afterSymbol ? `[${afterSymbol}]` : '无'} (货币后的数字)`);
+            } catch (e) {
+                log('   ⚠️ 后顾断言可能不受支持');
+            }
+            log('');
+
+            log('4️⃣ 综合应用:');
+            log(`   匹配价格: ${text2.match(/(?<=[€\$¥])\d+/g)?.join(', ')}`);
+            log('   提取 CSS 值:');
+            log(`     \\d+(?=px|em|rem|%): ${text1.match(/\d+(?=px|em|rem|%)/g)?.join(', ')}`);
+        }
+
+        console.log('=== 边界与锚点 ===');
+
+        document.getElementById('output').textContent =
+            `边界与锚点: ^ $ \\b \\B / 前瞻(?=) / 后顾(?<=) / 否定前瞻(?!) / 否定后顾(?<!)\n` +
+            `✅ 边界与锚点演示完成！`;
+    </script>
+</body>
+</html>

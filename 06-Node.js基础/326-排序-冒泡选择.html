@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排序-冒泡选择</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        .bar-container { display: flex; align-items: flex-end; height: 100px; gap: 3px; margin: 10px 0; }
+        .bar { background: #3498db; width: 20px; transition: height 0.3s; border-radius: 2px 2px 0 0; min-width: 12px; text-align: center; font-size: 10px; color: white; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>排序-冒泡选择</h2><p>冒泡排序优化、选择排序、可视化、时间/空间复杂度。</p></div>
+    <div class="card">
+        <h2>冒泡 & 选择排序</h2>
+        <div class="code">// ========== 冒泡排序 O(n²) ==========
+function bubbleSort(arr) {
+    const a = [...arr];
+    for (let i = 0; i < a.length; i++) {
+        for (let j = 0; j < a.length - 1 - i; j++) {
+            if (a[j] > a[j + 1]) {
+                [a[j], a[j + 1]] = [a[j + 1], a[j]];
+            }
+        }
+    }
+    return a;
+}
+
+// ========== 冒泡优化 (提前退出) ==========
+function bubbleSortOptimized(arr) {
+    const a = [...arr];
+    for (let i = 0; i < a.length; i++) {
+        let swapped = false;
+        for (let j = 0; j < a.length - 1 - i; j++) {
+            if (a[j] > a[j + 1]) {
+                [a[j], a[j + 1]] = [a[j + 1], a[j]];
+                swapped = true;
+            }
+        }
+        if (!swapped) break; // 已有序, 提前退出
+    }
+    return a;
+}
+
+// ========== 选择排序 O(n²) ==========
+function selectionSort(arr) {
+    const a = [...arr];
+    for (let i = 0; i < a.length - 1; i++) {
+        let minIdx = i;
+        for (let j = i + 1; j < a.length; j++) {
+            if (a[j] < a[minIdx]) minIdx = j;
+        }
+        if (minIdx !== i) [a[i], a[minIdx]] = [a[minIdx], a[i]];
+    }
+    return a;
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：冒泡 & 选择排序</h2>
+        <button onclick="demoBubble()">冒泡排序</button>
+        <button onclick="demoBubbleOpt()">冒泡优化</button>
+        <button onclick="demoSelection()">选择排序</button>
+        <button onclick="demoCompare()">性能对比</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoBubble() {
+            result.innerHTML = '';
+            log('🫧 冒泡排序:');
+            log('');
+
+            function bubbleSort(arr) {
+                const a = [...arr];
+                let comparisons = 0, swaps = 0;
+                log(`初始: [${a}]`);
+                for (let i = 0; i < a.length; i++) {
+                    for (let j = 0; j < a.length - 1 - i; j++) {
+                        comparisons++;
+                        if (a[j] > a[j + 1]) {
+                            [a[j], a[j + 1]] = [a[j + 1], a[j]];
+                            swaps++;
+                        }
+                    }
+                    log(`  第 ${i + 1} 轮: [${a}]`);
+                }
+                log(`比较: ${comparisons} 次, 交换: ${swaps} 次`);
+                return a;
+            }
+
+            const data = [5, 3, 8, 4, 2];
+            log(`原始数组: [${data}]`);
+            log('');
+            const sorted = bubbleSort(data);
+            log('');
+            log(`排序结果: [${sorted}]`);
+            log(`时间复杂度: O(n²), 空间复杂度: O(1)`);
+        }
+
+        function demoBubbleOpt() {
+            result.innerHTML = '';
+            log('⚡ 冒泡排序优化 (提前退出):');
+            log('');
+
+            function bubbleSortOpt(arr) {
+                const a = [...arr];
+                let comparisons = 0, swaps = 0;
+                log(`初始: [${a}]`);
+                for (let i = 0; i < a.length; i++) {
+                    let swapped = false;
+                    for (let j = 0; j < a.length - 1 - i; j++) {
+                        comparisons++;
+                        if (a[j] > a[j + 1]) {
+                            [a[j], a[j + 1]] = [a[j + 1], a[j]];
+                            swapped = true;
+                            swaps++;
+                        }
+                    }
+                    log(`  第 ${i + 1} 轮: [${a}] (${swapped ? '交换了' : '已有序, 提前退出!'})`);
+                    if (!swapped) break;
+                }
+                log(`比较: ${comparisons} 次, 交换: ${swaps} 次`);
+                return a;
+            }
+
+            // 几乎有序的情况
+            const data = [1, 2, 3, 5, 4];
+            log(`原始数组 (几乎有序): [${data}]`);
+            log('');
+            bubbleSortOpt(data);
+            log('');
+            log('✅ 优化后可以在最佳情况 O(n) 完成');
+        }
+
+        function demoSelection() {
+            result.innerHTML = '';
+            log('🎯 选择排序:');
+            log('');
+
+            function selectionSort(arr) {
+                const a = [...arr];
+                let comparisons = 0, swaps = 0;
+                log(`初始: [${a}]`);
+                for (let i = 0; i < a.length - 1; i++) {
+                    let minIdx = i;
+                    for (let j = i + 1; j < a.length; j++) {
+                        comparisons++;
+                        if (a[j] < a[minIdx]) minIdx = j;
+                    }
+                    if (minIdx !== i) {
+                        [a[i], a[minIdx]] = [a[minIdx], a[i]];
+                        swaps++;
+                    }
+                    log(`  第 ${i + 1} 轮: 选择 ${a[i]}, 数组 [${a}]`);
+                }
+                log(`比较: ${comparisons} 次, 交换: ${swaps} 次`);
+                return a;
+            }
+
+            const data = [29, 10, 14, 37, 13];
+            log(`原始数组: [${data}]`);
+            log('');
+            const sorted = selectionSort(data);
+            log('');
+            log(`排序结果: [${sorted}]`);
+            log('');
+            log('📌 选择排序特点:');
+            log('   • 比较次数固定: n(n-1)/2');
+            log('   • 交换次数少: 最多 n-1 次');
+            log('   • 不稳定排序 (相等元素可能交换位置)');
+        }
+
+        function demoCompare() {
+            result.innerHTML = '';
+            log('⚡ 性能对比 (1000 元素):');
+            log('');
+
+            // 生成测试数据
+            const size = 1000;
+            const testData = Array.from({ length: size }, () => Math.floor(Math.random() * 10000));
+            log(`测试规模: ${size} 个随机整数`);
+            log('');
+
+            function bubbleSort(arr) {
+                const a = [...arr];
+                for (let i = 0; i < a.length; i++) {
+                    for (let j = 0; j < a.length - 1 - i; j++) {
+                        if (a[j] > a[j + 1]) [a[j], a[j + 1]] = [a[j + 1], a[j]];
+                    }
+                }
+                return a;
+            }
+
+            function bubbleSortOpt(arr) {
+                const a = [...arr];
+                for (let i = 0; i < a.length; i++) {
+                    let swapped = false;
+                    for (let j = 0; j < a.length - 1 - i; j++) {
+                        if (a[j] > a[j + 1]) { [a[j], a[j + 1]] = [a[j + 1], a[j]]; swapped = true; }
+                    }
+                    if (!swapped) break;
+                }
+                return a;
+            }
+
+            function selectionSort(arr) {
+                const a = [...arr];
+                for (let i = 0; i < a.length - 1; i++) {
+                    let minIdx = i;
+                    for (let j = i + 1; j < a.length; j++) {
+                        if (a[j] < a[minIdx]) minIdx = j;
+                    }
+                    if (minIdx !== i) [a[i], a[minIdx]] = [a[minIdx], a[i]];
+                }
+                return a;
+            }
+
+            // 原生排序作为基准
+            let start = performance.now();
+            const nativeSorted = [...testData].sort((a, b) => a - b);
+            log(`1️⃣ 原生 sort: ${(performance.now() - start).toFixed(2)}ms`);
+
+            start = performance.now();
+            const bubbleSorted = bubbleSort(testData);
+            log(`2️⃣ 冒泡排序: ${(performance.now() - start).toFixed(2)}ms`);
+
+            start = performance.now();
+            const bubbleOptSorted = bubbleSortOpt(testData);
+            log(`3️⃣ 冒泡优化: ${(performance.now() - start).toFixed(2)}ms`);
+
+            start = performance.now();
+            const selectionSorted = selectionSort(testData);
+            log(`4️⃣ 选择排序: ${(performance.now() - start).toFixed(2)}ms`);
+
+            log('');
+            log('📊 复杂度对比:');
+            log('   算法'.padEnd(14) + '最好'.padEnd(12) + '平均'.padEnd(12) + '最坏'.padEnd(12) + '空间');
+            log('   冒泡排序'.padEnd(14) + 'O(n)'.padEnd(12) + 'O(n²)'.padEnd(12) + 'O(n²)'.padEnd(12) + 'O(1)');
+            log('   冒泡优化'.padEnd(14) + 'O(n)'.padEnd(12) + 'O(n²)'.padEnd(12) + 'O(n²)'.padEnd(12) + 'O(1)');
+            log('   选择排序'.padEnd(14) + 'O(n²)'.padEnd(12) + 'O(n²)'.padEnd(12) + 'O(n²)'.padEnd(12) + 'O(1)');
+            log('');
+            log('📌 结论: 数据量大时建议用原生 sort (TimSort)');
+        }
+
+        console.log('=== 排序-冒泡选择 ===');
+        document.getElementById('output').textContent = `排序基础: 冒泡 / 冒泡优化 / 选择 / 复杂度分析\n✅ 排序-冒泡选择演示完成！`;
+    </script>
+</body>
+</html>

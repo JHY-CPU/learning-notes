@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Flask基础</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🌶️ Python Flask 基础</h2><p>Flask 微框架介绍、应用创建、路由 @app.route、变量规则、HTTP 方法处理、request/response/jsonify、应用运行与调试模式。</p></div>
+    <div class="card">
+        <h2>Flask 简介</h2>
+        <div class="code">// ========== Flask 是什么 ==========
+// Flask: Python 轻量级 Web 框架
+// - 微框架 (核心简单,扩展灵活)
+// - WSGI 兼容 (Werkzeug + Jinja2)
+// - 适合: REST API / 原型 / 中小项目
+
+// 安装:
+// pip install flask
+
+// ========== 最小应用 ==========
+from flask import Flask
+
+app = Flask(__name__)
+
+@app.route("/")
+def hello():
+    return "Hello, World!"
+
+if __name__ == "__main__":
+    app.run(debug=True)  # 开发服务器
+
+// 运行:
+// python app.py
+// 访问: http://127.0.0.1:5000</div>
+    </div>
+    <div class="card">
+        <h2>路由 @app.route</h2>
+        <div class="code">// ========== 基本路由 ==========
+from flask import Flask
+app = Flask(__name__)
+
+@app.route("/")
+def index():
+    return "首页"
+
+@app.route("/about")
+def about():
+    return "关于页面"
+
+@app.route("/contact")
+def contact():
+    return "联系方式"
+
+// ========== 变量规则 ==========
+@app.route("/user/<username>")
+def show_user(username):
+    return f"用户: {username}"
+
+@app.route("/post/<int:post_id>")
+def show_post(post_id):
+    return f"文章 ID: {post_id}"
+
+@app.route("/path/<path:subpath>")
+def show_path(subpath):
+    return f"路径: {subpath}"
+
+// 转换器类型:
+// string — 默认,接受任何不含 / 的文本
+// int    — 整数
+// float  — 浮点数
+// path   — 接受 / 的路径
+// uuid   — UUID 字符串</div>
+    </div>
+    <div class="card">
+        <h2>HTTP 方法</h2>
+        <div class="code">// ========== 请求方法 ==========
+from flask import Flask, request
+app = Flask(__name__)
+
+# 指定方法:
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        return "处理登录"
+    return "显示登录表单"
+
+# 单一方法快捷方式:
+from flask import Flask
+
+@app.get("/users")       # GET 请求
+def list_users():
+    return "用户列表"
+
+@app.post("/users")      # POST 请求
+def create_user():
+    return "创建用户"
+
+@app.put("/users/<int:id>")
+def update_user(id):
+    return f"更新用户 {id}"
+
+@app.delete("/users/<int:id>")
+def delete_user(id):
+    return f"删除用户 {id}"
+
+@app.patch("/users/<int:id>")
+def patch_user(id):
+    return f"部分更新用户 {id}"</div>
+    </div>
+    <div class="card">
+        <h2>request 对象</h2>
+        <div class="code">// ========== 获取请求数据 ==========
+from flask import Flask, request
+app = Flask(__name__)
+
+@app.route("/example", methods=["GET", "POST"])
+def example():
+    # 查询参数: ?name=Alice&age=25
+    name = request.args.get("name")        # Alice
+    age = request.args.get("age", "18")    # 默认值
+    all_params = request.args               # ImmutableMultiDict
+
+    # 表单数据: POST 请求体 (application/x-www-form-urlencoded)
+    username = request.form.get("username")
+
+    # JSON 数据: POST 请求体 (application/json)
+    data = request.get_json()               # dict 或 None
+    if data:
+        email = data.get("email")
+
+    # 请求头:
+    user_agent = request.headers.get("User-Agent")
+    content_type = request.content_type
+    auth = request.headers.get("Authorization")
+
+    # URL 各部分:
+    print(request.url)          # 完整 URL
+    print(request.path)         # /example
+    print(request.host)         # 127.0.0.1:5000
+    print(request.remote_addr)  # 客户端 IP
+
+    # 上传文件:
+    file = request.files.get("file")
+    if file:
+        file.save(f"uploads/{file.filename}")
+
+    return "OK"</div>
+    </div>
+    <div class="card">
+        <h2>response 对象</h2>
+        <div class="code">// ========== 构建响应 ==========
+from flask import Flask, jsonify, make_response, redirect, abort, send_file
+app = Flask(__name__)
+
+# 方式 1: 直接返回字符串
+@app.route("/")
+def index():
+    return "Hello, World!"
+
+# 方式 2: 返回元组 (body, status_code, headers)
+@app.route("/created")
+def created():
+    return "创建成功", 201, {"X-Custom": "value"}
+
+# 方式 3: make_response
+@app.route("/custom")
+def custom():
+    resp = make_response("<h1>自定义</h1>")
+    resp.status_code = 200
+    resp.headers["Content-Type"] = "text/html"
+    resp.headers["X-Debug"] = "true"
+    resp.set_cookie("token", "abc123", max_age=3600)
+    return resp
+
+# 方式 4: jsonify (返回 JSON)
+@app.route("/api/user")
+def api_user():
+    return jsonify({
+        "id": 1,
+        "name": "Alice",
+        "email": "alice@example.com"
+    })
+    # Content-Type: application/json
+
+# 重定向:
+@app.route("/old")
+def old():
+    return redirect("/new")       # 302 重定向
+    # return redirect("/new", 301)  # 永久重定向
+
+# 错误:
+@app.route("/notfound")
+def not_found():
+    abort(404, description="资源不存在")
+
+// ========== 错误处理 ==========
+@app.errorhandler(404)
+def not_found_handler(error):
+    return jsonify({"error": "Not Found", "message": str(error)}), 404
+
+@app.errorhandler(500)
+def server_error(error):
+    return jsonify({"error": "Internal Server Error"}), 500</div>
+        <div class="note">💡 Flask 基础要点: (1) @app.route() 定义路由,<int:id> 变量规则; (2) @app.get/post/put/delete 方法快捷方式; (3) request.args/form/get_json/headers 获取请求数据; (4) jsonify 返回 JSON, make_response 自定义响应; (5) abort 触发错误,errorhandler 处理错误。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoRoute()">路由演示</button>
+        <button onclick="demoRequest()">request 演示</button>
+        <button onclick="demoResponse()">response 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoRoute() {
+            result.innerHTML = '';
+            log('# Flask 路由演示');
+            log('');
+            log('@app.route("/")            → 首页');
+            log('@app.route("/user/<name>") → 动态 URL');
+            log('@app.route("/post/<int:id>") → 整数参数');
+            log('@app.route("/path/<path:p>") → 路径参数');
+            log('');
+            log('HTTP 方法快捷方式:');
+            log('  @app.get("/users")');
+            log('  @app.post("/users")');
+            log('  @app.put("/users/<id>")');
+            log('  @app.delete("/users/<id>")');
+        }
+
+        function demoRequest() {
+            result.innerHTML = '';
+            log('# request 对象演示');
+            log('');
+            log('GET 参数:   request.args');
+            log('  URL?name=Alice → args.get("name")');
+            log('');
+            log('POST 表单:  request.form');
+            log('POST JSON:  request.get_json()');
+            log('');
+            log('请求头:     request.headers');
+            log('  User-Agent / Content-Type');
+            log('  Authorization');
+            log('');
+            log('文件:       request.files');
+            log('客户端 IP:  request.remote_addr');
+        }
+
+        function demoResponse() {
+            result.innerHTML = '';
+            log('# response 演示');
+            log('');
+            log('返回字符串: return "Hello"');
+            log('返回元组:   return "OK", 200, {...}');
+            log('JSON:       jsonify({...})');
+            log('重定向:     redirect("/new")');
+            log('错误:       abort(404)');
+            log('');
+            log('make_response: 完全自定义');
+            log('  resp.set_cookie()');
+            log('  resp.headers["X-"] = ...');
+            log('  resp.status_code = 201');
+        }
+    </script>
+</body>
+</html>

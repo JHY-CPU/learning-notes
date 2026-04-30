@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Object静态方法</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #9b59b6; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Object 静态方法</h2><p>Object 对象自带的工具方法。</p></div>
+    <div class="card">
+        <h2>Object.assign() — 合并对象</h2>
+        <div class="code">const target = { a: 1 };
+const source1 = { b: 2 };
+const source2 = { c: 3, a: 99 };  // a 会覆盖
+
+Object.assign(target, source1, source2);
+// target → { a: 99, b: 2, c: 3 }
+
+// 常用：创建副本
+const copy = Object.assign({}, original);
+
+// 合并默认配置
+const defaults = { theme: 'light', lang: 'zh' };
+const userConfig = { theme: 'dark' };
+const config = Object.assign({}, defaults, userConfig);
+// { theme: 'dark', lang: 'zh' }</div>
+    </div>
+    <div class="card">
+        <h2>Object.freeze() — 冻结对象</h2>
+        <div class="code">const obj = Object.freeze({ name: 'Alice' });
+obj.name = 'Bob';         // 静默失败（严格模式报错）
+obj.age = 25;             // 不能添加
+delete obj.name;          // 不能删除
+// 只读，不能修改、添加、删除
+
+Object.isFrozen(obj);     // true（检查是否冻结）
+
+// ⚠️ 浅冻结！嵌套对象仍可修改
+const frozen = Object.freeze({ inner: { x: 1 } });
+frozen.inner.x = 100;     // ✅ 内层对象可以修改</div>
+        <div class="note">💡 freeze() 可以让对象真正不可变（但只针对第一层）。</div>
+    </div>
+    <div class="card">
+        <h2>Object.seal() — 密封对象</h2>
+        <div class="code">const obj = Object.seal({ name: 'Alice', age: 25 });
+obj.name = 'Bob';         // ✅ 可以修改
+obj.job = 'dev';          // ❌ 不能添加
+delete obj.age;           // ❌ 不能删除
+
+Object.isSealed(obj);     // true
+
+// freeze vs seal：
+// freeze: 不能改/增/删
+// seal: 可以改，不能增/删</div>
+    </div>
+    <div class="card">
+        <h2>Object.defineProperty() — 定义属性</h2>
+        <div class="code">const obj = {};
+
+Object.defineProperty(obj, 'name', {
+    value: 'Alice',
+    writable: true,   // 可修改
+    enumerable: true, // 可遍历
+    configurable: true // 可删除/配置
+});
+
+// 定义 getter/setter
+Object.defineProperty(obj, 'fullName', {
+    get() { return this._firstName + ' ' + this._lastName; },
+    set(val) { [this._firstName, this._lastName] = val.split(' '); }
+});</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== Object.assign ===');
+        const defaults = { theme: 'light', lang: 'zh', debug: false };
+        const userConfig = { theme: 'dark' };
+        const config = Object.assign({}, defaults, userConfig);
+        console.log('合并配置:', config);
+
+        console.log('=== Object.freeze ===');
+        const frozen = Object.freeze({ name: 'Fixed', arr: [1, 2, 3] });
+        // frozen.name = 'changed';  // 静默失败
+        frozen.arr.push(4);  // 数组可以修改（浅冻结）
+        console.log('冻结对象的数组:', frozen.arr);
+
+        console.log('=== Object.keys/values/entries ===');
+        const data = { a: 1, b: 2, c: 3 };
+        console.log('keys:', Object.keys(data));
+        console.log('values:', Object.values(data));
+        console.log('entries:', Object.entries(data));
+
+        console.log('=== Object.fromEntries ===');
+        const arr = [['name', 'Alice'], ['age', 25]];
+        const obj = Object.fromEntries(arr);
+        console.log('fromEntries:', obj);
+
+        document.getElementById('output').textContent =
+            `assign合并: ${JSON.stringify(config)}\n` +
+            `keys: ${Object.keys(data).join(', ')}\n` +
+            `values: ${Object.values(data).join(', ')}\n` +
+            `✅ Object静态方法演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>03-递归调用栈 (Recursion Call Stack)</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 20px; color: #333; }
+h1 { text-align: center; color: #2c3e50; margin-bottom: 24px; font-size: 28px; }
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; font-size: 18px; }
+.card p { line-height: 1.7; color: #555; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; font-size: 14px; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; border-radius: 4px; margin: 10px 0; font-size: 14px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 14px; line-height: 1.5; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; font-size: 14px; transition: background 0.2s; }
+button:hover { opacity: 0.9; background: #2980b9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; white-space: pre-wrap; font-size: 14px; }
+.section-nav { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 24px; }
+.section-nav a { text-decoration: none; color: white; background: #7f8c8d; padding: 6px 14px; border-radius: 16px; font-size: 13px; transition: background 0.2s; }
+.section-nav a:hover { background: #3498db; }
+.stack-vis { display: flex; flex-direction: column-reverse; align-items: center; gap: 4px; margin: 15px 0; min-height: 60px; }
+.stack-item { background: #3498db; color: white; padding: 8px 24px; border-radius: 4px; font-family: monospace; font-size: 14px; min-width: 160px; text-align: center; animation: fadeIn 0.3s; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 14px; }
+th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: center; }
+th { background: #3498db; color: white; }
+tr:nth-child(even) { background: #f8f9fa; }
+</style></head>
+<body>
+<div class="section-nav">
+<a href="01-%E9%80%92%E5%BD%92%E5%9F%BA%E7%A1%80%20(Recursion%20Basics).html">01-递归基础</a>
+<a href="02-%E9%80%92%E5%BD%92%E4%B8%89%E8%A6%81%E7%B4%A0%20(Three%20Elements).html">02-三要素</a>
+<a href="03-%E9%80%92%E5%BD%92%E8%B0%83%E7%94%A8%E6%A0%88%20(Recursion%20Call%20Stack).html">03-调用栈</a>
+<a href="04-%E5%B0%BE%E9%80%92%E5%BD%92%E4%BC%98%E5%8C%96%20(Tail%20Recursion).html">04-尾递归</a>
+<a href="05-%E9%80%92%E5%BD%92%E8%BD%AC%E8%BF%AD%E4%BB%A3%20(Recursion%20to%20Iteration).html">05-转迭代</a>
+<a href="06-%E9%80%92%E6%8E%A8%E5%85%B3%E7%B3%BB%E5%BB%BA%E6%A8%A1%20(Recurrence%20Modeling).html">06-递推关系</a>
+<a href="07-%E9%80%92%E5%BD%92%E6%A0%91%E5%88%86%E6%9E%90%20(Recursion%20Tree).html">07-递归树</a>
+<a href="08-%E5%9B%9E%E6%BA%AF%E7%AE%97%E6%B3%95%E5%9F%BA%E7%A1%80%20(Backtracking%20Basics).html">08-回溯基础</a>
+<a href="09-%E5%9B%9E%E6%BA%AF%E4%B8%89%E8%A6%81%E7%B4%A0%20(Backtracking%20Framework).html">09-回溯框架</a>
+<a href="10-%E5%89%AA%E6%9E%9D%E4%BC%98%E5%8C%96%20(Pruning).html">10-剪枝</a>
+<a href="11-%E5%AD%90%E9%9B%86%E9%97%AE%E9%A2%98%20(Subsets).html">11-子集</a>
+<a href="12-%E7%BB%84%E5%90%88%E9%97%AE%E9%A2%98%20(Combinations).html">12-组合</a>
+<a href="13-%E6%8E%92%E5%88%97%E9%97%AE%E9%A2%98%20(Permutations).html">13-排列</a>
+<a href="14-%E7%BB%84%E5%90%88%E6%80%BB%E5%92%8C%20(Combination%20Sum).html">14-组合总和</a>
+<a href="15-N%E7%9A%87%E5%90%8E%E9%97%AE%E9%A2%98%20(N-Queens).html">15-N皇后</a>
+<a href="16-%E6%95%B0%E7%8B%AC%E6%B1%82%E8%A7%A3%20(Sudoku%20Solver).html">16-数独</a>
+<a href="17-%E6%8B%AC%E5%8F%B7%E7%94%9F%E6%88%90%20(Generate%20Parentheses).html">17-括号</a>
+<a href="18-%E5%8D%95%E8%AF%8D%E6%90%9C%E7%B4%A2%20(Word%20Search).html">18-单词搜索</a>
+<a href="19-%E5%88%86%E5%89%B2%E5%9B%9E%E6%96%87%E4%B8%B2%20(Palindrome%20Partitioning).html">19-回文串</a>
+<a href="20-%E5%A4%8D%E5%8E%9FIP%E5%9C%B0%E5%9D%80%20(Restore%20IP%20Addresses).html">20-IP地址</a>
+<a href="21-%E5%AD%90%E9%9B%86%E6%A0%91%E4%B8%8E%E6%8E%92%E5%88%97%E6%A0%91%20(Subset%20%26%20Permutation%20Tree).html">21-子集树</a>
+<a href="22-%E5%88%86%E6%94%AF%E9%99%90%E7%95%8C%E6%B3%95%20(Branch%20and%20Bound).html">22-分支限界</a>
+<a href="23-%E8%BF%AD%E4%BB%A3%E5%8A%A0%E6%B7%B1%E6%90%9C%E7%B4%A2%20(Iterative%20Deepening%20DFS).html">23-迭代加深</a>
+<a href="24-%E5%8F%8C%E5%90%91%E6%90%9C%E7%B4%A2%20(Bidirectional%20Search).html">24-双向搜索</a>
+<a href="25-%E9%80%92%E5%BD%92%E4%B8%8E%E5%9B%9E%E6%BA%AF%E7%BB%BC%E5%90%88%E7%BB%83%E4%B9%A0%20(Recursion%20%26%20Backtracking%20Practice).html">25-综合练习</a>
+</div>
+<h1>递归调用栈</h1>
+
+<div class="card">
+<h2>什么是调用栈</h2>
+<p>每当一个函数被调用时，系统会在内存中分配一块区域（栈帧）来存储函数的局部变量、参数和返回地址。递归调用时，这些栈帧会层层叠加，形成调用栈。</p>
+<div class="note"><b>栈溢出：</b>如果递归的深度太大，栈帧占用的内存超过系统限制，就会发生栈溢出（Stack Overflow）错误。</div>
+</div>
+
+<div class="card">
+<h2>调用栈可视化</h2>
+<p>点击按钮查看 factorial(5) 的调用栈变化过程：</p>
+<div style="text-align:center;margin-bottom:10px;">
+<div style="font-size:13px;color:#666;">栈顶</div>
+</div>
+<div id="stackVisual" class="stack-vis"></div>
+<div style="text-align:center;margin-bottom:10px;">
+<div style="font-size:13px;color:#666;">栈底</div>
+</div>
+<div style="display:flex;gap:10px;justify-content:center;">
+<button onclick="runStepwise()">逐步演示调用栈</button>
+<button onclick="resetStack()" style="background:#e74c3c;">重置</button>
+</div>
+<div id="result"></div>
+</div>
+
+<div class="card">
+<h2>常见栈深度对比</h2>
+<table>
+<tr><th>递归函数</th><th>输入规模</th><th>栈深度</th><th>说明</th></tr>
+<tr><td>factorial(n)</td><td>n=1000</td><td>1000</td><td>可能溢出</td></tr>
+<tr><td>fib(n)</td><td>n=50</td><td>50</td><td>安全但很慢</td></tr>
+<tr><td>binarySearch(arr, n)</td><td>n=10^6</td><td>~20</td><td>对数深度，安全</td></tr>
+</table>
+</div>
+
+<script>
+let stepIndex = 0;
+let steps = [];
+
+function runStepwise() {
+    const n = 5;
+    stepIndex = 0;
+    steps = [];
+    document.getElementById("stackVisual").innerHTML = "";
+    function gen(x, depth) {
+        steps.push({action: "push", label: "factorial(" + x + ")", depth: depth});
+        if (x <= 1) {
+            steps.push({action: "base", label: "factorial(" + x + ") = 1", depth: depth});
+            steps.push({action: "pop", label: "factorial(" + x + ")", depth: depth});
+            return;
+        }
+        gen(x - 1, depth + 1);
+        steps.push({action: "calc", label: "factorial(" + x + ") = " + x + " x ...", depth: depth});
+        steps.push({action: "pop", label: "factorial(" + x + ")", depth: depth});
+    }
+    gen(n, 0);
+    stepIndex = -1;
+    stepForward();
+}
+
+function stepForward() {
+    stepIndex++;
+    if (stepIndex >= steps.length) {
+        document.getElementById("result").textContent = "演示结束！所有栈帧已弹出。";
+        return;
+    }
+    const s = steps[stepIndex];
+    const vis = document.getElementById("stackVisual");
+    const res = document.getElementById("result");
+
+    if (s.action === "push") {
+        const item = document.createElement("div");
+        item.className = "stack-item";
+        item.textContent = s.label;
+        vis.appendChild(item);
+        res.textContent = "-> 调用 " + s.label + "，栈帧入栈。当前栈大小：" + vis.children.length;
+    } else if (s.action === "base") {
+        res.textContent = "✓ 到达基本情况：" + s.label + "，开始回归";
+    } else if (s.action === "calc") {
+        res.textContent = "↩ 计算 " + s.label + "，准备返回";
+    } else if (s.action === "pop") {
+        if (vis.lastChild) vis.removeChild(vis.lastChild);
+        if (vis.children.length > 0) {
+            res.textContent = "<- 弹出栈帧 " + s.label + "，返回上一层。当前栈大小：" + vis.children.length;
+        } else {
+            res.textContent = "<- 弹出栈帧 " + s.label + "，栈已清空。";
+        }
+    }
+
+    setTimeout(stepForward, 700);
+}
+
+function resetStack() {
+    stepIndex = 0;
+    steps = [];
+    document.getElementById("stackVisual").innerHTML = "";
+    document.getElementById("result").textContent = "已重置，点击"逐步演示调用栈"重新开始";
+}
+</script>
+</body></html>

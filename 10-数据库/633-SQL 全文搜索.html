@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 全文搜索</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔍 SQL 全文搜索</h2><p>全文索引概念、MySQL FULLTEXT 索引、MATCH AGAINST、自然语言模式、布尔模式、查询扩展、PostgreSQL tsvector/tsquery、全文搜索 vs LIKE。</p></div>
+    <div class="card">
+        <h2>全文搜索基础</h2>
+        <div class="code">// ========== 全文搜索概念 ==========
+-- 全文搜索: 在文本内容中搜索关键词
+-- 比 LIKE '%keyword%' 快得多!
+-- 支持: 相关性排序、词干分析、停用词过滤
+
+-- LIKE 的缺陷:
+-- 1. 无法使用索引 (前导 %) → 全表扫描
+-- 2. 不支持相关性排序
+-- 3. 不支持语言处理 (词干,同义词)
+-- 4. 大文本性能极差
+
+-- 全文索引的优势:
+-- 1. 索引支持 → 快速查找
+-- 2. 相关性评分 → 按匹配度排序
+-- 3. 分词处理 → 支持短语、排除词
+-- 4. 语言感知 → 停用词、词干
+
+-- ========== 应用场景 ==========
+-- 1. 文章/博客搜索
+-- 2. 商品搜索
+-- 3. 文档管理系统
+-- 4. 评论/论坛搜索
+-- 5. 日志分析</div>
+    </div>
+    <div class="card">
+        <h2>MySQL 全文搜索</h2>
+        <div class="code">// ========== MySQL 全文索引 ==========
+-- 支持引擎: InnoDB (5.6+), MyISAM
+-- 支持数据类型: CHAR, VARCHAR, TEXT
+
+-- 1. 创建全文索引
+-- 建表时:
+CREATE TABLE articles (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    title VARCHAR(200),
+    body TEXT,
+    FULLTEXT INDEX ft_articles (title, body)
+);
+
+-- 修改表:
+ALTER TABLE articles ADD FULLTEXT INDEX ft_body (body);
+
+-- 直接创建:
+CREATE FULLTEXT INDEX ft_articles_body ON articles(body);
+
+-- 2. 基本搜索 (自然语言模式 - 默认)
+SELECT id, title,
+       MATCH(title, body) AGAINST('database') AS relevance
+FROM articles
+WHERE MATCH(title, body) AGAINST('database')
+ORDER BY relevance DESC;
+
+-- 说明:
+-- - MATCH(...) AGAINST(...) 在 WHERE 和 SELECT 中
+-- - WHERE 中过滤, SELECT 中显示相关度
+-- - 相关度 0~1,越高越匹配
+-- - 默认按相关度降序排列
+
+-- 3. 布尔模式 (更灵活)
+SELECT id, title
+FROM articles
+WHERE MATCH(title, body) AGAINST('+database -sql' IN BOOLEAN MODE);
+
+-- 布尔模式操作符:
+-- +keyword:  必须包含
+-- -keyword:  必须排除
+-- >keyword:  提高权重
+-- <keyword:  降低权重
+-- *:         通配符 (如 data*)
+-- "phrase":  精确短语
+-- () :       分组
+-- ~keyword:  降低该词相关度 (类似 -,但非排除)
+
+-- 示例:
+-- 必须包含 database,排除 sql
+WHERE MATCH(...) AGAINST('+database -sql' IN BOOLEAN MODE);
+
+-- 必须包含 data 开头的词
+WHERE MATCH(...) AGAINST('data*' IN BOOLEAN MODE);
+
+-- 精确短语 "relational database"
+WHERE MATCH(...) AGAINST('"relational database"' IN BOOLEAN MODE);
+
+-- database 权重高, sql 权重低
+WHERE MATCH(...) AGAINST('>database <sql' IN BOOLEAN MODE);</div>
+    </div>
+    <div class="card">
+        <h2>MySQL 全文搜索进阶</h2>
+        <div class="code">// ========== 查询扩展 ==========
+-- WITH QUERY EXPANSION: 自动扩展搜索词
+-- 两阶段:
+-- 1. 先按关键词搜索
+-- 2. 从结果中提取相关词,再搜索一次
+
+-- 搜索"database"时,可能自动包含"SQL","Oracle"
+SELECT id, title
+FROM articles
+WHERE MATCH(title, body) AGAINST('database' WITH QUERY EXPANSION);
+
+-- 注意: 可能会降低精确度 (引入不相关内容)
+
+-- ========== 配置全文搜索 ==========
+
+-- 1. 最小词长 (默认 4)
+-- MySQL 默认忽略 3 个字符以下的词
+-- 修改: 在 my.cnf 中设置
+-- [mysqld]
+-- ft_min_word_len=2
+-- 重启后需重建索引: REPAIR TABLE articles QUICK;
+
+-- 2. 停用词 (stopwords)
+-- MySQL 默认忽略常见词 (the, a, an, and...)
+-- 查看默认停用词:
+-- SELECT * FROM INFORMATION_SCHEMA.INNODB_FT_DEFAULT_STOPWORD;
+
+-- 禁用停用词 (my.cnf):
+-- ft_stopword_file=''
+
+-- 3. 相关性计算
+-- 基于 TF-IDF 算法
+-- TF (词频): 词在文档中出现的频率
+-- IDF (逆文档频率): 词在整个索引中的稀有度
+-- 相关性 = TF * IDF 的累加
+
+-- ========== 全文搜索限制 ==========
+-- 1. 50% 阈值: 如果某词出现超过 50% 的行 → 忽略 (自然语言模式)
+-- 2. 最小词长限制 (默认 4)
+-- 3. 停用词被忽略
+-- 4. 布尔模式没有 50% 阈值</div>
+    </div>
+    <div class="card">
+        <h2>PostgreSQL 全文搜索</h2>
+        <div class="code">// ========== PostgreSQL 全文搜索 ==========
+-- PostgreSQL 全文搜索比 MySQL 更强大
+-- 核心: tsvector (文档) vs tsquery (查询)
+
+-- 1. 创建 tsvector
+-- to_tsvector('english', 'I love databases')
+-- → 'databas':3 'love':2
+-- 自动: 分词 → 词干 → 位置 → 去停用词
+
+-- 2. 基本搜索
+-- to_tsquery('english', 'database & sql')
+-- → 'databas' & 'sql'
+
+-- 3. 完整示例
+-- 建表
+CREATE TABLE documents (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    body TEXT NOT NULL
+);
+
+-- 创建索引 (GIN 索引加速全文搜索)
+CREATE INDEX idx_documents_fts
+ON documents
+USING GIN (to_tsvector('english', title || ' ' || body));
+
+-- 搜索
+SELECT id, title,
+       ts_rank(to_tsvector('english', title || ' ' || body),
+               to_tsquery('english', 'database & sql')) AS rank
+FROM documents
+WHERE to_tsvector('english', title || ' ' || body)
+      @@ to_tsquery('english', 'database & sql')
+ORDER BY rank DESC;
+
+-- ========== PostgreSQL 操作符 ==========
+-- & (AND):   'database & sql'     → 包含两者
+-- | (OR):    'database | sql'     → 包含任一
+-- ! (NOT):   '!database'          → 不包含
+-- <-> (短语): 'database <-> sql'  → database 后紧接 sql
+-- <N> (距离): 'database <2> sql'  → 两词距离 <= 2
+
+-- 示例:
+WHERE fts @@ to_tsquery('english', 'database & !sql');
+WHERE fts @@ to_tsquery('english', 'database <-> sql');
+
+-- ========== MySQL vs PostgreSQL 全文搜索 ==========
+-- MySQL:
+--   优点: 简单易用,自带
+--   缺点: 功能有限,分词差
+--   适用: 简单搜索
+
+-- PostgreSQL:
+--   优点: 强大灵活,语言支持好,自定义词典
+--   缺点: 配置复杂
+--   适用: 复杂全文搜索
+
+-- 外部搜索引擎:
+--   Elasticsearch: 大规模全文搜索
+--   MeiliSearch: 轻量级搜索
+--   Algolia: SaaS 搜索服务</div>
+    </div>
+    <div class="card">
+        <h2>全文搜索优化与替代</h2>
+        <div class="code">// ========== 全文搜索最佳实践 ==========
+
+-- 1. 选择合适的列
+--    - 只在需要搜索的列上建全文索引
+--    - 标题和正文分开索引
+
+-- 2. 结合 LIKE (精确前缀匹配)
+-- 用户搜索 "data":
+--   全文搜索: data*, databases, dataset (相关)
+--   LIKE:    data% (精确前缀)
+--   组合使用效果更好
+
+-- 3. 搜索建议 (自动补全)
+-- 用前缀匹配实现搜索建议:
+SELECT DISTINCT title FROM articles
+WHERE title LIKE 'data%'
+LIMIT 10;
+
+-- 4. 高亮搜索结果
+-- MySQL 无内置高亮,应用层处理
+-- PostgreSQL: ts_headline()
+-- SELECT ts_headline('english', body,
+--     to_tsquery('english', 'database'),
+--     'StartSel=<mark>, StopSel=</mark>');
+
+-- ========== 替代方案 ==========
+-- 当数据库全文搜索不够用时:
+
+-- 1. Elasticsearch
+--    - 分布式搜索引擎
+--    - 近乎实时搜索
+--    - 复杂聚合分析
+--    - 适合: 大规模搜索、日志分析
+
+-- 2. MeiliSearch
+--    - 轻量级、快速
+--    - 前端友好的搜索 API
+--    - 适合: 中小型项目搜索
+
+-- 3. SQLite FTS5
+--    - 嵌入式全文搜索
+--    - 适合: 移动端、桌面应用
+
+-- 选型建议:
+-- 小项目 → MySQL/PostgreSQL 全文搜索
+-- 中项目 → MeiliSearch
+-- 大项目 → Elasticsearch
+-- 嵌入式 → SQLite FTS5</div>
+        <div class="note">💡 全文搜索要点: FULLTEXT 索引加速文本搜索; MATCH AGAINST 支持自然语言/布尔模式; 布尔模式用 +/- 控制包含排除; PostgreSQL tsvector/tsquery 更强大; 大规搜索推荐 Elasticsearch。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoMySQL()">MySQL 全文搜索</button>
+        <button onclick="demoBoolean()">布尔模式演示</button>
+        <button onclick="demoPG()">PostgreSQL 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoMySQL() {
+            result.innerHTML = '';
+            log('# MySQL 全文搜索');
+            log('');
+            log('CREATE FULLTEXT INDEX ft_body ON articles(body);');
+            log('');
+            log("SELECT * FROM articles");
+            log("WHERE MATCH(title, body) AGAINST('database');");
+            log('');
+            log('特点: 自动按相关性排序');
+            log('忽略: 停用词, < 4 字符的词');
+        }
+
+        function demoBoolean() {
+            result.innerHTML = '';
+            log('# 布尔模式');
+            log('');
+            log('+keyword    必须包含');
+            log('-keyword    必须排除');
+            log('>keyword    提高权重');
+            log('*           通配符');
+            log('"phrase"    精确短语');
+            log('');
+            log("AGAINST('+database -sql' IN BOOLEAN MODE)");
+            log("AGAINST('data*'          IN BOOLEAN MODE)");
+            log("AGAINST('\"exact phrase\"' IN BOOLEAN MODE)");
+        }
+
+        function demoPG() {
+            result.innerHTML = '';
+            log('# PostgreSQL 全文搜索');
+            log('');
+            log("to_tsvector('english', body)");
+            log("  @@");
+            log("to_tsquery('english', 'database & sql');");
+            log('');
+            log('tsvector: 分词+词干+位置');
+            log('tsquery:  查询条件');
+            log('GIN 索引: 加速搜索');
+            log('ts_rank:  相关性排序');
+        }
+    </script>
+</body>
+</html>

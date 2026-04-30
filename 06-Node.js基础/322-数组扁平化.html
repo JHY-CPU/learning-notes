@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数组扁平化</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>数组扁平化</h2><p>flat/flatMap、递归实现、控制深度、栈实现、性能比较。</p></div>
+    <div class="card">
+        <h2>数组扁平化方法</h2>
+        <div class="code">// ========== flat (ES2019) ==========
+[1, [2, [3, [4]]]].flat(2);      // [1, 2, 3, [4]]
+[1, [2, [3, [4]]]].flat(Infinity); // [1, 2, 3, 4]
+
+// ========== flatMap ==========
+['a b', 'c d'].flatMap(s => s.split(' '));
+// ['a', 'b', 'c', 'd']
+
+// ========== 递归 reduce ==========
+function flatten(arr, depth = Infinity) {
+    return depth > 0
+        ? arr.reduce((acc, v) => acc.concat(
+            Array.isArray(v) ? flatten(v, depth - 1) : v
+        ), [])
+        : arr.slice();
+}
+
+// ========== 栈实现 (非递归) ==========
+function flattenStack(arr) {
+    const stack = [...arr];
+    const result = [];
+    while (stack.length) {
+        const v = stack.shift();
+        Array.isArray(v) ? stack.unshift(...v) : result.push(v);
+    }
+    return result;
+}
+
+// ========== toString (仅数字) ==========
+[1, [2, [3, [4]]]].toString().split(',').map(Number);
+// [1, 2, 3, 4] (只适用于数字)</div>
+    </div>
+    <div class="card">
+        <h2>演示：数组扁平化</h2>
+        <button onclick="demoFlat()">flat 方法</button>
+        <button onclick="demoRecursive()">递归实现</button>
+        <button onclick="demoFlatMap()">flatMap</button>
+        <button onclick="demoStack()">栈实现 & 性能</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoFlat() {
+            result.innerHTML = '';
+            log('📏 flat() 方法:');
+            log('');
+
+            const arr = [1, [2, [3, [4, [5]]]]];
+            log(`原始数组: ${JSON.stringify(arr)}`);
+            log('');
+
+            log('flat() 不传参:');
+            log(`   ${JSON.stringify(arr.flat())}`);
+            log('');
+
+            log('flat(1):');
+            log(`   ${JSON.stringify(arr.flat(1))}`);
+            log('');
+
+            log('flat(2):');
+            log(`   ${JSON.stringify(arr.flat(2))}`);
+            log('');
+
+            log('flat(Infinity) 完全扁平:');
+            log(`   ${JSON.stringify(arr.flat(Infinity))}`);
+            log('');
+
+            log('flat() 会跳过空位:');
+            log(`   ${JSON.stringify([1, , 2, [3, , 4]].flat())}`);
+        }
+
+        function demoRecursive() {
+            result.innerHTML = '';
+            log('🔄 递归实现:');
+            log('');
+
+            function flatten(arr, depth = Infinity) {
+                return depth > 0
+                    ? arr.reduce((acc, v) => acc.concat(
+                        Array.isArray(v) ? flatten(v, depth - 1) : v
+                    ), [])
+                    : arr.slice();
+            }
+
+            const arr = [1, [2, [3, [4, [5]]]]];
+            log(`原始: ${JSON.stringify(arr)}`);
+            log('');
+            log(`flatten(arr):      ${JSON.stringify(flatten(arr))}`);
+            log(`flatten(arr, 1):   ${JSON.stringify(flatten(arr, 1))}`);
+            log(`flatten(arr, 2):   ${JSON.stringify(flatten(arr, 2))}`);
+            log(`flatten(arr, 0):   ${JSON.stringify(flatten(arr, 0))}`);
+            log('');
+
+            log('手动递归版本:');
+            function flattenManual(arr) {
+                let result = [];
+                for (let i = 0; i < arr.length; i++) {
+                    if (Array.isArray(arr[i])) {
+                        result = result.concat(flattenManual(arr[i]));
+                    } else {
+                        result.push(arr[i]);
+                    }
+                }
+                return result;
+            }
+            log(`   手动递归: ${JSON.stringify(flattenManual(arr))}`);
+            log('');
+
+            log('深度控制版本:');
+            function flattenDepth(arr, depth) {
+                let result = [];
+                for (let i = 0; i < arr.length; i++) {
+                    if (Array.isArray(arr[i]) && depth > 0) {
+                        result = result.concat(flattenDepth(arr[i], depth - 1));
+                    } else {
+                        result.push(arr[i]);
+                    }
+                }
+                return result;
+            }
+            log(`   深度2: ${JSON.stringify(flattenDepth(arr, 2))}`);
+        }
+
+        function demoFlatMap() {
+            result.innerHTML = '';
+            log('🗺️ flatMap 演示:');
+            log('');
+
+            log('1️⃣ 字符串拆分:');
+            const words = ['hello world', 'foo bar'];
+            log(`   原始: [${words}]`);
+            log(`   flatMap: [${words.flatMap(s => s.split(' '))}]`);
+            log('');
+
+            log('2️⃣ 嵌套展开:');
+            const nested = [[1, 2], [3, 4], [5, 6]];
+            log(`   原始: ${JSON.stringify(nested)}`);
+            log(`   flatMap: ${JSON.stringify(nested.flatMap(x => x))}`);
+            log('');
+
+            log('3️⃣ 条件过滤 + 展开:');
+            const data = [1, 2, 3, 4, 5];
+            const result3 = data.flatMap(x => x % 2 === 0 ? [x, x * 10] : []);
+            log(`   偶数扩展: ${JSON.stringify(result3)}`);
+            log('');
+
+            log('4️⃣ flatMap vs map + flat:');
+            const arr = ['a b', 'c d'];
+            log(`   map + flat(1): ${JSON.stringify(arr.map(s => s.split(' ')).flat(1))}`);
+            log(`   flatMap:       ${JSON.stringify(arr.flatMap(s => s.split(' ')))}`);
+            log('');
+
+            log('5️⃣ 笛卡尔积:');
+            const colors = ['红', '蓝'];
+            const sizes = ['S', 'M'];
+            const cartesian = colors.flatMap(c => sizes.map(s => `${c}-${s}`));
+            log(`   颜色: [${colors}], 尺寸: [${sizes}]`);
+            log(`   笛卡尔积: [${cartesian}]`);
+        }
+
+        function demoStack() {
+            result.innerHTML = '';
+            log('📚 栈实现 (非递归):');
+            log('');
+
+            function flattenStack(arr) {
+                const stack = [...arr];
+                const result = [];
+                while (stack.length) {
+                    const v = stack.shift();
+                    if (Array.isArray(v)) {
+                        stack.unshift(...v);
+                    } else {
+                        result.push(v);
+                    }
+                }
+                return result;
+            }
+
+            const arr = [1, [2, [3, [4, [5]]]]];
+            log(`原始: ${JSON.stringify(arr)}`);
+            log(`栈实现: ${JSON.stringify(flattenStack(arr))}`);
+            log('');
+
+            log('生成器实现:');
+            function* flattenGen(arr) {
+                for (const v of arr) {
+                    Array.isArray(v) ? yield* flattenGen(v) : yield v;
+                }
+            }
+            log(`   生成器: ${JSON.stringify([...flattenGen(arr)])}`);
+            log('');
+
+            log('toString (仅适用于数字):');
+            const numArr = [1, [2, [3, [4]]]];
+            log(`   原始: ${JSON.stringify(numArr)}`);
+            const byToString = numArr.toString().split(',').map(Number);
+            log(`   toString: [${byToString}]`);
+            log('');
+
+            // 性能测试
+            log('⚡ 性能对比:');
+            const deep = Array.from({ length: 1000 }, (_, i) => [i]);
+            const deepArr = [deep];
+
+            let start = performance.now();
+            deepArr.flat(Infinity);
+            log(`   flat(Infinity): ${(performance.now() - start).toFixed(2)}ms`);
+
+            start = performance.now();
+            flattenStack(deepArr);
+            log(`   栈实现:          ${(performance.now() - start).toFixed(2)}ms`);
+
+            log('');
+            log('📌 选型建议:');
+            log('   • 小数组 → 递归 reduce (简洁)');
+            log('   • 大数组 → flat(Infinity) (原生最快)');
+            log('   • 深度未知 → flat(Infinity)');
+            log('   • 避免递归过深导致栈溢出');
+        }
+
+        console.log('=== 数组扁平化 ===');
+        document.getElementById('output').textContent = `数组扁平化: flat / flatMap / 递归 / 栈 / 生成器\n✅ 数组扁平化演示完成！`;
+    </script>
+</body>
+</html>

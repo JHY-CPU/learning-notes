@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express JWT 认证</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔐 Express JWT 认证</h2><p>JWT 结构 (header/payload/signature)、jsonwebtoken (sign/verify)、Access Token + Refresh Token 机制、认证中间件、令牌自动刷新、黑名单退出、安全存储策略。</p></div>
+    <div class="card">
+        <h2>JWT 概念</h2>
+        <div class="code">// ========== JWT ==========
+// JSON Web Token — 无状态认证方案
+// 三部分: Header.Payload.Signature
+
+// ========== JWT 结构 ==========
+// header.payload.signature
+eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.
+eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkFsaWNlIn0.
+4STJGeJ8B8Pz4e3eJm8X1O0XQgK9jK_QWfu0AnzLvIc
+
+// Header (算法 + 类型):
+{ "alg": "HS256", "typ": "JWT" }
+
+// Payload (数据):
+{
+  "sub": "1234567890",       // 用户 ID (subject)
+  "name": "Alice",
+  "role": "admin",
+  "iat": 1516239022,         // 签发时间
+  "exp": 1516242622           // 过期时间
+}
+
+// Signature (签名):
+// HMACSHA256(
+//   base64UrlEncode(header) + "." +
+//   base64UrlEncode(payload),
+//   secret
+// )
+
+// ========== JWT 工作流程 ==========
+// 1. 用户登录 → 服务器验证凭据
+// 2. 服务器签发 JWT → 返回客户端
+// 3. 客户端存储 JWT (localStorage / httpOnly Cookie)
+// 4. 每次请求携带 Authorization: Bearer <token>
+// 5. 服务器验证 JWT → 解析用户信息
+
+// ========== 安装 ==========
+npm install jsonwebtoken</div>
+    </div>
+    <div class="card">
+        <h2>签发与验证</h2>
+        <div class="code">// ========== JWT 工具 ==========
+// utils/jwt.js:
+const jwt = require('jsonwebtoken');
+const config = require('../config');
+
+const SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const REFRESH_SECRET = process.env.JWT_REFRESH_SECRET || 'refresh-secret-key';
+
+// ========== 签发 Access Token ==========
+function generateAccessToken(user) {
+    return jwt.sign(
+        {
+            sub: user._id.toString(),
+            role: user.role,
+        },
+        SECRET,
+        { expiresIn: '15m' }  // 短过期
+    );
+}
+
+// ========== 签发 Refresh Token ==========
+function generateRefreshToken(user) {
+    return jwt.sign(
+        { sub: user._id.toString() },
+        REFRESH_SECRET,
+        { expiresIn: '7d' }   // 长过期
+    );
+}
+
+// ========== 验证 Access Token ==========
+function verifyAccessToken(token) {
+    try {
+        return jwt.verify(token, SECRET);
+    } catch (err) {
+        if (err.name === 'TokenExpiredError') {
+            throw new AuthError('Token expired', 'TOKEN_EXPIRED');
+        }
+        throw new AuthError('Invalid token', 'INVALID_TOKEN');
+    }
+}
+
+// ========== 验证 Refresh Token ==========
+function verifyRefreshToken(token) {
+    return jwt.verify(token, REFRESH_SECRET);
+}
+
+// ========== 令牌对 ==========
+function generateTokens(user) {
+    return {
+        accessToken: generateAccessToken(user),
+        refreshToken: generateRefreshToken(user),
+    };
+}
+
+module.exports = {
+    generateAccessToken,
+    generateRefreshToken,
+    generateTokens,
+    verifyAccessToken,
+    verifyRefreshToken,
+};</div>
+    </div>
+    <div class="card">
+        <h2>认证中间件</h2>
+        <div class="code">// ========== 认证中间件 ==========
+// middleware/auth.js:
+
+const { verifyAccessToken } = require('../utils/jwt');
+const { UnauthorizedError, ForbiddenError } = require('../utils/errors');
+
+// ========== 必选认证 ==========
+function authenticate(req, res, next) {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        throw new UnauthorizedError('No token provided');
+    }
+
+    const token = authHeader.split(' ')[1];
+    const decoded = verifyAccessToken(token);
+
+    req.user = decoded;    // { sub, role, iat, exp }
+    next();
+}
+
+// ========== 可选认证 ==========
+function optionalAuth(req, res, next) {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        req.user = null;
+        return next();
+    }
+
+    try {
+        const token = authHeader.split(' ')[1];
+        req.user = verifyAccessToken(token);
+    } catch {
+        req.user = null;  // 令牌无效也继续
+    }
+
+    next();
+}
+
+// ========== 角色授权 ==========
+function authorize(...roles) {
+    return (req, res, next) => {
+        if (!req.user) {
+            throw new UnauthorizedError('Authentication required');
+        }
+        if (!roles.includes(req.user.role)) {
+            throw new ForbiddenError('Insufficient permissions');
+        }
+        next();
+    };
+}
+
+// ========== 使用 ==========
+router.get('/users', authenticate, authorize('admin'), userController.list);
+router.get('/profile', authenticate, userController.getProfile);
+router.get('/public', optionalAuth, publicController.list);
+
+// ========== 刷新令牌端点 ==========
+const { generateTokens, verifyRefreshToken } = require('../utils/jwt');
+
+router.post('/refresh', asyncHandler(async (req, res) => {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+        throw new BadRequestError('Refresh token required');
+    }
+
+    const decoded = verifyRefreshToken(refreshToken);
+    const user = await User.findById(decoded.sub);
+    if (!user) {
+        throw new UnauthorizedError('User not found');
+    }
+
+    const tokens = generateTokens(user);
+    res.success(tokens);
+}));</div>
+    </div>
+    <div class="card">
+        <h2>登录与安全最佳实践</h2>
+        <div class="code">// ========== 登录流程 ==========
+// authController.js:
+
+exports.login = asyncHandler(async (req, res) => {
+    const { email, password } = req.body;
+
+    // 1. 查找用户
+    const user = await User.findOne({ email }).select('+password');
+    if (!user) {
+        throw new UnauthorizedError('Invalid credentials');
+    }
+
+    // 2. 验证密码
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+        throw new UnauthorizedError('Invalid credentials');
+    }
+
+    // 3. 签发令牌
+    const tokens = generateTokens(user);
+
+    // 4. 可选: 记录登录日志
+    await LoginLog.create({
+        user: user._id,
+        ip: req.ip,
+        userAgent: req.get('User-Agent'),
+    });
+
+    res.success({ user: user.toPublicJSON(), ...tokens });
+});
+
+// ========== 退出登录 ==========
+// 将 token 加入黑名单 (Redis), 直到过期
+const blacklist = new Set();  // 生产用 Redis
+
+exports.logout = asyncHandler(async (req, res) => {
+    const token = req.headers.authorization.split(' ')[1];
+    const decoded = jwt.decode(token);
+
+    // 黑名单到令牌过期
+    blacklist.add(token);
+    setTimeout(() => blacklist.delete(token),
+        (decoded.exp - decoded.iat) * 1000);
+
+    res.success(null, 'Logged out');
+});
+
+// 在认证中间件检查黑名单:
+function checkBlacklist(req, res, next) {
+    const token = req.headers.authorization?.split(' ')[1];
+    if (token && blacklist.has(token)) {
+        throw new UnauthorizedError('Token revoked');
+    }
+    next();
+}
+
+// ========== 安全实践 ==========
+// 1. 短过期 Access Token (15m)
+// 2. Refresh Token (7d) 旋转
+// 3. httpOnly Cookie 存 Refresh Token
+// 4. 不在 JWT payload 存敏感信息
+// 5. 退出时黑名单 token
+// 6. 密码变更后旧 token 自动失效
+// 7. HTTPS 传输
+// 8. 环境变量管理密钥</div>
+        <div class="note">💡 JWT 要点: 无状态 (服务端不存 session); HS256 对称签名 (也可 RS256 非对称); 短过期 + Refresh Token 旋转; 认证中间件从 Authorization 头取 token; 可选认证允许游客访问; 退出用黑名单机制; JWT payload 只存非敏感信息 (sub/role); 使用环境变量管理密钥; HTTPS 必须。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoJWT()">JWT 结构</button>
+        <button onclick="demoAuth()">认证中间件</button>
+        <button onclick="demoRefresh()">刷新令牌</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoJWT() {
+            result.innerHTML = '';
+            log('# JWT 结构');
+            log('');
+            log('header.payload.signature');
+            log('');
+            log('Header: { "alg": "HS256" }');
+            log('Payload: { "sub": "user_id",');
+            log('  "role": "admin",');
+            log('  "iat": 1516239022,');
+            log('  "exp": 1516242622 }');
+            log('Signature: HMAC + secret');
+        }
+
+        function demoAuth() {
+            result.innerHTML = '';
+            log('# 认证中间件');
+            log('');
+            log('// 必选认证:');
+            log('app.use("/api", authenticate);');
+            log('req.user = { sub, role }');
+            log('');
+            log('// 可选认证:');
+            log('app.use("/public", optionalAuth);');
+            log('req.user = decoded || null');
+            log('');
+            log('// 角色授权:');
+            log('authorize("admin", "moderator")');
+        }
+
+        function demoRefresh() {
+            result.innerHTML = '';
+            log('# Refresh Token 流程');
+            log('');
+            log('1. 登录 → 签发 access + refresh');
+            log('   access:  15m');
+            log('   refresh: 7d');
+            log('');
+            log('2. access 过期 → 用 refresh 换新的');
+            log('   POST /auth/refresh');
+            log('   { refreshToken }');
+            log('');
+            log('3. 退出 → 黑名单 access token');
+            log('4. 密码改 → 所有 token 失效');
+        }
+    </script>
+</body>
+</html>

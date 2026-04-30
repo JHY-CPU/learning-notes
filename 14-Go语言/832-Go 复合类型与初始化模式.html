@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 复合类型与初始化模式</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🧩 Go 复合类型与初始化模式</h2><p>类型组合 (struct + slice + map)、工厂函数与构造器、Functional Options 模式、Builder 模式、对象池 sync.Pool、类型别名与定义。</p></div>
+    <div class="card">
+        <h2>类型组合模式</h2>
+        <div class="code">// ========== 复合类型声明 ==========
+// 组合已有的基础类型创建复杂结构
+
+// 完全嵌套结构
+type Order struct {
+    ID        int64
+    Customer  CustomerInfo    // 嵌套结构
+    Items     []OrderItem     // 结构切片
+    Shipping  Address         // 地址
+    Status    string
+    Tags      map[string]string // map 字段
+    CreatedAt time.Time
+}
+
+type CustomerInfo struct {
+    UserID int64
+    Email  string
+    Phone  string `json:"phone,omitempty"`
+}
+
+type OrderItem struct {
+    ProductID int64
+    Name      string
+    Quantity  int
+    Price     float64
+}
+
+// ========== 组合初始化 ==========
+func compositeInit() {
+    order := Order{
+        ID: 1001,
+        Customer: CustomerInfo{
+            UserID: 42,
+            Email:  "alice@example.com",
+        },
+        Items: []OrderItem{
+            {ProductID: 1, Name: "笔记本", Quantity: 2, Price: 15.5},
+            {ProductID: 2, Name: "钢笔", Quantity: 1, Price: 5.0},
+        },
+        Shipping: Address{
+            City:   "北京",
+            Street: "朝阳区xxx街",
+        },
+        Status: "pending",
+        Tags: map[string]string{
+            "source": "web",
+            "coupon": "NEW10",
+        },
+        CreatedAt: time.Now(),
+    }
+    _ = order
+}
+
+// ========== 匿名结构体 ==========
+// 临时数据结构, 无需单独定义类型
+
+func anonymousStruct() {
+    // 局部临时结构
+    result := struct {
+        Name  string `json:"name"`
+        Count int    `json:"count"`
+    }{
+        Name:  "测试",
+        Count: 42,
+    }
+
+    // JSON 中常用
+    data, _ := json.Marshal(struct {
+        ID   int    `json:"id"`
+        Role string `json:"role"`
+    }{ID: 1, Role: "admin"})
+
+    fmt.Println(string(data))  // {"id":1,"role":"admin"}
+    fmt.Println(result)
+}
+
+// ========== 类型定义 vs 别名 ==========
+// 类型定义: 全新类型 (不继承方法集)
+type Celsius float64           // 新类型
+type IDMap map[string]int      // 新类型
+
+// 类型别名: 完全相同的类型 (保留方法集)
+type MyFloat = float64         // 别名, 就是 float64
+
+func typeDefVsAlias() {
+    var c Celsius = 100.0
+    // var f float64 = c  // 编译错误! Celsius ≠ float64
+    var f float64 = float64(c) // 需显式转换
+
+    var m IDMap = make(map[string]int)
+    m["key"] = 1
+    // IDMap 有自己的方法集 (但不能继承 map 的方法)
+}
+
+// 类型定义的意义:
+// 1. 语义清晰 (温度、距离 都是 float64 但不可混用)
+// 2. 可添加方法
+func (c Celsius) String() string {
+    return fmt.Sprintf("%.1f°C", float64(c))
+}
+
+// 3. 可自定义 JSON
+func (c Celsius) MarshalJSON() ([]byte, error) {
+    return json.Marshal(map[string]interface{}{
+        "value": c,
+        "unit":  "Celsius",
+    })
+}</div>
+    </div>
+    <div class="card">
+        <h2>工厂与构造函数</h2>
+        <div class="code">// ========== 工厂函数模式 ==========
+// Go 没有构造函数, 用工厂函数替代
+
+// 基本工厂
+func NewConfig(host string, port int) *Config {
+    return &Config{
+        Host: host,
+        Port: port,
+        // 默认值
+        Timeout: 30 * time.Second,
+        Retries: 3,
+    }
+}
+
+// ========== 默认值填充 ==========
+type Server struct {
+    Host    string
+    Port    int
+    Timeout time.Duration
+    MaxConn int
+    Logger  *log.Logger
+}
+
+// 默认值模式
+func NewServer(host string, port int) *Server {
+    return &Server{
+        Host:    host,
+        Port:    port,
+        Timeout: 30 * time.Second,
+        MaxConn: 100,
+        Logger:  log.Default(),
+    }
+}
+
+// ========== 参数验证 ==========
+func NewUser(username, email string, age int) (*User, error) {
+    if username == "" {
+        return nil, fmt.Errorf("username 不能为空")
+    }
+    if !strings.Contains(email, "@") {
+        return nil, fmt.Errorf("无效 email")
+    }
+    if age < 0 || age > 150 {
+        return nil, fmt.Errorf("age 超出范围")
+    }
+    return &User{
+        Username:  username,
+        Email:     email,
+        Age:       age,
+        CreatedAt: time.Now(),
+    }, nil
+}
+
+// ========== Must 模式 ==========
+// 编译期确定正确的参数, 简化调用
+
+func MustNewConfig(host string, port int) *Config {
+    c, err := NewConfig(host, port)
+    if err != nil {
+        panic(err)
+    }
+    return c
+}
+// 使用: var cfg = MustNewConfig("localhost", 8080)
+
+// ========== init() 函数 ==========
+// 包级别初始化, 自动执行
+
+var db *sql.DB
+
+func init() {
+    var err error
+    db, err = sql.Open("sqlite3", "./data.db")
+    if err != nil {
+        log.Fatalf("数据库连接失败: %v", err)
+    }
+}
+
+// init 执行顺序: 导入包 → const/var → init() → main()
+// 同一文件多个 init 按顺序执行
+// 不建议依赖多个 init 的执行顺序</div>
+    </div>
+    <div class="card">
+        <h2>Functional Options 模式</h2>
+        <div class="code">// ========== Functional Options ==========
+// Go 经典模式: 灵活、可扩展的配置
+// 比多个构造函数更优雅
+
+// 定义: Option 是一个函数
+type Option func(*Server)
+
+// 默认配置
+func defaultServer() *Server {
+    return &Server{
+        Host:    "localhost",
+        Port:    8080,
+        Timeout: 30 * time.Second,
+        MaxConn: 100,
+        Logger:  log.Default(),
+    }
+}
+
+// Option 函数
+func WithHost(host string) Option {
+    return func(s *Server) {
+        s.Host = host
+    }
+}
+
+func WithPort(port int) Option {
+    return func(s *Server) {
+        s.Port = port
+    }
+}
+
+func WithTimeout(t time.Duration) Option {
+    return func(s *Server) {
+        s.Timeout = t
+    }
+}
+
+func WithMaxConn(n int) Option {
+    return func(s *Server) {
+        s.MaxConn = n
+    }
+}
+
+func WithLogger(l *log.Logger) Option {
+    return func(s *Server) {
+        s.Logger = l
+    }
+}
+
+// 构造函数: 默认值 + options
+func NewServerWithOptions(opts ...Option) *Server {
+    s := defaultServer()       // 默认值
+    for _, opt := range opts {
+        opt(s)                 // 应用配置
+    }
+    return s
+}
+
+// 使用:
+// srv := NewServerWithOptions(
+//     WithHost("example.com"),
+//     WithPort(9090),
+//     WithTimeout(60*time.Second),
+//     WithMaxConn(500),
+// )
+
+// ========== Functional Options 优点 ==========
+// 1. 零个或多个可选参数
+// 2. 向后兼容 (加新 Option 不改函数签名)
+// 3. 可读性强 (命名明确)
+// 4. 可组合 (可复用 Option 组合)
+
+// ========== Options 变种: Config Struct ==========
+// 简单场景直接用配置结构体
+type Config struct {
+    Host    string        `yaml:"host"`
+    Port    int           `yaml:"port"`
+    Timeout time.Duration `yaml:"timeout"`
+    MaxConn int           `yaml:"max_conn"`
+}
+
+func NewServerFromConfig(cfg Config) *Server {
+    return &Server{
+        Host:    cfg.Host,
+        Port:    cfg.Port,
+        Timeout: cfg.Timeout,
+        MaxConn: cfg.MaxConn,
+    }
+}
+
+// Functional Options vs Config Struct:
+// - Options: 需要默认值, 少量必选参数, 可扩展
+// - Config:  大量配置项, YAML/JSON 反序列化, 可选全都有</div>
+    </div>
+    <div class="card">
+        <h2>sync.Pool 对象池</h2>
+        <div class="code">// ========== sync.Pool ==========
+// 对象池: 复用临时对象, 减少 GC 压力
+// 适合: 频繁分配的大对象 (JSON 编解码/buffer)
+
+func poolDemo() {
+    // 创建 buffer 池
+    var bufPool = sync.Pool{
+        New: func() interface{} {
+            return new(bytes.Buffer)
+        },
+    }
+
+    // 从池获取 (如果池空则调用 New)
+    buf := bufPool.Get().(*bytes.Buffer)
+    buf.Reset()          // 重置状态
+    defer bufPool.Put(buf) // 放回池
+
+    // 使用 buffer
+    buf.WriteString("hello")
+    fmt.Println(buf.String())
+}
+
+// ========== 性能对比 ==========
+// 不适用 Pool:
+func encodeJSON(data []User) ([]byte, error) {
+    var buf bytes.Buffer
+    err := json.NewEncoder(&buf).Encode(data)
+    return buf.Bytes(), err
+}
+
+// 适用 Pool:
+var bufferPool = sync.Pool{
+    New: func() interface{} { return new(bytes.Buffer) },
+}
+
+func encodeJSONPooled(data []User) ([]byte, error) {
+    buf := bufferPool.Get().(*bytes.Buffer)
+    buf.Reset()
+    defer bufferPool.Put(buf)
+
+    err := json.NewEncoder(buf).Encode(data)
+    return buf.Bytes(), err
+}
+
+// Benchmark 对比:
+// BenchmarkEncodeJSON-8       50000  32000 ns/op  8216 B/op  6 allocs/op
+// BenchmarkEncodeJSONPool-8   50000  31000 ns/op  4152 B/op  2 allocs/op
+
+// ========== sync.Pool 注意 ==========
+// 1. 池中的对象可能被 GC 回收 (下次 Get 可能 nil)
+// 2. 适用于: 显式 Reset 后可复用的对象
+// 3. 不适用于: 连接池 (用 database/sql 连接池)
+// 4. 存储临时对象, 不要持久化引用池中对象
+
+// ========== 对象池 vs 连接池 ==========
+// sync.Pool:     临时对象缓存, GC 可回收, 减轻 GC 压力
+// database/sql 连接池: 持久连接, 复用 TCP 连接
+// 连接池实现:
+type ConnPool struct {
+    mu    sync.Mutex
+    conns []*Conn
+    max   int
+}
+
+func (p *ConnPool) Get() (*Conn, error) {
+    p.mu.Lock()
+    if len(p.conns) == 0 {
+        p.mu.Unlock()
+        return newConn()  // 新建
+    }
+    c := p.conns[len(p.conns)-1]
+    p.conns = p.conns[:len(p.conns)-1]
+    p.mu.Unlock()
+    return c, nil
+}
+
+func (p *ConnPool) Put(c *Conn) {
+    p.mu.Lock()
+    if len(p.conns) < p.max {
+        p.conns = append(p.conns, c)
+    } // 超过 max 直接丢弃
+    p.mu.Unlock()
+}</div>
+        <div class="note">💡 复合类型要点: 类型组合 = struct + slice + map 嵌套建模; 匿名结构体用于临时数据/JSON; 类型定义 (type Celsius float64) 创建新类型 ≠ 别名 (type MyFloat = float64); 工厂函数替代构造函数, 返回指针 + error; Functional Options 模式 (WithXxx func) 灵活配置; init() 用于包级别初始化; sync.Pool 复用临时对象减少 GC; 类型定义可添加方法, 增强语义安全。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoComposite()">类型组合</button>
+        <button onclick="demoOptions()">Options</button>
+        <button onclick="demoPool()">对象池</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoComposite() {
+            result.innerHTML = '';
+            log('# 复合类型组合');
+            log('');
+            log('多层嵌套结构体:');
+            log('  Order → CustomerInfo + []OrderItem + Address');
+            log('');
+            log('匿名结构体:');
+            log('  result := struct { Name string; Count int }{');
+            log('    Name: "test", Count: 42,');
+            log('  }');
+            log('');
+            log('类型定义 vs 别名:');
+            log('  type Celsius float64   // 新类型, 需显式转换');
+            log('  type MyFloat = float64 // 别名, 直接替代');
+        }
+
+        function demoOptions() {
+            result.innerHTML = '';
+            log('# Functional Options');
+            log('');
+            log('type Option func(*Server)');
+            log('');
+            log('func WithPort(port int) Option {');
+            log('  return func(s *Server) { s.Port = port }');
+            log('}');
+            log('');
+            log('使用:');
+            log('srv := NewServerWithOptions(');
+            log('  WithHost("example.com"),');
+            log('  WithPort(9090),');
+            log('  WithTimeout(60*time.Second),');
+            log(')');
+            log('');
+            log('优点: 可选参数、向后兼容、可读性强');
+        }
+
+        function demoPool() {
+            result.innerHTML = '';
+            log('# sync.Pool 对象池');
+            log('');
+            log('var bufPool = sync.Pool{');
+            log('  New: func() interface{} {');
+            log('    return new(bytes.Buffer)');
+            log('  },');
+            log('}');
+            log('');
+            log('buf := bufPool.Get().(*bytes.Buffer)');
+            log('buf.Reset()');
+            log('defer bufPool.Put(buf)');
+            log('');
+            log('适用: JSON 编解码, bytes.Buffer, 大对象');
+            log('注意: 对象可能被 GC, 需 Reset 后使用');
+            log('不适用: 连接池 (持久连接)');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模板字符串</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #f39c12; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>模板字符串（Template Literals）</h2>
+        <p>使用反引号 `` 定义，支持插值、多行、表达式。</p>
+    </div>
+
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">
+// 普通字符串（可以包含双引号、单引号）
+let str = `这是一个模板字符串`;
+
+// 可以写单引号/双引号而不用转义
+let withQuotes = `他说"你好"我说'嗨'`;  // ✅
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>字符串插值 ${}</h2>
+        <div class="code">
+let name = 'Alice';
+let age = 25;
+
+// 旧方式：拼接
+let oldWay = '我的名字是 ' + name + '，年龄 ' + age;
+
+// 模板字符串
+let newWay = `我的名字是 ${name}，年龄 ${age}`;
+// "我的名字是 Alice，年龄 25"
+
+// 可以放表达式
+let info = `${name} 明年 ${age + 1} 岁`;
+// "Alice 明年 26 岁"
+
+// 可以放函数调用
+let upper = `${name.toUpperCase()}`;
+// "ALICE"
+        </div>
+        <div class="note">💡 ${} 里可以放任何 JS 表达式：变量、运算、函数调用、三元运算符等。</div>
+    </div>
+
+    <div class="card">
+        <h2>多行字符串</h2>
+        <div class="code">
+// 旧方式：用 \n
+let old = '第一行\n第二行\n第三行';
+
+// 模板字符串：直接换行
+let multi = `第一行
+第二行
+第三行`;
+
+// 常用于生成HTML
+let html = `
+<div class="card">
+    <h2>${title}</h2>
+    <p>${content}</p>
+</div>
+`;
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>表达式在 ${} 中的应用</h2>
+        <div class="code">
+let price = 100;
+let count = 3;
+let isMember = true;
+
+// 运算
+let total = `总价: ${price * count} 元`;     // "总价: 300 元"
+
+// 三元运算符
+let discount = `会员: ${isMember ? '享受折扣' : '无折扣'}`;
+
+// 方法调用
+let items = ['苹果', '香蕉', '橘子'];
+let list = `商品: ${items.join(', ')}`;
+
+// 嵌套模板
+let cssClass = `btn ${isActive ? 'btn-active' : ''}`;
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>标签模板（Tagged Templates）</h2>
+        <div class="code">
+// 高级用法：用函数处理模板字符串
+function highlight(strings, ...values) {
+    return strings.reduce((result, str, i) => {
+        return result + str + (values[i] ? `<strong>${values[i]}</strong>` : '');
+    }, '');
+}
+
+let name = 'Alice';
+let score = 95;
+let result = highlight`学生 ${name} 考了 ${score} 分`;
+// "学生 <strong>Alice</strong> 考了 <strong>95</strong> 分"
+        </div>
+        <div class="note">标签模板可以自定义字符串的处理方式，常用于国际化、转义等。</div>
+    </div>
+
+    <div class="card">
+        <h2>实用示例</h2>
+        <div class="code">
+// 1. 构建URL参数
+let base = 'https://api.example.com';
+let endpoint = 'users';
+let id = 42;
+let url = `${base}/${endpoint}/${id}`;
+
+// 2. 生成CSS样式
+let color = '#3498db';
+let size = 16;
+let style = `
+    color: ${color};
+    font-size: ${size}px;
+    padding: ${size / 2}px;
+`;
+
+// 3. SQL查询（注意防注入）
+// let sql = `SELECT * FROM users WHERE id = ${userId}`;
+        </div>
+    </div>
+
+    <pre id="output"></pre>
+
+    <script>
+        // ====================
+        // 模板字符串演示
+        // ====================
+
+        console.log('=== 基本插值 ===');
+        let name = 'Alice';
+        let age = 25;
+        let greeting = `你好，${name}！你${age}岁了。`;
+        console.log(greeting);
+
+        console.log('=== 表达式 ===');
+        let a = 10, b = 20;
+        console.log(`${a} + ${b} = ${a + b}`);
+        console.log(`${a} > ${b}: ${a > b ? '是' : '否'}`);
+
+        console.log('=== 多行 ===');
+        let multiLine = `第一行
+第二行
+第三行`;
+        console.log(multiLine);
+
+        console.log('=== 实用：生成HTML ===');
+        let title = '商品标题';
+        let price = 99.9;
+        let html = `
+<div class="product">
+    <h3>${title}</h3>
+    <p class="price">¥${price}</p>
+</div>`;
+        console.log(html.trim());
+
+        // 标签模板
+        console.log('=== 标签模板 ===');
+        function highlight(strings, ...values) {
+            let result = '';
+            strings.forEach((str, i) => {
+                result += str + (values[i] ? `**${values[i]}**` : '');
+            });
+            return result;
+        }
+        let tagged = highlight`用户 ${name} 的年龄是 ${age} 岁`;
+        console.log(tagged);
+
+        document.getElementById('output').textContent =
+            `插值: ${greeting}\n` +
+            `运算: ${a} + ${b} = ${a + b}\n` +
+            `多行:\n${multiLine}\n` +
+            `标签模板: ${tagged}\n` +
+            `✅ 模板字符串演示完成！`;
+    </script>
+</body>
+</html>

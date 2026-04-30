@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>16-计数排序 (Counting Sort)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; white-space: pre-wrap; }
+table { border-collapse: collapse; margin: 10px 0; }
+th, td { border: 1px solid #ddd; padding: 6px 12px; text-align: center; }
+th { background: #2c3e50; color: white; }
+</style></head>
+<body>
+<div class="card">
+  <h2>计数排序 (Counting Sort)</h2>
+  <p>计数排序是一种<strong>非比较排序</strong>，通过统计每个元素出现的次数来确定位置。当数据范围有限时，效率极高。</p>
+  <div class="note">
+    <strong>复杂度分析：</strong>时间复杂度 O(n+k)，空间 O(k)。其中 k 是数据范围。稳定排序。
+  </div>
+</div>
+
+<div class="card">
+  <h2>算法步骤</h2>
+  <ol>
+    <li>找出待排序数组的最大值和最小值，确定范围</li>
+    <li>创建计数数组，统计每个元素出现的次数</li>
+    <li>对计数数组进行前缀和累加，确定每个元素的最终位置</li>
+    <li>从后向前遍历原数组，根据计数数组将元素放到正确位置</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h2>代码实现</h2>
+  <pre>function countingSort(arr) {
+  if (arr.length <= 1) return arr;
+  const max = Math.max(...arr);
+  const min = Math.min(...arr);
+  const range = max - min + 1;
+  const count = new Array(range).fill(0);
+  const output = new Array(arr.length);
+
+  // 统计每个元素出现次数
+  for (const num of arr) count[num - min]++;
+
+  // 前缀和，确定位置
+  for (let i = 1; i < range; i++) {
+    count[i] += count[i - 1];
+  }
+
+  // 从后向前遍历，保证稳定性
+  for (let i = arr.length - 1; i >= 0; i--) {
+    const idx = arr[i] - min;
+    output[count[idx] - 1] = arr[i];
+    count[idx]--;
+  }
+  return output;
+}</pre>
+</div>
+
+<div class="card">
+  <h2>交互演示</h2>
+  <button onclick="runCountingSort()">开始计数排序</button>
+  <button onclick="resetData()">重置数据</button>
+  <div id="result"></div>
+</div>
+
+<script>
+let data = [];
+
+function initData() {
+  data = Array.from({length: 12}, () => Math.floor(Math.random() * 20) + 1);
+  document.getElementById('result').textContent = '原始数组: [' + data.join(', ') + ']';
+}
+
+async function runCountingSort() {
+  const arr = [...data];
+  const max = Math.max(...arr);
+  const min = Math.min(...arr);
+  const range = max - min + 1;
+  const count = new Array(range).fill(0);
+  const output = new Array(arr.length);
+
+  let html = '<strong>原始数组：</strong>[' + arr.join(', ') + ']<br><br>';
+  html += '<strong>数据范围：</strong>' + min + ' ~ ' + max + '（共 ' + range + ' 个不同值）<br><br>';
+
+  // 统计
+  for (const num of arr) count[num - min]++;
+  html += '<strong>计数数组：</strong><br>';
+  for (let i = 0; i < range; i++) {
+    html += '值 ' + (i + min) + ' 出现 ' + count[i] + ' 次<br>';
+  }
+
+  // 前缀和
+  for (let i = 1; i < range; i++) count[i] += count[i - 1];
+  html += '<br><strong>前缀和数组：</strong><br>';
+  for (let i = 0; i < range; i++) {
+    html += '≤ ' + (i + min) + ' 的有 ' + count[i] + ' 个<br>';
+  }
+
+  // 放置
+  html += '<br><strong>放置过程（从后向前）：</strong><br>';
+  for (let i = arr.length - 1; i >= 0; i--) {
+    const idx = arr[i] - min;
+    const pos = count[idx] - 1;
+    output[pos] = arr[i];
+    count[idx]--;
+    html += '元素 ' + arr[i] + ' → 位置 ' + pos + '，当前 output: [' + output.join(', ') + ']<br>';
+  }
+
+  html += '<br><strong>排序结果：</strong>[' + output.join(', ') + ']';
+  html += '<br><strong>结果正确：</strong>' + output.every((v, i, a) => !i || a[i-1] <= v);
+  document.getElementById('result').innerHTML = html;
+}
+
+function resetData() {
+  initData();
+}
+
+initData();
+</script>
+</body></html>

@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java 接口</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📐 Java 接口</h2><p>interface 声明、implements 实现、接口多继承、default/static/private 方法 (Java 8/9+)、函数式接口 @FunctionalInterface、接口设计原则。</p></div>
+    <div class="card">
+        <h2>接口基础</h2>
+        <div class="code">// ========== 接口 (Interface) ==========
+// 完全抽象的"契约" — 定义行为规范
+// 所有方法默认 public abstract
+// 所有字段默认 public static final
+
+// ========== 定义接口 ==========
+interface Flyable {
+    // 常量 (public static final)
+    int MAX_SPEED = 1000;  // 默认 public static final
+
+    // 抽象方法 (public abstract)
+    void fly();
+    void land();
+}
+
+interface Swimmable {
+    void swim();
+    void dive(int depth);
+}
+
+// ========== 实现接口 ==========
+class Bird implements Flyable {
+    private String name;
+
+    Bird(String name) { this.name = name; }
+
+    @Override
+    public void fly() {
+        System.out.println(name + " is flying");
+    }
+
+    @Override
+    public void land() {
+        System.out.println(name + " is landing");
+    }
+}
+
+// ========== 多实现 ==========
+class Duck implements Flyable, Swimmable {
+    @Override
+    public void fly() {
+        System.out.println("Duck flies short distance");
+    }
+
+    @Override
+    public void land() {
+        System.out.println("Duck lands on water");
+    }
+
+    @Override
+    public void swim() {
+        System.out.println("Duck is swimming");
+    }
+
+    @Override
+    public void dive(int depth) {
+        System.out.println("Duck dives " + depth + " meters");
+    }
+}
+
+// ========== 接口多态 ==========
+public class InterfaceDemo {
+    public static void main(String[] args) {
+        Flyable f1 = new Bird("Eagle");
+        Flyable f2 = new Duck();
+
+        f1.fly();  // "Eagle is flying"
+        f2.fly();  // "Duck flies short distance"
+
+        // 接口引用调用接口方法
+        Flyable[] fliers = {f1, f2};
+        for (Flyable f : fliers) {
+            f.fly();
+        }
+
+        // 需要转型才能调用特有接口方法
+        if (f2 instanceof Swimmable s) {
+            s.swim();  // ✅ 模式匹配自动转型
+        }
+
+        // 接口常量
+        System.out.println(Flyable.MAX_SPEED);  // 1000
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>接口进阶 (Java 8+)</h2>
+        <div class="code">// ========== Java 8: default 方法 ==========
+// 接口可以有默认实现
+// 子类可以选择重写或不重写
+
+interface Vehicle {
+    void start();
+
+    // default 方法: 带默认实现
+    default void honk() {
+        System.out.println("Beep beep!");
+    }
+
+    // 另一个 default 方法
+    default void warning() {
+        System.out.println("Vehicle warning!");
+    }
+}
+
+class Car implements Vehicle {
+    @Override
+    public void start() {
+        System.out.println("Car engine started");
+    }
+    // honk() 使用默认实现
+}
+
+class Bus implements Vehicle {
+    @Override
+    public void start() {
+        System.out.println("Bus engine started");
+    }
+
+    @Override
+    public void honk() {
+        System.out.println("BUUUP BUUUP!");  // 重写默认
+    }
+}
+
+// ========== default 方法冲突解决 ==========
+// 当一个类实现多个接口, 且接口有相同 default 方法时:
+interface A {
+    default void hello() { System.out.println("A says hello"); }
+}
+
+interface B {
+    default void hello() { System.out.println("B says hello"); }
+}
+
+// 必须重写冲突方法!
+class MyClass implements A, B {
+    @Override
+    public void hello() {
+        // 可以选择调用其中一个父接口的默认实现
+        A.super.hello();  // 调用 A 的 default 方法
+        // B.super.hello();  // 或调用 B 的
+        System.out.println("MyClass says hello");
+    }
+}
+
+// ========== Java 8: static 方法 ==========
+interface MathUtils {
+    static double sqrt(double x) {
+        return Math.sqrt(x);
+    }
+
+    static int max(int a, int b) {
+        return a > b ? a : b;
+    }
+}
+// 调用: MathUtils.sqrt(25) → 5.0
+
+// ========== Java 9: private 方法 ==========
+interface PrivateInterface {
+    // 用于共享 default 方法间的公共逻辑
+    default void methodA() {
+        commonLogic();
+        System.out.println("A");
+    }
+
+    default void methodB() {
+        commonLogic();
+        System.out.println("B");
+    }
+
+    // private 方法: 接口内部共享, 不暴露给子类
+    private void commonLogic() {
+        System.out.print("Processing: ");
+    }
+
+    // private static 也可以
+    private static void helper() {
+        System.out.println("Helper");
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>函数式接口与 Lambda</h2>
+        <div class="code">// ========== 函数式接口 @FunctionalInterface ==========
+// 只有一个抽象方法的接口
+// 可以用 Lambda 表达式实现
+
+// ========== 常见函数式接口 ==========
+// Runnable       — void run()                    — 无参无返
+// Callable<T>    — T call()                      — 无参有返
+// Consumer<T>    — void accept(T)                — 消费
+// Supplier<T>    — T get()                        — 供给
+// Function<T,R>  — R apply(T)                    — 转换
+// Predicate<T>   — boolean test(T)               — 判断
+// Comparator<T>  — int compare(T, T)             — 比较
+
+@FunctionalInterface
+interface Greeter {
+    String greet(String name);
+    // 只能有一个抽象方法!
+    // void other();  // ❌ 编译错误
+}
+
+// ========== 使用 Lambda ==========
+// 传统方式 (匿名内部类)
+Greeter traditional = new Greeter() {
+    @Override
+    public String greet(String name) {
+        return "Hello, " + name;
+    }
+};
+
+// Lambda 方式
+Greeter lambda = name -> "Hello, " + name;
+
+// ========== 实际应用 ==========
+import java.util.*;
+import java.util.function.*;
+
+public class FunctionalDemo {
+    public static void main(String[] args) {
+        // Predicate: 判断
+        Predicate<String> isEmpty = s -> s.isEmpty();
+        System.out.println(isEmpty.test(""));  // true
+
+        // Consumer: 消费
+        Consumer<String> print = s -> System.out.println(s);
+        print.accept("Hello");  // "Hello"
+
+        // Function: 转换
+        Function<String, Integer> length = s -> s.length();
+        System.out.println(length.apply("Java"));  // 4
+
+        // Supplier: 供给
+        Supplier<Double> random = () -> Math.random();
+        System.out.println(random.get());
+
+        // 综合: 方法引用
+        List<String> names = Arrays.asList("Alice", "Bob", "Charlie");
+        names.forEach(System.out::println);  // 方法引用
+    }
+}
+
+// ========== @FunctionalInterface 设计指南 ==========
+// 1. 只定义一个抽象方法
+// 2. 可以用 default/static 方法补充
+// 3. 标注 @FunctionalInterface 让编译器检查
+// 4. 常用: Comparator, Runnable, Callable
+// 5. Lambda 可替代匿名内部类, 更简洁
+
+// 自定义函数式接口:
+@FunctionalInterface
+interface Transformer<T, R> {
+    R transform(T input);
+    // 一个抽象方法: transform
+}</div>
+    </div>
+    <div class="card">
+        <h2>接口设计原则</h2>
+        <div class="code">// ========== 接口设计原则 ==========
+
+// 1. 接口隔离原则 (ISP)
+//    ❌ 胖接口: 方法太多, 实现类被迫实现不需要的方法
+//    ✅ 小接口: 职责单一, 按需实现
+
+// ❌ 胖接口
+interface Worker {
+    void work();
+    void eat();
+    void sleep();
+    void attendMeeting();
+}
+
+// ✅ 接口隔离
+interface Workable { void work(); }
+interface Eatable { void eat(); }
+interface MeetingAttendable { void attendMeeting(); }
+
+// 机器人只需要 Workable
+class Robot implements Workable {
+    public void work() { System.out.println("Robot working"); }
+}
+
+// 人类可以实现多个
+class Human implements Workable, Eatable, MeetingAttendable {
+    public void work() { System.out.println("Working"); }
+    public void eat() { System.out.println("Eating"); }
+    public void attendMeeting() { System.out.println("In meeting"); }
+}
+
+// ========== 2. 标记接口 (Marker Interface) ==========
+// 没有方法的接口, 用于标记能力
+// 例如: Serializable, Cloneable, RandomAccess
+
+// 自定义标记接口
+interface Secure {}  // 标记为安全
+
+class SecureData implements Secure {
+    String data;
+}
+
+// 使用标记判断
+class SecurityChecker {
+    void process(Object obj) {
+        if (obj instanceof Secure) {
+            System.out.println("Processing secure data");
+        } else {
+            System.out.println("Warning: not secure!");
+        }
+    }
+}
+
+// ========== 3. 接口 vs 抽象类选择 ==========
+// 接口: "can-do" 能力契约
+// 抽象类: "is-a" 层次关系
+
+// 鸭子能飞能游 → 接口
+// 狗是动物 → 继承
+
+// ========== 常见 JDK 接口 ==========
+// Comparable<T>   — compareTo() 自然排序
+// Iterable<T>     — iterator() 可迭代
+// Collection<E>   — 集合根接口
+// List<E>, Set<E>, Map<K,V> — 集合子接口
+// AutoCloseable   — close() 资源自动关闭
+// Serializable    — 可序列化 (标记接口)</div>
+        <div class="note">💡 接口要点: interface 完全抽象契约; implements 多实现; 字段默认 public static final; 方法默认 public abstract; Java 8+ default/static 方法; Java 9+ private 方法; @FunctionalInterface 单抽象方法 → Lambda; default 方法冲突必须重写; 接口隔离原则 (ISP) 小接口优于胖接口; 标记接口无方法。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoInterface()">接口基础</button>
+        <button onclick="demoDefault()">default 方法</button>
+        <button onclick="demoFunc()">函数式接口</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoInterface() {
+            result.innerHTML = '';
+            log('# 接口 (Interface)');
+            log('');
+            log('interface Flyable {');
+            log('  void fly();');
+            log('  void land();');
+            log('}');
+            log('');
+            log('class Bird implements Flyable {');
+            log('  public void fly() { ... }');
+            log('  public void land() { ... }');
+            log('}');
+            log('');
+            log('多实现: class Duck implements A, B {}');
+            log('接口引用: Flyable f = new Bird();');
+        }
+
+        function demoDefault() {
+            result.innerHTML = '';
+            log('# default & static 方法 (Java 8+)');
+            log('');
+            log('interface Vehicle {');
+            log('  void start();');
+            log('  default void honk() {');
+            log('    System.out.println("Beep");');
+            log('  }');
+            log('}');
+            log('');
+            log('冲突: 实现多个同 default 方法接口');
+            log('  必须 @Override 并可用 X.super.method()');
+            log('');
+            log('static: MathUtils.sqrt(x)');
+            log('private (Java 9): 接口内共享逻辑');
+        }
+
+        function demoFunc() {
+            result.innerHTML = '';
+            log('# 函数式接口 + Lambda');
+            log('');
+            log('@FunctionalInterface: 1个抽象方法');
+            log('');
+            log('常用:');
+            log('  Predicate<T>   test()');
+            log('  Consumer<T>    accept()');
+            log('  Function<T,R>  apply()');
+            log('  Supplier<T>    get()');
+            log('  Comparator<T>  compare()');
+            log('');
+            log('Lambda:');
+            log('  Predicate<String> p = s -> s.isEmpty();');
+            log('  list.forEach(System.out::println);');
+        }
+    </script>
+</body>
+</html>

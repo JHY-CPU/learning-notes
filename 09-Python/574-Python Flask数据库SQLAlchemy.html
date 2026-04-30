@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Flask数据库SQLAlchemy</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🗄️ Flask 数据库 SQLAlchemy</h2><p>Flask-SQLAlchemy 配置与模型定义、CRUD 操作、Flask-Migrate 数据库迁移、多表关系（一对多/多对多）、查询过滤与分页。</p></div>
+    <div class="card">
+        <h2>Flask-SQLAlchemy 配置</h2>
+        <div class="code">// ========== Flask-SQLAlchemy ==========
+// 安装: pip install flask-sqlalchemy
+// 数据库驱动: pip install psycopg2-binary  # PostgreSQL
+//            pip install pymysql          # MySQL
+// SQLite 无需额外驱动
+
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+
+app = Flask(__name__)
+
+# 配置:
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
+# PostgreSQL: "postgresql://user:pass@localhost/dbname"
+# MySQL:      "mysql+pymysql://user:pass@localhost/dbname"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+app.config["SQLALCHEMY_ECHO"] = True  # 打印 SQL
+
+db = SQLAlchemy(app)</div>
+    </div>
+    <div class="card">
+        <h2>模型定义</h2>
+        <div class="code">// ========== 模型 ==========
+from flask_sqlalchemy import SQLAlchemy
+from datetime import datetime, timezone
+
+db = SQLAlchemy()
+
+class User(db.Model):
+    __tablename__ = "users"
+
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
+    age = db.Column(db.Integer, default=18)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+
+    # 关系:
+    posts = db.relationship("Post", back_populates="author", lazy="dynamic")
+
+    def __repr__(self):
+        return f"<User {self.username}>"
+
+class Post(db.Model):
+    __tablename__ = "posts"
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+
+    author = db.relationship("User", back_populates="posts")
+
+    def __repr__(self):
+        return f"<Post {self.title[:20]}>"
+
+# 创建所有表:
+with app.app_context():
+    db.create_all()</div>
+    </div>
+    <div class="card">
+        <h2>CRUD 操作</h2>
+        <div class="code">// ========== Create ==========
+from flask import Flask
+from models import db, User, Post
+
+@app.route("/users/create")
+def create_user():
+    user = User(username="Alice", email="alice@example.com", age=25)
+    db.session.add(user)
+    db.session.commit()     # 提交事务
+    return f"创建用户: {user.id}"
+
+# 批量:
+user1 = User(username="Bob", email="bob@example.com")
+user2 = User(username="Charlie", email="charlie@example.com")
+db.session.add_all([user1, user2])
+db.session.commit()
+
+// ========== Read ==========
+# 获取所有:
+users = User.query.all()
+user = User.query.get(1)              # 按主键
+
+# 过滤:
+users = User.query.filter_by(username="Alice").all()
+users = User.query.filter(User.age > 18).all()
+users = User.query.filter(User.email.like("%@example.com")).all()
+
+# 排序:
+users = User.query.order_by(User.created_at.desc()).all()
+
+# 分页:
+page = User.query.paginate(page=1, per_page=10, error_out=False)
+print(page.items)     # 当前页数据
+print(page.total)     # 总数
+print(page.pages)     # 总页数
+
+# 限制:
+users = User.query.limit(5).offset(0).all()
+
+// ========== Update ==========
+user = User.query.get(1)
+user.age = 26
+db.session.commit()
+
+// ========== Delete ==========
+user = User.query.get(1)
+db.session.delete(user)
+db.session.commit()</div>
+    </div>
+    <div class="card">
+        <h2>Flask-Migrate 数据库迁移</h2>
+        <div class="code">// ========== Flask-Migrate ==========
+// 安装: pip install flask-migrate
+
+from flask import Flask
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+
+app = Flask(__name__)
+app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
+
+// 命令行操作:
+# 1. 初始化迁移仓库:
+flask db init                  # 创建 migrations/ 目录
+
+# 2. 生成迁移脚本 (检测模型变化):
+flask db migrate -m "添加用户表"
+
+# 3. 应用迁移:
+flask db upgrade               # 更新数据库
+
+# 4. 回滚:
+flask db downgrade             # 回滚上一次迁移
+
+# 其他:
+flask db history               # 查看迁移历史
+flask db current               # 查看当前版本
+
+# 迁移示例:
+# 1. 修改模型 (添加字段)
+# 2. flask db migrate -m "添加 email 字段"
+# 3. flask db upgrade
+
+# 自动生成的迁移文件在 migrations/versions/</div>
+    </div>
+    <div class="card">
+        <h2>多表关系</h2>
+        <div class="code">// ========== 一对多 ==========
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    posts = db.relationship("Post", back_populates="author")
+
+class Post(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    author = db.relationship("User", back_populates="posts")
+
+# 使用:
+user = User.query.get(1)
+for post in user.posts:
+    print(post.title)
+
+// ========== 多对多 ==========
+# 关联表:
+student_course = db.Table("student_course",
+    db.Column("student_id", db.Integer, db.ForeignKey("students.id")),
+    db.Column("course_id", db.Integer, db.ForeignKey("courses.id"))
+)
+
+class Student(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(50))
+    courses = db.relationship("Course",
+        secondary=student_course,
+        back_populates="students"
+    )
+
+class Course(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100))
+    students = db.relationship("Student",
+        secondary=student_course,
+        back_populates="courses"
+    )
+
+// ========== 一对一 ==========
+class Profile(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    bio = db.Column(db.Text)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), unique=True)
+    user = db.relationship("User", back_populates="profile", uselist=False)
+
+# User 中添加: profile = db.relationship("Profile", back_populates="user", uselist=False)</div>
+        <div class="note">💡 SQLAlchemy 要点: (1) db.Model 定义模型,db.Column 定义字段; (2) CRUD: db.session.add/commit/delete; (3) 查询: filter_by/filter/order_by/limit/paginate; (4) Flask-Migrate 管理数据库版本变更; (5) relationship 定义表关系,ForeignKey 定义外键。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoModel()">模型演示</button>
+        <button onclick="demoQuery()">查询演示</button>
+        <button onclick="demoRelation()">关系演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoModel() {
+            result.innerHTML = '';
+            log('# SQLAlchemy 模型演示');
+            log('');
+            log('class User(db.Model):');
+            log('    __tablename__ = "users"');
+            log('    id = db.Column(db.Integer, primary_key=True)');
+            log('    username = db.Column(db.String(80), unique=True)');
+            log('    email = db.Column(db.String(120))');
+            log('    created_at = db.Column(db.DateTime)');
+            log('');
+            log('字段类型:');
+            log('  Integer / String / Text / Boolean');
+            log('  DateTime / Float / JSON');
+        }
+
+        function demoQuery() {
+            result.innerHTML = '';
+            log('# 查询操作演示');
+            log('');
+            log('User.query.get(1)         # 主键查询');
+            log('User.query.filter_by(name="Alice").all()');
+            log('User.query.filter(User.age > 18).all()');
+            log('User.query.order_by(User.created_at.desc())');
+            log('User.query.limit(10).offset(0)');
+            log('User.query.paginate(page=1, per_page=10)');
+            log('');
+            log('db.session.add(user)');
+            log('db.session.commit()');
+            log('db.session.delete(user)');
+        }
+
+        function demoRelation() {
+            result.innerHTML = '';
+            log('# 表关系演示');
+            log('');
+            log('一对多: User → Post');
+            log('  ForeignKey("users.id")');
+            log('  relationship("Post", back_populates="author")');
+            log('');
+            log('多对多: Student ↔ Course');
+            log('  secondary = student_course 表');
+            log('');
+            log('一对一: User → Profile');
+            log('  uselist=False');
+            log('  unique=True on ForeignKey');
+        }
+    </script>
+</body>
+</html>

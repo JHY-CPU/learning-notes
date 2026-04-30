@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 方法接收者与选择</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📝 Go 方法接收者与选择</h2><p>值接收者 vs 指针接收者选择准则、接收者方法集规则、nil 接收者处理、嵌入式类型的方法提升、方法表达式与函数值。</p></div>
+    <div class="card">
+        <h2>接收者类型</h2>
+        <div class="code">// ========== 方法接收者 ==========
+// Go 方法在函数名和参数之间指定接收者
+
+type Counter struct {
+    value int
+}
+
+// 值接收者: 操作的是副本
+func (c Counter) Value() int {
+    return c.value  // 只读, 不影响原对象
+}
+
+// 指针接收者: 操作的是原对象
+func (c *Counter) Inc() {
+    c.value++  // 修改原对象
+}
+
+func (c *Counter) Add(n int) {
+    c.value += n
+}
+
+// ========== 值 vs 指针接收者 ==========
+func receiverDemo() {
+    c := Counter{value: 10}
+
+    // 值接收者: 不修改原值
+    fmt.Println(c.Value())  // 10
+
+    // 指针接收者: 修改原值
+    c.Inc()   // (&c).Inc() 自动取地址
+    fmt.Println(c.Value())  // 11
+
+    // 指针变量调用
+    cp := &Counter{value: 5}
+    cp.Add(10)
+    fmt.Println(cp.Value())  // 15
+}
+
+// ========== 选择准则 ==========
+// 何时用值接收者:
+// 1. 方法不修改接收者
+// 2. 接收者是小类型 (< 4 个字段或 < 64 字节)
+// 3. 接收者是 map/slice/chan 等引用类型
+// 4. 接收者是不可变类型
+
+// 何时用指针接收者:
+// 1. 方法需要修改接收者
+// 2. 接收者是大结构体 (避免复制开销)
+// 3. 接收者包含 sync.Mutex 等不可复制字段
+// 4. 一致性: 同一类型的其他方法用指针接收者
+
+// ========== 值接收者 vs 指针接收者对接口的影响 ==========
+type Stringer interface {
+    String() string
+}
+
+// 值接收者方法
+type T1 struct{ val int }
+func (t T1) String() string { return fmt.Sprintf("T1(%d)", t.val) }
+
+// 指针接收者方法
+type T2 struct{ val int }
+func (t *T2) String() string { return fmt.Sprintf("T2(%d)", t.val) }
+
+func interfaceSatisfaction() {
+    var s Stringer
+
+    // T1: 值接收者实现 → 值和指针都满足接口
+    s = T1{1}    // OK
+    s = &T1{1}   // OK
+
+    // T2: 指针接收者实现 → 只有指针满足接口
+    // s = T2{1}  // 编译错误! T2 未实现 Stringer
+    s = &T2{1}   // OK
+
+    // 原因: 值接收者的方法集在值和指针上都可用
+    // 指针接收者的方法集只在指针上可用
+}
+
+func methodSetRule() {
+    // 方法集规则:
+    // 类型 T 的方法集 = 值接收者方法
+    // 类型 *T 的方法集 = 值接收者 + 指针接收者方法
+    //
+    // T 可调用: 值接收者方法
+    // *T 可调用: 值接收者 + 指针接收者方法
+    //
+    // 接口实现:
+    // T 实现的接口 = 值接收者方法满足的接口
+    // *T 实现的接口 = 所有方法满足的接口
+}</div>
+    </div>
+    <div class="card">
+        <h2>nil 接收者</h2>
+        <div class="code">// ========== nil 接收者 ==========
+// Go 允许在 nil 指针上调用方法!
+// 只要方法内部处理 nil 情况
+
+type LinkedList struct {
+    Value int
+    Next  *LinkedList
+}
+
+// nil 接收者安全
+func (l *LinkedList) Sum() int {
+    if l == nil {
+        return 0
+    }
+    return l.Value + l.Next.Sum()
+}
+
+func (l *LinkedList) Print() {
+    if l == nil {
+        fmt.Println("(nil)")
+        return
+    }
+    fmt.Print(l.Value, " ")
+    l.Next.Print()
+}
+
+func nilReceiverDemo() {
+    var list *LinkedList  // nil
+    fmt.Println(list.Sum())  // 0 (安全!)
+
+    // 空链表
+    list = &LinkedList{Value: 10}
+    fmt.Println(list.Sum())  // 10
+}
+
+// ========== nil 接收者的设计意图 ==========
+// 让 nil 成为合理的零值
+
+type Tree struct {
+    Value       int
+    Left, Right *Tree
+}
+
+// nil 树是空树
+func (t *Tree) Insert(val int) *Tree {
+    if t == nil {
+        return &Tree{Value: val}
+    }
+    if val < t.Value {
+        t.Left = t.Left.Insert(val)
+    } else {
+        t.Right = t.Right.Insert(val)
+    }
+    return t
+}
+
+func (t *Tree) Contains(val int) bool {
+    if t == nil {
+        return false
+    }
+    if val == t.Value {
+        return true
+    }
+    if val < t.Value {
+        return t.Left.Contains(val)
+    }
+    return t.Right.Contains(val)
+}
+
+// 使用:
+// var root *Tree  // nil, 空树
+// root = root.Insert(5)
+// root = root.Insert(3)
+// fmt.Println(root.Contains(3))  // true
+// fmt.Println(root.Contains(7))  // false</div>
+    </div>
+    <div class="card">
+        <h2>方法提升与嵌入</h2>
+        <div class="code">// ========== 嵌入提升方法 ==========
+// 嵌入类型的方法被提升到外部类型
+
+type Log struct{}
+
+func (l Log) Info(msg string) {
+    fmt.Println("[INFO]", msg)
+}
+
+func (l Log) Error(msg string) {
+    fmt.Println("[ERROR]", msg)
+}
+
+// 嵌入 Log, 方法被提升
+type Service struct {
+    Log           // 嵌入, 方法提升
+    Name string
+}
+
+func methodPromotion() {
+    s := Service{Name: "users"}
+    s.Info("启动")    // 提升: Log.Info
+    s.Error("出错")   // 提升: Log.Error
+
+    // 也可通过类型名访问
+    s.Log.Info("显式调用")
+}
+
+// ========== 方法覆盖 ==========
+// 外部类型定义同名方法, 覆盖嵌入类型的方法
+
+type BaseRepo struct{}
+
+func (r *BaseRepo) Find(id int) string {
+    return fmt.Sprintf("Base find %d", id)
+}
+
+type UserRepo struct {
+    *BaseRepo  // 嵌入
+}
+
+// 覆盖 BaseRepo.Find
+func (r *UserRepo) Find(id int) string {
+    return fmt.Sprintf("User find %d", id)
+}
+
+func overrideDemo() {
+    repo := &UserRepo{}
+    fmt.Println(repo.Find(1))  // "User find 1" (覆盖)
+
+    // 仍可访问原方法 (通过类型名)
+    fmt.Println(repo.BaseRepo.Find(1))  // "Base find 1"
+}
+
+// ========== 多嵌入冲突 ==========
+type A struct{}
+func (a A) Say() string { return "A" }
+
+type B struct{}
+func (b B) Say() string { return "B" }
+
+// type C struct {
+//     A
+//     B  // 编译错误: ambiguous selector C.Say
+// }
+
+// 解决方法: 显式指定
+type C struct {
+    A
+    B
+}
+
+func (c C) Say() string {
+    return c.A.Say() + " " + c.B.Say()
+}</div>
+    </div>
+    <div class="card">
+        <h2>方法表达式与函数值</h2>
+        <div class="code">// ========== 方法表达式 ==========
+// 方法可以当作普通函数使用
+
+type Point struct {
+    X, Y float64
+}
+
+func (p Point) Distance(q Point) float64 {
+    dx := p.X - q.X
+    dy := p.Y - q.Y
+    return math.Sqrt(dx*dx + dy*dy)
+}
+
+func methodExpr() {
+    p := Point{1, 2}
+    q := Point{4, 6}
+
+    // 普通方法调用
+    d := p.Distance(q)
+
+    // 方法表达式: T.Method 或 (*T).Method
+    // 第一个参数变为接收者
+    dist := Point.Distance  // func(Point, Point) float64
+    fmt.Println(dist(p, q)) // 等同于 p.Distance(q)
+
+    // 指针接收者方法表达式
+    pPtr := &Point{0, 0}
+    // (*Point).Distance
+}
+
+// ========== 方法值 ==========
+// 绑定接收者的函数值 (闭包)
+
+func methodValue() {
+    p := Point{1, 2}
+    q := Point{4, 6}
+
+    // 方法值: p.Distance 是绑定 p 的函数
+    distFromP := p.Distance  // func(Point) float64
+    fmt.Println(distFromP(q)) // p 和 q 的距离
+
+    // 应用: 回调中绑定上下文
+    widgets := []Widget{{x: 1}, {x: 2}}
+    for _, w := range widgets {
+        // w.ScaleBy(2.0)  // 直接调用
+        defer w.Draw()  // 方法值: 在 defer 时执行
+    }
+}
+
+// ========== 实用方法模式 ==========
+
+// 1. 链式方法
+type QueryBuilder struct {
+    clauses []string
+}
+
+func (qb *QueryBuilder) Select(cols ...string) *QueryBuilder {
+    qb.clauses = append(qb.clauses, "SELECT "+strings.Join(cols, ", "))
+    return qb
+}
+
+func (qb *QueryBuilder) From(table string) *QueryBuilder {
+    qb.clauses = append(qb.clauses, "FROM "+table)
+    return qb
+}
+
+func (qb *QueryBuilder) Where(cond string) *QueryBuilder {
+    qb.clauses = append(qb.clauses, "WHERE "+cond)
+    return qb
+}
+
+func (qb *QueryBuilder) Build() string {
+    return strings.Join(qb.clauses, " ") + ";"
+}
+
+// qb := new(QueryBuilder)
+// sql := qb.Select("id", "name").From("users").Where("age > 18").Build()
+
+// 2. 排序方法
+type ByAge []User
+func (a ByAge) Len() int           { return len(a) }
+func (a ByAge) Less(i, j int) bool { return a[i].Age < a[j].Age }
+func (a ByAge) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+
+// sort.Sort(ByAge(users))
+
+// 3. 校验方法
+func (u *User) Validate() error {
+    var errs []string
+    if u.Username == "" { errs = append(errs, "用户名必填") }
+    if !strings.Contains(u.Email, "@") { errs = append(errs, "邮箱无效") }
+    if len(errs) > 0 {
+        return fmt.Errorf("验证失败: %s", strings.Join(errs, "; "))
+    }
+    return nil
+}</div>
+        <div class="note">💡 方法接收者要点: 值接收者不修改原对象、小对象用值; 指针接收者修改原对象、大对象、含 Mutex; 方法集规则: T 只有值接收者方法, *T 有全部方法; 值接收者实现接口 = 值和指针都满足; 指针接收者实现接口 = 只有指针满足; nil 接收者可调用, 需在方法内处理; 嵌入提升方法, 同名覆盖; 方法表达式 T.Method 转为普通函数 (第一参数为接收者); 方法值绑定接收者形成闭包。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoReceiver()">接收者选择</button>
+        <button onclick="demoNil()">nil接收者</button>
+        <button onclick="demoEmbed()">方法提升</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoReceiver() {
+            result.innerHTML = '';
+            log('# 接收者选择指南');
+            log('');
+            log('值接收者:');
+            log('  func (c Counter) Value() int');
+            log('  不修改, 小对象, 引用类型, 一致性');
+            log('');
+            log('指针接收者:');
+            log('  func (c *Counter) Inc()');
+            log('  需修改, 大对象, 含 Mutex');
+            log('');
+            log('方法集规则:');
+            log('  T 可调用 → 值方法');
+            log('  *T 可调用 → 值方法 + 指针方法');
+            log('');
+            log('接口实现:');
+            log('  值方法 → T 和 *T 都满足接口');
+            log('  指针方法 → 仅 *T 满足接口');
+        }
+
+        function demoNil() {
+            result.innerHTML = '';
+            log('# nil 接收者');
+            log('');
+            log('Go 允许在 nil 指针上调用方法!');
+            log('但方法内部需检查 nil');
+            log('');
+            log('type LinkedList struct {');
+            log('  Value int');
+            log('  Next  *LinkedList');
+            log('}');
+            log('');
+            log('func (l *LinkedList) Sum() int {');
+            log('  if l == nil { return 0 }');
+            log('  return l.Value + l.Next.Sum()');
+            log('}');
+            log('');
+            log('var list *LinkedList  // nil');
+            log('fmt.Println(list.Sum())  // 0 (安全)');
+            log('');
+            log('设计意图: 让 nil 成为合理的零值');
+            log('如: nil 树 = 空树, nil 链表 = 空链表');
+        }
+
+        function demoEmbed() {
+            result.innerHTML = '';
+            log('# 嵌入与提升');
+            log('');
+            log('嵌入:');
+            log('  type Service struct {');
+            log('    Log    // 嵌入, 方法提升');
+            log('    Name string');
+            log('  }');
+            log('');
+            log('提升: s.Log.Info → s.Info');
+            log('覆盖: 外部同名方法覆盖嵌入方法');
+            log('冲突: 多嵌入同名方法需显式指定');
+            log('');
+            log('方法表达式:');
+            log('  dist := Point.Distance  // func(Point, Point)');
+            log('  dist(p, q)  // 等价于 p.Distance(q)');
+            log('');
+            log('方法值:');
+            log('  distFromP := p.Distance  // func(Point)');
+        }
+    </script>
+</body>
+</html>

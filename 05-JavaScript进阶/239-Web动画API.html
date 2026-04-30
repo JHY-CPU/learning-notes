@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web动画API</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #anim-box { width: 100px; height: 100px; background: linear-gradient(135deg, #e74c3c, #c0392b); border-radius: 8px; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; margin: 20px 0; }
+        #anim-status { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; }
+        .ball { display: inline-block; width: 30px; height: 30px; border-radius: 50%; margin: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Web Animations API</h2><p>Element.animate() — 用 JavaScript 控制 CSS 动画。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 1. 创建动画
+const animation = element.animate(keyframes, options);
+
+// keyframes — 关键帧数组
+const keyframes = [
+    { transform: 'translateX(0)', opacity: 1 },
+    { transform: 'translateX(200px)', opacity: 0.5 },
+    { offset: 0.3 }, // 控制在 30% 处
+    { transform: 'translateX(0)', opacity: 1 },
+];
+
+// 或使用对象格式
+const keyframes = {
+    transform: ['translateX(0)', 'translateX(200px)', 'translateX(0)'],
+    opacity: [1, 0.5, 1],
+};
+
+// options — 选项
+const options = {
+    duration: 1000,           // 持续时间 (ms)
+    delay: 200,               // 延迟 (ms)
+    endDelay: 0,              // 结束后延迟
+    iterations: Infinity,     // 循环次数 (Infinity = 无限)
+    direction: 'normal',      // 'normal' | 'reverse' | 'alternate' | 'alternate-reverse'
+    easing: 'ease-in-out',    // 缓动函数
+    fill: 'forwards',         // 'none' | 'forwards' | 'backwards' | 'both'
+    iterationStart: 0,
+};
+
+// 2. 控制动画
+animation.play();        // 播放
+animation.pause();       // 暂停
+animation.reverse();     // 反向播放
+animation.finish();      // 跳到结束
+animation.cancel();      // 取消
+
+// 3. 读取状态
+animation.playState;     // 'idle' | 'running' | 'paused' | 'finished'
+animation.currentTime;   // 当前进度 (ms)
+animation.timeline;      // 时间线（默认 document.timeline）
+
+// 4. 事件
+animation.onfinish = () => {};
+animation.oncancel = () => {};
+animation.onremove = () => {};
+
+// 5. 播放速率 (2 = 双倍速, 0.5 = 慢放)
+animation.playbackRate = 1;
+
+// 6. 获取元素所有动画
+element.getAnimations();        // 返回 Animation[]</div>
+    </div>
+    <div class="card">
+        <h2>演示：动画控制</h2>
+        <button onclick="startAnim()">▶ 开始</button>
+        <button onclick="pauseAnim()">⏸ 暂停</button>
+        <button onclick="resumeAnim()">▶️ 继续</button>
+        <button onclick="reverseAnim()">🔄 反向</button>
+        <button onclick="speedUp()">⏩ 加速</button>
+        <button onclick="slowDown()">🐢 减速</button>
+        <button onclick="cancelAnim()">⏹ 取消</button>
+        <div id="anim-box">🎯</div>
+        <div id="anim-status">就绪</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const box = document.getElementById('anim-box');
+        const status = document.getElementById('anim-status');
+        let animation = null;
+
+        function updateStatus() {
+            if (!animation) { status.textContent = '未创建'; return; }
+            status.innerHTML = `
+                playState: <strong>${animation.playState}</strong> |
+                currentTime: <strong>${(animation.currentTime || 0).toFixed(0)}ms</strong> |
+                playbackRate: <strong>${animation.playbackRate}</strong>
+            `;
+        }
+
+        function startAnim() {
+            if (animation) animation.cancel();
+            animation = box.animate([
+                { transform: 'translateX(0) rotate(0deg)', background: '#e74c3c' },
+                { transform: 'translateX(300px) rotate(360deg)', background: '#2ecc71' },
+                { transform: 'translateX(0) rotate(720deg)', background: '#e74c3c' },
+            ], {
+                duration: 1500,
+                easing: 'ease-in-out',
+                iterations: Infinity,
+            });
+            animation.onfinish = () => status.textContent = '✅ 动画结束';
+            animation.oncancel = () => status.textContent = '⏹ 已取消';
+            updateStatus();
+        }
+
+        function pauseAnim() { animation?.pause(); updateStatus(); }
+        function resumeAnim() { animation?.play(); updateStatus(); }
+        function reverseAnim() { animation?.reverse(); updateStatus(); }
+
+        function speedUp() {
+            if (animation) {
+                animation.playbackRate = Math.min(animation.playbackRate * 1.5, 10);
+                updateStatus();
+            }
+        }
+        function slowDown() {
+            if (animation) {
+                animation.playbackRate = Math.max(animation.playbackRate / 1.5, 0.1);
+                updateStatus();
+            }
+        }
+        function cancelAnim() { animation?.cancel(); animation = null; updateStatus(); }
+
+        // 定期更新状态
+        setInterval(updateStatus, 200);
+
+        console.log('=== Web Animation API ===');
+        console.log('animate 支持:', 'animate' in document.createElement('div'));
+
+        document.getElementById('output').textContent =
+            `Web Animation API: Element.animate()\n` +
+            `控制: play/pause/reverse/finish/cancel\n` +
+            `属性: playState/currentTime/playbackRate\n` +
+            `✅ Web Animation API 演示完成！`;
+    </script>
+</body>
+</html>

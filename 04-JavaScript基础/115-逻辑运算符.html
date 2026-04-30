@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>逻辑运算符</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #9b59b6; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+        th { background: #9b59b6; color: white; }
+        td { background: white; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>逻辑运算符</h2>
+        <p>用于组合多个条件，控制程序的逻辑流程。</p>
+    </div>
+
+    <div class="card">
+        <h2>三种基本逻辑运算符</h2>
+        <table>
+            <tr><th>运算符</th><th>名称</th><th>含义</th><th>示例</th></tr>
+            <tr><td>&&</td><td>AND（与）</td><td>所有条件都为 true</td><td>a > 0 && b > 0</td></tr>
+            <tr><td>||</td><td>OR（或）</td><td>至少一个条件为 true</td><td>a > 0 || b > 0</td></tr>
+            <tr><td>!</td><td>NOT（非）</td><td>取反</td><td>!isActive</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">
+// && — 全部为true才返回true
+true && true;       // true
+true && false;      // false
+false && false;     // false
+
+// || — 只要有一个true就返回true
+true || false;      // true
+false || false;     // false
+false || true;      // true
+
+// ! — 取反
+!true;              // false
+!false;             // true
+!!'hello';          // true（转布尔）
+
+// 实际条件判断
+let age = 20;
+age >= 18 && age <= 60;   // true（成年且未退休）
+age < 18 || age > 60;     // false（不在区间外）
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>短路求值（Short-circuit Evaluation）</h2>
+        <p>逻辑运算符不一定返回 true/false，而是返回某个<strong>操作数的值</strong>。</p>
+        <div class="code">
+// && 短路：遇到 falsy 就停止，返回该值
+0 && 'hello';          // 0（第一个就是 false，不继续了）
+1 && 'hello';          // 'hello'（两个都是 truthy，返回最后一个）
+null && 'hello';       // null
+'hello' && 'world';    // 'world'
+
+// || 短路：遇到 truthy 就停止，返回该值
+0 || 'hello';          // 'hello'（第一个是 false，继续找）
+1 || 'hello';          // 1（第一个就是 true，不继续了）
+'' || 'default';       // 'default'
+null || undefined;     // undefined（都是 falsy，返回最后一个）
+        </div>
+        <div class="note">💡 || 常用于给变量设置默认值</div>
+    </div>
+
+    <div class="card">
+        <h2>实际应用：默认值</h2>
+        <div class="code">
+// 给参数设置默认值（旧方式）
+function greet(name) {
+    name = name || '游客';     // 如果 name 是 falsy，使用'游客'
+    console.log('你好, ' + name);
+}
+greet();             // "你好, 游客"
+greet('Alice');      // "你好, Alice"
+
+// ⚠️ || 的缺陷：如果合法值是空字符串/0，也会被覆盖
+let count = 0;
+let result = count || 10;     // 10（0被当成falsy了！）
+// 此时应该用 ??（空值合并运算符）:
+// let result = count ?? 10;  // 0（只有 null/undefined 才使用默认值）
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>实际应用：条件执行</h2>
+        <div class="code">
+// && 短路执行（如果条件为真才执行）
+isLoggedIn && renderDashboard();   // 只有登录了才渲染
+
+// 相当于：
+if (isLoggedIn) {
+    renderDashboard();
+}
+
+// React 中常用：
+// {isLoading && <Spinner />}
+// {!isLoading && <Content />}
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>逻辑非 ! 的常见用法</h2>
+        <div class="code">
+// 取反
+let isActive = false;
+if (!isActive) { /* 执行 */ }
+
+// 转布尔（双感叹号）
+!!'hello';      // true
+!!0;            // false
+!!null;         // false
+
+// 检查变量是否存在
+if (!user) { /* 用户不存在 */ }
+        </div>
+    </div>
+
+    <pre id="output"></pre>
+
+    <script>
+        // ====================
+        // 逻辑运算符演示
+        // ====================
+
+        console.log('=== 基本逻辑 ===');
+        console.log('true && true:', true && true);
+        console.log('true && false:', true && false);
+        console.log('true || false:', true || false);
+        console.log('false || false:', false || false);
+        console.log('!true:', !true);
+        console.log('!false:', !false);
+
+        console.log('=== 条件组合 ===');
+        let age = 25;
+        let hasLicense = true;
+        console.log('age:', age, 'hasLicense:', hasLicense);
+        console.log('可以开车:', age >= 18 && hasLicense);
+        console.log('未成年或没驾照:', age < 18 || !hasLicense);
+
+        console.log('=== 短路求值 && ===');
+        console.log('0 && "hello":', 0 && 'hello');
+        console.log('1 && "hello":', 1 && 'hello');
+        console.log('null && "hello":', null && 'hello');
+
+        console.log('=== 短路求值 || ===');
+        console.log('0 || "default":', 0 || 'default');
+        console.log('"" || "fallback":', '' || 'fallback');
+        console.log('"hello" || "world":', 'hello' || 'world');
+
+        console.log('=== 实际应用 ===');
+        // 默认值
+        let username = '';
+        let displayName = username || '游客';
+        console.log('用户名:', displayName); // '游客'
+
+        // 条件执行
+        let isLoggedIn = true;
+        isLoggedIn && console.log('✅ 用户已登录，执行操作');
+
+        document.getElementById('output').textContent =
+            `true && false = ${true && false}\n` +
+            `true || false = ${true || false}\n` +
+            `!true = ${!true}\n` +
+            `\n短路求值:\n` +
+            `0 && "hello" → ${0 && 'hello'}\n` +
+            `0 || "default" → ${0 || 'default'}\n` +
+            `\n默认值: "" || "游客" → ${'' || '游客'}\n` +
+            `✅ 逻辑运算符演示完成！`;
+    </script>
+</body>
+</html>

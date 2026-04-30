@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>证书链</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📜 证书链</h2><p>X.509 证书结构、CA 体系、证书链验证、自签名证书、Let's Encrypt。</p></div>
+    <div class="card">
+        <h2>数字证书</h2>
+        <p>数字证书类似"网络身份证"，由 CA (证书颁发机构) 签发，证明网站身份的真实性。</p>
+        <div class="code">// ========== X.509 证书结构 ==========
+//
+// 证书内容:
+//   版本 (V1/V3)
+//   序列号
+//   签名算法 (如 sha256WithRSAEncryption)
+//   颁发者 (Issuer): CN=Let's Encrypt Authority X3
+//   有效期:
+//     生效日期: Jan 1 00:00:00 2024 GMT
+//     到期日期: Jan 1 00:00:00 2025 GMT
+//   主体 (Subject): CN=*.example.com
+//   公钥信息:
+//     算法: RSA (2048 bits) / ECDSA (P-256)
+//     公钥: [公钥数据]
+//   扩展:
+//     Subject Alternative Name (SAN): *.example.com, example.com
+//     Key Usage: Digital Signature, Key Encipherment
+//     Extended Key Usage: Server Authentication
+//   签名: [CA 私钥签名]
+
+// ========== 证书链 ==========
+// 根 CA → 中间 CA → 服务器证书
+//
+//   根证书 (Root CA)
+//   └── 自签名 (根 CA 私钥签名自己)
+//   └── 预装在操作系统/浏览器中
+//       │
+//       ▼
+//   中间证书 (Intermediate CA)
+//   └── 由根 CA 签发
+//   └── 保护根 CA (私钥离线存储)
+//       │
+//       ▼
+//   服务器证书 (Leaf/End-Entity)
+//   └── 由中间 CA 签发
+//   └── 实际网站使用
+//
+// 验证: 服务器证书 → 中间 CA → 根 CA (信任锚)</div>
+    </div>
+    <div class="card">
+        <h2>证书验证过程</h2>
+        <div class="code">// ========== 浏览器验证证书 ==========
+// 1. 证书链完整性
+//    服务器证书 → 中间 CA → 根 CA
+//    (每个证书的签发者 = 上一级的主体)
+//
+// 2. 签名验证
+//    用上级证书的公钥验证下级证书的签名
+//    根证书自签名,预装在信任存储中
+//
+// 3. 有效期检查
+//    当前时间在证书有效期内
+//
+// 4. 吊销检查 (可选)
+//    CRL (证书吊销列表) 或 OCSP (在线证书状态协议)
+//    检查证书是否被提前吊销
+//
+// 5. 域名匹配
+//    检查 Subject Alternative Name (SAN)
+//    证书上的域名是否匹配访问的域名
+//    *.example.com 匹配 www.example.com
+//    但不匹配 example.com (需要分开列)
+
+// ========== 证书错误 ==========
+// SEC_ERROR_UNKNOWN_ISSUER: 颁发者未知
+//   → 缺少中间证书
+//
+// SEC_ERROR_EXPIRED_CERTIFICATE: 证书过期
+//   → 需要续期
+//
+// SSL_ERROR_BAD_CERT_DOMAIN: 域名不匹配
+//   → 证书与访问域名不符
+//
+// SEC_ERROR_CA_CERT_INVALID: CA 无效
+//   → 自签名证书或根证书不被信任
+
+// ========== OCSP (在线证书状态协议) ==========
+// 实时查询证书是否被吊销
+// OCSP Stapling: 服务器提前获取 OCSP 响应
+//   在 TLS 握手中附带,减少客户端查询延迟</div>
+        <div class="note">🔒 根证书是信任链的起点——操作系统和浏览器预装约 100-200 个根证书。如果你安装了公司或抓包工具的根证书,就等于信任了它们签发的所有证书。这就是 Charles/Fiddler 抓包 HTTPS 的原理。</div>
+    </div>
+    <div class="card">
+        <h2>Let's Encrypt 与免费证书</h2>
+        <div class="code">// ========== Let's Encrypt ==========
+// 非盈利 CA, 提供免费自动化证书
+// 证书有效期: 90 天
+// 自动续期: certbot / acme.sh
+// 支持通配符: *.example.com
+//
+// 截至 2024 年, 签发超过 4 亿个证书
+// 全球约 30% 的 HTTPS 网站使用 Let's Encrypt
+//
+// ========== ACME 协议 ==========
+// 自动证书管理环境, 验证域名所有权
+// 验证方式:
+//
+// HTTP-01 (HTTP 验证):
+//   在服务器的 /.well-known/acme-challenge/<token>
+//   放置指定文件
+//   CA 通过 HTTP 访问验证
+//   端口: 80
+//
+// DNS-01 (DNS 验证):
+//   在 DNS 添加 TXT 记录
+//   支持通配符证书
+//
+// TLS-ALPN-01 (TLS 验证):
+//   在 443 端口响应 ACME TLS 请求
+//   无需开放 80 端口
+
+// ========== 证书类型 ==========
+// DV (Domain Validation): 验证域名所有权
+//   简单,快速,免费 (Let's Encrypt)
+//
+// OV (Organization Validation): 验证组织身份
+//   付费,需要人工审核
+//
+// EV (Extended Validation): 扩展验证
+//   严格审核,浏览器地址栏显示公司名
+//   (Chrome 已淡化 EV 标识)
+//
+// 大多数场景: DV 证书已足够</div>
+    </div>
+    <div class="card">
+        <h2>自签名证书与本地开发</h2>
+        <div class="code">// ========== 自签名证书 ==========
+// 用于开发环境,不被浏览器信任
+//
+// 使用 OpenSSL 生成:
+//   # 生成私钥
+//   openssl genrsa -out key.pem 2048
+//
+//   # 生成证书签名请求 (CSR)
+//   openssl req -new -key key.pem -out csr.pem
+//
+//   # 自签名证书 (有效期 365 天)
+//   openssl x509 -req -days 365 \
+//     -in csr.pem -signkey key.pem -out cert.pem
+//
+//   # 一步生成 (推荐)
+//   openssl req -x509 -newkey rsa:2048 \
+//     -nodes -keyout key.pem -out cert.pem \
+//     -days 365 -subj "/CN=localhost"
+
+// ========== mkcert (推荐) ==========
+// 自动生成本地信任的开发证书:
+//   # 安装
+//   $ mkcert -install
+//   # 生成本地证书
+//   $ mkcert localhost 127.0.0.1 ::1
+//   # 生成 "localhost+2.pem" + "localhost+2-key.pem"
+
+// ========== 查看证书信息 ==========
+// $ openssl x509 -in cert.pem -text -noout
+// $ openssl s_client -connect example.com:443
+
+// ========== 证书格式 ==========
+// PEM: Base64 编码的证书 (最常见)
+// DER: 二进制格式 (Windows)
+// PFX/P12: 含私钥的加密容器
+// CRT/CER: 扩展名,内容与 PEM 相同</div>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('📜 证书链');
+        log('');
+        log('X.509 证书: 身份信息 + 公钥 + CA 签名');
+        log('证书链: 根CA → 中间CA → 服务器证书');
+        log('验证: 链完整性 → 签名 → 有效期 → 吊销 → 域名');
+        log('Let\'s Encrypt: 免费 DV 证书, 90 天有效期, ACME 自动续期');
+        log('自签名证书: openssl 生成, 本地开发使用');
+    </script>
+</body>
+</html>

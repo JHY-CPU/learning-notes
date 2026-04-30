@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>云计算与部署实战</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>☁️ 云计算与部署实战</h2><p>云计算模型 (IaaS/PaaS/SaaS/FaaS)、AWS 核心服务 (EC2/S3/RDS/Lambda/ELB)、Nginx + SSL 配置、进程管理 (PM2/systemd)、Serverless 部署、CI/CD 流水线。</p></div>
+    <div class="card">
+        <h2>云计算模型</h2>
+        <div class="code">// ========== 云服务模型 ==========
+// ┌──────────────────────────────────┐
+// │   On-Premises (自建)              │
+// │   ┌──────────────────────────┐   │
+// │   │   IaaS (基础设施即服务)    │   │
+// │   │   ┌────────────────────┐  │   │
+// │   │   │   PaaS (平台即服务)  │  │   │
+// │   │   │   ┌──────────────┐ │  │   │
+// │   │   │   │ SaaS (软件)   │ │  │   │
+// │   │   │   │ FaaS (函数)   │ │  │   │
+// │   │   │   └──────────────┘ │  │   │
+// │   │   └────────────────────┘  │   │
+// │   └──────────────────────────┘   │
+// └──────────────────────────────────┘
+//
+// IaaS: 虚拟机/网络/存储 (AWS EC2, GCP Compute)
+//   你管: OS, 运行时, 应用
+//   云管: 硬件, 网络, 虚拟化
+//
+// PaaS: 托管运行时 (Heroku, Railway, Render)
+//   你管: 应用代码
+//   云管: OS, 运行时, 扩展
+//
+// FaaS: 函数即服务 (AWS Lambda, Cloud Functions)
+//   你管: 函数代码
+//   云管: 一切
+//
+// SaaS: 直接用 (Gmail, Notion, Slack)
+
+// ========== 三大云厂商 ==========
+// AWS:   最大, 服务最多, 学习成本高
+//   EC2 (VM), S3 (对象存储), RDS (数据库)
+//   Lambda (函数), ELB (负载均衡), CloudFront (CDN)
+//
+// GCP:   数据/AI 强, Kubernetes 原生
+//   Compute Engine, Cloud Storage, Cloud SQL
+//   Cloud Functions, GKE, BigQuery
+//
+// Azure: 企业集成, .NET 友好
+//   VMs, Blob Storage, SQL Database
+//   Azure Functions, AKS
+
+// 选型因素:
+//   技术栈: .NET → Azure, K8s → GCP, 全面 → AWS
+//   团队经验: 熟悉哪个用哪个
+//   成本: 预留实例/Spot 实例省钱
+//   区域: 合规要求选择区域</div>
+    </div>
+    <div class="card">
+        <h2>AWS 核心服务</h2>
+        <div class="code">// ========== EC2 (虚拟机) ==========
+// 创建实例:
+// aws ec2 run-instances \
+//     --image-id ami-0c55b159cbfafe1f0 \
+//     --instance-type t3.medium \
+//     --key-name my-key \
+//     --security-group-ids sg-xxx \
+//     --user-data file://setup.sh
+
+// 安全组:
+//   入站: 80 (HTTP), 443 (HTTPS), 22 (SSH)
+//   出站: 全部放行
+
+// SSH 连接:
+// chmod 600 my-key.pem
+// ssh -i my-key.pem ec2-user@<public-ip>
+
+// ========== S3 (对象存储) ==========
+// 存储桶 → 对象 (文件)
+// 适用: 图片/视频/备份/静态网站
+
+// # 上传文件
+// aws s3 cp file.png s3://my-bucket/uploads/
+//
+// # 公开访问
+// aws s3api put-public-access-block --bucket my-bucket --public
+//
+// # 预签名 URL (临时访问)
+// aws s3 presign s3://my-bucket/private.pdf --expires-in 3600
+
+// S3 存储类:
+//   Standard: 频繁访问
+//   Infrequent Access: 低频, 便宜
+//   Glacier: 归档 (取回需几分钟)
+
+// ========== RDS (托管数据库) ==========
+// 支持: PostgreSQL, MySQL, MariaDB, SQL Server
+// 特性:
+//   自动备份 (快照)
+//   多可用区部署 (高可用)
+//   只读副本 (读扩展)
+//   自动扩缩容
+
+// # 创建 RDS
+// aws rds create-db-instance \
+//     --engine postgres \
+//     --db-instance-class db.t3.medium \
+//     --master-username app \
+//     --master-user-password secret \
+//     --allocated-storage 100 \
+//     --multi-az
+
+// ========== ELB (负载均衡) ==========
+// ALB (HTTP/HTTPS): 路径/主机路由
+// NLB (TCP/UDP): 高性能
+// 特性:
+//   健康检查
+//   SSL 终止
+//   跨可用区
+//   自动扩展集成</div>
+    </div>
+    <div class="card">
+        <h2>Nginx + SSL + 进程管理</h2>
+        <div class="code">// ========== Nginx 配置 ==========
+// /etc/nginx/sites-available/api.example.com
+
+// server {
+//     listen 80;
+//     server_name api.example.com;
+//     return 301 https://$server_name$request_uri; // HTTP→HTTPS
+// }
+//
+// server {
+//     listen 443 ssl http2;
+//     server_name api.example.com;
+//
+//     ssl_certificate     /etc/letsencrypt/live/api.example.com/fullchain.pem;
+//     ssl_certificate_key /etc/letsencrypt/live/api.example.com/privkey.pem;
+//
+//     # 安全配置
+//     ssl_protocols TLSv1.2 TLSv1.3;
+//     ssl_ciphers HIGH:!aNULL:!MD5;
+//     ssl_prefer_server_ciphers on;
+//
+//     location /api/ {
+//         proxy_pass http://127.0.0.1:3000;
+//         proxy_set_header Host $host;
+//         proxy_set_header X-Real-IP $remote_addr;
+//         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+//         proxy_set_header X-Forwarded-Proto $scheme;
+//
+//         # WebSocket 支持
+//         proxy_http_version 1.1;
+//         proxy_set_header Upgrade $http_upgrade;
+//         proxy_set_header Connection "upgrade";
+//     }
+//
+//     location /static/ {
+//         root /var/www/myapp;
+//         expires 365d;
+//         add_header Cache-Control "public, immutable";
+//     }
+// }
+
+// ========== Let's Encrypt SSL ==========
+// 免费 SSL 证书, 自动续期
+//
+// # 安装 certbot
+// apt install certbot python3-certbot-nginx
+//
+// # 获取证书
+// certbot --nginx -d api.example.com
+//
+// # 自动续期 (cron)
+// 0 3 * * * certbot renew --quiet
+
+// ========== 进程管理 ==========
+// PM2 (Node.js):
+//   pm2 start app.js -i max         # 多进程
+//   pm2 start app.js --name myapp    # 命名
+//   pm2 list / logs / monit          # 监控
+//   pm2 reload all                   # 零宕机重载
+//   pm2 save && pm2 startup          # 开机自启
+//
+// systemd (通用):
+// /etc/systemd/system/myapp.service:
+// [Unit]
+// Description=My App
+// After=network.target
+//
+// [Service]
+// Type=simple
+// User=appuser
+// WorkingDirectory=/opt/myapp
+// ExecStart=/usr/local/bin/myapp
+// Restart=always
+// RestartSec=5
+// EnvironmentFile=/etc/myapp/env
+//
+// [Install]
+// WantedBy=multi-user.target
+//
+// 命令:
+//   systemctl daemon-reload
+//   systemctl start myapp
+//   systemctl enable myapp  # 开机启动
+//   journalctl -u myapp -f  # 看日志
+
+// ========== 优雅关闭 ==========
+// Go:
+// quit := make(chan os.Signal, 1)
+// signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+// <-quit
+// ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+// defer cancel()
+// server.Shutdown(ctx)
+
+// Node.js:
+// process.on('SIGTERM', () => {
+//   server.close(() => process.exit(0));
+// });</div>
+    </div>
+    <div class="card">
+        <h2>Serverless 与 CI/CD 部署</h2>
+        <div class="code">// ========== AWS Lambda ==========
+// 函数即服务, 按调用计费
+
+// exports.handler = async (event) => {
+//     const { userId } = JSON.parse(event.body);
+//     const user = await db.findUser(userId);
+//
+//     return {
+//         statusCode: 200,
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify(user),
+//     };
+// };
+
+// Lambda 触发:
+//   API Gateway → Lambda (REST API)
+//   S3 事件 → Lambda (图片处理)
+//   SQS → Lambda (消息处理)
+//   CloudWatch → Lambda (定时任务)
+
+// 冷启动:
+//   首次调用/闲置后启动慢 (~1s)
+//   优化: 减少包体积, 预留并发
+
+// ========== Serverless 框架 ==========
+// serverless.yml:
+// service: my-api
+//
+// provider:
+//   name: aws
+//   runtime: nodejs20.x
+//   region: ap-northeast-1
+//
+// functions:
+//   hello:
+//     handler: handler.hello
+//     events:
+//       - http:
+//           path: /hello
+//           method: get
+
+// 替代平台:
+//   Vercel: 前端 + API, Next.js 友好
+//   Netlify: 前端 + 函数, Jamstack
+//   Railway: 简单部署, 无需配置
+
+// ========== CI/CD 部署流水线 ==========
+// GitHub Actions → 服务器/Docker
+
+// name: Deploy
+// on:
+//   push:
+//     branches: [main]
+//
+// jobs:
+//   deploy:
+//     runs-on: ubuntu-latest
+//     steps:
+//       - uses: actions/checkout@v4
+//
+//       - name: Build Docker image
+//         run: docker build -t myapp .
+//
+//       - name: Push to registry
+//         run: |
+//           docker tag myapp registry.example.com/myapp:${{ github.sha }}
+//           docker push registry.example.com/myapp:${{ github.sha }}
+//
+//       - name: Deploy to server
+//         uses: appleboy/ssh-action@v1
+//         with:
+//           host: ${{ secrets.HOST }}
+//           username: ${{ secrets.USER }}
+//           key: ${{ secrets.SSH_KEY }}
+//           script: |
+//             cd /opt/myapp
+//             docker-compose pull
+//             docker-compose up -d
+//             docker system prune -f
+
+// 多环境晋升:
+//   dev (自动部署) → staging (手动) → prod (手动+审批)
+//   环境变量: .env.dev / .env.staging / .env.prod
+//   数据库: 迁移脚本版本管理</div>
+        <div class="note">💡 云部署要点: IaaS 自管OS, PaaS 只管代码, FaaS 只管函数; AWS EC2 + S3 + RDS 核心服务; Nginx 反向代理 + SSL; Let's Encrypt 免费证书自动续期; PM2/systemd 进程管理; Lambda 函数按调用付费; CI/CD 构建→推送→部署流水线; 多环境 dev/staging/prod 晋升。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCloud()">云计算模型</button>
+        <button onclick="demoNginx()">Nginx + SSL</button>
+        <button onclick="demoDeploy()">CI/CD 部署</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCloud() {
+            result.innerHTML = '';
+            log('# 云计算模型');
+            log('');
+            log('IaaS: EC2, 虚拟机');
+            log('  你管: OS/运行时/应用');
+            log('');
+            log('PaaS: Heroku, Railway');
+            log('  你只管: 应用代码');
+            log('');
+            log('FaaS: Lambda, 函数');
+            log('  你只管: 函数代码');
+            log('');
+            log('AWS 核心:');
+            log('  EC2 + S3 + RDS + Lambda + ELB');
+        }
+
+        function demoNginx() {
+            result.innerHTML = '';
+            log('# Nginx + SSL 配置');
+            log('');
+            log('Nginx:');
+            log('  反向代理: proxy_pass');
+            log('  HTTPS: ssl_certificate');
+            log('  WebSocket: Upgrade header');
+            log('  静态文件: root + expires');
+            log('');
+            log('SSL:');
+            log('  Let\'s Encrypt / certbot');
+            log('  自动续期: certbot renew');
+            log('');
+            log('进程管理:');
+            log('  PM2: Node.js 多进程');
+            log('  systemd: 通用服务管理');
+        }
+
+        function demoDeploy() {
+            result.innerHTML = '';
+            log('# Serverless + CI/CD');
+            log('');
+            log('Lambda:');
+            log('  按调用付费');
+            log('  冷启动 ~1s');
+            log('  预留并发优化');
+            log('');
+            log('CI/CD 流水线:');
+            log('  push → test → build');
+            log('  → push image → deploy');
+            log('');
+            log('多环境:');
+            log('  dev: 自动部署');
+            log('  staging: 手动触发');
+            log('  prod: 手动 + 审批');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>37-最小费用最大流 (Min Cost Max Flow)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Min Cost Max Flow</h2>
+  <div class="code">在最大流的基础上最小化总费用，用 SPFA 或 Dijkstra 找最短路增广。</div>
+  <pre>function minCostMaxFlow(capacity, cost, source, sink) {
+  const n = capacity.length;
+  const graph = Array.from({length:n}, () => []);
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < n; j++)
+      if (capacity[i][j]) graph[i].push(j);
+  let flow = 0, costTotal = 0;
+  const cap = capacity.map(r => [...r]);
+  while (true) {
+    const dist = new Array(n).fill(Infinity);
+    const parent = new Array(n).fill(-1);
+    const inq = new Array(n).fill(false);
+    dist[source] = 0; const q = [source]; inq[source] = true;
+    while (q.length) {
+      const u = q.shift(); inq[u] = false;
+      for (const v of graph[u]) {
+        if (cap[u][v] > 0 && dist[u] + cost[u][v] < dist[v]) {
+          dist[v] = dist[u] + cost[u][v]; parent[v] = u;
+          if (!inq[v]) { q.push(v); inq[v] = true; }
+        }
+      }
+    }
+    if (parent[sink] === -1) break;
+    let add = Infinity;
+    for (let v = sink; v !== source; v = parent[v]) add = Math.min(add, cap[parent[v]][v]);
+    for (let v = sink; v !== source; v = parent[v]) { cap[parent[v]][v] -= add; cap[v][parent[v]] += add; }
+    flow += add; costTotal += add * dist[sink];
+  }
+  return { flow, costTotal };
+}
+console.log('最小费用最大流');</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  document.getElementById('result').textContent =
+    `最小费用最大流:\n在最大流基础上最小化费用\n用 SPFA/Dijkstra 找最短路增广\n\n应用:\n- 任务分配\n- 运输问题\n- 二分图最优匹配`;
+}
+</script>
+</body>
+</html>

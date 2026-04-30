@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot 文件上传与下载</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📤 Spring Boot 文件上传与下载</h2><p>MultipartFile 文件上传、多文件上传、下载文件 (InputStreamResource/Resource)、文件类型/大小校验、静态资源映射。</p></div>
+    <div class="card">
+        <h2>文件上传</h2>
+        <div class="code">// ========== Spring Boot 文件上传 ==========
+// 使用 MultipartFile 接收上传文件
+// 自动配置: spring.servlet.multipart.*
+
+// ========== 配置 ==========
+spring:
+  servlet:
+    multipart:
+      enabled: true                    # 启用文件上传 (默认)
+      max-file-size: 10MB              # 单文件最大 (默认 1MB)
+      max-request-size: 100MB          # 请求最大 (默认 10MB)
+      file-size-threshold: 2KB         # 超过此大小写入磁盘
+      location: ${java.io.tmpdir}      # 临时目录
+
+// ========== 单文件上传 ==========
+@RestController
+@RequestMapping("/api/files")
+@Slf4j
+public class FileUploadController {
+
+    @PostMapping("/upload")
+    public ApiResponse&lt;String&gt; uploadFile(
+            @RequestParam("file") MultipartFile file) {
+
+        // 校验空文件
+        if (file.isEmpty()) {
+            return ApiResponse.error(400, "文件不能为空");
+        }
+
+        // 获取文件信息
+        String originalName = file.getOriginalFilename();  // 原文件名
+        String contentType = file.getContentType();        // MIME 类型
+        long size = file.getSize();                        // 文件大小 (字节)
+
+        log.info("收到文件: name={}, type={}, size={}",
+            originalName, contentType, size);
+
+        try {
+            // 保存文件
+            String fileName = UUID.randomUUID() + "_" + originalName;
+            Path uploadPath = Path.of("uploads", fileName);
+            Files.createDirectories(uploadPath.getParent());
+            file.transferTo(uploadPath.toFile());          // 保存到磁盘
+
+            return ApiResponse.success(fileName);
+        } catch (IOException e) {
+            log.error("文件上传失败", e);
+            return ApiResponse.error(500, "文件上传失败");
+        }
+    }
+
+    // ========== 多文件上传 ==========
+    @PostMapping("/uploads")
+    public ApiResponse&lt;List&lt;String&gt;&gt; uploadFiles(
+            @RequestParam("files") List&lt;MultipartFile&gt; files) {
+
+        List&lt;String&gt; savedNames = new ArrayList&lt;&gt;();
+
+        for (MultipartFile file : files) {
+            if (file.isEmpty()) continue;
+
+            String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
+            try {
+                file.transferTo(Path.of("uploads", fileName));
+                savedNames.add(fileName);
+            } catch (IOException e) {
+                log.error("文件上传失败: {}", fileName, e);
+            }
+        }
+
+        return ApiResponse.success(savedNames);
+    }
+}
+
+// ========== MultipartFile 方法 ==========
+file.getOriginalFilename()    // 原文件名 (含后缀)
+file.getContentType()         // MIME 类型 (image/png)
+file.getSize()                // 文件大小 (字节)
+file.getBytes()               // 文件字节数组
+file.getInputStream()         // 输入流
+file.isEmpty()                // 是否为空
+file.transferTo(dest)         // 保存到目标文件</div>
+    </div>
+    <div class="card">
+        <h2>文件校验</h2>
+        <div class="code">// ========== 文件校验 ==========
+
+// ========== 图片上传校验 ==========
+@PostMapping("/upload/image")
+public ApiResponse&lt;String&gt; uploadImage(@RequestParam("file") MultipartFile file) {
+
+    // 1. 空文件
+    if (file.isEmpty()) {
+        return ApiResponse.error(400, "文件不能为空");
+    }
+
+    // 2. 文件大小 (不超过 5MB)
+    if (file.getSize() > 5 * 1024 * 1024) {
+        return ApiResponse.error(400, "图片大小不能超过 5MB");
+    }
+
+    // 3. 文件类型 (白名单)
+    String contentType = file.getContentType();
+    List&lt;String&gt; allowedTypes = List.of("image/jpeg", "image/png", "image/gif", "image/webp");
+    if (!allowedTypes.contains(contentType)) {
+        return ApiResponse.error(400, "仅支持 JPG/PNG/GIF/WebP 格式");
+    }
+
+    // 4. 文件扩展名 (二次验证)
+    String originalName = file.getOriginalFilename();
+    if (originalName == null || originalName.isBlank()) {
+        return ApiResponse.error(400, "文件名无效");
+    }
+
+    String extension = originalName.substring(originalName.lastIndexOf(".") + 1).toLowerCase();
+    List&lt;String&gt; allowedExts = List.of("jpg", "jpeg", "png", "gif", "webp");
+    if (!allowedExts.contains(extension)) {
+        return ApiResponse.error(400, "文件扩展名不合法");
+    }
+
+    // 5. 保存
+    String fileName = UUID.randomUUID() + "." + extension;
+    try {
+        file.transferTo(Path.of("uploads/images", fileName));
+        return ApiResponse.success(fileName);
+    } catch (IOException e) {
+        log.error("图片上传失败", e);
+        return ApiResponse.error(500, "上传失败");
+    }
+}
+
+// ========== 文件校验工具 ==========
+@Component
+public class FileValidator {
+
+    // 允许的 MIME 类型
+    private static final Map&lt;String, List&lt;String&gt;&gt; ALLOWED_TYPES = Map.of(
+        "image", List.of("image/jpeg", "image/png", "image/gif", "image/webp"),
+        "document", List.of("application/pdf", "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+        "video", List.of("video/mp4", "video/mpeg")
+    );
+
+    public static boolean isValidType(String category, String contentType) {
+        return ALLOWED_TYPES.getOrDefault(category, List.of()).contains(contentType);
+    }
+
+    public static boolean isValidSize(long size, long maxBytes) {
+        return size > 0 && size <= maxBytes;
+    }
+
+    public static String sanitizeFileName(String fileName) {
+        // 防止路径遍历攻击
+        return fileName.replaceAll("[^a-zA-Z0-9._-]", "_");
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>文件下载</h2>
+        <div class="code">// ========== 文件下载 ==========
+
+@RestController
+@RequestMapping("/api/files")
+public class FileDownloadController {
+
+    // ========== 方式 1: InputStreamResource ==========
+    @GetMapping("/download/{fileName}")
+    public ResponseEntity&lt;InputStreamResource&gt; downloadFile(
+            @PathVariable String fileName) {
+
+        try {
+            Path filePath = Path.of("uploads", fileName);
+
+            if (!Files.exists(filePath)) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // 获取 MIME 类型
+            String contentType = Files.probeContentType(filePath);
+            if (contentType == null) {
+                contentType = "application/octet-stream";
+            }
+
+            // 创建资源
+            InputStreamResource resource = new InputStreamResource(
+                new FileInputStream(filePath.toFile()));
+
+            return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .contentLength(Files.size(filePath))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                    "attachment; filename=\"" + fileName + "\"")
+                .body(resource);
+
+        } catch (IOException e) {
+            log.error("文件下载失败: {}", fileName, e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    // ========== 方式 2: Resource (推荐) ==========
+    @GetMapping("/download2/{fileName}")
+    public ResponseEntity&lt;Resource&gt; downloadAsResource(@PathVariable String fileName) {
+        try {
+            Path filePath = Path.of("uploads", fileName);
+            Path file = filePath.normalize();
+
+            if (!Files.exists(file)) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // 防止路径遍历
+            if (!file.startsWith(Path.of("uploads").normalize())) {
+                return ResponseEntity.badRequest().build();
+            }
+
+            Resource resource = new UrlResource(file.toUri());
+            String contentType = Files.probeContentType(file);
+
+            return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(
+                    contentType != null ? contentType : "application/octet-stream"))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                    "attachment; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
+
+        } catch (IOException e) {
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    // ========== 方式 3: 在线预览 (非下载) ==========
+    @GetMapping("/preview/{fileName}")
+    public ResponseEntity&lt;Resource&gt; previewFile(@PathVariable String fileName) {
+        // inline = 浏览器内预览 (图片/PDF)
+        // attachment = 下载
+        try {
+            Path filePath = Path.of("uploads", fileName);
+            Resource resource = new UrlResource(filePath.toUri());
+
+            return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                    "inline; filename=\"" + resource.getFilename() + "\"")
+                .body(resource);
+        } catch (IOException e) {
+            return ResponseEntity.notFound().build();
+        }
+    }
+}
+
+// ========== Content-Disposition 说明 ==========
+// attachment: 下载, 浏览器弹出保存对话框
+//   "attachment; filename=\"report.pdf\""
+// inline: 浏览器直接打开 (图片/PDF)
+//   "inline; filename=\"photo.jpg\""</div>
+    </div>
+    <div class="card">
+        <h2>静态资源映射</h2>
+        <div class="code">// ========== 静态资源映射 ==========
+// 浏览器直接访问文件, 无需 Controller
+
+// ========== 默认静态资源路径 ==========
+// Spring Boot 默认映射:
+// classpath:/static/
+// classpath:/public/
+// classpath:/resources/
+// classpath:/META-INF/resources/
+
+// 访问: http://localhost:8080/image.png
+// 对应: src/main/resources/static/image.png
+
+// ========== 自定义静态资源 ==========
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addResourceHandlers(ResourceHandlerRegistry registry) {
+        // 映射上传目录到 /uploads/**
+        registry.addResourceHandler("/uploads/**")
+            .addResourceLocations("file:uploads/")    // 文件系统路径
+            .setCacheControl(CacheControl.maxAge(1, TimeUnit.HOURS));
+
+        // 映射自定义目录
+        registry.addResourceHandler("/static/**")
+            .addResourceLocations("classpath:/my-static/");
+    }
+}
+
+// 访问: http://localhost:8080/uploads/photo.jpg
+// 对应: 项目根目录 uploads/photo.jpg
+
+// ========== application.yml 配置 ==========
+spring:
+  web:
+    resources:
+      static-locations: classpath:/static/,classpath:/public/,file:uploads/
+      cache:
+        period: 3600                    # 缓存 1 小时
+      add-mappings: true
+      chain:
+        enabled: true                   # 启用资源链
+        compressed: true                # 启用压缩
+        cache: true                     # 启用资源缓存
+
+// ========== 文件操作服务 ==========
+@Service
+public class FileStorageService {
+
+    private final Path root = Path.of("uploads");
+
+    public FileStorageService() {
+        init();
+    }
+
+    // 初始化目录
+    private void init() {
+        try {
+            Files.createDirectories(root);
+            Files.createDirectories(root.resolve("images"));
+            Files.createDirectories(root.resolve("documents"));
+        } catch (IOException e) {
+            throw new RuntimeException("无法创建上传目录", e);
+        }
+    }
+
+    // 保存文件
+    public String store(MultipartFile file, String subDir) {
+        String fileName = UUID.randomUUID() + "_" + file.getOriginalFilename();
+        Path targetPath = root.resolve(subDir).resolve(fileName);
+        try {
+            Files.createDirectories(targetPath.getParent());
+            file.transferTo(targetPath);
+            return subDir + "/" + fileName;
+        } catch (IOException e) {
+            throw new RuntimeException("文件保存失败", e);
+        }
+    }
+
+    // 删除文件
+    public void delete(String filePath) {
+        try {
+            Files.deleteIfExists(root.resolve(filePath));
+        } catch (IOException e) {
+            log.warn("文件删除失败: {}", filePath);
+        }
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>最佳实践</h2>
+        <div class="code">// ========== 文件上传最佳实践 ==========
+
+// ========== 1. 限制文件大小 ==========
+// 在 application.yml 中配置 max-file-size
+// 超限时: MaxUploadSizeExceededException
+
+@ExceptionHandler(MaxUploadSizeExceededException.class)
+@ResponseStatus(HttpStatus.PAYLOAD_TOO_LARGE)
+public ApiResponse&lt;Void&gt; handleMaxSize(MaxUploadSizeExceededException e) {
+    return ApiResponse.error(413, "文件大小超出限制");
+}
+
+// ========== 2. 使用白名单校验类型 ==========
+// 不要用黑名单 (攻击者可绕过)
+// 用 MIME 类型 + 扩展名双重校验
+
+// ========== 3. 防止路径遍历 ==========
+// 校验文件名: 不能包含 ../ 或 ..
+// sanitizeFileName() 去掉危险字符
+// 使用 normalize() 检查路径
+
+// ========== 4. 文件重命名 ==========
+// 不直接使用用户提供的文件名 (冲突/安全)
+// UUID + 原后缀: UUID_random_name.jpg
+
+// ========== 5. 按日期/类型分目录 ==========
+// uploads/images/2026/04/29/uuid_photo.jpg
+// 避免单目录文件过多
+
+// ========== 6. 使用云存储 ==========
+// 生产环境用 S3/MinIO/OSS, 不要存本地
+// 提供预签名 URL 直接上传到 S3
+
+// ========== 7. 防盗链 ==========
+// Referer 验证
+// 自定义 Header 验证
+// 临时签名 URL
+
+// ========== 8. 扫描病毒 ==========
+// 上传文件后使用 ClamAV 扫描
+// 或使用云服务的安全扫描功能</div>
+        <div class="note">💡 文件上传要点: MultipartFile 接收文件; transferTo() 保存; max-file-size 限制大小; 白名单校验 MIME 类型 + 扩展名; 重命名 UUID; 防止路径遍历; InputStreamResource/Resource 下载; Content-Disposition attachment/inline; 静态资源映射 file:uploads/; 生产用 S3/MinIO 云存储。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoUpload()">文件上传</button>
+        <button onclick="demoDownload()">文件下载</button>
+        <button onclick="demoStatic()">静态资源</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoUpload() {
+            result.innerHTML = '';
+            log('# 文件上传');
+            log('');
+            log('MultipartFile:');
+            log('  getOriginalFilename() — 原文件名');
+            log('  getContentType()      — MIME 类型');
+            log('  getSize()             — 大小');
+            log('  transferTo(file)      — 保存');
+            log('');
+            log('配置:');
+            log('  max-file-size: 10MB');
+            log('  max-request-size: 100MB');
+        }
+
+        function demoDownload() {
+            result.innerHTML = '';
+            log('# 文件下载');
+            log('');
+            log('InputStreamResource:');
+            log('  contentType + contentLength + Content-Disposition');
+            log('');
+            log('Content-Disposition:');
+            log('  attachment — 下载 (保存对话框)');
+            log('  inline     — 预览 (浏览器打开)');
+            log('');
+            log('Resource: UrlResource(file.toUri())');
+        }
+
+        function demoStatic() {
+            result.innerHTML = '';
+            log('# 静态资源映射');
+            log('');
+            log('默认路径 (classpath:):');
+            log('  /static/');
+            log('  /public/');
+            log('  /resources/');
+            log('');
+            log('自定义: addResourceHandler("uploads/**")');
+            log('  .addResourceLocations("file:uploads/")');
+        }
+    </script>
+</body>
+</html>

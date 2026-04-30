@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>window与弹窗</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #2c3e50; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>window 与弹窗</h2><p>浏览器全局对象 window，以及 alert/confirm/prompt 弹窗。</p></div>
+    <div class="card">
+        <h2>window 全局对象</h2>
+        <div class="code">// window 是浏览器中的全局对象
+// 所有全局变量和函数都是 window 的属性
+
+console.log(window === this);  // true（全局作用域下）
+
+// window 的属性：
+window.document       // DOM 入口
+window.console        // 控制台
+window.location       // URL 信息
+window.navigator      // 浏览器信息
+window.history        // 浏览历史
+window.screen         // 屏幕信息
+window.localStorage   // 本地存储
+window.sessionStorage // 会话存储
+window.fetch          // 网络请求
+window.setTimeout     // 定时器
+window.requestAnimationFrame // 动画
+
+// 全局变量挂在 window 上
+var x = 10;
+console.log(window.x);  // 10
+
+let y = 20;
+console.log(window.y);  // undefined（let 不会挂在 window 上）
+
+// 窗口尺寸
+window.innerWidth     // 视口宽度（含滚动条）
+window.innerHeight    // 视口高度
+window.outerWidth     // 浏览器窗口宽度
+window.outerHeight    // 浏览器窗口高度
+
+// 滚动位置
+window.scrollX        // 水平滚动距离（别名 pageXOffset）
+window.scrollY        // 垂直滚动距离（别名 pageYOffset）
+
+// 设备像素比
+window.devicePixelRatio  // 物理像素 / CSS 像素</div>
+    </div>
+    <div class="card">
+        <h2>弹窗方法</h2>
+        <div class="code">// alert() — 警告框
+alert('这是一条消息');
+// 只有确定按钮
+// 阻塞代码执行直到用户点击确定
+// 返回 undefined
+
+// confirm() — 确认框
+const result = confirm('你确定要删除吗？');
+// 确定 → true
+// 取消 → false
+
+// prompt() — 输入框
+const value = prompt('请输入你的名字：');
+// 输入后点确定 → 输入字符串
+// 点取消 → null
+// 可以设置默认值：
+const value2 = prompt('请输入你的名字：', '默认值');
+
+// ⚠️ 弹窗会阻塞页面执行！
+// ⚠️ 现代 UI 开发中不推荐使用（用自定义弹窗替代）
+// ⚠️ 部分浏览器会阻止弹窗（特别是第二个以后的 alert）</div>
+    </div>
+    <div class="card">
+        <h2>窗口打开与关闭</h2>
+        <div class="code">// window.open() — 打开新窗口/标签页
+const newWindow = window.open(url, name, features);
+
+// 参数：
+// url — 打开的页面地址
+// name — 窗口名（'_blank', '_self', '_parent', '_top'）
+// features — 窗口特性配置字符串
+
+// 打开新标签页
+window.open('https://example.com', '_blank');
+
+// 打开指定大小的新窗口
+window.open('https://example.com', 'myWindow',
+    'width=800,height=600,left=100,top=100,scrollbars=yes');
+
+// features 可用选项：
+// width/height — 窗口宽高
+// left/top — 窗口位置
+// menubar=yes/no — 菜单栏
+// toolbar=yes/no — 工具栏
+// location=yes/no — 地址栏
+// status=yes/no — 状态栏
+// resizable=yes/no — 可调整大小
+// scrollbars=yes/no — 滚动条
+
+// window.close() — 关闭窗口
+// newWindow.close();  // 关闭打开的窗口
+// window.close();     // 关闭当前窗口（可能被浏览器阻止）
+
+// ⚠️ 现代浏览器会阻止弹窗（除非用户主动触发）</div>
+    </div>
+    <div class="card">
+        <h2>窗口关系与判断</h2>
+        <div class="code">// window.self — 当前窗口（等价于 window）
+window.self === window;  // true
+
+// window.top — 顶层窗口（用于 iframe）
+// 如果页面在 iframe 中：
+// window.self — 当前 frame
+// window.top — 最顶层窗口
+// window.parent — 父窗口
+
+// 判断是否在 iframe 中
+if (window.self !== window.top) {
+    console.log('页面在 iframe 中');
+}
+
+// window.opener — 打开当前窗口的父窗口
+// 通过 window.open 打开的新窗口可以访问 opener
+// ⚠️ 安全原因，跨域时 opener 受限
+
+// 断开 opener 连接
+// &lt;a href="..." target="_blank" rel="noopener"&gt;
+// 或 window.opener = null;</div>
+    </div>
+    <pre id="output"></pre>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin:10px 0;">
+        <button onclick="demoAlert()">alert 弹窗</button>
+        <button onclick="demoConfirm()">confirm 确认</button>
+        <button onclick="demoPrompt()">prompt 输入</button>
+        <button onclick="showWindowInfo()">显示 window 信息</button>
+    </div>
+    <script>
+        function demoAlert() {
+            alert('这是 alert 弹窗\n点击确定继续');
+            document.getElementById('output').textContent += 'alert 已关闭\n';
+        }
+        function demoConfirm() {
+            const result = confirm('你确认吗？');
+            document.getElementById('output').textContent += 'confirm 结果: ' + result + '\n';
+        }
+        function demoPrompt() {
+            const result = prompt('请输入测试文字:', '默认值');
+            document.getElementById('output').textContent += 'prompt 结果: ' + result + '\n';
+        }
+        function showWindowInfo() {
+            const out = document.getElementById('output');
+            out.textContent =
+                'inner: ' + window.innerWidth + 'x' + window.innerHeight + '\n' +
+                'outer: ' + window.outerWidth + 'x' + window.outerHeight + '\n' +
+                'scrollX: ' + window.scrollX + ', scrollY: ' + window.scrollY + '\n' +
+                'devicePixelRatio: ' + window.devicePixelRatio + '\n' +
+                'self === window: ' + (window.self === window) + '\n' +
+                'top === self: ' + (window.top === window.self);
+        }
+
+        console.log('=== window 全局对象 ===');
+        console.log('inner:', window.innerWidth, 'x', window.innerHeight);
+        console.log('devicePixelRatio:', window.devicePixelRatio);
+
+        console.log('=== 弹窗（需取消注释才能运行） ===');
+        // alert('测试');
+        // confirm('确认吗？');
+        // prompt('输入：');
+
+        console.log('=== 全局变量 ===');
+        var globalVar = 'var 变量';
+        let globalLet = 'let 变量';
+        console.log('window.globalVar:', window.globalVar);
+        console.log('window.globalLet:', window.globalLet);
+
+        console.log('=== iframe 检测 ===');
+        console.log('在 iframe 中:', window.self !== window.top);
+
+        console.log('=== window.open ===');
+        // window.open('about:blank', '_blank', 'width=400,height=300');
+
+        document.getElementById('output').textContent += '✅ window 与弹窗演示完成！\n';
+    </script>
+</body>
+</html>

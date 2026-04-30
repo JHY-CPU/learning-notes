@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件操作touch-cp-mv-rm</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📄 文件操作 touch/cp/mv/rm</h2><p>文件创建、复制、移动、删除命令详解，常用选项，安全删除技巧。</p></div>
+    <div class="card">
+        <h2>touch — 创建文件与更新时间戳</h2>
+        <div class="code">// ========== touch ==========
+// 主要用途:
+//   1. 创建空文件
+//   2. 更新文件的时间戳
+//
+// $ touch file.txt              # 创建空文件 (如果已存在则更新时间)
+// $ touch file1.txt file2.txt   # 同时创建多个文件
+// $ touch -a file.txt           # 只更新访问时间 (atime)
+// $ touch -m file.txt           # 只更新修改时间 (mtime)
+// $ touch -t 202401011200 file  # 设置指定时间 (YYYYMMDDhhmm)
+// $ touch -r ref.txt target.txt # 复制 ref.txt 的时间戳到 target.txt
+//
+// 不存在的文件会自动创建,已存在则更新时间
+// touch 是最安全的命令之一——不会覆盖文件内容
+
+// ========== cp (Copy) ==========
+// $ cp source.txt dest.txt              # 复制文件
+// $ cp -i source.txt dest.txt           # 交互模式 (覆盖前询问)
+// $ cp -r src_dir/ dest_dir/            # 递归复制目录
+// $ cp -a src_dir/ dest_dir/            # 归档复制 (保留权限/属性)
+// $ cp -v source.txt dest.txt           # 显示复制过程
+// $ cp -u source.txt dest.txt           # 只复制源比目标新的文件
+// $ cp -p file.txt dest.txt             # 保留文件属性 (权限/时间戳)
+// $ cp -l file.txt link.txt             # 创建硬链接 (不是复制)
+// $ cp -s file.txt link.txt             # 创建符号链接
+//
+// 复制目录时注意:
+//   cp -r dir1/ dir2/   # 将 dir1 复制为 dir2/dir1
+//   cp -r dir1/. dir2/  # 将 dir1 内容复制到 dir2</div>
+    </div>
+    <div class="card">
+        <h2>mv 与 rm</h2>
+        <div class="code">// ========== mv (Move / Rename) ==========
+// 移动文件/目录,或重命名
+//
+// $ mv file.txt newname.txt            # 重命名
+// $ mv file.txt /tmp/                  # 移动到 /tmp 目录
+// $ mv -i file.txt /tmp/               # 交互模式 (覆盖前询问)
+// $ mv -u file.txt /tmp/               # 只移动源比目标新的文件
+// $ mv -v file.txt /tmp/               # 显示过程
+// $ mv *.txt /tmp/                     # 移动所有 txt 文件
+// $ mv dir1/ dir2/                     # 重命名或移动目录
+//
+// 注意: mv 在同一文件系统内是"重命名",非常快
+// 跨文件系统时才会实际复制+删除
+
+// ========== rm (Remove / Delete) ==========
+// 删除文件或目录 (注意: 不可恢复!)
+//
+// $ rm file.txt                        # 删除文件
+// $ rm -i file.txt                     # 交互删除 (确认)
+// $ rm -f file.txt                     # 强制删除 (不提示)
+// $ rm -v file.txt                     # 显示删除过程
+// $ rm *.log                           # 删除所有 .log 文件
+// $ rm -r dir/                         # 递归删除目录
+// $ rm -rf dir/                        # 强制递归删除 (⚠️ 危险!)
+//
+// ⚠️ 安全提示:
+//   rm -rf /   # 删除根目录!!! 系统崩溃
+//   rm -rf .  # 删除当前目录
+//   建议: 先用 ls 确认再删
+//   或者使用 alias rm='rm -i' 防止误删
+
+// ========== 安全删除替代 ==========
+// 将文件移动到临时目录,确认后再删:
+//   $ mkdir -p ~/trash
+//   $ mv file.txt ~/trash/
+//   $ rm -rf ~/trash/*   # 确认后清空
+
+// 使用 trash-cli (类似回收站):
+//   $ trash file.txt           # 移到回收站
+//   $ trash-list               # 查看回收站
+//   $ trash-empty              # 清空回收站</div>
+        <div class="note">⚠️ rm -rf 是 Linux 最危险的命令之一。特别忌讳: rm -rf / (删除根目录) 和 rm -rf . (删除当前目录)。建议添加 alias rm='rm -i' 到 ~/.bashrc。</div>
+    </div>
+    <div class="card">
+        <h2>mkdir 与 rmdir</h2>
+        <div class="code">// ========== mkdir (Make Directory) ==========
+// $ mkdir newdir                   # 创建目录
+// $ mkdir -p a/b/c/d               # 递归创建 (父目录不存在时自动创建)
+// $ mkdir -v dir                   # 显示创建过程
+// $ mkdir -m 755 securedir         # 创建时指定权限
+// $ mkdir {2023,2024,2025}         # 创建多个目录
+// $ mkdir -p project/{src,test,docs} # 创建项目结构
+
+// ========== rmdir (Remove Directory) ==========
+// 只能删除空目录
+// $ rmdir emptydir                 # 删除空目录
+// $ rmdir -p a/b/c                 # 递归删除空父目录
+//
+// 非空目录用:
+// $ rm -r dir/      # 递归删除 (包含文件)
+// $ rm -rf dir/     # 强制递归删除
+
+// ========== mkdir -p 实战 ==========
+// 创建标准项目目录结构:
+// $ mkdir -p my-project/{src,test,docs,config}
+// $ mkdir -p src/{components,utils,styles}
+// $ mkdir -p test/{unit,integration}
+//
+// 结果:
+// my-project/
+// ├── src/
+// │   ├── components/
+// │   ├── utils/
+// │   └── styles/
+// ├── test/
+// │   ├── unit/
+// │   └── integration/
+// ├── docs/
+// └── config/</div>
+    </div>
+    <div class="card">
+        <h2>批量文件操作</h2>
+        <div class="code">// ========== 通配符批量操作 ==========
+// $ cp *.txt /tmp/          # 复制所有 .txt
+// $ mv report-*.pdf ~/docs/ # 移动匹配的 PDF
+// $ rm -f *.tmp             # 删除所有临时文件
+// $ cp file.{txt,md,bak}    # 展开: file.txt file.md file.bak
+
+// ========== find + 操作 ==========
+// $ find . -name "*.tmp" -delete           # 删除所有 .tmp
+// $ find . -name "*.log" -exec rm {} \;    # 删除所有 .log
+// $ find . -type f -size +100M -exec ls -lh {} \;
+//   # 查找大于 100MB 的文件
+// $ find . -mtime +30 -delete              # 删除 30 天前的文件
+
+// ========== 实用技巧 ==========
+// 创建大文件 (测试用):
+//   $ fallocate -l 1G bigfile.img        # 快速创建 1GB 文件
+//   $ dd if=/dev/zero of=test.img bs=1M count=100  # 100MB
+//
+// 安全删除文件名有特殊字符的文件:
+//   $ rm -i -- -filename.txt    # -- 表示选项结束
+//   $ rm ./--filename.txt       # 或加路径</div>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('📄 文件操作 touch/cp/mv/rm');
+        log('');
+        log('touch: 创建空文件或更新时间戳');
+        log('cp: 复制, cp -r 目录, cp -a 保留属性');
+        log('mv: 移动/重命名, mv -i 覆盖前询问');
+        log('rm: 删除, rm -rf 递归强制 (⚠️ 危险!)');
+        log('mkdir -p: 递归创建目录, mkdir {a,b,c}: 批量创建');
+    </script>
+</body>
+</html>

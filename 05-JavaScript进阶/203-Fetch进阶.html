@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fetch进阶</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #fetch-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; max-height: 200px; overflow-y: auto; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Fetch 进阶</h2><p>POST/PUT/DELETE、自定义 headers、credentials、fetch 封装。</p></div>
+    <div class="card">
+        <h2>POST / PUT / DELETE</h2>
+        <div class="code">// POST — 创建资源
+fetch('https://api.example.com/posts', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+    },
+    body: JSON.stringify({
+        title: 'Hello',
+        content: 'World',
+    }),
+});
+
+// PUT — 更新资源
+fetch(`https://api.example.com/posts/1`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title: 'Updated', content: '...' }),
+});
+
+// DELETE — 删除资源
+fetch(`https://api.example.com/posts/1`, {
+    method: 'DELETE',
+});
+
+// body 类型
+// JSON:    body: JSON.stringify(data)
+// FormData: body: formData (自动设置 Content-Type)
+// URLSearchParams: body: new URLSearchParams(params)
+// Blob:    body: blob
+// 文本:    body: 'plain text'
+
+// credentials — Cookie 策略
+fetch(url, { credentials: 'same-origin' });  // 默认：同源发送
+fetch(url, { credentials: 'include' });      // 跨域也发送（需 CORS）
+fetch(url, { credentials: 'omit' });         // 不发送 Cookie</div>
+    </div>
+    <div class="card">
+        <h2>fetch 封装</h2>
+        <div class="code">// 通用 fetch 封装
+async function request(url, options = {}) {
+    const config = {
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${getToken()}`,
+            ...options.headers,
+        },
+        ...options,
+    };
+
+    // 如果是 GET/HEAD，删除 body
+    if (!config.method || config.method === 'GET' || config.method === 'HEAD') {
+        delete config.body;
+    }
+
+    const res = await fetch(url, config);
+
+    if (!res.ok) {
+        const err = new Error(`HTTP ${res.status}`);
+        err.status = res.status;
+        err.data = await res.json().catch(() => null);
+        throw err;
+    }
+
+    // 204 No Content 不解析 body
+    if (res.status === 204) return null;
+    return res.json();
+}
+
+// 使用
+const data = await request('/api/users', {
+    method: 'POST',
+    body: { name: 'Alice', role: 'admin' },
+});</div>
+    </div>
+    <div class="card">
+        <h2>演示：POST 请求</h2>
+        <button onclick="postDemo()">发送 POST 请求</button>
+        <button onclick="putDemo()">发送 PUT 请求</button>
+        <div id="fetch-result">点击按钮发送请求</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('fetch-result');
+
+        function log(msg) {
+            const div = document.createElement('div');
+            div.textContent = msg;
+            result.appendChild(div);
+            console.log(msg);
+        }
+
+        const BASE = 'https://jsonplaceholder.typicode.com';
+
+        function postDemo() {
+            result.innerHTML = '';
+            log('🔄 POST 创建新文章...');
+
+            fetch(`${BASE}/posts`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: 1,
+                    title: 'Fetch 进阶教程',
+                    body: '这是使用 fetch POST 请求创建的内容',
+                }),
+            })
+                .then(res => {
+                    log(`状态: ${res.status} ${res.statusText}`);
+                    return res.json();
+                })
+                .then(data => {
+                    log(`✅ 创建成功! ID: ${data.id}`);
+                    log(`标题: ${data.title}`);
+                    log(`完整: ${JSON.stringify(data)}`);
+                })
+                .catch(err => log(`❌ 错误: ${err.message}`));
+        }
+
+        function putDemo() {
+            result.innerHTML = '';
+            log('🔄 PUT 更新文章 #1...');
+
+            fetch(`${BASE}/posts/1`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id: 1, title: '已更新', body: '新内容', userId: 1 }),
+            })
+                .then(res => {
+                    log(`状态: ${res.status}`);
+                    return res.json();
+                })
+                .then(data => log(`✅ 更新成功: ${JSON.stringify(data)}`))
+                .catch(err => log(`❌ 错误: ${err.message}`));
+        }
+
+        // 封装演示
+        log('\n📋 fetch 封装示例:');
+        log('async function request(url, options)');
+        log('自动处理 JSON/错误/Token');
+
+        console.log('=== Fetch 进阶 ===');
+        console.log('Method: POST/PUT/PATCH/DELETE');
+        console.log('Body: JSON/FormData/URLSearchParams');
+
+        document.getElementById('output').textContent =
+            `Fetch 进阶: POST/PUT/DELETE + headers + credentials\n` +
+            `body: JSON.stringify / FormData / URLSearchParams\n` +
+            `封装: 统一错误处理 / Token / JSON 自动解析\n` +
+            `✅ Fetch 进阶演示完成！`;
+    </script>
+</body>
+</html>

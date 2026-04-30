@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>发布订阅模式</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; max-height: 300px; overflow-y: auto; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        .log-entry { padding: 2px 0; font-size: 13px; border-bottom: 1px solid #333; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>发布订阅模式 Pub-Sub</h2><p>通过事件中心（Event Bus）解耦发布者和订阅者。发布者触发事件，订阅者接收通知，双方无需直接引用。</p></div>
+    <div class="card"><h2>完整 Event Bus 实现</h2><p>支持 on/emit/off/once，命名空间事件，通配符事件，以及内存泄漏警告。</p><div class="code">class EventBus { on(event, handler) { /* ... */ } emit(event, data) { /* ... */ } off(event, handler) { /* ... */ } once(event, handler) { /* ... */ } }</div></div>
+    <div class="card"><h2>跨组件通信演示</h2><p>模拟两个独立组件通过 EventBus 通信，无需直接耦合。</p></div>
+    <div class="card"><h2>操作按钮</h2><p>
+        <button onclick="demoPubSub()">发送消息</button>
+        <button onclick="demoNamespaced()">命名空间事件</button>
+        <button onclick="demoOnce()">一次性事件</button>
+        <button onclick="demoWildcard()">通配符事件</button>
+        <button onclick="clearLog()">清空日志</button>
+    </p></div>
+    <pre id="output"></pre>
+    <script>
+        // ========== 完整 Event Bus 实现 ==========
+        class EventBus {
+            constructor() {
+                this._handlers = {};      // 普通事件处理器
+                this._onceHandlers = {};  // 一次性事件处理器
+                this._maxListeners = 10;  // 每个事件最大监听数
+            }
+
+            // 订阅事件
+            on(event, handler) {
+                const events = this._getEventList(event);
+                events.push(handler);
+                if (events.length > this._maxListeners) {
+                    console.warn(`[EventBus] 事件 "${event}" 的监听器超过 ${this._maxListeners} 个，可能存在内存泄漏`);
+                }
+                return this; // 链式调用
+            }
+
+            // 一次性订阅
+            once(event, handler) {
+                const wrapped = (...args) => {
+                    this.off(event, wrapped);
+                    handler.apply(this, args);
+                };
+                wrapped._original = handler;
+                this.on(event, wrapped);
+                return this;
+            }
+
+            // 触发事件
+            emit(event, ...args) {
+                // 精确匹配
+                const handlers = this._handlers[event];
+                if (handlers) {
+                    handlers.slice().forEach(fn => fn.apply(this, args));
+                }
+                // 通配符匹配：匹配 event.* 模式
+                const namespace = event.split('.')[0];
+                const wildcardHandlers = this._handlers[`${namespace}.*`];
+                if (wildcardHandlers) {
+                    wildcardHandlers.slice().forEach(fn => fn.apply(this, [event, ...args]));
+                }
+                // 全局通配符 *
+                const allHandlers = this._handlers['*'];
+                if (allHandlers) {
+                    allHandlers.slice().forEach(fn => fn.apply(this, [event, ...args]));
+                }
+                return this;
+            }
+
+            // 取消订阅
+            off(event, handler) {
+                const events = this._handlers[event];
+                if (events) {
+                    if (handler) {
+                        // 移除特定处理器
+                        const idx = events.indexOf(handler);
+                        if (idx !== -1) events.splice(idx, 1);
+                    } else {
+                        // 移除该事件所有处理器
+                        delete this._handlers[event];
+                    }
+                }
+                return this;
+            }
+
+            // 获取事件的监听器列表
+            _getEventList(event) {
+                if (!this._handlers[event]) {
+                    this._handlers[event] = [];
+                }
+                return this._handlers[event];
+            }
+
+            // 获取监听器数量
+            listenerCount(event) {
+                const handlers = this._handlers[event];
+                return handlers ? handlers.length : 0;
+            }
+
+            // 移除所有监听器
+            removeAllListeners() {
+                this._handlers = {};
+                this._onceHandlers = {};
+            }
+        }
+
+        // ========== 创建全局 EventBus ==========
+        const bus = new EventBus();
+
+        // ========== 模拟组件 A ==========
+        class ComponentA {
+            constructor() {
+                this.name = '组件A';
+                bus.on('msg', data => this.onMessage(data));
+                bus.on('system.*', (event, data) => {
+                    log(`[${this.name}] 收到系统事件 ${event}: ${JSON.stringify(data)}`);
+                });
+                bus.on('*', (event, data) => {
+                    log(`[${this.name}] 监听到全局事件: ${event}`);
+                });
+                log(`[${this.name}] 已订阅 msg, system.*, * 事件`);
+            }
+            onMessage(data) {
+                log(`[${this.name}] 收到消息: "${data.text}" (来自: ${data.from})`);
+            }
+            send(text) {
+                bus.emit('msg', { text, from: this.name, time: new Date().toLocaleTimeString() });
+            }
+        }
+
+        // ========== 模拟组件 B ==========
+        class ComponentB {
+            constructor() {
+                this.name = '组件B';
+                bus.on('msg', data => this.onMessage(data));
+                log(`[${this.name}] 已订阅 msg 事件`);
+            }
+            onMessage(data) {
+                log(`[${this.name}] 收到消息: "${data.text}" (来自: ${data.from})`);
+            }
+            send(text) {
+                bus.emit('msg', { text, from: this.name, time: new Date().toLocaleTimeString() });
+            }
+        }
+
+        // ========== 初始化组件 ==========
+        const compA = new ComponentA();
+        const compB = new ComponentB();
+
+        // ========== 日志输出 ==========
+        const output = document.getElementById('output');
+
+        function log(msg) {
+            const line = document.createElement('div');
+            line.className = 'log-entry';
+            line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            output.appendChild(line);
+            output.scrollTop = output.scrollHeight;
+            console.log(msg);
+        }
+
+        function clearLog() {
+            output.innerHTML = '';
+        }
+
+        // ========== 演示函数 ==========
+        function demoPubSub() {
+            log('--- 基本发布订阅 ---');
+            compA.send('你好，组件B！');
+            compB.send('你好，组件A，收到消息！');
+            log('两个组件通过 EventBus 通信，互不直接引用');
+        }
+
+        function demoNamespaced() {
+            log('--- 命名空间事件 ---');
+            bus.emit('system.login', { userId: 1 });
+            bus.emit('system.logout', { userId: 1 });
+            bus.emit('system.error', { code: 500 });
+            log('组件A 监听了 system.*，收到所有 system 前缀事件');
+        }
+
+        function demoOnce() {
+            log('--- 一次性事件 ---');
+            bus.once('once-event', data => {
+                log(`一次性处理器收到: ${JSON.stringify(data)}`);
+            });
+            bus.emit('once-event', { msg: '第一次触发' });
+            bus.emit('once-event', { msg: '第二次触发（不会收到）' });
+            log('第二次触发后，once 处理器已被自动移除');
+        }
+
+        function demoWildcard() {
+            log('--- 通配符事件 ---');
+            bus.emit('*', { type: 'global', msg: '全局通知' });
+            log('通配符 * 匹配所有事件，所有订阅了 * 的组件都会收到');
+        }
+    </script>
+</body>
+</html>

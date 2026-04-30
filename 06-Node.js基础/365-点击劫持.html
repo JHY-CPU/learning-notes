@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>点击劫持</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        .attack-demo { position: relative; width: 300px; height: 200px; margin: 10px 0; border: 1px solid #ddd; overflow: hidden; border-radius: 4px; }
+        .attack-demo .fake-ui { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #f8f9fa; z-index: 2; }
+        .attack-demo .fake-ui button { background: #2ecc71; font-size: 18px; padding: 12px 24px; }
+        .attack-demo iframe { position: absolute; top: -40px; left: -20px; opacity: 0.3; width: 340px; height: 280px; border: none; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>点击劫持</h2><p>X-Frame-Options (DENY/SAMEORIGIN)、frame-busting、CSP frame-ancestors。</p></div>
+    <div class="card">
+        <h2>点击劫持 API</h2>
+        <div class="code">// ========== X-Frame-Options (HTTP头) ==========
+X-Frame-Options: DENY           // 禁止任何页面嵌入
+X-Frame-Options: SAMEORIGIN     // 仅允许同源页面嵌入
+X-Frame-Options: ALLOW-FROM uri // 仅允许指定页面嵌入 (已废弃)
+
+// ========== CSP frame-ancestors (推荐) ==========
+Content-Security-Policy: frame-ancestors 'none';
+Content-Security-Policy: frame-ancestors 'self';
+Content-Security-Policy: frame-ancestors https://trusted.com;
+
+// ========== JS frame-busting (防御) ==========
+if (top !== self) {
+    top.location.href = self.location.href;
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：点击劫持</h2>
+        <button onclick="demoAttack()">攻击原理</button>
+        <button onclick="demoDefense()">防御方案</button>
+        <button onclick="demoFrameBusting()">Frame-busting</button>
+        <button onclick="demoComparison()">方案对比</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoAttack() {
+            result.innerHTML = '';
+            log('🎯 点击劫持原理:');
+            log('');
+
+            log('1️⃣ 攻击方式:');
+            log('   攻击者将目标网站透明嵌入 <iframe>');
+            log('   覆盖在诱饵 UI 上方');
+            log('   用户点击"诱饵"实际点击了目标网站按钮');
+            log('');
+
+            log('2️⃣ 攻击示例:');
+            log('   <!-- 攻击者页面 -->');
+            log('   <body>');
+            log('     <!-- 透明 iframe 覆盖在按钮上 -->');
+            log('     <div style="position:relative; width:300px; height:200px;">');
+            log('       <!-- 诱饵按钮 (用户看到) -->');
+            log('       <button style="position:absolute; z-index:2;');
+            log('                top:100px; left:80px;">');
+            log('         点击领大奖!');
+            log('       </button>');
+            log('       <!-- 透明 iframe (用户实际点击) -->');
+            log('       <iframe src="https://bank.com/transfer"');
+            log('         style="opacity:0; position:absolute;');
+            log('                top:60px; left:40px;">');
+            log('       </iframe>');
+            log('     </div>');
+            log('   </body>');
+            log('');
+
+            log('3️⃣ 攻击效果:');
+            log('   • 用户以为在抽奖 → 实际在转账');
+            log('   • 用户以为在点赞 → 实际在授权');
+            log('   • 用户以为在关闭广告 → 实际在下载');
+            log('');
+
+            log('4️⃣ 变种:');
+            log('   • 拖拽劫持 (Drag-and-drop)');
+            log('   • 按键劫持 (Keystroke)');
+            log('   • 光标劫持 (Cursor spoofing)');
+            log('   • 像素劫持 (使用部分透明的 iframe)');
+        }
+
+        function demoDefense() {
+            result.innerHTML = '';
+            log('🛡️ 点击劫持防御:');
+            log('');
+
+            log('1️⃣ X-Frame-Options (HTTP 头):');
+            log('   由服务端设置:');
+            log('   X-Frame-Options: DENY');
+            log('   // 完全禁止 iframe 嵌入');
+            log('   // 兼容性: 所有浏览器');
+            log('   // 缺点: 粒度粗 (不能指定白名单)');
+            log('');
+
+            log('2️⃣ X-Frame-Options 值:');
+            log('   DENY        — 完全禁止嵌入');
+            log('   SAMEORIGIN  — 仅同源可嵌入');
+            log('   ALLOW-FROM  — 已废弃 (不要使用)');
+            log('');
+
+            log('3️⃣ CSP frame-ancestors (推荐):');
+            log('   替代 X-Frame-Options 的现代方案');
+            log('   支持白名单，粒度更细');
+            log('');
+
+            log('   示例:');
+            log('   Content-Security-Policy: frame-ancestors \'none\';');
+            log('   // 完全禁止');
+            log('');
+            log('   Content-Security-Policy: frame-ancestors \'self\';');
+            log('   // 仅同源');
+            log('');
+            log('   Content-Security-Policy:');
+            log('     frame-ancestors https://trusted.com \'self\';');
+            log('   // 同源 + 指定域名');
+            log('');
+
+            log('4️⃣ 同时设置 (兼容旧浏览器):');
+            log('   X-Frame-Options: DENY');
+            log('   Content-Security-Policy: frame-ancestors \'none\';');
+            log('   // CSP 优先级更高，X-FO 作为 fallback');
+        }
+
+        function demoFrameBusting() {
+            result.innerHTML = '';
+            log('🚫 Frame-busting (JS 防御):');
+            log('');
+
+            log('1️⃣ 经典代码:');
+            log('   if (top !== self) {');
+            log('     top.location.href = self.location.href;');
+            log('   }');
+            log('');
+
+            log('2️⃣ 增强版:');
+            log('   // 防止多种绕过方式');
+            log('   (function() {');
+            log('     if (self === top) return;');
+            log('');
+            log('     // 方式1: 跳转 top');
+            log('     try { top.location.href = self.location.href; }');
+            log('     catch(e) {');
+            log('       // 方式2: 显示警告');
+            log('       document.body.innerHTML = "";');
+            log('       document.body.textContent = "请直接访问本站";');
+            log('     }');
+            log('   })();');
+            log('');
+
+            log('3️⃣ 绕过 frame-busting:');
+            log('   攻击者可能使用:');
+            log('   • sandbox 属性 (禁止 JS)');
+            log('     <iframe sandbox="allow-scripts" ...>');
+            log('   • 检测 top.location 赋值');
+            log('   • onbeforeunload 阻止跳转');
+            log('');
+
+            log('4️⃣ 可靠的防御:');
+            log('   // 服务端头才是根本解决方案');
+            log('   // JS 作为补充 (防御 old browser)');
+            log('   // 建议: 不要仅依赖 frame-busting');
+            log('');
+
+            log('5️⃣ 检测是否被嵌入:');
+            log('   console.log("当前页面是否被嵌入iframe:");');
+            log('   console.log("  self:", self);');
+            log('   console.log("  top:", top);');
+            log('   console.log("  parent:", parent);');
+            log('   console.log("  被嵌入?", self !== top);');
+        }
+
+        function demoComparison() {
+            result.innerHTML = '';
+            log('📊 防御方案对比:');
+            log('');
+
+            log('1️⃣ 方案对比表:');
+            log('   ┌─────────────────┬──────┬──────┬──────┐');
+            log('   │ 方案             │ 安全 │ 灵活 │ 兼容 │');
+            log('   ├─────────────────┼──────┼──────┼──────┤');
+            log('   │ X-Frame-Options │ 高   │ 低   │ 高   │');
+            log('   │ CSP ancestors   │ 高   │ 高   │ 中   │');
+            log('   │ Frame-busting   │ 低   │ 中   │ 高   │');
+            log('   │ 同时使用三者    │ 极高 │ 高   │ 高   │');
+            log('   └─────────────────┴──────┴──────┴──────┘');
+            log('');
+
+            log('2️⃣ 推荐配置:');
+            log('   # Nginx 配置');
+            log('   add_header X-Frame-Options SAMEORIGIN;');
+            log('   add_header Content-Security-Policy "');
+            log('     frame-ancestors \'self\' https://app.example.com;');
+            log('   "');
+            log('');
+
+            log('3️⃣ 针对不同页面的策略:');
+            log('   • 首页/内容页: SAMEORIGIN');
+            log('   • 支付页面: DENY');
+            log('   • 管理后台: DENY');
+            log('   • 嵌入 Widget: CSP 白名单');
+            log('');
+
+            log('4️⃣ 检测工具:');
+            log('   • curl -I 检查响应头');
+            log('   • OWASP ZAP 扫描');
+            log('   • Chrome DevTools → Network → Headers');
+            log('');
+
+            log('5️⃣ 最佳实践:');
+            log('   • 所有页面默认设置 DENY');
+            log('   • 需要嵌入的页面明确配置白名单');
+            log('   • 使用 CSP frame-ancestors (现代)');
+            log('   • X-Frame-Options 作为 fallback');
+            log('   • 定期安全扫描');
+        }
+
+        console.log('=== 点击劫持 ===');
+        document.getElementById('output').textContent =
+            `点击劫持: 攻击原理 / X-Frame-Options / CSP frame-ancestors / frame-busting\n` +
+            `✅ 点击劫持演示完成！`;
+    </script>
+</body>
+</html>

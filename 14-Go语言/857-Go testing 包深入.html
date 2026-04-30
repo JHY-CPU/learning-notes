@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go testing 包深入</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🧪 Go testing 包深入</h2><p>testing.T 管理、子测试与 table-driven、Helper/Cleanup/tempDir、覆盖率分析、Fuzz 测试、test main 与并行控制。</p></div>
+    <div class="card">
+        <h2>testing.T 深入</h2>
+        <div class="code">// ========== testing.T 核心方法 ==========
+// Error/Errorf: 失败但继续
+// Fatal/Fatalf: 失败立即停止
+// Log/Logf: 打印日志 (仅失败或 -v 时显示)
+// Skip/Skipf: 跳过测试
+
+func TestBasic(t *testing.T) {
+    result := add(1, 2)
+
+    // 常用断言模式
+    if result != 3 {
+        t.Errorf("add(1,2) = %d, want 3", result)
+    }
+}
+
+func TestFatal(t *testing.T) {
+    data, err := loadConfig()
+    if err != nil {
+        t.Fatalf("加载配置失败: %v", err)  // 立即停止
+    }
+    _ = data
+}
+
+// ========== 测试辅助函数 ==========
+// Helper 标记辅助函数, 出错时报告调用行
+func assertEqual(t *testing.T, got, want interface{}) {
+    t.Helper()  // 标记为辅助函数
+    if got != want {
+        t.Errorf("got %v, want %v", got, want)
+    }
+}
+
+func assertNoError(t *testing.T, err error) {
+    t.Helper()
+    if err != nil {
+        t.Errorf("unexpected error: %v", err)
+    }
+}
+
+func assertTrue(t *testing.T, cond bool, msg string) {
+    t.Helper()
+    if !cond {
+        t.Errorf("assertion failed: %s", msg)
+    }
+}
+
+func TestWithHelper(t *testing.T) {
+    assertEqual(t, add(1, 2), 3)
+    assertEqual(t, add(0, 0), 0)
+
+    result, err := divide(10, 2)
+    assertNoError(t, err)
+    assertEqual(t, result, 5.0)
+}
+
+// ========== Cleanup 注册清理函数 ==========
+// Go 1.14+ 支持 Cleanup
+func TestWithCleanup(t *testing.T) {
+    dir, _ := os.MkdirTemp("", "test-*")
+    t.Cleanup(func() {
+        os.RemoveAll(dir)  // 测试结束清理
+    })
+
+    // 使用临时目录
+    file := filepath.Join(dir, "test.txt")
+    os.WriteFile(file, []byte("hello"), 0644)
+}
+
+// ========== TempDir 自动清理 ==========
+// Go 1.15+ 自动创建并清理
+func TestTempDir(t *testing.T) {
+    dir := t.TempDir()  // 自动清理
+    file := filepath.Join(dir, "data.json")
+    os.WriteFile(file, []byte(`{"key":"value"}`), 0644)
+
+    data, _ := os.ReadFile(file)
+    t.Logf("文件内容: %s", data)
+}
+
+// ========== Setenv 环境变量 ==========
+// Go 1.17+ 自动恢复
+func TestWithEnv(t *testing.T) {
+    t.Setenv("DB_HOST", "localhost")  // 自动恢复原值
+    t.Setenv("DB_PORT", "5432")
+
+    host := os.Getenv("DB_HOST")
+    assertEqual(t, host, "localhost")
+}
+
+// ========== Parallel 并行执行 ==========
+func TestParallel(t *testing.T) {
+    tests := []struct {
+        name string
+        input int
+        want  int
+    }{
+        {"case1", 1, 2},
+        {"case2", 2, 4},
+        {"case3", 3, 6},
+    }
+
+    for _, tt := range tests {
+        tt := tt  // 捕获
+        t.Run(tt.name, func(t *testing.T) {
+            t.Parallel()  // 并行执行
+            result := double(tt.input)
+            if result != tt.want {
+                t.Errorf("got %d, want %d", result, tt.want)
+            }
+        })
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>子测试与组织</h2>
+        <div class="code">// ========== 子测试嵌套 ==========
+func TestUserService(t *testing.T) {
+    //  setUp / tearDown 模式
+    db := setupTestDB(t)
+    svc := NewUserService(db)
+
+    t.Run("Create", func(t *testing.T) {
+        t.Run("正常创建", func(t *testing.T) {
+            user, err := svc.Create("John", "john@test.com")
+            assertNoError(t, err)
+            assertEqual(t, user.Name, "John")
+        })
+
+        t.Run("重复邮箱", func(t *testing.T) {
+            _, err := svc.Create("Jane", "john@test.com")
+            if err == nil {
+                t.Error("期望重复邮箱错误")
+            }
+        })
+    })
+
+    t.Run("Query", func(t *testing.T) {
+        t.Run("根据 ID 查找", func(t *testing.T) {
+            user, err := svc.GetByID(1)
+            assertNoError(t, err)
+            assertEqual(t, user.ID, 1)
+        })
+
+        t.Run("不存在的 ID", func(t *testing.T) {
+            _, err := svc.GetByID(999)
+            if err == nil {
+                t.Error("期望未找到错误")
+            }
+        })
+    })
+}
+
+// 运行特定子测试:
+// go test -run "TestUserService/Create/正常创建"
+// go test -run "TestUserService/Query" -v
+
+// ========== 测试分组 ==========
+// 表格驱动 + 子测试 = 最佳组合
+type calcTestCase struct {
+    name string
+    a, b int
+    want int
+}
+
+func TestCalculator(t *testing.T) {
+    tests := []calcTestCase{
+        {name: "正数相加", a: 1, b: 2, want: 3},
+        {name: "零值", a: 0, b: 0, want: 0},
+        {name: "负数", a: -1, b: 1, want: 0},
+        {name: "大数", a: 1 << 30, b: 1 << 30, want: 1 << 31},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            got := add(tt.a, tt.b)
+            if got != tt.want {
+                t.Errorf("add(%d,%d) = %d, want %d", tt.a, tt.b, got, tt.want)
+            }
+        })
+    }
+}
+
+// ========== TestMain 控制测试生命周期 ==========
+func TestMain(m *testing.M) {
+    // 全局 setup
+    fmt.Println("=== 测试开始 ===")
+    setupGlobal()
+
+    // 运行所有测试
+    code := m.Run()
+
+    // 全局 teardown
+    teardownGlobal()
+    fmt.Println("=== 测试结束 ===")
+
+    os.Exit(code)
+}
+
+func setupGlobal() {
+    // 初始化数据库连接池
+    // 创建测试数据
+    // 启动模拟服务器
+}
+
+func teardownGlobal() {
+    // 清理资源
+    // 关闭连接
+}
+
+// ========== 测试覆盖率 ==========
+// 基本覆盖率:
+// go test -cover ./...
+// go test -coverprofile=coverage.out ./...
+// go tool cover -html=coverage.out
+
+// 覆盖率模式:
+// -covermode=set   : 是否执行 (默认)
+// -covermode=count : 执行次数
+// -covermode=atomic: 并发安全计数
+
+// 每个函数覆盖率:
+// go test -coverprofile=coverage.out ./...
+// go tool cover -func=coverage.out</div>
+    </div>
+    <div class="card">
+        <h2>Fuzz 测试</h2>
+        <div class="code">// ========== Fuzz 测试 (Go 1.18+) ==========
+// 自动生成随机输入测试边界情况
+
+func FuzzReverse(f *testing.F) {
+    // 种子语料库
+    f.Add("hello")
+    f.Add("world")
+    f.Add("123")
+    f.Add("")
+
+    f.Fuzz(func(t *testing.T, s string) {
+        reversed := reverse(s)
+        doubleReversed := reverse(reversed)
+        if s != doubleReversed {
+            t.Errorf("reverse(reverse(%q)) = %q, want %q", s, doubleReversed, s)
+        }
+
+        // UTF-8 有效性
+        if utf8.ValidString(s) && !utf8.ValidString(reversed) {
+            t.Errorf("reverse 产生了无效 UTF-8: %q", reversed)
+        }
+    })
+}
+
+// 运行:
+// go test -fuzz=FuzzReverse -fuzztime=30s
+// go test -fuzz=FuzzReverse -fuzztime=5x  // 5 次迭代
+
+// ========== Fuzz 测试 HTTP Handler ==========
+func FuzzHandler(f *testing.F) {
+    f.Add("GET", "/api/users", "")
+    f.Add("POST", "/api/users", `{"name":"test"}`)
+
+    f.Fuzz(func(t *testing.T, method, path, body string) {
+        r := setupTestRouter()
+        w := httptest.NewRecorder()
+
+        var bodyReader io.Reader
+        if body != "" {
+            bodyReader = strings.NewReader(body)
+        }
+
+        req, _ := http.NewRequest(method, path, bodyReader)
+        r.ServeHTTP(w, req)
+
+        // 只要不 panic 就行
+        if w.Code < 200 || w.Code >= 600 {
+            t.Errorf("异常状态码: %d", w.Code)
+        }
+    })
+}
+
+// ========== Fuzz 测试 JSON 解析 ==========
+func FuzzJSON(f *testing.F) {
+    f.Add(`{"name":"test","age":30}`)
+    f.Add(`null`)
+    f.Add(`[]`)
+
+    f.Fuzz(func(t *testing.T, data string) {
+        var v interface{}
+        err := json.Unmarshal([]byte(data), &v)
+        if err != nil {
+            return  // 解析失败是可接受的
+        }
+        // 验证能正确重新序列化
+        _, err = json.Marshal(v)
+        if err != nil {
+            t.Errorf("marshal 失败: %v", err)
+        }
+    })
+}
+
+// ========== Fuzz 注意事项 ==========
+// 1. Fuzz 函数必须在 _test.go 文件中
+// 2. 参数是 *testing.F 不是 *testing.T
+// 3. f.Add 设置种子语料库
+// 4. f.Fuzz 接收 *testing.T + fuzzing 参数
+// 5. 失败的 case 保存到 testdata/fuzz/FuzzXxx/
+// 6. 使用 -fuzztime 控制运行时间
+// 7. Fuzz 测试会消耗大量内存</div>
+    </div>
+    <div class="card">
+        <h2>测试最佳实践</h2>
+        <div class="code">// ========== 测试文件命名 ==========
+// source.go        → source_test.go
+// source.go        → source_example_test.go
+
+// 测试函数命名:
+// func TestXxx(t *testing.T)
+// func BenchmarkXxx(b *testing.B)
+// func ExampleXxx()  // 示例测试
+// func FuzzXxx(f *testing.F)
+
+// ========== Example 测试 ==========
+// Example 函数既是文档也是测试
+
+func ExampleAdd() {
+    result := add(2, 3)
+    fmt.Println(result)
+    // Output: 5
+}
+
+func ExampleUserService_Create() {
+    svc := NewUserService(nil)
+    user, err := svc.Create("John", "john@test.com")
+    if err != nil {
+        fmt.Println("error:", err)
+        return
+    }
+    fmt.Println(user.Name)
+    // Output: John
+}
+
+// 无序输出:
+// func ExampleAdd() {
+//     fmt.Println(3)
+//     fmt.Println(1)
+//     // Unordered output:
+//     // 1
+//     // 3
+// }
+
+// ========== go test 常用标志 ==========
+// go test ./...                    // 所有包
+// go test -v ./...                 // 详细输出
+// go test -run TestName            // 匹配测试名
+// go test -count=1                 // 禁用缓存
+// go test -race ./...              // 竞态检测
+// go test -shuffle=on              // 随机顺序
+// go test -timeout=30s             // 超时
+// go test -short                   // 短测试
+// go test -json                    // JSON 输出
+
+// ========== -short 标志 ==========
+func TestIntegration(t *testing.T) {
+    if testing.Short() {
+        t.Skip("跳过集成测试")
+    }
+    // 需要外部依赖的测试
+}
+
+// ========== 测试缓存 ==========
+// Go 1.10+ 缓存测试结果
+// 缓存条件: 同一代码 + 同一参数
+// 清除缓存: go clean -testcache
+// 禁用缓存: go test -count=1
+
+// ========== 测试组织结构 ==========
+// 推荐:
+// package service
+// package service_test  // 外部测试包
+
+// 外部测试包: 模拟真实用户
+// 内部测试包: 测试内部函数
+
+// example_test.go 使用 _test 后缀</div>
+        <div class="note">💡 testing 要点: t.Error/Fatal/Log/Skip; t.Helper() 标记辅助函数; t.Cleanup/t.TempDir/t.Setenv 自动清理; t.Run 子测试组织; TestMain 全局 setup/teardown; 表格驱动 + 子测试; Fuzz 测试 (Go 1.18+) f.Add + f.Fuzz 自动生成输入; Example 测试既是文档也是测试; go test -cover -race -v -count=1 -short; 外部测试包 xxx_test 模拟真实用户。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoTest()">testing.T</button>
+        <button onclick="demoFuzz()">Fuzz</button>
+        <button onclick="demoCover()">覆盖率</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoTest() {
+            result.innerHTML = '';
+            log('# testing.T 深入');
+            log('');
+            log('核心方法:');
+            log('  Error/Errorf: 失败继续');
+            log('  Fatal/Fatalf: 立即停止');
+            log('  Log/Logf: 日志 (-v 显示)');
+            log('  Skip/Skipf: 跳过');
+            log('');
+            log('辅助:');
+            log('  t.Helper() → 错误显示调用行');
+            log('  t.Cleanup(fn) → 注册清理');
+            log('  t.TempDir() → 自动临时目录');
+            log('  t.Setenv(k, v) → 自动恢复');
+            log('  t.Parallel() → 并行');
+        }
+
+        function demoFuzz() {
+            result.innerHTML = '';
+            log('# Fuzz 测试');
+            log('');
+            log('结构:');
+            log('  func FuzzXxx(f *testing.F) {');
+            log('    f.Add("seed")');
+            log('    f.Fuzz(func(t *testing.T, s string) {');
+            log('      // 测试逻辑');
+            log('    })');
+            log('  }');
+            log('');
+            log('运行:');
+            log('  go test -fuzz=FuzzXxx -fuzztime=30s');
+            log('');
+            log('失败保存到:');
+            log('  testdata/fuzz/FuzzXxx/');
+        }
+
+        function demoCover() {
+            result.innerHTML = '';
+            log('# 测试覆盖率');
+            log('');
+            log('命令:');
+            log('  go test -cover ./...');
+            log('  go test -coverprofile=out ./...');
+            log('  go tool cover -html=out');
+            log('  go tool cover -func=out');
+            log('');
+            log('模式:');
+            log('  set: 是否执行');
+            log('  count: 执行次数');
+            log('  atomic: 并发计数');
+            log('');
+            log('标志:');
+            log('  -v -race -count=1 -short');
+            log('  -timeout=30s -shuffle=on');
+        }
+    </script>
+</body>
+</html>

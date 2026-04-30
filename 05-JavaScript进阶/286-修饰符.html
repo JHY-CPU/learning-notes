@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>修饰符</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #flag-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; margin: 5px 0; width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>修饰符</h2><p>i / g / m / s / u / y / d 修饰符及其组合效果。</p></div>
+    <div class="card">
+        <h2>修饰符大全</h2>
+        <div class="code">// ========== 修饰符 ==========
+// i — ignoreCase 不区分大小写
+//   /hello/i.test('HELLO') // true
+
+// g — global 全局匹配
+//   'a1b2c3'.match(/\d/g) // ['1','2','3']
+
+// m — multiline 多行模式
+//   ^ 和 $ 匹配每行的开头/结尾
+//   'a\nb'.match(/^\w$/gm) // ['a','b']
+
+// s — dotAll (ES2018)
+//   . 匹配换行符
+//   'a\nb'.match(/a.b/s) // ['a\nb']
+
+// u — unicode (ES2015)
+//   启用 Unicode 匹配
+//   \p{L} 等 Unicode 属性需要 u 标志
+//   '😀'.match(/./u) // 正确匹配 4 字节字符
+
+// y — sticky (ES2015)
+//   粘性匹配，从 lastIndex 开始
+//   const re = /a/y; re.lastIndex = 1; 'aba'.match(re) // null
+
+// d — hasIndices (ES2022)
+//   匹配结果包含索引
+//   'abc'.match(/(b)/d) // indices: [[1,2],[1,2]]
+
+// ========== 组合效果 ==========
+/hello/gim    // 全局 + 不区分大小写 + 多行
+/./gs         // dotAll + 全局
+/\p{L}+/gu    // Unicode 字母 + 全局
+
+// ========== 修饰符顺序不影响结果 ==========
+/hello/gim === /hello/mig // true (等效)</div>
+    </div>
+    <div class="card">
+        <h2>演示：修饰符效果</h2>
+        <input id="flagInput" value="Hello\nhello\nHELLO\nWorld" placeholder="输入多行文本">
+        <button onclick="demoFlags()">修饰符对比</button>
+        <div id="flag-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const flagResult = document.getElementById('flag-result');
+
+        function log(msg) {
+            flagResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoFlags() {
+            flagResult.innerHTML = '';
+            const text = document.getElementById('flagInput').value;
+            log(`📋 文本:\n${text}`);
+            log('');
+
+            log('1️⃣ i — 不区分大小写:');
+            log(`   /hello/i: ${text.match(/hello/i)?.join(', ') || '无'}`);
+            log(`   /hello/: ${text.match(/hello/)?.join(', ') || '无'}`);
+            log('');
+
+            log('2️⃣ g — 全局匹配:');
+            log(`   /hello/g: ${text.match(/hello/g)?.join(', ') || '无'}`);
+            log(`   /hello/gi: ${text.match(/hello/gi)?.join(', ') || '无'}`);
+            log('');
+
+            log('3️⃣ m — 多行模式:');
+            log(`   /^\\w+/gm: ${text.match(/^\w+/gm)?.join(', ') || '无'}`);
+            log(`   /^\\w+/g: ${text.match(/^\w+/g)?.join(', ') || '无'} (无 m)`);
+            log('');
+
+            log('4️⃣ s — dotAll:');
+            log(`   /Hello.World/s: ${/Hello.World/s.test(text) ? '✅ 匹配' : '❌ 不匹配'}`);
+            log(`   /Hello.World/: ${/Hello.World/.test(text) ? '✅ 匹配' : '❌ 不匹配 (.) 不匹配换行'}`);
+            log('');
+
+            log('5️⃣ u — Unicode:');
+            const emoji = '😀 Hello';
+            log(`   /./u 匹配 "${emoji}": ${emoji.match(/./u)?.[0]}`);
+
+            try {
+                const hanMatches = text.match(/\p{Han}+/gu);
+                log(`   \\p{Han}+ (汉字): ${hanMatches?.join(', ') || '无'}`);
+            } catch (e) {
+                log('   Unicode 属性转义需要 u flag');
+            }
+            log('');
+
+            log('6️⃣ y — 粘性匹配:');
+            const stickyRe = /hello/y;
+            stickyRe.lastIndex = 0;
+            log(`   /hello/y (lastIndex=0): ${stickyRe.test(text)}`);
+            stickyRe.lastIndex = 5;
+            log(`   /hello/y (lastIndex=5): ${stickyRe.test(text)} (从位置5开始)`);
+
+            log('');
+            log('📌 常用组合:');
+            log('   /pattern/gi  — 全局不区分大小写');
+            log('   /pattern/gm  — 全局多行');
+            log('   /pattern/gs  — dotAll 全局');
+            log('   /pattern/gu  — Unicode 全局');
+        }
+
+        console.log('=== 修饰符 ===');
+
+        document.getElementById('output').textContent =
+            `修饰符: i(忽略大小写) / g(全局) / m(多行) / s(dotAll) / u(Unicode) / y(粘性) / d(索引)\n` +
+            `组合: /pattern/gi / /pattern/gm / /pattern/gu\n` +
+            `✅ 修饰符演示完成！`;
+    </script>
+</body>
+</html>

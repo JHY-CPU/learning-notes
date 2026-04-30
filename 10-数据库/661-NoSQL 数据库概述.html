@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoSQL 数据库概述</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🗄️ NoSQL 数据库概述</h2><p>NoSQL 分类 (文档/列族/键值/图)、CAP 定理通俗理解、BASE 理论、NoSQL vs SQL 选型指南、常见 NoSQL 数据库介绍。</p></div>
+    <div class="card">
+        <h2>什么是 NoSQL</h2>
+        <div class="code">// ========== NoSQL 简介 ==========
+// NoSQL = Not Only SQL (不仅仅是 SQL)
+
+// 为什么需要 NoSQL?
+// 1. 海量数据: 关系型数据库水平扩展困难
+// 2. 高并发: 需要低延迟读写
+// 3. 灵活 schema: 半结构化/非结构化数据
+// 4. 特定场景: 缓存/时序/图关系
+
+// ========== 四类 NoSQL 数据库 ==========
+
+// 1. 文档型 (Document)
+//    数据模型: JSON/BSON 文档
+//    代表: MongoDB, Couchbase, Firebase Firestore
+//    场景: CMS, 用户资料, 日志, 目录
+//    特点: 灵活 schema, 嵌套结构
+
+// 2. 键值型 (Key-Value)
+//    数据模型: 键 → 值 (任意类型)
+//    代表: Redis, DynamoDB, Memcached, Etcd
+//    场景: 缓存, 会话, 计数器, 配置
+//    特点: 简单快速, O(1) 读写
+
+// 3. 列族型 (Column-Family)
+//    数据模型: 行键 → 列族 → 列
+//    代表: HBase, Cassandra, ScyllaDB
+//    场景: 时序数据, IoT, 日志分析
+//    特点: 高可扩展, 压缩好, 适合宽表
+
+// 4. 图数据库 (Graph)
+//    数据模型: 节点 + 边 + 属性
+//    代表: Neo4j, ArangoDB, JanusGraph
+//    场景: 社交网络, 推荐, 反欺诈
+//    特点: 关系查询高效 (深度遍历)</div>
+    </div>
+    <div class="card">
+        <h2>CAP 定理</h2>
+        <div class="code">// ========== CAP 定理 ==========
+// 分布式系统只能同时满足 3 个中的 2 个
+
+// C = Consistency (一致性)
+//   所有节点在同一时刻看到相同数据
+//   "每次读取都返回最新写入"
+
+// A = Availability (可用性)
+//   每个请求都能得到非错误响应
+//   "系统一直可用, 即使部分节点挂了"
+
+// P = Partition Tolerance (分区容忍)
+//   节点间通信中断时系统仍能工作
+//   "网络分区时系统继续运行"
+
+// ┌───────────────┬──────────────────────────┐
+// │ 组合          │ 代表数据库                │
+// ├───────────────┼──────────────────────────┤
+// │ CP (一致+分区)│ HBase, MongoDB(默认), Etcd│
+// │ AP (可用+分区)│ Cassandra, DynamoDB       │
+// │ CA (一致+可用)│ 传统关系型数据库 (单机)   │
+// └───────────────┴──────────────────────────┘
+
+// 关键理解:
+// P 是必选的 (分布式系统一定会有网络分区)
+// 实际是在 C 和 A 之间做选择
+
+// 例子:
+// 网络分区发生时:
+// - CP 系统: 停止写入保证一致性 (部分不可用)
+// - AP 系统: 继续写入, 但可能有冲突 (不一致)
+
+// ========== PACELC 扩展 ==========
+// 在正常 (无分区) 时也在 L 和 C 之间权衡:
+// - 网络分区时: C vs A 之间选择
+// - 正常时: L (延迟) vs C 之间选择</div>
+    </div>
+    <div class="card">
+        <h2>BASE 理论</h2>
+        <div class="code">// ========== BASE 理论 ==========
+// NoSQL 的核心哲学, ACID 的相反
+
+// BA = Basically Available (基本可用)
+//     系统允许部分故障, 核心功能正常
+//     例如: 双十一时, 订单系统降级为排队
+
+// S = Soft State (软状态)
+//     数据状态可以在一段时间内不一致
+//     不要求时刻强一致
+
+// E = Eventually Consistent (最终一致)
+//     经过一段时间后, 数据最终达到一致
+//     通常几毫秒到几秒
+
+// ========== ACID vs BASE ==========
+// ┌──────────┬────────────────┬────────────────┐
+// │          │ ACID (SQL)     │ BASE (NoSQL)   │
+// ├──────────┼────────────────┼────────────────┤
+// │ 一致性   │ 强一致         │ 最终一致       │
+// │ 可用性   │ 相对低         │ 高可用         │
+// │ 扩展性   │ 垂直扩展       │ 水平扩展       │
+// │ 设计焦点 │ 数据完整性     │ 可用性+性能    │
+// │ 典型场景 │ 金融/交易      │ 社交/缓存/日志 │
+// └──────────┴────────────────┴────────────────┘</div>
+    </div>
+    <div class="card">
+        <h2>NoSQL vs SQL 选型</h2>
+        <div class="code">// ========== 选型指南 ==========
+
+// ┌─────────────┬──────────────────┬──────────────────┐
+// │ 场景        │ 推荐 SQL         │ 推荐 NoSQL       │
+// ├─────────────┼──────────────────┼──────────────────┤
+// │ 事务强一致  │ PostgreSQL/MySQL │ ❌               │
+// │ 复杂 JOIN   │ PostgreSQL       │ ❌               │
+// │ 缓存        │ ❌               │ Redis            │
+// │ 用户会话    │ ❌               │ Redis            │
+// │ 日志/时序   │ ❌               │ Cassandra/TSDB   │
+// │ 全文搜索    │ PostgreSQL       │ Elasticsearch    │
+// │ 社交关系    │ ❌               │ Neo4j (图)       │
+// │ 内容管理    │ ❌               │ MongoDB          │
+// │ 物联网数据  │ ❌               │ ScyllaDB/HBase   │
+// │ 文件元数据  │ ❌               │ MongoDB          │
+// │ 购物车      │ 可用             │ Redis             │
+// │ 排行榜      │ ❌               │ Redis (SortedSet)│
+// └─────────────┴──────────────────┴──────────────────┘
+
+// ========== 混合架构 (常见) ==========
+// ┌──────────┐    ┌──────────┐    ┌──────────┐
+// │  PostgreSQL │    │  Redis    │    │ MongoDB  │
+// │ (核心数据) │    │ (缓存)    │    │ (日志)    │
+// │ 用户/订单  │    │ 会话/队列 │    │ 操作日志  │
+// └──────────┘    └──────────┘    └──────────┘
+
+// ========== 选型决策 ==========
+// 1. 需要事务? → SQL
+// 2. 数据关系复杂? → SQL (PostgreSQL)
+// 3. 数据量巨大 (>10TB)? → NoSQL
+// 4. schema 频繁变? → MongoDB
+// 5. 需要缓存? → Redis + 现有数据库
+// 6. 社交关系? → Neo4j + SQL
+// 7. 高吞吐写入? → Cassandra/ScyllaDB</div>
+        <div class="note">💡 NoSQL 不是替代 SQL, 而是补充。现代架构通常混合使用: SQL 存核心业务数据, Redis 做缓存, MongoDB 存日志/非结构化数据, Elasticsearch 做搜索。选型时先确定场景再选数据库。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoTypes()">NoSQL 分类</button>
+        <button onclick="demoCAP()">CAP 定理</button>
+        <button onclick="demoChoice()">选型建议</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoTypes() {
+            result.innerHTML = '';
+            log('# NoSQL 四类数据库');
+            log('');
+            log('📄 文档型 - MongoDB');
+            log('  灵活 schema, JSON 文档');
+            log('');
+            log('🔑 键值型 - Redis');
+            log('  简单快速, O(1) 读写');
+            log('');
+            log('📊 列族型 - Cassandra/HBase');
+            log('  高扩展, 适合宽表/时序');
+            log('');
+            log('🔗 图数据库 - Neo4j');
+            log('  关系查询, 社交/推荐');
+        }
+
+        function demoCAP() {
+            result.innerHTML = '';
+            log('# CAP 定理');
+            log('');
+            log('C = 一致性 (所有节点数据相同)');
+            log('A = 可用性 (每个请求都有响应)');
+            log('P = 分区容忍 (网络中断仍工作)');
+            log('');
+            log('分布式系统: P 必选, 在 C/A 中权衡');
+            log('CP: HBase, MongoDB');
+            log('AP: Cassandra, DynamoDB');
+        }
+
+        function demoChoice() {
+            result.innerHTML = '';
+            log('# 选型指南');
+            log('');
+            log('需要事务/复杂查询 → SQL');
+            log('海量数据/高并发 → NoSQL');
+            log('缓存 → Redis');
+            log('日志/非结构化 → MongoDB');
+            log('推荐关系 → Neo4j');
+            log('时序/IoT → Cassandra');
+            log('');
+            log('常见: SQL + Redis + MongoDB');
+        }
+    </script>
+</body>
+</html>

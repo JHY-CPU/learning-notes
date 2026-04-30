@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Context 模式与设计</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔗 Go Context 模式与设计</h2><p>Context 链式传播、超时级联、请求追踪、取消传播、deadline 预估、context 安全设计模式、常见陷阱与最佳实践。</p></div>
+    <div class="card">
+        <h2>Context 链式传播</h2>
+        <div class="code">// ========== Context 链 ==========
+// Context 形成树状结构, 子 ctx 继承父 ctx
+// 父取消 → 所有子也取消
+
+func contextChain() {
+    // 根 context
+    root := context.Background()
+
+    // 第一层: timeout
+    ctx1, cancel1 := context.WithTimeout(root, 5*time.Second)
+    defer cancel1()
+
+    // 第二层: WithValue (继承超时)
+    ctx2 := context.WithValue(ctx1, "user", "alice")
+
+    // 第三层: cancel (继承超时和值)
+    ctx3, cancel3 := context.WithCancel(ctx2)
+    defer cancel3()
+
+    // ctx3 的取消链: cancel3 → cancel1 → root
+    // 5 秒后 ctx1 超时 → ctx2, ctx3 也 Done
+}
+
+// ========== 超时级联 ==========
+// 父超时小于子超时 → 子超时永远不会触发
+
+func cascadeTimeout() {
+    root := context.Background()
+
+    // 父: 1秒超时
+    parent, parentCancel := context.WithTimeout(root, 1*time.Second)
+    defer parentCancel()
+
+    // 子: 5秒超时 (但父 1秒就超时!)
+    child, childCancel := context.WithTimeout(parent, 5*time.Second)
+    defer childCancel()
+
+    select {
+    case <-child.Done():
+        // 1 秒后触发 (父超时 → 子也 Done)
+        fmt.Println("child done:", child.Err())
+        // 输出: context deadline exceeded
+    }
+}
+
+// ========== 取消传播 ==========
+// 取消是向下传播的
+
+func cancelPropagation() {
+    ctx, cancel := context.WithCancel(context.Background())
+
+    // goroutine A
+    go func() {
+        ctxA, cancelA := context.WithCancel(ctx)
+        defer cancelA()
+
+        // goroutine A1 (嵌套)
+        go func() {
+            ctxA1 := context.WithValue(ctxA, "depth", 2)
+            select {
+            case <-ctxA1.Done():
+                fmt.Println("A1 取消")
+            }
+        }()
+
+        select {
+        case <-ctxA.Done():
+            fmt.Println("A 取消")
+        }
+    }()
+
+    // goroutine B (不受 A 影响)
+    go func() {
+        select {
+        case <-ctx.Done():
+            fmt.Println("B 取消")
+        }
+    }()
+
+    time.Sleep(time.Millisecond)
+    cancel()  // 取消所有: A, A1, B 都收到
+    time.Sleep(time.Millisecond)
+}
+
+// ========== context 树结构 ==========
+// Background
+// └── WithCancel (手动取消)
+//     ├── WithTimeout (5s)
+//     │   └── WithValue (user=alice)
+//     └── WithTimeout (3s)
+//         └── WithValue (trace=traceID)</div>
+    </div>
+    <div class="card">
+        <h2>请求追踪</h2>
+        <div class="code">// ========== 用 Context 传递追踪信息 ==========
+// 分布式追踪的核心
+
+type contextKey string
+
+const (
+    TraceIDKey    contextKey = "trace_id"
+    SpanIDKey     contextKey = "span_id"
+    UserIDKey     contextKey = "user_id"
+    RequestIDKey  contextKey = "request_id"
+)
+
+type TraceInfo struct {
+    TraceID string
+    SpanID  string
+    UserID  string
+}
+
+func GetTraceInfo(ctx context.Context) TraceInfo {
+    return TraceInfo{
+        TraceID: ctx.Value(TraceIDKey).(string),
+        SpanID:  ctx.Value(SpanIDKey).(string),
+        UserID:  ctx.Value(UserIDKey).(string),
+    }
+}
+
+func WithTraceInfo(ctx context.Context, info TraceInfo) context.Context {
+    ctx = context.WithValue(ctx, TraceIDKey, info.TraceID)
+    ctx = context.WithValue(ctx, SpanIDKey, info.SpanID)
+    ctx = context.WithValue(ctx, UserIDKey, info.UserID)
+    return ctx
+}
+
+// HTTP 中间件
+func TraceMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        traceID := r.Header.Get("X-Trace-ID")
+        if traceID == "" {
+            traceID = generateUUID()
+        }
+
+        info := TraceInfo{
+            TraceID: traceID,
+            SpanID:  generateUUID(),
+            UserID:  extractUser(r),
+        }
+
+        ctx := WithTraceInfo(r.Context(), info)
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}
+
+// ========== 日志集成 ==========
+type Logger struct{}
+
+func (l *Logger) Info(ctx context.Context, msg string, args ...interface{}) {
+    trace := GetTraceInfo(ctx)
+    log.Printf("[%s/%s] %s %v", trace.TraceID, trace.UserID, msg, args)
+}
+
+// ========== 数据库查询追踪 ==========
+func queryWithTrace(ctx context.Context, db *sql.DB, query string, args ...interface{}) (*sql.Rows, error) {
+    trace := GetTraceInfo(ctx)
+
+    start := time.Now()
+    rows, err := db.Query(query, args...)
+    elapsed := time.Since(start)
+
+    log.Printf("[trace=%s] query=%q elapsed=%v err=%v",
+        trace.TraceID, query, elapsed, err)
+
+    return rows, err
+}
+
+// ========== Context Values 安全设计 ==========
+// 1. 用私有类型做 key (防止 key 冲突)
+type userKeyType struct{}  // 包私有
+
+var userKey = userKeyType{}
+
+func WithUser(ctx context.Context, user *User) context.Context {
+    return context.WithValue(ctx, userKey, user)
+}
+
+func UserFromContext(ctx context.Context) *User {
+    if user, ok := ctx.Value(userKey).(*User); ok {
+        return user
+    }
+    return nil
+}
+
+// 2. 提供类型安全的 getter/setter
+// 3. 不要把 context 存在 struct 中
+// 4. 只传请求范围数据 (不要传可选参数)</div>
+    </div>
+    <div class="card">
+        <h2>Context 最佳实践</h2>
+        <div class="code">// ========== 规则 1: context 是第一个参数 ==========
+func DoSomething(ctx context.Context, arg string) error {
+    // ...
+    return nil
+}
+
+// ========== 规则 2: 不存 struct ==========
+// ❌ 错误
+type BadHandler struct {
+    ctx context.Context  // 不要!
+    db  *sql.DB
+}
+
+// ✅ 正确
+type GoodHandler struct {
+    db *sql.DB
+}
+func (h *GoodHandler) Handle(ctx context.Context, req Request) {
+    // ctx 作为参数传入
+}
+
+// ========== 规则 3: defer cancel() ==========
+func withCancel() {
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()  // 防止泄漏!
+    // ...
+}
+
+// ========== 规则 4: 不传 nil context ==========
+// 不确定用 context.TODO()
+// 不要传 nil!
+
+func mayBeOptional(ctx context.Context) {
+    if ctx == nil {
+        ctx = context.TODO()
+    }
+    // ...
+}
+
+// ========== 规则 5: 超时 + 调用链 ==========
+// HTTP 请求链中都传递 context
+
+func callService(ctx context.Context) (*Response, error) {
+    // 每个调用用剩余超时的子 context
+    req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+    return http.DefaultClient.Do(req)
+}
+
+// ========== 规则 6: WithValue 只用于追踪数据 ==========
+// 不要用 WithValue 传可选的函数参数
+// 不要用 WithValue 代替函数参数
+
+// ❌ 错误
+// ctx = context.WithValue(ctx, "format", "json")
+// process(ctx)
+
+// ✅ 正确
+// process(ctx, "json")
+
+// ========== 常见陷阱 ==========
+
+// 陷阱 1: 循环中同一个 ctx 复用
+// func loop() {
+//     for _, item := range items {
+//         ctx, cancel := context.WithTimeout(root, time.Second)
+//         defer cancel()  // 循环结束才取消! 浪费资源
+//         process(ctx, item)
+//     }
+// }
+
+// ✅ 正确: 每次循环创建新 ctx
+func loop() {
+    for _, item := range items {
+        func() {
+            ctx, cancel := context.WithTimeout(root, time.Second)
+            defer cancel()
+            process(ctx, item)
+        }()
+    }
+}
+
+// 陷阱 2: WithValue 的 key 用 string
+// ctx := context.WithValue(ctx, "key", "val")
+// 不同包可能使用相同 key "key" → 冲突!
+
+// ✅ 正确: 用自定义类型
+type ctxKey int
+const keyUser ctxKey = iota
+
+// 陷阱 3: 忘记 cancel 导致 context 泄漏
+// go func() {
+//     ctx, cancel := context.WithTimeout(root, time.Hour)
+//     _ = ctx
+//     // cancel 没被调用! 资源保留一小时
+// }()</div>
+    </div>
+    <div class="card">
+        <h2>实用 Context 模式</h2>
+        <div class="code">// ========== 1. 合并取消 ==========
+// 两个 context 任一取消时触发
+
+func mergeCancel(ctx1, ctx2 context.Context) context.Context {
+    ctx, cancel := context.WithCancel(context.Background())
+
+    go func() {
+        select {
+        case <-ctx1.Done():
+        case <-ctx2.Done():
+        }
+        cancel()
+    }()
+
+    return ctx
+}
+
+// ========== 2. 超时预估 ==========
+// 根据剩余时间自动调整超时
+
+func withDynamicTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+    deadline, ok := ctx.Deadline()
+    if !ok {
+        return context.WithTimeout(ctx, timeout)
+    }
+
+    remaining := time.Until(deadline)
+    if remaining < timeout {
+        return context.WithTimeout(ctx, remaining)
+    }
+    return context.WithTimeout(ctx, timeout)
+}
+
+// ========== 3. Context 传递 requestID ==========
+type RequestID string
+
+func WithRequestID(ctx context.Context, id string) context.Context {
+    return context.WithValue(ctx, RequestIDKey, RequestID(id))
+}
+
+func GetRequestID(ctx context.Context) string {
+    if id, ok := ctx.Value(RequestIDKey).(RequestID); ok {
+        return string(id)
+    }
+    return ""
+}
+
+// ========== 4. 超时数据库查询 ==========
+func queryWithTimeout(ctx context.Context, db *sql.DB, timeout time.Duration, query string, args ...interface{}) ([]Row, error) {
+    ctx, cancel := context.WithTimeout(ctx, timeout)
+    defer cancel()
+
+    rows, err := db.QueryContext(ctx, query, args...)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    // 处理结果...
+    return nil, nil
+}
+
+// ========== 5. Graceful Shutdown ==========
+func gracefulShutdown(ctx context.Context, srv *http.Server) {
+    <-ctx.Done()  // 等待中断信号
+
+    shutdownCtx, cancel := context.WithTimeout(
+        context.Background(), 30*time.Second,
+    )
+    defer cancel()
+
+    if err := srv.Shutdown(shutdownCtx); err != nil {
+        log.Fatal("shutdown error:", err)
+    }
+}
+
+// ========== context 链性能 ==========
+// 每次 WithValue/WithCancel 增加 O(1) 开销
+// 深层链 (几十层) 开始有影响
+// 建议: 值数量 < 10, 链深度 < 20</div>
+        <div class="note">💡 Context 设计要点: 树状传播 (父取消 → 子取消); 超时级联 (子超时 > 父超时 → 永远不触发); 追踪数据 (traceID/userID) 用 WithValue; key 用私有类型防冲突; context 永远是第一个参数; 不存 struct; defer cancel() 防泄漏; 不传 nil (不确定用 TODO); WithValue 只传请求范围数据, 不替代函数参数; 循环中正确管理 context 生命周期; 实用模式: merge cancel, 动态超时, graceful shutdown。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoChain()">Context 链</button>
+        <button onclick="demoTrace()">追踪</button>
+        <button onclick="demoRules()">最佳实践</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoChain() {
+            result.innerHTML = '';
+            log('# Context 链式传播');
+            log('');
+            log('树状结构:');
+            log('  Background');
+            log('  ├── WithCancel');
+            log('  │   └── WithTimeout(5s)');
+            log('  │       └── WithValue(user)');
+            log('  └── WithTimeout(3s)');
+            log('');
+            log('规则: 父取消 → 所有子取消');
+            log('子超时 > 父超时: 永远不会触发');
+            log('子超时 < 父超时: 按子超时触发');
+        }
+
+        function demoTrace() {
+            result.innerHTML = '';
+            log('# Context 分布式追踪');
+            log('');
+            log('type contextKey string');
+            log('const TraceIDKey contextKey = "trace_id"');
+            log('');
+            log('中间件提取 traceID:');
+            log('  traceID := r.Header.Get("X-Trace-ID")');
+            log('  ctx = context.WithValue(ctx, TraceIDKey, id)');
+            log('');
+            log('安全设计:');
+            log('  - 私有 key 类型 (防冲突)');
+            log('  - 类型安全的 Getter/Setter');
+            log('  - 只传请求范围数据');
+        }
+
+        function demoRules() {
+            result.innerHTML = '';
+            log('# Context 最佳实践');
+            log('');
+            log('六大规则:');
+            log('  1. 第一个参数');
+            log('  2. 不存 struct');
+            log('  3. defer cancel()');
+            log('  4. 不传 nil');
+            log('  5. 调用链传递');
+            log('  6. WithValue 只传追踪');
+            log('');
+            log('常见陷阱:');
+            log('  循环中 defer cancel');
+            log('  string 类型 key 冲突');
+            log('  忘记 cancel 导致泄漏');
+        }
+    </script>
+</body>
+</html>

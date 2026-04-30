@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Channel 模式与最佳实践</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📨 Go Channel 模式与最佳实践</h2><p>Channel 类型与方向、无缓冲 vs 有缓冲选择、ownership 模式、channel 关闭原则、管道 Pipeline 模式、常用并发模式实现。</p></div>
+    <div class="card">
+        <h2>Channel 类型与方向</h2>
+        <div class="code">// ========== Channel 的多种形式 ==========
+// 双向
+ch := make(chan int)
+
+// 单向 (作为参数限制)
+func producer(ch chan<- int) {  // 只写
+    ch <- 42
+    close(ch)
+}
+
+func consumer(ch <-chan int) {  // 只读
+    for v := range ch {
+        fmt.Println(v)
+    }
+}
+
+// 无缓冲 (同步)
+syncCh := make(chan int)
+// 发送阻塞直到接收
+
+// 有缓冲 (异步)
+bufCh := make(chan int, 10)
+// 发送阻塞仅当缓冲区满
+
+// nil channel
+var nilCh chan int
+// 发送和接收都永久阻塞 (select 中不可达)
+
+// ========== 无缓冲 vs 有缓冲 ==========
+// 无缓冲: 同步通信, 发送和接收同时发生
+// 适用: 事件通知, 精确同步
+
+func unbufferedDemo() {
+    ch := make(chan struct{})
+    go func() {
+        // 工作...
+        ch <- struct{}{}  // 通知完成 (阻塞直到接收)
+    }()
+    <-ch  // 等待完成
+}
+
+// 有缓冲: 异步通信, 解耦发送和接收
+// 适用: 工作池, 限流, 信号量
+
+func bufferedDemo() {
+    ch := make(chan int, 3)
+
+    ch <- 1  // 立即成功
+    ch <- 2  // 立即成功
+    ch <- 3  // 立即成功
+    // ch <- 4  // 阻塞! 缓冲区满
+
+    fmt.Println(<-ch)  // 1
+}
+
+// ========== 选择指南 ==========
+// 无缓冲:
+//   - 同步保证 (goroutine 交接)
+//   - 事件通知
+//   - 精确协调
+
+// 有缓冲:
+//   - 解耦生产者和消费者
+//   - 限流 (缓冲区大小 = 容忍的延迟)
+//   - 信号量 (限制并发)
+
+// 缓冲区大小:
+//   无缓冲 = 0
+//   有缓冲 > 0
+//   确定大小: 测量生产/消费速率差 + 容忍延迟</div>
+    </div>
+    <div class="card">
+        <h2>Ownership 与关闭原则</h2>
+        <div class="code">// ========== Channel Ownership 模式 ==========
+// 核心原则: 谁创建, 谁关闭; 谁发送, 谁关闭
+
+// 明确的 ownership:
+// 1. 创建 channel 的 goroutine 拥有它
+// 2. 只有发送方才关闭 channel
+// 3. 接收方从不关闭 channel
+
+// ========== 关闭 channel 的规则 ==========
+// 1. 向已关闭的 channel 发送 → panic
+// 2. 从已关闭的 channel 接收 → 立即返回零值
+// 3. 重复关闭 channel → panic
+// 4. close(nil) → panic
+
+func closeRules() {
+    ch := make(chan int)
+    close(ch)
+
+    // ch <- 1  // panic: send on closed channel
+
+    v := <-ch  // 立即返回零值 (0)
+    v, ok := <-ch  // ok = false (已关闭)
+    fmt.Println(v, ok)  // 0, false
+
+    // close(ch)  // panic: close of closed channel
+}
+
+// ========== 安全关闭模式 ==========
+
+// 模式 1: 发送方负责关闭
+func producerSafe() <-chan int {
+    ch := make(chan int)
+    go func() {
+        for i := 0; i < 5; i++ {
+            ch <- i
+        }
+        close(ch)  // 发送方关闭
+    }()
+    return ch  // 返回只读 channel
+}
+
+// 模式 2: 使用 done channel 控制
+func controlledClose(done <-chan struct{}) <-chan int {
+    ch := make(chan int)
+    go func() {
+        defer close(ch)
+        for i := 0; ; i++ {
+            select {
+            case ch <- i:
+            case <-done:
+                return  // 收到关闭信号
+            }
+        }
+    }()
+    return ch
+}
+
+// 模式 3: sync.Once 确保只关闭一次
+type SafeCloseChan struct {
+    ch    chan struct{}
+    once  sync.Once
+}
+
+func NewSafeCloseChan() *SafeCloseChan {
+    return &SafeCloseChan{ch: make(chan struct{})}
+}
+
+func (sc *SafeCloseChan) Close() {
+    sc.once.Do(func() {
+        close(sc.ch)
+    })
+}
+
+func (sc *SafeCloseChan) Done() <-chan struct{} {
+    return sc.ch
+}
+
+// ========== 优雅关闭工作池 ==========
+// 需要等到所有 worker 完成后再关闭
+
+func gracefulShutdown() {
+    jobs := make(chan int, 10)
+    var wg sync.WaitGroup
+
+    // workers
+    for w := 0; w < 3; w++ {
+        wg.Add(1)
+        go func(id int) {
+            defer wg.Done()
+            for job := range jobs {
+                fmt.Printf("worker %d 处理 %d\n", id, job)
+            }
+        }(w)
+    }
+
+    // 发送任务
+    for j := 0; j < 10; j++ {
+        jobs <- j
+    }
+    close(jobs)  // 通知 worker 没有更多任务
+    wg.Wait()    // 等待所有 worker 退出
+}</div>
+    </div>
+    <div class="card">
+        <h2>Pipeline 与并发模式</h2>
+        <div class="code">// ========== Pipeline 流水线 ==========
+// 每个 stage 通过 channel 连接
+
+// Stage 1: 生成数字
+func gen(nums ...int) <-chan int {
+    out := make(chan int)
+    go func() {
+        for _, n := range nums {
+            out <- n
+        }
+        close(out)
+    }()
+    return out
+}
+
+// Stage 2: 平方
+func sq(in <-chan int) <-chan int {
+    out := make(chan int)
+    go func() {
+        for n := range in {
+            out <- n * n
+        }
+        close(out)
+    }()
+    return out
+}
+
+// Stage 3: 过滤偶数
+func filterEven(in <-chan int) <-chan int {
+    out := make(chan int)
+    go func() {
+        for n := range in {
+            if n%2 != 0 {
+                out <- n
+            }
+        }
+        close(out)
+    }()
+    return out
+}
+
+// 使用: pipeline 链
+// nums := gen(1, 2, 3, 4, 5)
+// squares := sq(nums)
+// filtered := filterEven(squares)
+// for v := range filtered {
+//     fmt.Println(v)  // 1, 9, 25 (奇数的平方)
+// }
+
+// ========== 扇出 (Fan-Out) ==========
+// 多个函数从同一个 channel 读取
+// 适用: 并行处理无关数据
+
+func fanOut(in <-chan int, workers int) []<-chan int {
+    channels := make([]<-chan int, workers)
+    for i := 0; i < workers; i++ {
+        ch := make(chan int)
+        go func() {
+            defer close(ch)
+            for v := range in {
+                ch <- process(v)
+            }
+        }()
+        channels[i] = ch
+    }
+    return channels
+}
+
+// ========== 扇入 (Fan-In) ==========
+// 合并多个 channel 到同一个
+
+func fanIn(chs ...<-chan int) <-chan int {
+    out := make(chan int)
+    var wg sync.WaitGroup
+
+    for _, ch := range chs {
+        wg.Add(1)
+        go func(c <-chan int) {
+            defer wg.Done()
+            for v := range c {
+                out <- v
+            }
+        }(ch)
+    }
+
+    go func() {
+        wg.Wait()
+        close(out)
+    }()
+
+    return out
+}
+
+// ========== 有限并发 + Pipeline ==========
+func parallelPipeline(items []int, workers int) []int {
+    jobs := make(chan int, len(items))
+    results := make(chan int, len(items))
+
+    // Worker pool
+    var wg sync.WaitGroup
+    for i := 0; i < workers; i++ {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            for item := range jobs {
+                results <- expensiveOp(item)
+            }
+        }()
+    }
+
+    // 发送任务
+    for _, item := range items {
+        jobs <- item
+    }
+    close(jobs)
+
+    // 等待完成
+    go func() {
+        wg.Wait()
+        close(results)
+    }()
+
+    // 收集结果
+    var out []int
+    for r := range results {
+        out = append(out, r)
+    }
+    return out
+}</div>
+    </div>
+    <div class="card">
+        <h2>实用模式</h2>
+        <div class="code">// ========== 常用 Channel 模式 ==========
+
+// 1. Tee: 分接 (一个 channel 到多个)
+func tee(input <-chan int, n int) []<-chan int {
+    outputs := make([]chan int, n)
+    for i := range outputs {
+        outputs[i] = make(chan int)
+    }
+
+    go func() {
+        for v := range input {
+            for _, ch := range outputs {
+                ch <- v
+            }
+        }
+        for _, ch := range outputs {
+            close(ch)
+        }
+    }()
+
+    result := make([]<-chan int, n)
+    for i := range result {
+        result[i] = outputs[i]
+    }
+    return result
+}
+
+// 2. Bridge: 将 channel 的 channel 扁平化
+func bridge(done <-chan struct{}, chanStream <-chan <-chan int) <-chan int {
+    out := make(chan int)
+    go func() {
+        defer close(out)
+        for {
+            var ch <-chan int
+            select {
+            case maybeCh, ok := <-chanStream:
+                if !ok {
+                    return
+                }
+                ch = maybeCh
+            case <-done:
+                return
+            }
+            for v := range ch {
+                select {
+                case out <- v:
+                case <-done:
+                    return
+                }
+            }
+        }
+    }()
+    return out
+}
+
+// 3. Or-Done: 任意一个完成
+func orDone(chs ...<-chan struct{}) <-chan struct{} {
+    switch len(chs) {
+    case 0:
+        return nil
+    case 1:
+        return chs[0]
+    }
+
+    done := make(chan struct{})
+    go func() {
+        defer close(done)
+        select {
+        case <-chs[0]:
+        case <-chs[1]:
+        case <-orDone(chs[2:]...):
+        }
+    }()
+    return done
+}
+// 使用: select { case <-orDone(ctx1.Done(), ctx2.Done()): }
+
+// 4. 有限资源并发
+func boundedWork(items []string, limit int) {
+    sem := make(chan struct{}, limit)
+    var wg sync.WaitGroup
+
+    for _, item := range items {
+        wg.Add(1)
+        sem <- struct{}{}  // 获取令牌
+        go func(v string) {
+            defer wg.Done()
+            defer func() { <-sem }()  // 释放令牌
+            processItem(v)
+        }(item)
+    }
+    wg.Wait()
+}</div>
+        <div class="note">💡 Channel 要点: 通道方向 (chan<- 只写, <-chan 只读); 无缓冲 = 同步通信; 有缓冲 = 异步+限流; 关闭规则: 仅发送方关闭; 关闭后接收返回零值; 重复关闭和向关闭的 chan 发送都 panic; safe close 用 sync.Once; Pipeline: gen→sq→filter; Fan-Out: 多个消费同一 chan; Fan-In: 合并多个 chan; 实用模式: Tee 分接, Bridge 扁平化, Or-Done 完成合并, semaphore 限流。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoChannel()">Channel 类型</button>
+        <button onclick="demoPipeline()">Pipeline</button>
+        <button onclick="demoPattern()">并发模式</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoChannel() {
+            result.innerHTML = '';
+            log('# Channel 类型与选择');
+            log('');
+            log('无缓冲 (同步):');
+            log('  ch := make(chan int)');
+            log('  发送阻塞 → 接收完成');
+            log('  适用: 事件通知, 精确同步');
+            log('');
+            log('有缓冲 (异步):');
+            log('  ch := make(chan int, 10)');
+            log('  缓冲满才阻塞');
+            log('  适用: 解耦, 限流, 信号量');
+            log('');
+            log('单向:');
+            log('  func send(ch chan<- int)   // 只写');
+            log('  func recv(ch <-chan int)   // 只读');
+        }
+
+        function demoPipeline() {
+            result.innerHTML = '';
+            log('# Pipeline 流水线');
+            log('');
+            log('gen(1,2,3) → sq → filterEven → print');
+            log('');
+            log('每个 stage:');
+            log('  接收上游 channel');
+            log('  处理数据');
+            log('  输出到下游 channel');
+            log('  负责关闭自己的 out channel');
+            log('');
+            log('Fan-Out: 多个 worker 消费');
+            log('Fan-In: 合并多个 channel');
+            log('串行: gen → sq → filter');
+        }
+
+        function demoPattern() {
+            result.innerHTML = '';
+            log('# 实用并发模式');
+            log('');
+            log('Tee 分接:');
+            log('  1 个输入 → N 个输出');
+            log('  每个输出收到全部数据');
+            log('');
+            log('Bridge 桥接:');
+            log('  将 <-chan <-chan int');
+            log('  扁平化为 <-chan int');
+            log('');
+            log('Or-Done:');
+            log('  任意一个 channel 完成则完成');
+            log('  简化多路取消');
+            log('');
+            log('Semaphore:');
+            log('  make(chan struct{}, limit)');
+            log('  控制并发数');
+        }
+    </script>
+</body>
+</html>

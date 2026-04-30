@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Crypto</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        .crypto-output { font-family: monospace; font-size: 11px; word-break: break-all; background: #f8f9fa; padding: 10px; border-radius: 4px; margin: 8px 0; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Web Crypto</h2><p>crypto.getRandomValues、SubtleCrypto(digest/encrypt/sign)、hash 计算。</p></div>
+    <div class="card">
+        <h2>Web Crypto API</h2>
+        <div class="code">// ========== 随机数 ==========
+const arr = new Uint8Array(32);
+crypto.getRandomValues(arr);
+
+// ========== Hash 计算 ==========
+const hash = await crypto.subtle.digest('SHA-256', data);
+// SHA-1, SHA-256, SHA-384, SHA-512
+
+// ========== 加密/解密 ==========
+const key = await crypto.subtle.generateKey(
+    { name: 'AES-GCM', length: 256 },
+    true, ['encrypt', 'decrypt']
+);
+const encrypted = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv: iv },
+    key, plaintext
+);
+
+// ========== 签名/验证 ==========
+const signature = await crypto.subtle.sign(
+    { name: 'HMAC', hash: 'SHA-256' },
+    key, data
+);
+const verified = await crypto.subtle.verify(
+    { name: 'HMAC', hash: 'SHA-256' },
+    key, signature, data
+);</div>
+    </div>
+    <div class="card">
+        <h2>演示：Web Crypto</h2>
+        <button onclick="demoRandom()">随机数</button>
+        <button onclick="demoHash()">Hash 计算</button>
+        <button onclick="demoEncrypt()">加解密</button>
+        <button onclick="demoKey()">密钥管理</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        // Mock SubtleCrypto
+        class MockSubtleCrypto {
+            async digest(algo, data) {
+                const name = typeof algo === 'string' ? algo : algo.name;
+                const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : new Uint8Array(data);
+                // Simulate hash
+                let hash = new Uint8Array(32);
+                for (let i = 0; i < 32; i++) {
+                    hash[i] = (bytes[i % bytes.length] + i * 31) % 256;
+                }
+                if (name === 'SHA-384') hash = hash.slice(0, 48);
+                if (name === 'SHA-512') hash = hash.slice(0, 64);
+                if (name === 'SHA-1') hash = hash.slice(0, 20);
+                return hash.buffer;
+            }
+            async generateKey(algorithm, extractable, usages) {
+                return { type: 'secret', algorithm, extractable, usages };
+            }
+            async encrypt(algo, key, data) {
+                return new Uint8Array([...data].map(b => b ^ 0xFF)).buffer;
+            }
+            async decrypt(algo, key, data) {
+                return new Uint8Array([...new Uint8Array(data)].map(b => b ^ 0xFF)).buffer;
+            }
+            async sign(algo, key, data) {
+                return new Uint8Array(32).buffer;
+            }
+            async verify(algo, key, signature, data) {
+                return true;
+            }
+            async importKey(format, keyData, algo, extractable, usages) {
+                return { type: 'secret', format, algorithm: algo, extractable, usages };
+            }
+            async exportKey(format, key) {
+                return new Uint8Array(32).buffer;
+            }
+        }
+
+        const mockCrypto = {
+            getRandomValues: (arr) => {
+                for (let i = 0; i < arr.length; i++) {
+                    arr[i] = Math.floor(Math.random() * 256);
+                }
+                return arr;
+            },
+            subtle: new MockSubtleCrypto()
+        };
+
+        function ab2hex(buf) {
+            return Array.from(new Uint8Array(buf))
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join('');
+        }
+
+        function ab2b64(buf) {
+            const bytes = new Uint8Array(buf);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary);
+        }
+
+        function demoRandom() {
+            result.innerHTML = '';
+            log('🎲 crypto.getRandomValues:');
+            log('');
+
+            log('1️⃣ 基本用法:');
+            log('   const arr = new Uint8Array(16);');
+            log('   crypto.getRandomValues(arr);');
+            log('   // arr 被填充 16 个随机字节');
+            log('');
+
+            log('2️⃣ 支持的类型:');
+            log('   Int8Array, Uint8Array, Uint8ClampedArray');
+            log('   Int16Array, Uint16Array');
+            log('   Int32Array, Uint32Array, BigInt64Array, BigUint64Array');
+            log('');
+
+            log('3️⃣ 生成随机值:');
+            const bytes = new Uint8Array(16);
+            mockCrypto.getRandomValues(bytes);
+            log(`   16 随机字节: ${ab2hex(bytes)}`);
+            log('');
+
+            const ints = new Uint32Array(6);
+            mockCrypto.getRandomValues(ints);
+            log(`   6 随机整数: ${Array.from(ints).join(', ')}`);
+            log('');
+
+            log('4️⃣ Math.random() vs crypto.getRandomValues():');
+            log('   • Math.random()     — 伪随机, 可预测, 不加密安全');
+            log('   • getRandomValues() — 加密安全, 适合 Token/密钥');
+            log('');
+
+            log('5️⃣ 生成随机 Token:');
+            const token = new Uint8Array(32);
+            mockCrypto.getRandomValues(token);
+            log(`   32 字节随机 Token:`);
+            log(`   ${ab2hex(token)}`);
+        }
+
+        function demoHash() {
+            result.innerHTML = '';
+            log('🔐 Hash 计算:');
+            log('');
+
+            log('1️⃣ 支持的算法:');
+            log('   • SHA-1    (160位, 不推荐)');
+            log('   • SHA-256  (256位, 推荐)');
+            log('   • SHA-384  (384位)');
+            log('   • SHA-512  (512位)');
+            log('');
+
+            log('2️⃣ 基本使用:');
+            log('   const encoder = new TextEncoder();');
+            log('   const data = encoder.encode("hello");');
+            log('   const hash = await crypto.subtle.digest("SHA-256", data);');
+            log('');
+
+            async function computeHash() {
+                const encoder = new TextEncoder();
+                const data = encoder.encode('Hello Web Crypto!');
+                const hash = await mockCrypto.subtle.digest('SHA-256', data);
+                log(`   输入: "Hello Web Crypto!"`);
+                log(`   SHA-256: ${ab2hex(hash)}`);
+                log(`   长度: ${new Uint8Array(hash).length} 字节`);
+                log('');
+                return hash;
+            }
+            computeHash();
+
+            log('3️⃣ 计算文件 Hash:');
+            log('   async function fileHash(file) {');
+            log('     const buffer = await file.arrayBuffer();');
+            log('     const hash = await crypto.subtle.digest("SHA-256", buffer);');
+            log('     return ab2hex(hash);');
+            log('   }');
+            log('');
+
+            log('4️⃣ HMAC (基于 Hash 的消息认证码):');
+            log('   const key = await crypto.subtle.importKey(');
+            log('     "raw", keyData,');
+            log('     { name: "HMAC", hash: "SHA-256" },');
+            log('     false, ["sign", "verify"]');
+            log('   );');
+            log('   const sig = await crypto.subtle.sign("HMAC", key, data);');
+        }
+
+        function demoEncrypt() {
+            result.innerHTML = '';
+            log('🔒 加密/解密:');
+            log('');
+
+            log('1️⃣ 对称加密 (AES-GCM):');
+            log('   // 生成密钥');
+            log('   const key = await crypto.subtle.generateKey(');
+            log('     { name: "AES-GCM", length: 256 },');
+            log('     true, ["encrypt", "decrypt"]');
+            log('   );');
+            log('');
+            log('   // 加密');
+            log('   const iv = crypto.getRandomValues(new Uint8Array(12));');
+            log('   const encrypted = await crypto.subtle.encrypt(');
+            log('     { name: "AES-GCM", iv }, key, plaintext');
+            log('   );');
+            log('');
+            log('   // 解密');
+            log('   const decrypted = await crypto.subtle.decrypt(');
+            log('     { name: "AES-GCM", iv }, key, encrypted');
+            log('   );');
+            log('');
+
+            log('2️⃣ AES 加密模式:');
+            log('   • AES-CBC  — 块加密 (需 PKCS#7 填充)');
+            log('   • AES-GCM  — 认证加密 (推荐)');
+            log('   • AES-CTR  — 计数器模式');
+            log('   • AES-KW   — 密钥包装');
+            log('');
+
+            log('3️⃣ 非对称加密 (RSA-OAEP):');
+            log('   const keyPair = await crypto.subtle.generateKey(');
+            log('     { name: "RSA-OAEP", modulusLength: 2048 },');
+            log('     true, ["encrypt", "decrypt"]');
+            log('   );');
+            log('   const encrypted = await crypto.subtle.encrypt(');
+            log('     { name: "RSA-OAEP" }, keyPair.publicKey, data');
+            log('   );');
+            log('');
+
+            // Demo encryption
+            async function demoEnc() {
+                const plaintext = new TextEncoder().encode('保密数据: 123456');
+                const key = await mockCrypto.subtle.generateKey(
+                    { name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']
+                );
+                const iv = mockCrypto.getRandomValues(new Uint8Array(12));
+                const encrypted = await mockCrypto.subtle.encrypt(
+                    { name: 'AES-GCM', iv }, key, plaintext
+                );
+                const decrypted = await mockCrypto.subtle.decrypt(
+                    { name: 'AES-GCM', iv }, key, encrypted
+                );
+                const decText = new TextDecoder().decode(new Uint8Array(decrypted));
+                log(`   明文: "保密数据: 123456"`);
+                log(`   密文 (hex): ${ab2hex(encrypted).substring(0, 40)}...`);
+                log(`   解密: "${decText}"`);
+            }
+            demoEnc();
+        }
+
+        function demoKey() {
+            result.innerHTML = '';
+            log('🔑 密钥管理:');
+            log('');
+
+            log('1️⃣ generateKey (生成密钥):');
+            log('   const key = await crypto.subtle.generateKey(');
+            log('     { name: "AES-GCM", length: 256 },');
+            log('     true,  // extractable: 可导出');
+            log('     ["encrypt", "decrypt"]');
+            log('   );');
+            log('');
+
+            log('2️⃣ importKey (导入密钥):');
+            log('   const key = await crypto.subtle.importKey(');
+            log('     "raw",                           // 格式');
+            log('     keyBytes,                        // 密钥字节');
+            log('     { name: "AES-GCM" },             // 算法');
+            log('     false,                           // 不可导出');
+            log('     ["encrypt", "decrypt"]           // 用途');
+            log('   );');
+            log('');
+
+            log('3️⃣ 密钥格式:');
+            log('   • raw        — 原始字节');
+            log('   • pkcs8      — 私钥 (PKCS#8)');
+            log('   • spki       — 公钥 (SubjectPublicKeyInfo)');
+            log('   • jwk        — JSON Web Key');
+            log('');
+
+            log('4️⃣ exportKey (导出密钥):');
+            log('   const exported = await crypto.subtle.exportKey("raw", key);');
+            log('   // 导出后可以 Base64 编码存储');
+            log('');
+
+            log('5️⃣ 密钥用法 (usages):');
+            log('   对称加密: ["encrypt", "decrypt"]');
+            log('   签名: ["sign", "verify"]');
+            log('   密钥协商: ["deriveKey", "deriveBits"]');
+            log('   密钥包装: ["wrapKey", "unwrapKey"]');
+            log('');
+
+            log('6️⃣ 安全要求:');
+            log('   • AES 密钥长度: 128/192/256 位');
+            log('   • RSA 密钥长度: 2048/4096 位');
+            log('   • ECDSA/P-256: 256 位');
+            log('   • IV/Nonce: 每次加密使用不同的随机值');
+        }
+
+        console.log('=== Web Crypto ===');
+        document.getElementById('output').textContent =
+            `Web Crypto: getRandomValues / SubtleCrypto / SHA / AES-GCM / 密钥管理\n` +
+            `✅ Web Crypto 演示完成！`;
+    </script>
+</body>
+</html>

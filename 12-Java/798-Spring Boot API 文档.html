@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot API 文档</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📖 Spring Boot API 文档</h2><p>SpringDoc OpenAPI 3 (Swagger UI)、@Operation/@Schema 注解、自定义配置、分组文档、安全方案集成。</p></div>
+    <div class="card">
+        <h2>SpringDoc 入门</h2>
+        <div class="code">// ========== SpringDoc OpenAPI ==========
+// 自动生成 OpenAPI 3.0 文档 + Swagger UI
+// 替代旧的 Springfox (已停止维护)
+
+// ========== 添加依赖 ==========
+// Maven:
+&lt;dependency&gt;
+    &lt;groupId&gt;org.springdoc&lt;/groupId&gt;
+    &lt;artifactId&gt;springdoc-openapi-starter-webmvc-ui&lt;/artifactId&gt;
+    &lt;version&gt;2.5.0&lt;/version&gt;
+&lt;/dependency&gt;
+
+// Gradle:
+// implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.5.0'
+
+// ========== 即可使用 ==========
+// 启动应用后访问:
+// Swagger UI:  http://localhost:8080/swagger-ui/index.html
+// JSON 文档:   http://localhost:8080/v3/api-docs
+// YAML 文档:   http://localhost:8080/v3/api-docs.yaml
+
+// ========== 配置 ==========
+springdoc:
+  api-docs:
+    path: /v3/api-docs               # API 文档路径
+    enabled: true                     # 启用 (默认)
+  swagger-ui:
+    path: /swagger-ui.html           # Swagger UI 路径
+    enabled: true                     # 启用 (默认)
+    tags-sorter: alpha                # 标签排序 (alpha/method)
+    operations-sorter: alpha          # 操作排序 (alpha/method)
+    display-request-duration: true    # 显示请求耗时
+    doc-expansion: list               # 文档展开 (list/full/none)
+    try-it-out-enabled: true          # 启用 Try it out
+    filter: true                      # 搜索过滤
+
+// ========== 生产环境禁用 ==========
+// application-prod.yml
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false</div>
+    </div>
+    <div class="card">
+        <h2>@Operation 与 @ApiResponse</h2>
+        <div class="code">// ========== 控制器文档注解 ==========
+
+@RestController
+@RequestMapping("/api/users")
+@Tag(name = "用户管理", description = "用户 CRUD 操作")   // 接口分组
+public class UserController {
+
+    // ========== @Operation: 接口描述 ==========
+    @Operation(
+        summary = "获取用户列表",
+        description = "分页查询所有用户, 支持关键字搜索",
+        tags = {"用户管理"}
+    )
+    @ApiResponse(
+        responseCode = "200",
+        description = "查询成功",
+        content = @Content(schema = @Schema(implementation = PageResponse.class))
+    )
+    @GetMapping
+    public ApiResponse&lt;List&lt;User&gt;&gt; getAllUsers(
+            @Parameter(description = "页码", example = "0")
+            @RequestParam(defaultValue = "0") int page,
+
+            @Parameter(description = "每页大小", example = "20")
+            @RequestParam(defaultValue = "20") int size,
+
+            @Parameter(description = "搜索关键字")
+            @RequestParam(required = false) String keyword) {
+        return ApiResponse.success(userService.findAll());
+    }
+
+    // ========== 多响应描述 ==========
+    @Operation(summary = "获取用户详情", description = "根据 ID 获取用户信息")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "成功",
+            content = @Content(schema = @Schema(implementation = User.class))),
+        @ApiResponse(responseCode = "404", description = "用户不存在",
+            content = @Content(schema = @Schema(implementation = ApiResponse.class))),
+        @ApiResponse(responseCode = "401", description = "未认证")
+    })
+    @GetMapping("/{id}")
+    public ApiResponse&lt;User&gt; getUserById(@PathVariable Long id) {
+        return userService.findById(id)
+            .map(ApiResponse::success)
+            .orElse(ApiResponse.error(404, "用户不存在"));
+    }
+
+    // ========== 创建 ==========
+    @Operation(summary = "创建用户")
+    @PostMapping
+    public ApiResponse&lt;User&gt; createUser(
+            @RequestBody(description = "用户信息", required = true)
+            @Valid @RequestBody CreateUserRequest request) {
+        return ApiResponse.success(userService.create(request));
+    }
+
+    // ========== 删除 ==========
+    @Operation(summary = "删除用户")
+    @ApiResponse(responseCode = "204", description = "删除成功")
+    @DeleteMapping("/{id}")
+    public ResponseEntity&lt;Void&gt; deleteUser(@PathVariable Long id) {
+        userService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>@Schema 模型注解</h2>
+        <div class="code">// ========== 模型文档注解 ==========
+
+// ========== DTO 文档 ==========
+@Schema(description = "创建用户请求")
+@Data
+public class CreateUserRequest {
+
+    @Schema(description = "用户名", example = "alice", minLength = 3, maxLength = 50)
+    @NotBlank
+    private String username;
+
+    @Schema(description = "密码", example = "123456", minLength = 6)
+    @NotBlank
+    private String password;
+
+    @Schema(description = "邮箱", example = "alice@example.com")
+    @Email
+    private String email;
+
+    @Schema(description = "年龄", example = "25", minimum = "0", maximum = "150")
+    @Min(0) @Max(150)
+    private Integer age;
+
+    @Schema(description = "手机号", example = "13812345678")
+    @Pattern(regexp = "^1[3-9]\\d{9}$")
+    private String phone;
+}
+
+// ========== 响应模型 ==========
+@Schema(description = "统一响应")
+@Data
+@Builder
+public class ApiResponse&lt;T&gt; {
+
+    @Schema(description = "业务状态码", example = "200")
+    private int code;
+
+    @Schema(description = "提示信息", example = "success")
+    private String message;
+
+    @Schema(description = "数据")
+    private T data;
+
+    @Schema(description = "时间戳")
+    private long timestamp;
+}
+
+// ========== 枚举文档 ==========
+@Schema(description = "用户状态")
+public enum UserStatus {
+    @Schema(description = "激活")
+    ACTIVE,
+    @Schema(description = "未激活")
+    INACTIVE,
+    @Schema(description = "已锁定")
+    LOCKED
+}
+
+// ========== 隐藏字段 ==========
+@Schema(hidden = true)                 // 文档中隐藏
+private String internalField;
+
+@Schema(accessMode = Schema.AccessMode.READ_ONLY)  // 只读 (响应)
+private LocalDateTime createTime;
+
+@Schema(accessMode = Schema.AccessMode.WRITE_ONLY) // 只写 (请求)
+private String password;</div>
+    </div>
+    <div class="card">
+        <h2>自定义配置</h2>
+        <div class="code">// ========== OpenAPI Bean 配置 ==========
+
+@Configuration
+public class OpenApiConfig {
+
+    @Bean
+    public OpenAPI customOpenAPI() {
+        return new OpenAPI()
+            // 基本信息
+            .info(new Info()
+                .title("My Service API")
+                .version("1.0.0")
+                .description("用户管理系统后端 API 文档")
+                .contact(new Contact()
+                    .name("开发团队")
+                    .email("dev@example.com")
+                    .url("https://example.com"))
+                .license(new License()
+                    .name("Apache 2.0")
+                    .url("https://apache.org/licenses/LICENSE-2.0"))
+            )
+            // 服务器
+            .addServersItem(new Server()
+                .url("http://localhost:8080")
+                .description("本地开发"))
+            .addServersItem(new Server()
+                .url("https://api.example.com")
+                .description("生产环境"))
+            // 全局安全方案
+            .addSecurityItem(new SecurityRequirement()
+                .addList("bearerAuth"))
+            .components(new Components()
+                .addSecuritySchemes("bearerAuth", new SecurityScheme()
+                    .name("bearerAuth")
+                    .type(SecurityScheme.Type.HTTP)
+                    .scheme("bearer")
+                    .bearerFormat("JWT")
+                    .description("输入 JWT Token (不含 Bearer 前缀)"))
+            )
+            // 全局标签
+            .addTagsItem(new Tag().name("用户管理").description("用户相关操作"))
+            .addTagsItem(new Tag().name("订单管理").description("订单相关操作"));
+    }
+}
+
+// ========== 分组文档 ==========
+// 将不同模块的 API 分到不同文档
+
+@Configuration
+public class OpenApiGroupConfig {
+
+    @Bean
+    public GroupedOpenApi userApi() {
+        return GroupedOpenApi.builder()
+            .group("用户服务")                      // 分组名
+            .displayName("用户服务 API")
+            .pathsToMatch("/api/users/**")          // 匹配路径
+            .packagesToScan("com.example.controller.user")
+            .addOpenApiCustomizer(openApi -> openApi
+                .info(new Info().title("用户服务").version("1.0")))
+            .build();
+    }
+
+    @Bean
+    public GroupedOpenApi orderApi() {
+        return GroupedOpenApi.builder()
+            .group("订单服务")
+            .displayName("订单服务 API")
+            .pathsToMatch("/api/orders/**")
+            .build();
+    }
+
+    @Bean
+    public GroupedOpenApi allApi() {
+        return GroupedOpenApi.builder()
+            .group("全部 API")
+            .displayName("全部接口")
+            .pathsToMatch("/api/**")
+            .build();
+    }
+}
+
+// 访问: http://localhost:8080/swagger-ui/index.html
+// 右上角可选择分组: 用户服务 / 订单服务 / 全部 API</div>
+    </div>
+    <div class="card">
+        <h2>安全集成与最佳实践</h2>
+        <div class="code">// ========== Spring Security 集成 ==========
+// Swagger UI 路径需要放行
+
+@Configuration
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .authorizeHttpRequests(auth -> auth
+                // 放行 Swagger 文档
+                .requestMatchers(
+                    "/v3/api-docs/**",
+                    "/swagger-ui/**",
+                    "/swagger-ui.html"
+                ).permitAll()
+                .anyRequest().authenticated()
+            );
+        return http.build();
+    }
+}
+
+// ========== JWT 认证文档 ==========
+// 在 OpenAPI 中配置 JWT (见上方 customOpenAPI())
+// Swagger UI 中点击 Authorize 按钮输入 Token
+
+// ========== 最佳实践 ==========
+
+// 1. 生产环境禁用
+springdoc.api-docs.enabled=false
+springdoc.swagger-ui.enabled=false
+
+// 2. 使用 @Profile 控制
+@Configuration
+@Profile("!prod")                            // 非生产环境
+public class OpenApiConfig { ... }
+
+// 3. 有意义的注解
+// @Operation summary = "动词+名词" (创建用户)
+// @ApiResponse 描述所有可能的状态码
+// @Schema 提供 example
+
+// 4. 使用 example 帮助测试
+// @Schema(example = "alice@example.com")
+
+// 5. 隐藏敏感字段
+// @Schema(hidden = true) 或 accessMode = WRITE_ONLY
+
+// 6. 保持文档同步
+// 代码即文档: 注解改变, 文档自动更新
+
+// 7. 分组管理
+// 大项目按模块分组, 方便查看
+
+// 8. 版本管理
+// 在 Info 中标注 API 版本
+// 多版本 API 用不同分组
+
+// 9. 文档测试
+// Swagger UI "Try it out" 直接调试接口</div>
+        <div class="note">💡 API 文档要点: springdoc-openapi 自动生成 OpenAPI 3.0; @Tag 分组; @Operation 接口描述; @Schema 模型描述; @ApiResponse 响应描述; GroupedOpenApi 分组; 生产环境禁用; 安全方案 JWT 集成; Try it out 在线调试; 代码即文档自动同步。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSpringDoc()">SpringDoc 入门</button>
+        <button onclick="demoAnno()">文档注解</button>
+        <button onclick="demoGroup()">分组配置</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSpringDoc() {
+            result.innerHTML = '';
+            log('# SpringDoc OpenAPI');
+            log('');
+            log('依赖: springdoc-openapi-starter-webmvc-ui');
+            log('');
+            log('访问:');
+            log('  Swagger UI:  /swagger-ui/index.html');
+            log('  JSON 文档:   /v3/api-docs');
+            log('  YAML 文档:   /v3/api-docs.yaml');
+            log('');
+            log('配置:');
+            log('  生产环境禁用 api-docs.enabled=false');
+        }
+
+        function demoAnno() {
+            result.innerHTML = '';
+            log('# 文档注解');
+            log('');
+            log('@Tag(name="用户管理")         — 分组');
+            log('@Operation(summary="创建")    — 接口描述');
+            log('@ApiResponse(responseCode=404) — 响应');
+            log('@Schema(description="用户名")   — 模型');
+            log('@Parameter(description="页码")  — 参数');
+            log('');
+            log('@Schema(example="alice@test.com") 提供示例');
+            log('@Schema(hidden=true) 隐藏字段');
+        }
+
+        function demoGroup() {
+            result.innerHTML = '';
+            log('# API 分组');
+            log('');
+            log('GroupedOpenApi.builder()');
+            log('  .group("用户服务")');
+            log('  .pathsToMatch("/api/users/**")');
+            log('  .packagesToScan("com.example.controller.user")');
+            log('');
+            log('Swagger UI 右上角切换分组');
+            log('方便前后端对接不同模块');
+        }
+    </script>
+</body>
+</html>

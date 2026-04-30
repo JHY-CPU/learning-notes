@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot 配置</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚙️ Spring Boot 配置</h2><p>application.properties/yml、@Value 注入、@ConfigurationProperties 绑定、@PropertySource 外部配置、配置优先级、随机值与占位符。</p></div>
+    <div class="card">
+        <h2>application.properties vs YAML</h2>
+        <div class="code">// ========== Spring Boot 配置 ==========
+// 默认文件: application.properties 或 application.yml
+// 位置: src/main/resources/
+
+// ========== properties 格式 ==========
+// application.properties
+server.port=8080
+server.servlet.context-path=/api
+
+spring.datasource.url=jdbc:mysql://localhost:3306/mydb
+spring.datasource.username=root
+spring.datasource.password=secret
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.show-sql=true
+spring.jpa.properties.hibernate.dialect=org.hibernate.dialect.MySQLDialect
+
+// ========== YAML 格式 (推荐) ==========
+// application.yml
+// 层次结构更清晰, 支持列表/多行字符串
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/mydb
+    username: root
+    password: ${DB_PASSWORD:secret}    # 环境变量 + 默认值
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:                            # HikariCP 连接池
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+  jpa:
+    hibernate:
+      ddl-auto: update                 # none/validate/update/create
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        dialect: org.hibernate.dialect.MySQLDialect
+
+# ========== YAML 列表 ==========
+myapp:
+  servers:
+    - dev.example.com
+    - test.example.com
+    - prod.example.com
+
+spring:
+  profiles:
+    active: dev
+    include:                            # 同时激活多个
+      - common
+      - security
+
+# ========== properties vs YAML ==========
+// properties: 扁平, 重复前缀, IDE 自动补全差
+// YAML: 层次, 简洁, 支持列表, 需注意缩进
+// ✅ 推荐使用 YAML</div>
+    </div>
+    <div class="card">
+        <h2>@Value 注入</h2>
+        <div class="code">// ========== @Value 注入 ==========
+// 将配置文件的值注入到字段
+
+@RestController
+public class ConfigController {
+
+    // ========== 基本类型注入 ==========
+    @Value("${server.port}")
+    private int port;
+
+    @Value("${spring.application.name:my-app}")
+    private String appName;             // 带默认值 (冒号后)
+
+    // ========== 随机值 ==========
+    @Value("${random.int}")
+    private int randomInt;              // 随机整数
+
+    @Value("${random.int(100,200)}")
+    private int randomRange;            // 100-200 随机
+
+    @Value("${random.long}")
+    private long randomLong;
+
+    @Value("${random.uuid}")
+    private String uuid;                // 随机 UUID
+
+    @Value("${random.value}")
+    private String randomStr;           // 随机字符串
+
+    // ========== SpEL 表达式 ==========
+    @Value("#{2 * 3}")
+    private int calculated;             // 6
+
+    @Value("#{systemProperties['user.home']}")
+    private String userHome;
+
+    @Value("#{T(java.lang.Math).random() * 100}")
+    private double randomNumber;
+
+    // ========== 使用示例 ==========
+    @GetMapping("/config")
+    public Map&lt;String, Object&gt; getConfig() {
+        return Map.of(
+            "port", port,
+            "appName", appName,
+            "uuid", uuid
+        );
+    }
+}
+
+// ========== @Value 使用场景 ==========
+// ✅ 简单值注入 (单个字段)
+// ❌ 复杂对象 (用 @ConfigurationProperties)
+// ❌ 同一组属性多次使用 (用 @ConfigurationProperties)</div>
+    </div>
+    <div class="card">
+        <h2>@ConfigurationProperties</h2>
+        <div class="code">// ========== @ConfigurationProperties ==========
+// 类型安全的属性绑定
+// 将一组相关属性绑定到 POJO
+
+// ========== 1. 定义配置类 ==========
+@ConfigurationProperties(prefix = "myapp")
+@Data                              // Lombok 生成 getter/setter
+@Component                         // 注册为 Bean
+// @EnableConfigurationProperties  // 或在配置类启用
+public class MyAppProperties {
+
+    private String name;
+    private String version;
+    private boolean enabled = true;  // 默认值
+
+    private Security security = new Security();
+    private List&lt;String&gt; servers = new ArrayList&lt;&gt;();
+    private Map&lt;String, String&gt; custom = new HashMap&lt;&gt;();
+
+    @Data
+    public static class Security {
+        private String tokenSecret;
+        private long tokenExpiration = 3600000L;  // 1 hour
+        private List&lt;String&gt; allowedOrigins;
+    }
+}
+
+// ========== 2. 配置文件 ==========
+// application.yml
+myapp:
+  name: my-service
+  version: 1.0.0
+  enabled: true
+  security:
+    token-secret: ${JWT_SECRET:default-dev-secret}  # kebab-case
+    token-expiration: 7200000                        # 2 hours
+    allowed-origins:
+      - http://localhost:3000
+      - https://example.com
+  servers:
+    - dev.example.com
+    - prod.example.com
+  custom:
+    key1: value1
+    key2: value2
+
+// ========== 3. 启用 (两种方式) ==========
+// 方式一: @Component 让 Spring 自动注册
+// 方式二: @EnableConfigurationProperties(MyAppProperties.class)
+@SpringBootApplication
+@EnableConfigurationProperties(MyAppProperties.class)
+public class Application { ... }
+
+// ========== 4. 使用 ==========
+@Service
+@RequiredArgsConstructor
+public class MyService {
+
+    private final MyAppProperties props;
+
+    public void printConfig() {
+        System.out.println(props.getName());            // my-service
+        System.out.println(props.getSecurity().getTokenSecret());
+        System.out.println(props.getServers());
+    }
+}
+
+// ========== @ConfigurationProperties vs @Value ==========
+// ┌───────────────┬──────────────────────┬──────────────────┐
+// │               │ @ConfigurationProps  │ @Value           │
+// ├───────────────┼──────────────────────┼──────────────────┤
+// │ 绑定方式      │ 松绑定 (kebab-case)  │ 精确匹配         │
+// │               │ token-secret →       │ ${myapp.name}    │
+// │               │   tokenSecret        │                  │
+// │ 复杂对象      │ ✅ 嵌套/列表/Map     │ ❌ 只能简单值    │
+// │ 校验          │ ✅ @Validated        │ ❌               │
+// │ IDE 提示      │ ✅ spring-boot-config │ ❌               │
+// │               │   -processor         │                  │
+// │ 复用          │ ✅ 注入一次          │ ❌ 重复写 ${}    │
+// └───────────────┴──────────────────────┴──────────────────┘</div>
+    </div>
+    <div class="card">
+        <h2>@PropertySource 与外部配置</h2>
+        <div class="code">// ========== @PropertySource ==========
+// 加载自定义 properties 文件
+
+@Configuration
+@PropertySource({
+    "classpath:config/db.properties",
+    "file:${user.home}/app-config.properties"  // 外部文件
+})
+public class AppConfig {
+
+    @Value("${db.host}")
+    private String dbHost;
+
+    @Value("${app.custom.property}")
+    private String customProp;
+}
+
+// ========== 配置优先级 ==========
+// 从高到低 (高优先级覆盖低):
+
+// 1. 命令行参数
+//    --server.port=8081 --spring.profiles.active=prod
+
+// 2. JNDI 属性 (java:comp/env)
+
+// 3. Java 系统属性 (-D)
+//    java -Dserver.port=8081 -jar app.jar
+
+// 4. OS 环境变量
+//    SERVER_PORT=8081
+
+// 5. 应用外部配置文件
+//    application-{profile}.yml (外部)
+
+// 6. 应用内部配置文件
+//    application-{profile}.yml (classpath 内部)
+
+// 7. 应用外部 application.yml
+//    ./config/application.yml
+//    ./application.yml
+
+// 8. 应用内部 application.yml (默认)
+
+// 9. @PropertySource 加载的文件
+
+// ========== 外部配置文件 ==========
+// Spring Boot 自动从以下位置加载 (优先级从高到低):
+// 1. ./config/application.yml         (项目根目录的 config 子目录)
+// 2. ./application.yml                (项目根目录)
+// 3. classpath:/config/application.yml (classpath 的 config 子目录)
+// 4. classpath:/application.yml       (classpath 根目录)
+
+// 指定外部配置:
+// --spring.config.location=file:/opt/config/application.yml
+
+// ========== 配置元数据 ==========
+// 添加依赖, IDE 自动提示自定义属性
+// &lt;dependency&gt;
+//     &lt;groupId&gt;org.springframework.boot&gt;
+//     &lt;artifactId&gt;spring-boot-configuration-processor&lt;/artifactId&gt;
+//     &lt;optional&gt;true&lt;/optional&gt;
+// &lt;/dependency&gt;
+
+// 生成 META-INF/spring-configuration-metadata.json
+// IDE 中可以自动补全 myapp.security.token-secret</div>
+    </div>
+    <div class="card">
+        <h2>配置最佳实践</h2>
+        <div class="code">// ========== Spring Boot 配置最佳实践 ==========
+
+// ========== 1. 使用 YAML 而非 properties ==========
+// 层次清晰, 支持列表, 减少重复
+
+// ========== 2. 分组管理配置 ==========
+// application.yml            — 通用配置
+// application-dev.yml        — 开发环境
+// application-prod.yml       — 生产环境
+// application-test.yml       — 测试环境
+
+// ========== 3. 敏感信息加密 ==========
+// ❌ 直接写密码:
+// spring.datasource.password=mysecret123
+
+// ✅ 使用环境变量:
+// spring.datasource.password=${DB_PASSWORD}
+
+// ✅ 使用 Spring Cloud Config + Vault
+
+// ✅ 使用 Jasypt 加密:
+// @Value("${db.password}")
+// private String password;
+// 配置: jasypt.encryptor.password=${JASYPT_MASTER_KEY}
+
+// ========== 4. 使用 @ConfigurationProperties ==========
+// 而非 @Value 分散注入
+// 类型安全 + 可校验 + 可测试
+
+// ========== 5. 配置校验 ==========
+@ConfigurationProperties(prefix = "myapp")
+@Validated
+@Data
+public class MyAppProperties {
+
+    @NotBlank
+    private String name;                // 必填
+
+    @Min(1024)
+    @Max(65535)
+    private int port = 8080;            // 范围校验
+
+    @Email
+    private String adminEmail;          // 邮箱格式
+
+    @NotEmpty
+    private List&lt;String&gt; servers;      // 不能为空列表
+}
+
+// ========== 6. 第三方配置 ==========
+// 不要硬编码, 统一放在配置文件中
+// 如: API 密钥, URL, 超时时间
+
+// ========== 7. 使用 spring-boot-configuration-processor ==========
+// IDE 自动补全自定义属性
+
+// ========== 8. @TestPropertySource 测试覆盖 ==========
+@SpringBootTest
+@TestPropertySource(properties = {
+    "myapp.name=test-name",
+    "myapp.security.token-secret=test-secret"
+})
+class MyServiceTest {
+    // 测试中使用自定义属性
+}</div>
+        <div class="note">💡 配置要点: YAML 推荐用于层次配置; @Value 简单值注入; @ConfigurationProperties 类型安全绑定一组属性 (支持嵌套/列表/校验); 配置优先级: 命令行 &gt; 环境变量 &gt; 外部文件 &gt; 内部文件; 敏感信息用环境变量; kebab-case 匹配 camelCase; 添加 processor 获得 IDE 提示。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoYaml()">YAML 配置</button>
+        <button onclick="demoBind()">配置绑定</button>
+        <button onclick="demoPriority()">配置优先级</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoYaml() {
+            result.innerHTML = '';
+            log('# YAML 配置格式');
+            log('');
+            log('层次结构:');
+            log('  server:');
+            log('    port: 8080');
+            log('    servlet:');
+            log('      context-path: /api');
+            log('');
+            log('列表:');
+            log('  myapp.servers:');
+            log('    - dev.example.com');
+            log('    - prod.example.com');
+            log('');
+            log('环境变量占位:');
+            log('  password: ${DB_PASSWORD:default}');
+        }
+
+        function demoBind() {
+            result.innerHTML = '';
+            log('# 配置绑定方式');
+            log('');
+            log('1. @Value("${myapp.name}")');
+            log('   适合: 单个简单值');
+            log('');
+            log('2. @ConfigurationProperties(prefix="myapp")');
+            log('   适合: 一组相关属性');
+            log('   支持嵌套/列表/Map');
+            log('   类型安全 + @Validated 校验');
+            log('');
+            log('YAML → Java:');
+            log('  token-secret → tokenSecret');
+            log('  (kebab-case → camelCase)');
+        }
+
+        function demoPriority() {
+            result.innerHTML = '';
+            log('# 配置优先级 (高→低)');
+            log('');
+            log('1. 命令行参数    --server.port=8081');
+            log('2. JVM 参数      -Dserver.port=8081');
+            log('3. 环境变量      SERVER_PORT=8081');
+            log('4. 外部配置文件  ./config/application.yml');
+            log('5. 内部配置文件  classpath:application.yml');
+            log('');
+            log('敏感信息:');
+            log('  password: ${DB_PASSWORD}');
+            log('  避免在代码库中明文密码');
+        }
+    </script>
+</body>
+</html>

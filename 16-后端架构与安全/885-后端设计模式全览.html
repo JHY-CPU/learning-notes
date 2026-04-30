@@ -1,0 +1,532 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后端设计模式全览</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🧩 后端设计模式全览</h2><p>创建型 (Singleton/Factory/Builder)、结构型 (Repository/DAO/Adapter/Proxy/Facade)、行为型 (Strategy/Observer/Command/Template)、架构型 (Middleware/DI/Pipeline/Saga/Circuit Breaker)。</p></div>
+    <div class="card">
+        <h2>创建型模式</h2>
+        <div class="code">// ========== 单例模式 (Singleton) ==========
+// 确保一个类只有一个实例
+// 适用: 连接池, 配置管理器, 日志器
+
+// Go 实现 (sync.Once):
+type Config struct {
+    DBHost string
+    DBPort int
+}
+
+var (
+    config *Config
+    once   sync.Once
+)
+
+func GetConfig() *Config {
+    once.Do(func() {
+        config = &Config{
+            DBHost: os.Getenv("DB_HOST"),
+            DBPort: 5432,
+        }
+    })
+    return config
+}
+
+// Python 实现:
+// class Config:
+//     _instance = None
+//
+//     def __new__(cls):
+//         if cls._instance is None:
+//             cls._instance = super().__new__(cls)
+//         return cls._instance
+
+// ========== 工厂方法 (Factory Method) ==========
+// 创建对象而不指定具体类
+// 适用: 多态创建, 框架集成
+
+// interface PaymentGateway {
+//     charge(amount float64) error
+// }
+//
+// type StripeGateway struct{}
+// func (s *StripeGateway) charge(amount float64) error { /* stripe */ }
+//
+// type PayPalGateway struct{}
+// func (p *PayPalGateway) charge(amount float64) error { /* paypal */ }
+//
+// func NewPaymentGateway(gatewayType string) PaymentGateway {
+//     switch gatewayType {
+//     case "stripe":
+//         return &StripeGateway{}
+//     case "paypal":
+//         return &PayPalGateway{}
+//     default:
+//         return &StripeGateway{} // 默认
+//     }
+// }
+
+// ========== 建造者模式 (Builder) ==========
+// 分步构建复杂对象
+// 适用: 多参数构造函数, 链式调用
+
+// type QueryBuilder struct {
+//     selectCols []string
+//     table      string
+//     where      []string
+//     orderBy    string
+//     limit      int
+// }
+//
+// func (b *QueryBuilder) Select(cols ...string) *QueryBuilder {
+//     b.selectCols = cols
+//     return b
+// }
+//
+// func (b *QueryBuilder) From(table string) *QueryBuilder {
+//     b.table = table
+//     return b
+// }
+//
+// func (b *QueryBuilder) Where(cond string) *QueryBuilder {
+//     b.where = append(b.where, cond)
+//     return b
+// }
+//
+// func (b *QueryBuilder) Build() string {
+//     q := "SELECT " + strings.Join(b.selectCols, ", ")
+//     q += " FROM " + b.table
+//     if len(b.where) > 0 {
+//         q += " WHERE " + strings.Join(b.where, " AND ")
+//     }
+//     return q
+// }
+//
+// // 使用:
+// q := new(QueryBuilder).
+//     Select("id", "name").
+//     From("users").
+//     Where("status = 'active'").
+//     Build()
+// // SELECT id, name FROM users WHERE status = 'active'</div>
+    </div>
+    <div class="card">
+        <h2>结构型模式</h2>
+        <div class="code">// ========== 仓库模式 (Repository) ==========
+// 数据访问抽象, 集合风格接口
+// 适用: 数据层统一访问
+
+// type UserRepository interface {
+//     FindByID(id int) (*User, error)
+//     FindAll(filter Filter) ([]*User, error)
+//     Save(user *User) error
+//     Delete(id int) error
+// }
+//
+// type PostgresUserRepo struct {
+//     db *sql.DB
+// }
+//
+// func (r *PostgresUserRepo) FindByID(id int) (*User, error) {
+//     row := r.db.QueryRow("SELECT id, name, email FROM users WHERE id = $1", id)
+//     user := &User{}
+//     err := row.Scan(&user.ID, &user.Name, &user.Email)
+//     return user, err
+// }
+//
+// 测试: MockUserRepo 实现同样的接口
+
+// ========== DAO 模式 (Data Access Object) ==========
+// 类似 Repository, 更贴近数据库
+// Repository 偏业务, DAO 偏数据
+
+// type UserDAO struct {
+//     db *sql.DB
+// }
+//
+// func (dao *UserDAO) Insert(ctx context.Context, u *User) error {
+//     _, err := dao.db.ExecContext(ctx,
+//         "INSERT INTO users (name, email) VALUES ($1, $2)",
+//         u.Name, u.Email)
+//     return err
+// }
+//
+// func (dao *UserDAO) FindByEmail(ctx context.Context, email string) (*User, error) {
+//     row := dao.db.QueryRowContext(ctx,
+//         "SELECT id, name, email FROM users WHERE email = $1", email)
+//     // ...
+// }
+
+// ========== 适配器模式 (Adapter) ==========
+// 将不兼容的接口转换为目标接口
+// 适用: 第三方SDK集成, 旧系统对接
+
+// 目标接口:
+// type NotificationSender interface {
+//     Send(to, title, body string) error
+// }
+//
+// 外部SDK (不兼容):
+// type SendGridClient struct{}
+// func (c *SendGridClient) DispatchEmail(from, to, subject, html string) error { ... }
+//
+// 适配器:
+// type SendGridAdapter struct {
+//     client *SendGridClient
+// }
+//
+// func (a *SendGridAdapter) Send(to, title, body string) error {
+//     return a.client.DispatchEmail("noreply@site.com", to, title, body)
+// }
+
+// ========== 代理模式 (Proxy) ==========
+// 为另一个对象提供替代/占位
+// 适用: 延迟加载, 访问控制, 日志
+
+// type CacheProxy struct {
+//     repo  UserRepository
+//     cache map[int]*User
+// }
+//
+// func (p *CacheProxy) FindByID(id int) (*User, error) {
+//     if user, ok := p.cache[id]; ok {
+//         return user, nil // 缓存命中
+//     }
+//     user, err := p.repo.FindByID(id)
+//     if err == nil {
+//         p.cache[id] = user
+//     }
+//     return user, err
+// }
+
+// ========== 外观模式 (Facade) ==========
+// 为复杂子系统提供统一接口
+// 适用: 简化复杂操作
+
+// type OrderFacade struct {
+//     payment  PaymentService
+//     inventory InventoryService
+//     shipping ShippingService
+//     notifier NotificationService
+// }
+//
+// func (f *OrderFacade) PlaceOrder(order Order) error {
+//     if err := f.inventory.Reserve(order.Items); err != nil {
+//         return err
+//     }
+//     if err := f.payment.Charge(order.Total); err != nil {
+//         f.inventory.Release(order.Items) // 补偿
+//         return err
+//     }
+//     tracking, _ := f.shipping.Ship(order)
+//     f.notifier.Send(order.UserID, "Order shipped: "+tracking)
+//     return nil
+// }</div>
+    </div>
+    <div class="card">
+        <h2>行为型模式</h2>
+        <div class="code">// ========== 策略模式 (Strategy) ==========
+// 定义算法族, 运行时切换
+// 适用: 多种验证/认证/支付/压缩
+
+// type Validator interface {
+//     Validate(value string) error
+// }
+//
+// type EmailValidator struct{}
+// func (v *EmailValidator) Validate(email string) error {
+//     if !strings.Contains(email, "@") {
+//         return errors.New("invalid email")
+//     }
+//     return nil
+// }
+//
+// type LengthValidator struct {
+//     Min, Max int
+// }
+// func (v *LengthValidator) Validate(s string) error {
+//     if len(s) < v.Min || len(s) > v.Max {
+//         return fmt.Errorf("length must be %d-%d", v.Min, v.Max)
+//     }
+//     return nil
+// }
+//
+// // 使用:
+// validators := []Validator{EmailValidator{}, &LengthValidator{Min: 6, Max: 100}}
+// for _, v := range validators {
+//     if err := v.Validate(input); err != nil { ... }
+// }
+
+// ========== 观察者模式 (Observer) ==========
+// 一对多依赖, 状态变化通知所有观察者
+// 适用: 事件系统, 消息通知
+
+// type EventBus struct {
+//     listeners map[string][]func(Event)
+//     mu        sync.RWMutex
+// }
+//
+// func (b *EventBus) Subscribe(event string, handler func(Event)) {
+//     b.mu.Lock()
+//     defer b.mu.Unlock()
+//     b.listeners[event] = append(b.listeners[event], handler)
+// }
+//
+// func (b *EventBus) Publish(event Event) {
+//     b.mu.RLock()
+//     handlers := b.listeners[event.Type]
+//     b.mu.RUnlock()
+//     for _, h := range handlers {
+//         h(event) // 可改为 goroutine
+//     }
+// }
+//
+// // 使用:
+// bus := &EventBus{listeners: make(map[string][]func(Event))}
+// bus.Subscribe("order.created", func(e Event) {
+//     sendEmail(e.Data)
+// })
+// bus.Publish(Event{Type: "order.created", Data: order})
+
+// ========== 命令模式 (Command) ==========
+// 将请求封装为对象
+// 适用: 队列/撤销/事务
+
+// type Command interface {
+//     Execute() error
+//     Undo() error
+// }
+//
+// type CreateOrderCommand struct {
+//     orderID string
+//     repo    OrderRepository
+//     items   []Item
+// }
+//
+// func (c *CreateOrderCommand) Execute() error {
+//     return c.repo.Save(c.orderID, c.items)
+// }
+//
+// func (c *CreateOrderCommand) Undo() error {
+//     return c.repo.Delete(c.orderID)
+// }
+
+// ========== 模板方法 (Template Method) ==========
+// 定义算法骨架, 子类实现具体步骤
+// 适用: 框架流程, 数据处理
+
+// type DataExporter interface {
+//     FetchData() ([]Record, error)
+//     Format(records []Record) ([]byte, error)
+//     Write(data []byte) error
+// }
+//
+// func Export(e DataExporter) error {
+//     data, err := e.FetchData()
+//     if err != nil { return err }
+//
+//     formatted, err := e.Format(data)
+//     if err != nil { return err }
+//
+//     return e.Write(formatted)
+// }
+//
+// CSV 导出: FetchData → Format CSV → Write file
+// JSON 导出: FetchData → Format JSON → Write HTTP</div>
+    </div>
+    <div class="card">
+        <h2>架构型与弹性模式</h2>
+        <div class="code">// ========== 中间件链 (Middleware Chain) ==========
+// 请求处理管道, 每个中间件决定是否传至下一个
+// 适用: Web 框架, 认证/日志/限流
+
+// type Middleware func(Handler) Handler
+// type Handler func(ctx *Context)
+//
+// func Chain(middlewares ...Middleware) Middleware {
+//     return func(final Handler) Handler {
+//         for i := len(middlewares) - 1; i >= 0; i-- {
+//             final = middlewares[i](final)
+//         }
+//         return final
+//     }
+// }
+//
+// func Logger(next Handler) Handler {
+//     return func(ctx *Context) {
+//         log.Printf("request: %s", ctx.Path)
+//         next(ctx)
+//     }
+// }
+//
+// func Auth(next Handler) Handler {
+//     return func(ctx *Context) {
+//         if !isValid(ctx.Token) {
+//             ctx.Status = 401
+//             return // 终止链
+//         }
+//         next(ctx)
+//     }
+// }
+
+// ========== 依赖注入 (DI) ==========
+// 外部提供依赖, 而非内部创建
+// 适用: 解耦, 测试
+
+// type UserService struct {
+//     repo UserRepository // 依赖接口, 非具体实现
+//     cache CacheClient
+// }
+//
+// func NewUserService(repo UserRepository, cache CacheClient) *UserService {
+//     return &UserService{repo: repo, cache: cache}
+// }
+//
+// // 测试: 注入 mock
+// func TestUserService(t *testing.T) {
+//     mockRepo := new(MockUserRepository)
+//     svc := NewUserService(mockRepo, nil)
+// }
+
+// ========== 管道模式 (Pipeline) ==========
+// 数据经过多个处理步骤
+// 适用: 数据处理, ETL
+
+// type PipeFunc func(input interface{}) (output interface{}, err error)
+//
+// type Pipeline struct {
+//     stages []PipeFunc
+// }
+//
+// func (p *Pipeline) Add(fn PipeFunc) *Pipeline {
+//     p.stages = append(p.stages, fn)
+//     return p
+// }
+//
+// func (p *Pipeline) Execute(input interface{}) (interface{}, error) {
+//     data := input
+//     for _, stage := range p.stages {
+//         var err error
+//         data, err = stage(data)
+//         if err != nil { return nil, err }
+//     }
+//     return data, nil
+// }
+
+// ========== 断路器 (Circuit Breaker) ==========
+// 保护下游故障服务不被持续调用
+
+// type CircuitBreaker struct {
+//     state       string  // closed / open / half-open
+//     failureCount int
+//     threshold   int
+//     timeout     time.Duration
+//     lastFailure time.Time
+// }
+//
+// func (cb *CircuitBreaker) Call(fn func() error) error {
+//     switch cb.state {
+//     case "open":
+//         if time.Since(cb.lastFailure) > cb.timeout {
+//             cb.state = "half-open" // 尝试恢复
+//         } else {
+//             return ErrCircuitOpen // 快速失败
+//         }
+//     case "half-open":
+//         // 允许一个请求通过
+//     }
+//
+//     if err := fn(); err != nil {
+//         cb.failureCount++
+//         cb.lastFailure = time.Now()
+//         if cb.failureCount >= cb.threshold {
+//             cb.state = "open"
+//         }
+//         return err
+//     }
+//
+//     // 成功 → 重置
+//     cb.failureCount = 0
+//     cb.state = "closed"
+//     return nil
+// }
+//
+// 状态: closed (正常) → open (断开) → half-open (尝试) → closed (恢复)</div>
+        <div class="note">💡 设计模式要点: Singleton (sync.Once), Factory (多态创建), Builder (链式构建); Repository 数据抽象, Adapter 接口转换, Proxy 延迟/控制; Strategy 策略切换, Observer 事件通知, Command 命令封装; Middleware 洋葱模型, DI 依赖注入, Pipeline 数据处理; Circuit Breaker 保护下游, Saga 分布式事务补偿。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCreational()">创建型</button>
+        <button onclick="demoStructural()">结构型</button>
+        <button onclick="demoBehavioral()">行为+架构</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCreational() {
+            result.innerHTML = '';
+            log('# 创建型模式');
+            log('');
+            log('Singleton: 全局唯一实例');
+            log('  连接池 / 配置 / 日志');
+            log('');
+            log('Factory: 统一创建接口');
+            log('  NewPaymentGateway("stripe")');
+            log('  NewPaymentGateway("paypal")');
+            log('');
+            log('Builder: 分步构建');
+            log('  query.Select("id").From("users").Build()');
+        }
+
+        function demoStructural() {
+            result.innerHTML = '';
+            log('# 结构型模式');
+            log('');
+            log('Repository: 数据访问抽象');
+            log('  UserRepository.FindByID(id)');
+            log('');
+            log('Adapter: 接口转换');
+            log('  SendGridAdapter implements NotificationSender');
+            log('');
+            log('Proxy: 控制访问');
+            log('  CacheProxy: 缓存未命中→查DB');
+            log('');
+            log('Facade: 统一入口');
+            log('  OrderFacade.PlaceOrder() 整合支付/库存/物流');
+        }
+
+        function demoBehavioral() {
+            result.innerHTML = '';
+            log('# 行为+架构模式');
+            log('');
+            log('Strategy: 运行时切换算法');
+            log('  EmailValidator / LengthValidator');
+            log('');
+            log('Observer: 事件通知');
+            log('  EventBus.Subscribe / Publish');
+            log('');
+            log('Middleware: 请求处理链');
+            log('  Logger → Auth → Handler');
+            log('');
+            log('Circuit Breaker:');
+            log('  closed → open → half-open → closed');
+            log('  失败阈值断开, 超时后尝试恢复');
+        }
+    </script>
+</body>
+</html>

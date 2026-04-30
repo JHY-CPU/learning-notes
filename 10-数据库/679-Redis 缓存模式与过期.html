@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redis 缓存模式与过期</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚡ Redis 缓存模式与过期</h2><p>缓存模式 (Cache Aside / Read-Through / Write-Through / Write-Behind)、缓存穿透/击穿/雪崩、分布式锁 Redlock、限流实现、缓存更新策略。</p></div>
+    <div class="card">
+        <h2>缓存模式</h2>
+        <div class="code">// ========== 缓存模式 ==========
+
+// ========== 1. Cache Aside (旁路缓存) ==========
+// 最常用模式
+
+// 读流程:
+// 1. 读 Redis
+// 2. 命中 → 返回
+// 3. 未命中 → 读数据库
+// 4. 写入 Redis (设置过期)
+// 5. 返回
+
+function get_user(id) {
+    // 1. 查缓存
+    let user = redis.get(`user:${id}`)
+    if (user) return user
+
+    // 2. 缓存未命中, 查数据库
+    user = db.query("SELECT * FROM users WHERE id = ?", id)
+
+    // 3. 写入缓存 (5 分钟过期)
+    redis.setex(`user:${id}`, 300, JSON.stringify(user))
+
+    return user
+}
+
+// 写流程:
+// 1. 更新数据库
+// 2. 删除缓存 (不是更新!)
+
+function update_user(id, data) {
+    db.update("users", data, "WHERE id = ?", id)
+    redis.del(`user:${id}`)  // 删除缓存
+}
+
+// 为什么删缓存而不是更新?
+// 1. 并发写可能导致缓存不一致
+// 2. 删缓存简单 (下次读自动回填)
+// 3. 避免计算成本 (可能不常用)
+
+// ========== 2. Read-Through (通读) ==========
+// 缓存层负责读数据库
+// 应用只与缓存交互
+
+// ========== 3. Write-Through (通写) ==========
+// 写缓存同时写数据库, 保证一致
+
+// ========== 4. Write-Behind (异步写) ==========
+// 先写缓存, 异步批量写数据库
+// 性能最高, 但有丢失风险</div>
+    </div>
+    <div class="card">
+        <h2>缓存问题: 穿透/击穿/雪崩</h2>
+        <div class="code">// ========== 缓存穿透 ==========
+// 查询不存在的数据, 每次穿透到数据库
+
+// 问题: 查询 ID=-1 的用户
+// 缓存没有, 数据库也没有
+// 恶意攻击: 大量请求不存在的数据 → 数据库被打崩
+
+// 解决方案:
+// 1. 缓存空值 (存 null, 短过期)
+if (user == null) {
+    redis.setex(`user:${id}`, 60, null)  // 1 分钟空缓存
+    return null
+}
+
+// 2. 布隆过滤器 (Bloom Filter)
+//    提前判断 key 是否存在
+//    不存在 → 直接返回 (不查数据库)
+
+// ========== 缓存击穿 ==========
+// 热点 key 过期, 大量请求同时到数据库
+
+// 问题: 热门文章缓存过期, 1000 个请求同时查 DB
+
+// 解决方案:
+// 1. 互斥锁 (Mutex)
+//    第一个请求加锁查 DB, 其他等待
+String key = "hot:article:42"
+String value = redis.get(key)
+if (value == null) {
+    // 尝试获取锁
+    if (redis.setnx("lock:" + key, "1")) {
+        redis.expire("lock:" + key, 5)
+        value = db.query(article, 42)
+        redis.setex(key, 3600, value)
+        redis.del("lock:" + key)
+    } else {
+        Thread.sleep(50)
+        return get_article(42)  // 重试
+    }
+}
+
+// 2. 热点数据永不过期 + 异步更新
+//    后台线程定期刷新缓存
+
+// ========== 缓存雪崩 ==========
+// 大量 key 同时过期, 请求涌入数据库
+
+// 问题: 晚上 8 点缓存集体过期
+// 场景: 设置 EXPIRE 相同时间
+
+// 解决方案:
+// 1. 过期时间加随机值
+redis.setex(key, base_ttl + random(0, 300), value)
+// 2. 多级缓存 (本地缓存 + Redis)
+// 3. 服务降级/限流
+// 4. 热点数据预加载</div>
+    </div>
+    <div class="card">
+        <h2>分布式锁</h2>
+        <div class="code">// ========== 分布式锁 ==========
+
+// ========== 简单锁 (单 Redis 节点) ==========
+
+// 加锁:
+SET lock:resource:123 UUID NX EX 10
+// NX = 不存在才设置
+// UUID = 唯一标识 (解锁时验证)
+// EX 10 = 10 秒自动释放 (防死锁)
+
+// 解锁 (Lua 脚本保证原子):
+if redis.call("GET", KEYS[1]) == ARGV[1] then
+    return redis.call("DEL", KEYS[1])
+else
+    return 0
+end
+
+// ========== Redlock (Redis 官方分布式锁) ==========
+// 用于多 Redis 节点场景
+
+// 原理:
+// 1. 获取当前时间 T1
+// 2. 依次向 N 个 Redis 节点申请锁 (SET NX EX)
+// 3. 计算获取锁的时间 = T2 - T1
+// 4. 成功条件: 多数节点 (N/2+1) 加锁成功
+//    且总耗时 < 锁过期时间
+// 5. 释放: 所有节点 DEL
+
+// ========== 应用: 防止重复提交 ==========
+// 订单防重复:
+SET order:prevent:123456 UUID NX EX 3
+// 成功 → 处理订单; 失败 → 已处理
+
+// ========== 应用: 定时任务互斥 ==========
+// 多台服务器只执行一次
+SET cron:send_email UUID NX EX 3600
+// 成功 → 执行任务; 失败 → 跳过
+
+// ========== 应用: 限流 ==========
+
+// 简单计数器限流 (每 IP 每秒 10 次):
+INCR rate:ip:192.168.1.1
+EXPIRE rate:ip:192.168.1.1 1
+// 值 > 10 则拒绝
+
+// 滑动窗口限流 (ZSet):
+ZADD rate:ip:192.168.1.1 now request_id
+ZREMRANGEBYSCORE rate:ip:192.168.1.1 0 now-1000
+// 窗口内次数 > 阈值则拒绝
+ZCARD rate:ip:192.168.1.1
+
+// 令牌桶限流:
+// 用 Lua 脚本实现</div>
+    </div>
+    <div class="card">
+        <h2>缓存更新策略</h2>
+        <div class="code">// ========== 缓存更新策略 ==========
+
+// ========== 策略 1: 先更新 DB, 后删缓存 ==========
+// Cache Aside 标准模式
+
+// 写:
+UPDATE users SET name = "NewName" WHERE id = 1
+DEL user:1         // 删除缓存
+
+// 读:
+GET user:1 → 未命中 → SELECT * FROM users WHERE id = 1
+SET user:1 result
+
+// 优点: 实现简单, 适合大多数场景
+// 缺点: 刚删缓存后有短暂不一致
+
+// ========== 策略 2: 延迟双删 ==========
+// 解决主从同步延迟导致的不一致
+
+// 写:
+DEL user:1              // 先删缓存
+UPDATE users SET ...    // 更新 DB
+sleep(100)              // 等待 100ms
+DEL user:1              // 再删一次
+
+// ========== 策略 3: 先删缓存, 后更新 DB ==========
+// (不推荐, 双删也不行)
+// 并发问题: 读在更新前回填旧缓存</div>
+        <div class="note">💡 缓存要点: Cache Aside 是标准模式; 删缓存不是更新缓存; 穿透用空值/布隆过滤器; 击穿用互斥锁; 雪崩用随机过期; 分布式锁用 SET NX EX + Lua 解锁; 限流用计数器或滑动窗口。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoPattern()">缓存模式</button>
+        <button onclick="demoProblem()">缓存问题</button>
+        <button onclick="demoLock()">分布式锁</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoPattern() {
+            result.innerHTML = '';
+            log('# 缓存模式');
+            log('');
+            log('Cache Aside (标准):');
+            log('  读: 缓存→DB→回填');
+            log('  写: 更新DB→删缓存');
+            log('');
+            log('Read-Through: 缓存负责读DB');
+            log('Write-Behind: 异步写DB');
+        }
+
+        function demoProblem() {
+            result.innerHTML = '';
+            log('# 缓存问题');
+            log('');
+            log('穿透: 不存在的数据');
+            log('  解决: 缓存空值, 布隆过滤器');
+            log('');
+            log('击穿: 热点 key 过期');
+            log('  解决: 互斥锁, 永不过期');
+            log('');
+            log('雪崩: 大量 key 同时过期');
+            log('  解决: 随机过期时间');
+        }
+
+        function demoLock() {
+            result.innerHTML = '';
+            log('# 分布式锁');
+            log('');
+            log('SET lock:key UUID NX EX 10');
+            log('');
+            log('解锁 Lua:');
+            log('  GET key == UUID ? DEL');
+            log('');
+            log('防重入: 定时任务互斥');
+            log('限流: INCR + EXPIRE 1');
+        }
+    </script>
+</body>
+</html>

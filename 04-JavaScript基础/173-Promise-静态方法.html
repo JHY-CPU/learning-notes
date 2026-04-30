@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Promise-静态方法</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #8e44ad; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Promise 静态方法</h2><p>处理多个 Promise 的工具方法：all/race/allSettled/any。</p></div>
+    <div class="card">
+        <h2>Promise.all — 全部成功才成功</h2>
+        <div class="code">// Promise.all(iterable)
+// 所有 Promise 都成功 → 返回结果数组（顺序与输入一致）
+// 任何一个失败 → 立即失败（返回第一个错误）
+
+const p1 = Promise.resolve(1);
+const p2 = Promise.resolve(2);
+const p3 = Promise.resolve(3);
+
+Promise.all([p1, p2, p3])
+    .then(results => {
+        console.log(results);  // [1, 2, 3]
+    })
+    .catch(err => {
+        console.log('至少一个失败:', err);
+    });
+
+// 异步场景：并发请求
+const urls = ['/api/user', '/api/posts', '/api/comments'];
+// Promise.all(urls.map(url => fetch(url)))
+//     .then(([user, posts, comments]) => {
+//         // 所有请求完成后一起处理
+//     });
+
+// ⚠️ 空数组 → 立即成功 []
+Promise.all([]).then(v => console.log(v));  // []
+
+// ⚠️ 传入非 Promise 值会通过 Promise.resolve 转换
+Promise.all([1, 'hello', true]).then(v => console.log(v));  // [1, 'hello', true]
+
+// ❌ 一个失败就全部失败
+Promise.all([
+    Promise.resolve('ok'),
+    Promise.reject(new Error('失败')),
+    Promise.resolve('不会到达')
+]).catch(e => console.log(e.message));  // '失败'</div>
+    </div>
+    <div class="card">
+        <h2>Promise.race — 竞速</h2>
+        <div class="code">// Promise.race(iterable)
+// 返回第一个完成的 Promise（无论成功还是失败）
+
+const p1 = new Promise(r => setTimeout(() => r('slow'), 500));
+const p2 = new Promise(r => setTimeout(() => r('fast'), 100));
+
+Promise.race([p1, p2])
+    .then(result => {
+        console.log(result);  // 'fast'（100ms 先到）
+    });
+
+// 应用场景：超时控制
+function fetchWithTimeout(url, timeoutMs = 3000) {
+    const fetchPromise = fetch(url);
+    const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('请求超时')), timeoutMs)
+    );
+    return Promise.race([fetchPromise, timeoutPromise]);
+}
+
+// 应用场景：请求重试优化（最快的返回）
+function raceRequests(url, mirrors) {
+    const requests = [url, ...mirrors].map(u => fetch(u));
+    return Promise.race(requests);
+}
+
+// ⚠️ 空数组 → 永远 pending
+// Promise.race([]).then(v => console.log('不会执行'));
+
+// ⚠️ 返回第一个 settled 的，不 cancel 其他的</div>
+    </div>
+    <div class="card">
+        <h2>Promise.allSettled — 全部完成</h2>
+        <div class="code">// Promise.allSettled(iterable) — ES2020
+// 所有 Promise 都完成（无论成功/失败）
+// 返回每个 Promise 的结果对象：
+// { status: 'fulfilled', value: 值 }
+// { status: 'rejected', reason: 错误 }
+
+const p1 = Promise.resolve(42);
+const p2 = Promise.reject(new Error('错了'));
+const p3 = Promise.resolve('hello');
+
+Promise.allSettled([p1, p2, p3]).then(results => {
+    results.forEach((r, i) => {
+        if (r.status === 'fulfilled') {
+            console.log(`第${i+1}个成功:`, r.value);
+        } else {
+            console.log(`第${i+1}个失败:`, r.reason.message);
+        }
+    });
+});
+// 第1个成功: 42
+// 第2个失败: 错了
+// 第3个成功: hello
+
+// 和 Promise.all 的区别：
+// all：一个失败就全部失败 → catch
+// allSettled：等待所有完成 → 永远不走 catch（除非迭代器本身有问题）
+
+// 应用：批量请求，个别失败不影响整体结果
+async function loadAllData(ids) {
+    const promises = ids.map(id => fetch(`/api/item/${id}`));
+    const results = await Promise.allSettled(promises);
+    return results
+        .filter(r => r.status === 'fulfilled')
+        .map(r => r.value);
+}</div>
+    </div>
+    <div class="card">
+        <h2>Promise.any — 首个成功</h2>
+        <div class="code">// Promise.any(iterable) — ES2021
+// 返回第一个成功的 Promise
+// 全部失败则返回 AggregateError
+
+const p1 = Promise.reject(new Error('失败1'));
+const p2 = Promise.resolve('成功2');
+const p3 = Promise.resolve('成功3');
+
+Promise.any([p1, p2, p3])
+    .then(result => {
+        console.log(result);  // '成功2'（第一个成功的）
+    })
+    .catch(e => {
+        if (e instanceof AggregateError) {
+            console.log('全部失败:', e.errors);
+        }
+    });
+
+// 全部失败的情况
+const allFail = [
+    Promise.reject(new Error('err1')),
+    Promise.reject(new Error('err2')),
+];
+
+Promise.any(allFail)
+    .catch(e => {
+        console.log(e instanceof AggregateError);  // true
+        console.log(e.errors.length);              // 2
+        console.log(e.errors[0].message);          // 'err1'
+    });
+
+// 对比 all / race / allSettled / any：
+// | 方法          | 完成条件             | 失败条件           |
+// |---------------|---------------------|-------------------|
+// | Promise.all   | 全部成功             | 一个失败立即失败   |
+// | Promise.race  | 第一个 settled       | 第一个 settled    |
+// | Promise.allSettled | 全部 settled    | 永不失败          |
+// | Promise.any   | 第一个成功           | 全部失败          |</div>
+    </div>
+    <div class="card">
+        <h2>Promise.resolve / Promise.reject</h2>
+        <div class="code">// Promise.resolve(value) — 创建成功 Promise
+Promise.resolve('静态值').then(v => console.log(v));
+
+// Promise.reject(reason) — 创建失败 Promise
+Promise.reject(new Error('快速失败')).catch(e => console.log(e.message));
+
+// 实际应用：将同步值转为 Promise（统一接口）
+function getData(useCache) {
+    if (useCache && cache.has('data')) {
+        return Promise.resolve(cache.get('data'));
+    }
+    return fetch('/api/data');
+}
+
+// 应用：在 async 函数中快速返回
+async function validate(user) {
+    if (!user.name) {
+        return Promise.reject(new Error('名字必填'));
+    }
+    // ... 继续处理
+}
+
+// ⚠️ Promise.reject 传空会得到 undefined 错误</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== Promise.all ===');
+        Promise.all([1, 2, 3].map(v => Promise.resolve(v)))
+            .then(v => console.log('all:', v))
+            .catch(e => console.log('all 错误:', e));
+
+        // 一个失败的情况
+        Promise.all([
+            Promise.resolve('ok'),
+            Promise.reject(new Error('失败'))
+        ]).catch(e => console.log('all 一个失败:', e.message));
+
+        console.log('=== Promise.race ===');
+        const fast = new Promise(r => setTimeout(() => r('快'), 50));
+        const slow = new Promise(r => setTimeout(() => r('慢'), 200));
+        Promise.race([fast, slow]).then(v => console.log('race 胜出:', v));
+
+        console.log('=== Promise.allSettled ===');
+        Promise.allSettled([
+            Promise.resolve(1),
+            Promise.reject(new Error('错')),
+            Promise.resolve(3)
+        ]).then(results => {
+            results.forEach(r => {
+                if (r.status === 'fulfilled') {
+                    console.log('  fulfilled:', r.value);
+                } else {
+                    console.log('  rejected:', r.reason.message);
+                }
+            });
+        });
+
+        console.log('=== Promise.any ===');
+        Promise.any([
+            Promise.reject(new Error('失败1')),
+            Promise.resolve('成功'),
+            Promise.reject(new Error('失败2'))
+        ]).then(v => console.log('any 成功:', v));
+
+        // 全部失败
+        Promise.any([
+            Promise.reject(new Error('a')),
+            Promise.reject(new Error('b'))
+        ]).catch(e => console.log('any 全部失败:', e.errors.length, '个错误'));
+
+        document.getElementById('output').textContent =
+            `Promise.all: 一 fail 全 fail\n` +
+            `Promise.race: 竞速胜出\n` +
+            `Promise.allSettled: 不关心成败\n` +
+            `Promise.any: 首个成功\n` +
+            `✅ Promise 静态方法演示完成！`;
+    </script>
+</body>
+</html>

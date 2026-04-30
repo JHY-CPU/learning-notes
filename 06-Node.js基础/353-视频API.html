@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频API</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        video { border: 1px solid #ddd; margin: 10px 0; background: #000; max-width: 400px; }
+        .player { position: relative; display: inline-block; }
+        .controls { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); padding: 8px; display: flex; gap: 8px; align-items: center; }
+        .controls input[type="range"] { flex: 1; }
+        .timeline { width: 100%; height: 4px; background: #555; cursor: pointer; position: absolute; bottom: 40px; left: 0; }
+        .timeline-progress { height: 100%; background: #3498db; width: 0; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>视频 API</h2><p>HTML5 Video 事件、play/pause/seek、字幕 track、自定义控件。</p></div>
+    <div class="card">
+        <h2>HTML5 Video API</h2>
+        <div class="code">// ========== 视频元素 ==========
+&lt;video src="video.mp4" controls&gt;&lt;/video&gt;
+
+// ========== 控制方法 ==========
+video.play();              // 播放
+video.pause();             // 暂停
+video.load();              // 重新加载
+
+// ========== 属性 ==========
+video.currentTime          // 当前播放位置 (秒)
+video.duration             // 总时长 (秒)
+video.volume               // 音量 (0-1)
+video.playbackRate         // 播放速度 (0.5-16)
+video.paused               // 是否暂停
+video.ended                // 是否播放完毕
+video.muted                // 是否静音
+
+// ========== 事件 ==========
+// loadstart/durationchange/loadedmetadata/loadeddata
+// progress/canplay/canplaythrough
+// play/pause/playing/ended/waiting/seeking/seeked
+// ratechange/volumechange/timeupdate
+
+// ========== 字幕 ==========
+&lt;track kind="subtitles" src="sub.vtt" srclang="zh" label="中文"&gt;</div>
+    </div>
+    <div class="card">
+        <h2>演示：视频 API</h2>
+        <button onclick="demoVideoBase()">视频基础</button>
+        <button onclick="demoVideoEvents()">事件列表</button>
+        <button onclick="demoCustomPlayer()">自定义播放器</button>
+        <button onclick="demoTrack()">字幕与轨道</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        // Mock Video element
+        class MockVideo {
+            constructor() {
+                this._events = {};
+                this._time = 0;
+                this._duration = 120;
+                this._volume = 1;
+                this._rate = 1;
+                this._paused = true;
+                this._muted = false;
+                this._ended = false;
+                this._readyState = 0;
+                this._textTracks = [];
+                this._src = '';
+                this._timer = null;
+                this.buffered = { length: 0, start: () => 0, end: () => 0 };
+                this.videoWidth = 640;
+                this.videoHeight = 360;
+                this.error = null;
+                this.networkState = 0;
+                this.seeking = false;
+            }
+            get currentTime() { return this._time; }
+            set currentTime(t) {
+                this.seeking = true;
+                this.emit('seeking');
+                this._time = Math.max(0, Math.min(t, this._duration));
+                this.seeking = false;
+                setTimeout(() => this.emit('seeked'), 50);
+            }
+            get duration() { return this._duration; }
+            get paused() { return this._paused; }
+            get ended() { return this._ended; }
+            get volume() { return this._volume; }
+            set volume(v) { this._volume = Math.max(0, Math.min(1, v)); this.emit('volumechange'); }
+            get muted() { return this._muted; }
+            set muted(m) { this._muted = m; this.emit('volumechange'); }
+            get playbackRate() { return this._rate; }
+            set playbackRate(r) { this._rate = r; this.emit('ratechange'); }
+            get readyState() { return this._readyState; }
+            get textTracks() { return this._textTracks; }
+
+            play() {
+                if (this._paused) {
+                    this._paused = false;
+                    this._ended = false;
+                    this.emit('play');
+                    this._timer = setInterval(() => {
+                        this._time += 0.1 * this._rate;
+                        this.emit('timeupdate');
+                        if (this._time >= this._duration) {
+                            this._paused = true;
+                            this._ended = true;
+                            this.emit('ended');
+                            clearInterval(this._timer);
+                        }
+                    }, 100);
+                    setTimeout(() => this.emit('playing'), 50);
+                }
+            }
+            pause() {
+                if (!this._paused) {
+                    this._paused = true;
+                    clearInterval(this._timer);
+                    this.emit('pause');
+                }
+            }
+            load() {
+                this._readyState = 1;
+                this.emit('loadstart');
+                setTimeout(() => {
+                    this._readyState = 4;
+                    this.emit('loadedmetadata');
+                    this.emit('loadeddata');
+                    this.emit('canplay');
+                    this.emit('canplaythrough');
+                }, 100);
+            }
+            addEventListener(event, handler) {
+                if (!this._events[event]) this._events[event] = [];
+                this._events[event].push(handler);
+            }
+            removeEventListener(event, handler) {
+                if (!this._events[event]) return;
+                this._events[event] = this._events[event].filter(h => h !== handler);
+            }
+            emit(event, data) {
+                if (this._events[event]) {
+                    this._events[event].forEach(h => h({ type: event, target: this, ...data }));
+                }
+            }
+        }
+
+        function demoVideoBase() {
+            result.innerHTML = '';
+            log('🎬 HTML5 Video 基础:');
+            log('');
+
+            const video = new MockVideo();
+            video.load();
+
+            log('1️⃣ 视频元素属性:');
+            log(`   src: ${video._src || '(未设置)'}`);
+            log(`   duration: ${video.duration}s`);
+            log(`   readyState: ${video.readyState} (4=HAVE_ENOUGH_DATA)`);
+            log(`   videoWidth: ${video.videoWidth}, videoHeight: ${video.videoHeight}`);
+            log('');
+
+            log('2️⃣ 播放控制:');
+            log('   video.play()   — 开始播放');
+            log('   video.pause()  — 暂停播放');
+            log('   video.load()   — 重新加载');
+            log('');
+
+            log('3️⃣ 属性读取:');
+            log('   currentTime  — 当前播放位置 (秒)');
+            log('   duration     — 总时长 (秒)');
+            log('   paused       — 是否暂停');
+            log('   ended        — 是否播放结束');
+            log('   seeking      — 是否正在跳转');
+            log('   volume       — 音量 0.0-1.0');
+            log('   muted        — 是否静音');
+            log('   playbackRate — 播放速度 (0.5x-16x)');
+            log('   readyState   — 就绪状态 (0-4)');
+            log('');
+
+            log('4️⃣ readyState 状态:');
+            log('   0 = HAVE_NOTHING       — 无数据');
+            log('   1 = HAVE_METADATA      — 元数据已加载');
+            log('   2 = HAVE_CURRENT_DATA  — 当前帧数据');
+            log('   3 = HAVE_FUTURE_DATA   — 后续帧可用');
+            log('   4 = HAVE_ENOUGH_DATA   — 数据充足可播放');
+        }
+
+        function demoVideoEvents() {
+            result.innerHTML = '';
+            log('📋 视频事件列表:');
+            log('');
+
+            const categories = [
+                {
+                    name: '加载事件',
+                    events: [
+                        ['loadstart', '开始加载视频'],
+                        ['durationchange', '时长信息可用'],
+                        ['loadedmetadata', '元数据加载完成'],
+                        ['loadeddata', '第一帧加载完成'],
+                        ['progress', '下载进度更新'],
+                        ['canplay', '可以播放'],
+                        ['canplaythrough', '可以完整播放'],
+                    ]
+                },
+                {
+                    name: '播放事件',
+                    events: [
+                        ['play', '从暂停恢复播放'],
+                        ['pause', '播放暂停'],
+                        ['playing', '播放进行中'],
+                        ['ended', '播放结束'],
+                        ['waiting', '缓冲等待'],
+                        ['seeking', '跳转开始'],
+                        ['seeked', '跳转完成'],
+                    ]
+                },
+                {
+                    name: '状态事件',
+                    events: [
+                        ['timeupdate', '播放位置更新 (约 4Hz)'],
+                        ['volumechange', '音量/静音改变'],
+                        ['ratechange', '播放速度改变'],
+                        ['resize', '视频尺寸改变'],
+                        ['stalled', '数据流中断'],
+                        ['suspend', '加载暂停'],
+                        ['abort', '加载中止'],
+                        ['error', '加载错误'],
+                    ]
+                }
+            ];
+
+            categories.forEach(cat => {
+                log(`▶️ ${cat.name}:`);
+                cat.events.forEach(([name, desc]) => {
+                    log(`   • ${name.padEnd(20)} ${desc}`);
+                });
+                log('');
+            });
+
+            log('📌 常用事件监听:');
+            log('   video.addEventListener("timeupdate", handler);');
+            log('   video.addEventListener("ended", handler);');
+            log('   video.addEventListener("loadedmetadata", handler);');
+        }
+
+        function demoCustomPlayer() {
+            result.innerHTML = '';
+            log('🎮 自定义播放器:');
+            log('');
+
+            log('1️⃣ 自定义控件布局:');
+            log('   ┌─────────────────────────────────────┐');
+            log('   │          视频画面区域                  │');
+            log('   ├─────────────────────────────────────┤');
+            log('   │ 进度条 ████████░░░░░░░░░░            │');
+            log('   │ ▶️ ⏸️  01:23 / 05:30  🔊 ████  ⛶   │');
+            log('   └─────────────────────────────────────┘');
+            log('');
+
+            log('2️⃣ 自定义控件实现:');
+            log('   // 播放/暂停按钮');
+            log('   playBtn.onclick = () => {');
+            log('     video.paused ? video.play() : video.pause();');
+            log('   };');
+            log('');
+            log('   // 进度条更新 (timeupdate 事件)');
+            log('   video.addEventListener("timeupdate", () => {');
+            log('     const pct = (video.currentTime / video.duration) * 100;');
+            log('     progress.style.width = pct + "%";');
+            log('   });');
+            log('');
+            log('   // 点击跳转');
+            log('   timeline.onclick = (e) => {');
+            log('     const pct = e.offsetX / timeline.offsetWidth;');
+            log('     video.currentTime = pct * video.duration;');
+            log('   };');
+            log('');
+            log('   // 音量滑块');
+            log('   volumeSlider.oninput = () => { video.volume = volumeSlider.value; };');
+            log('');
+            log('   // 倍速选择');
+            log('   speedSelect.onchange = () => { video.playbackRate = speedSelect.value; };');
+            log('');
+
+            log('3️⃣ 播放速度选项:');
+            log('   0.5x — 慢放    1.0x — 正常    1.5x — 快速');
+            log('   2.0x — 倍速    4.0x — 极速    16x — 最大');
+            log('');
+
+            log('4️⃣ 全屏 API:');
+            log('   video.requestFullscreen()        — 进入全屏');
+            log('   document.exitFullscreen()         — 退出全屏');
+            log('   document.fullscreenElement         — 当前全屏元素');
+            log('   document.addEventListener("fullscreenchange", handler)');
+            log('');
+
+            log('5️⃣ 自适应流 (HLS/DASH):');
+            log('   • HLS.js — Apple HLS 播放 (TS/fMP4)');
+            log('   • Dash.js — MPEG-DASH 播放 (fMP4/WebM)');
+            log('   • Shaka Player — Google Shaka 播放器');
+        }
+
+        function demoTrack() {
+            result.innerHTML = '';
+            log('📝 字幕与轨道:');
+            log('');
+
+            log('1️⃣ <track> 元素:');
+            log('   <video>');
+            log('     <track kind="subtitles"  src="subs_zh.vtt" srclang="zh" label="中文" default>');
+            log('     <track kind="subtitles"  src="subs_en.vtt" srclang="en" label="English">');
+            log('     <track kind="captions"   src="captions.vtt" srclang="zh" label="说明">');
+            log('     <track kind="chapters"   src="chapters.vtt" srclang="zh" label="章节">');
+            log('     <track kind="metadata"   src="metadata.vtt" srclang="zh" label="元数据">');
+            log('   </video>');
+            log('');
+
+            log('2️⃣ kind 类型:');
+            log('   • subtitles — 字幕 (翻译)');
+            log('   • captions  — 说明 (含音效描述)');
+            log('   • chapters  — 章节导航');
+            log('   • metadata  — 元数据');
+            log('');
+
+            log('3️⃣ VTT 字幕格式:');
+            log('   WEBVTT');
+            log('');
+            log('   00:00:01.000 --> 00:00:05.000');
+            log('   大家好，欢迎观看本教程');
+            log('');
+            log('   00:00:06.500 --> 00:00:10.000');
+            log('   今天我们来学习视频API');
+            log('');
+
+            log('4️⃣ VTT 样式与定位:');
+            log('   00:00:01.000 --> 00:00:05.000 position:10% line:80%');
+            log('   <c.blue>蓝色文字</c>');
+            log('   <v.alice>Alice</v.alice> - 说话人标注');
+            log('');
+
+            log('5️⃣ textTrack API:');
+            log('   const tracks = video.textTracks;  // TextTrackList');
+            log('   const track = tracks[0];           // TextTrack');
+            log('   track.mode = "showing";            // disabled/hidden/showing');
+            log('   track.addEventListener("cuechange", handler);');
+            log('   const cues = track.cues;           // TextTrackCueList');
+            log('');
+
+            log('6️⃣ 无障碍字幕:');
+            log('   • 提供多语言字幕');
+            log('   • 音频描述 track (kind="descriptions")');
+            log('   • 确保颜色对比度');
+            log('   • 支持字幕样式自定义');
+        }
+
+        console.log('=== 视频 API ===');
+        document.getElementById('output').textContent =
+            `视频 API: HTML5 Video / play-pause-seek / 事件 / 自定义播放器 / 字幕\n` +
+            `✅ 视频 API 演示完成！`;
+    </script>
+</body>
+</html>

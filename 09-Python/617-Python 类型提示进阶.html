@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python 类型提示进阶</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🏷️ Python 类型提示进阶</h2><p>TypedDict、Literal、TypeAlias、Pydantic 模型、类型守卫、泛型进阶 (协变/逆变)、运行时类型检查。</p></div>
+    <div class="card">
+        <h2>TypedDict 与 Literal</h2>
+        <div class="code">// ========== TypedDict ==========
+from typing import TypedDict, NotRequired, Required, Literal
+from datetime import datetime
+
+# TypedDict: 定义字典的结构 (Python 3.8+)
+# 类似接口,但用于字典
+
+class UserDict(TypedDict):
+    """用户字典的类型定义"""
+    id: int
+    name: str
+    email: str
+    age: NotRequired[int]  # 可选字段
+
+# 使用:
+user: UserDict = {
+    "id": 1,
+    "name": "Alice",
+    "email": "alice@test.com",
+}
+# user["id"]        # int ✅
+# user["name"]      # str ✅
+# user["unknown"]   # 类型检查错误 ❌
+
+# total=False: 全部可选
+class Config(TypedDict, total=False):
+    debug: bool
+    port: int
+    host: str
+
+# 继承:
+class ExtendedUser(UserDict):
+    phone: str
+
+# ========== Literal ==========
+# Literal: 限制值为特定字面量
+
+def set_status(status: Literal["active", "inactive", "pending"]):
+    """状态只能是指定的三个值之一"""
+    pass
+
+set_status("active")     # ✅
+# set_status("unknown")  # 类型错误 ❌
+
+# 多个类型:
+def process(value: Literal[1, "one", True]):
+    pass
+
+# 实际应用:
+def get_env(name: str) -> Literal["dev", "staging", "prod"]:
+    return os.getenv("ENV", "dev")
+
+# TypeAlias: 类型别名
+from typing import TypeAlias
+
+UserId: TypeAlias = int
+UserList: TypeAlias = list[UserId]
+
+def get_user(uid: UserId) -> UserDict:
+    ...</div>
+    </div>
+    <div class="card">
+        <h2>Pydantic 模型</h2>
+        <div class="code">// ========== Pydantic v2 ==========
+# pip install pydantic
+
+from pydantic import BaseModel, Field, EmailStr, ValidationError
+from datetime import datetime
+from typing import Optional
+
+# Pydantic: 数据验证 + 类型转换 + 序列化
+
+class UserCreate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=50)
+    email: EmailStr
+    age: int = Field(ge=0, le=150)
+    tags: list[str] = []
+    created_at: datetime = Field(default_factory=datetime.now)
+
+    # 自定义验证器
+    @field_validator("name")
+    @classmethod
+    def name_must_be_valid(cls, v):
+        if not v.strip():
+            raise ValueError("名称不能为空")
+        return v.strip()
+
+    # 模型验证器
+    @model_validator(mode="after")
+    def check_age_name(self):
+        if self.age < 18 and self.name == "Admin":
+            raise ValueError("未成年不能设置为 Admin")
+        return self
+
+# 使用:
+try:
+    user = UserCreate(
+        name="Alice",
+        email="alice@test.com",
+        age=25,
+    )
+    print(user.model_dump())  # 序列化
+    print(user.model_dump_json())  # JSON
+
+except ValidationError as e:
+    print(e.errors())  # 详细的错误信息
+
+# ========== 高级 Pydantic ==========
+from pydantic import (
+    ConfigDict,  # v2 配置方式
+    BaseModel,
+    field_serializer,
+)
+
+class Post(BaseModel):
+    model_config = ConfigDict(
+        from_attributes=True,  # ORM 模式 (原 orm_mode)
+        populate_by_name=True, # 允许用字段名或别名
+        extra="forbid",        # 禁止额外字段
+    )
+
+    id: int
+    title: str = Field(alias="post_title")
+
+    @field_serializer("id")
+    def serialize_id(self, v):
+        return str(v)  # 序列化时转为字符串</div>
+    </div>
+    <div class="card">
+        <h2>泛型进阶</h2>
+        <div class="code">// ========== 泛型 ==========
+from typing import (
+    Generic, TypeVar, TypeVarTuple,
+    ParamSpec, Concatenate,
+    Self,  # Python 3.11+
+    overload,
+)
+
+# 基本泛型
+T = TypeVar("T")          # 任意类型
+T_co = TypeVar("T_co", covariant=True)     # 协变
+T_contra = TypeVar("T_contra", contravariant=True)  # 逆变
+
+class Stack(Generic[T]):
+    """类型安全的栈"""
+
+    def __init__(self) -> None:
+        self._items: list[T] = []
+
+    def push(self, item: T) -> None:
+        self._items.append(item)
+
+    def pop(self) -> T:
+        return self._items.pop()
+
+# 使用:
+int_stack = Stack[int]()
+int_stack.push(1)
+int_stack.push(2)
+# int_stack.push("str")  # 类型错误 ❌
+
+# ========== 约束泛型 ==========
+N = TypeVar("N", int, float)  # 只允许 int 或 float
+
+def double(value: N) -> N:
+    return value * 2
+
+double(5)       # ✅ int
+double(3.14)    # ✅ float
+# double("hi")  # 类型错误 ❌
+
+# ========== Self 类型 ==========
+# 返回当前类的实例 (Python 3.11+)
+
+class Model:
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class UserModel(Model):
+    pass
+
+user = UserModel.create()  # 类型是 UserModel,而非 Model
+
+# ========== @overload ==========
+@overload
+def process(data: int) -> str: ...
+
+@overload
+def process(data: str) -> int: ...
+
+def process(data: int | str) -> str | int:
+    if isinstance(data, int):
+        return str(data)
+    return len(data)
+
+# int → str, str → int (类型检查器理解!)</div>
+    </div>
+    <div class="card">
+        <h2>类型守卫与 isinstance</h2>
+        <div class="code">// ========== 类型守卫 ==========
+from typing import TypeGuard, cast, assert_type
+
+# TypeGuard: 用户定义的类型守卫 (Python 3.10+)
+
+def is_str_list(val: list[object]) -> TypeGuard[list[str]]:
+    """判断是否为字符串列表"""
+    return all(isinstance(x, str) for x in val)
+
+def process_items(items: list[object]):
+    if is_str_list(items):
+        # 这里 items 被收窄为 list[str]
+        print(",".join(items))  # ✅
+    else:
+        # 这里还是 list[object]
+        pass
+
+# ========== cast ==========
+# cast: 告诉类型检查器某个值的类型
+# 运行时无影响
+
+from typing import cast
+
+def get_user() -> object:
+    return {"id": 1, "name": "Alice"}
+
+user = cast(dict, get_user())
+print(user["name"])  # 类型检查器知道是 dict
+
+# ========== assert_type ==========
+# 运行时断言类型 (测试用)
+from typing import assert_type
+
+x: int = 5
+assert_type(x, int)  # ✅ 运行时会检查
+
+# ========== Final 与 ClassVar ==========
+from typing import Final, ClassVar
+
+MAX_RETRIES: Final = 3
+# MAX_RETRIES = 5  # 类型检查错误 ❌
+
+class Config:
+    DEFAULT_TIMEOUT: ClassVar[int] = 30  # 类变量
+
+    def __init__(self):
+        self.timeout: int = Config.DEFAULT_TIMEOUT</div>
+    </div>
+    <div class="card">
+        <h2> mypy 与静态分析</h2>
+        <div class="code">// ========== mypy ==========
+# pip install mypy
+
+# mypy: Python 静态类型检查器
+
+# 命令行:
+# mypy src/                          # 检查 src 目录
+# mypy src/app.py --strict           # 严格模式
+# mypy src/ --ignore-missing-imports # 忽略缺失导入
+
+# ========== pyproject.toml 配置 ==========
+# [tool.mypy]
+# python_version = "3.11"
+# strict = True
+# warn_unused_configs = True
+# ignore_missing_imports = True
+#
+# [[tool.mypy.overrides]]
+# module = "tests.*"
+# disallow_untyped_defs = False
+
+# ========== 常见 mypy 规则 ==========
+# 函数需要类型注解
+def add(a, b):  # mypy 警告: 缺少类型注解
+    return a + b
+
+# 变量不能隐式 Any
+x = []  # mypy 警告: 需要类型注解
+y: list[int] = []  # ✅
+
+# 返回值类型必须匹配
+def get_name() -> str:
+    return 123  # mypy 错误: 期望 str,得到 int
+
+# None 必须显式声明
+def get_user() -> dict | None:
+    if condition:
+        return None
+    return {"id": 1}
+
+# ========== 类型检查集成 ==========
+# pre-commit 配置:
+# repos:
+#   - repo: https://github.com/pre-commit/mirrors-mypy
+#     rev: v1.8.0
+#     hooks:
+#       - id: mypy</div>
+        <div class="note">💡 类型提示进阶: TypedDict 定义字典结构; Literal 限制字面量; Pydantic 运行时验证; 泛型 Generic[T]; Self 返回自身类型; TypeGuard 类型守卫; mypy 静态检查。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoTypedDict()">TypedDict 演示</button>
+        <button onclick="demoPydantic()">Pydantic 演示</button>
+        <button onclick="demoGeneric()">泛型演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoTypedDict() {
+            result.innerHTML = '';
+            log('# TypedDict');
+            log('');
+            log('class User(TypedDict):');
+            log('    id: int');
+            log('    name: str');
+            log('    age: NotRequired[int]');
+            log('');
+            log('user: User = {"id": 1, "name": "A"}');
+            log('');
+            log('Literal:');
+            log('  status: Literal["on", "off"]');
+        }
+
+        function demoPydantic() {
+            result.innerHTML = '';
+            log('# Pydantic v2');
+            log('');
+            log('class User(BaseModel):');
+            log('    name: str = Field(min_length=2)');
+            log('    email: EmailStr');
+            log('    age: int = Field(ge=0, le=150)');
+            log('');
+            log('user = User(name="A", email="a@b.com", age=25)');
+            log('user.model_dump()  # → dict');
+            log('user.model_dump_json()  # → JSON');
+        }
+
+        function demoGeneric() {
+            result.innerHTML = '';
+            log('# 泛型');
+            log('');
+            log('T = TypeVar("T")');
+            log('class Stack(Generic[T]):');
+            log('    def push(self, item: T): ...');
+            log('    def pop(self) -> T: ...');
+            log('');
+            log('stack = Stack[int]()');
+            log('stack.push(1)     # ✅');
+            log('stack.push("s")   # ❌');
+        }
+    </script>
+</body>
+</html>

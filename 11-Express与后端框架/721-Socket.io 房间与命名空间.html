@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.io 房间与命名空间</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🏠 Socket.io 房间与命名空间</h2><p>命名空间隔离 (namespace)、动态房间管理、房间成员追踪、跨房间消息、通配符事件、动态命名空间、适配器 (adapter) 与多进程扩展。</p></div>
+    <div class="card">
+        <h2>命名空间 (Namespace)</h2>
+        <div class="code">// ========== 命名空间 ==========
+// 在同一连接上隔离不同功能
+// 每个 namespace 有独立的 room/event
+
+// ========== 服务端定义 ==========
+const { Server } = require('socket.io');
+const io = new Server(server);
+
+// 默认命名空间: /
+const main = io;
+
+// 自定义命名空间:
+const chat = io.of('/chat');
+const news = io.of('/news');
+const admin = io.of('/admin');
+
+// ========== 各命名空间独立 ==========
+// /chat 命名空间:
+chat.on('connection', (socket) => {
+    socket.on('message', (data) => {
+        socket.emit('reply', 'Chat message received');
+    });
+});
+
+// /news 命名空间:
+news.on('connection', (socket) => {
+    socket.emit('headline', { title: 'Breaking News!' });
+});
+
+// /admin 命名空间:
+admin.on('connection', (socket) => {
+    // 只发送给 admin 命名空间
+    io.of('/admin').emit('stats', { users: 100 });
+});
+
+// ========== 客户端连接 ==========
+// 连接到默认:
+const socket = io();                    // → /
+
+// 连接到特定命名空间:
+const chatSocket = io('/chat');         // → /chat
+const newsSocket = io('/news');         // → /news
+
+// 每个连接独立:
+chatSocket.emit('message', 'Hi');
+newsSocket.on('headline', (data) => {});
+
+// ========== 使用场景 ==========
+// /chat    — 实时聊天
+// /notif   — 通知推送
+// /admin   — 管理监控
+// /game    — 游戏状态同步</div>
+    </div>
+    <div class="card">
+        <h2>动态命名空间</h2>
+        <div class="code">// ========== 动态命名空间 ==========
+// 根据条件创建命名空间
+
+// ========== 动态创建 ==========
+io.of(/^\/dynamic-\d+$/).on('connection', (socket) => {
+    const namespace = socket.nsp.name;  // /dynamic-123
+    socket.emit('welcome', { namespace });
+});
+
+// ========== 房间与命名空间交互 ==========
+io.on('connection', (socket) => {
+    // 用户加入聊天室
+    socket.join('chat:general');
+
+    // 加入项目房间
+    socket.join(`project:${projectId}`);
+
+    // 加入用户自己的房间 (私信)
+    socket.join(`user:${userId}`);
+});
+
+// ========== 房间设计模式 ==========
+// ┌────────────────────────────────────────┐
+// │ 房间命名规范:                           │
+// │   chat:general     — 公共聊天           │
+// │   chat:room:123    — 聊天室            │
+// │   user:456         — 用户私信          │
+// │   project:789      — 项目协作          │
+// │   notify:all       — 全局通知          │
+// │   game:match:abc   — 游戏对战          │
+// └────────────────────────────────────────┘
+
+// ========== 跨房间消息 ==========
+// 消息同时发送到多个房间:
+function sendToUser(userId, event, data) {
+    io.to(`user:${userId}`).emit(event, data);
+}
+
+function sendToProject(projectId, event, data) {
+    io.to(`project:${projectId}`).emit(event, data);
+}
+
+// 组合:
+app.post('/api/projects/:id/tasks', authenticate, asyncHandler(async (req, res) => {
+    const task = await Task.create({ ...req.body, project: req.params.id });
+
+    // 通知项目成员
+    io.to(`project:${req.params.id}`).emit('task:created', task);
+
+    // 通知创建者
+    io.to(`user:${req.user.sub}`).emit('notification', {
+        type: 'task_created',
+        message: 'Task created successfully',
+    });
+
+    res.created(task);
+}));</div>
+    </div>
+    <div class="card">
+        <h2>中间件与事件拦截</h2>
+        <div class="code">// ========== 命名空间中间件 ==========
+// 在每个命名空间连接前执行
+
+// ========== 全局中间件 ==========
+io.use((socket, next) => {
+    // 检查用户认证
+    const token = socket.handshake.auth.token;
+    if (!token) {
+        return next(new Error('Authentication required'));
+    }
+
+    try {
+        const user = jwt.verify(token, process.env.JWT_SECRET);
+        socket.user = user;       // 附加用户信息到 socket
+        next();
+    } catch (err) {
+        next(new Error('Invalid token'));
+    }
+});
+
+// ========== 命名空间级中间件 ==========
+admin.use((socket, next) => {
+    if (socket.user?.role !== 'admin') {
+        return next(new Error('Admin access required'));
+    }
+    next();
+});
+
+// ========== 事件拦截 ==========
+// 监听所有事件 (通配符):
+socket.use(([event, ...args], next) => {
+    console.log(`Event: ${event}`, args);
+
+    // 阻止特定事件
+    if (event === 'secret' && socket.user?.role !== 'admin') {
+        return;  // 不调用 next() 就阻止了
+    }
+
+    // 限流检查
+    const now = Date.now();
+    if (now - lastEvent < 100) {
+        return;  // 节流
+    }
+    lastEvent = now;
+
+    next();
+});
+
+// ========== 动态加入/离开 ==========
+io.on('connection', (socket) => {
+    // 连接后根据用户角色加入房间
+    if (socket.user?.role === 'admin') {
+        socket.join('admins');
+    }
+
+    if (socket.user?.premium) {
+        socket.join('premium');
+    }
+
+    // 用户状态广播
+    socket.broadcast.emit('user:online', {
+        userId: socket.user.sub,
+    });
+
+    socket.on('disconnect', () => {
+        socket.broadcast.emit('user:offline', {
+            userId: socket.user.sub,
+        });
+    });
+});</div>
+    </div>
+    <div class="card">
+        <h2>房间状态监控</h2>
+        <div class="code">// ========== 房间监控 ==========
+// 查看和管理房间状态
+
+// ========== 管理 API ==========
+// Express 路由 + Socket.io 状态:
+
+app.get('/admin/socket/rooms', authenticate, authorize('admin'), (req, res) => {
+    const rooms = {};
+    const allRooms = io.sockets.adapter.rooms;
+
+    for (const [room, sockets] of allRooms) {
+        if (!sockets.has(room)) { // 排除 socket 自带的房间
+            rooms[room] = sockets.size;
+        }
+    }
+
+    res.json({
+        totalRooms: Object.keys(rooms).length,
+        rooms,
+    });
+});
+
+app.get('/admin/socket/clients', authenticate, authorize('admin'), (req, res) => {
+    const clients = [];
+    const sockets = io.sockets.sockets;
+
+    for (const [id, socket] of sockets) {
+        clients.push({
+            id: socket.id,
+            userId: socket.user?.sub,
+            rooms: [...socket.rooms].filter(r => r !== id),
+            connectedAt: socket.connected,
+        });
+    }
+
+    res.json({
+        totalClients: clients.length,
+        clients,
+    });
+});
+
+// ========== 强制断开 ==========
+app.post('/admin/socket/disconnect/:userId',
+    authenticate, authorize('admin'), (req, res) => {
+    const sockets = io.sockets.sockets;
+    for (const [id, socket] of sockets) {
+        if (socket.user?.sub === req.params.userId) {
+            socket.disconnect(true);
+        }
+    }
+    res.success(null, 'User disconnected');
+});
+
+// ========== 统计 ==========
+// 实时在线数:
+const onlineCount = io.engine.clientsCount;
+
+// 命名空间连接数:
+const chatCount = io.of('/chat').sockets.size;</div>
+        <div class="note">💡 命名空间与房间要点: 命名空间隔离不同功能模块 (chat/news/admin); 房间逻辑分组 (chat:general/user:123/project:456); 中间件在连接和事件前执行; 通配符 event 拦截可做日志/限流; 用户连接时自动加入个人房间 (user:userId); 断开自动清理; 管理 API 可监控在线状态。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoNS()">命名空间</button>
+        <button onclick="demoRoomDesign()">房间设计</button>
+        <button onclick="demoMonitor()">状态监控</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoNS() {
+            result.innerHTML = '';
+            log('# 命名空间');
+            log('');
+            log('const chat = io.of("/chat");');
+            log('const news = io.of("/news");');
+            log('const admin = io.of("/admin");');
+            log('');
+            log('客户端:');
+            log('const socket = io("/chat");');
+            log('// 只接收 /chat 事件');
+        }
+
+        function demoRoomDesign() {
+            result.innerHTML = '';
+            log('# 房间命名规范');
+            log('');
+            log('chat:general     公共聊天');
+            log('chat:room:123    特定聊天室');
+            log('user:456         用户私信');
+            log('project:789      项目协作');
+            log('notify:all       全局通知');
+            log('');
+            log('socket.join(`user:${userId}`);');
+            log('io.to(`user:${userId}`).emit();');
+        }
+
+        function demoMonitor() {
+            result.innerHTML = '';
+            log('# 房间状态监控');
+            log('');
+            log('io.sockets.adapter.rooms');
+            log('  → Map { roomId => Set { socketId } }');
+            log('');
+            log('io.engine.clientsCount');
+            log('  → 在线连接数');
+            log('');
+            log('io.of("/chat").sockets.size');
+            log('  → 命名空间连接数');
+        }
+    </script>
+</body>
+</html>

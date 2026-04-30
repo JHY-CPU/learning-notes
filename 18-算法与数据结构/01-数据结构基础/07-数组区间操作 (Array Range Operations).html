@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>07-数组区间操作 (Array Range Operations)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card"><h2>07-数组区间操作 (Array Range Operations)</h2><p>区间操作关注如何处理数组中的连续子数组片段，包括区间合并、区间交集、区间覆盖等。</p></div>
+
+<div class="card"><h2>区间合并</h2><p>合并所有重叠的区间：</p>
+<div class="code">
+// 输入: intervals = [[1,3],[2,6],[8,10],[15,18]]
+// 输出: [[1,6],[8,10],[15,18]]
+function mergeIntervals(intervals) {
+  if (intervals.length <= 1) return intervals;
+
+  // 按区间起点排序
+  intervals.sort((a, b) => a[0] - b[0]);
+
+  let result = [intervals[0]];
+
+  for (let i = 1; i < intervals.length; i++) {
+    let last = result[result.length - 1];
+    let current = intervals[i];
+
+    if (current[0] <= last[1]) {
+      // 有重叠，合并
+      last[1] = Math.max(last[1], current[1]);
+    } else {
+      // 无重叠，直接添加
+      result.push(current);
+    }
+  }
+
+  return result;
+}
+</div></div>
+
+<div class="card"><h2>区间交集</h2>
+<div class="code">
+// 求两个区间列表的交集
+function intervalIntersection(A, B) {
+  let i = 0, j = 0;
+  let result = [];
+
+  while (i < A.length && j < B.length) {
+    let start = Math.max(A[i][0], B[j][0]);
+    let end = Math.min(A[i][1], B[j][1]);
+
+    if (start <= end) {
+      result.push([start, end]);
+    }
+
+    // 移动结束较早的指针
+    if (A[i][1] < B[j][1]) i++;
+    else j++;
+  }
+
+  return result;
+}
+</div></div>
+
+<div class="card"><h2>交互演示</h2>
+<button onclick="demoInterval()">运行区间操作演示</button>
+<div id="result"></div>
+</div>
+
+<script>
+function demoInterval() {
+  let output = '';
+
+  output += '=== 区间合并 ===\n\n';
+  let intervals = [[1,3], [2,6], [8,10], [15,18], [17,22]];
+  output += '输入区间: ' + JSON.stringify(intervals) + '\n';
+
+  // 合并
+  let merged = merge(intervals);
+  output += '合并结果: ' + JSON.stringify(merged) + '\n';
+
+  function merge(intervals) {
+    if (intervals.length <= 1) return intervals;
+    intervals.sort((a, b) => a[0] - b[0]);
+    let result = [intervals[0]];
+    for (let i = 1; i < intervals.length; i++) {
+      let last = result[result.length - 1];
+      let cur = intervals[i];
+      if (cur[0] <= last[1]) {
+        last[1] = Math.max(last[1], cur[1]);
+      } else {
+        result.push([...cur]);
+      }
+    }
+    return result;
+  }
+
+  output += '\n=== 区间交集 ===\n\n';
+  let A = [[0,2], [5,10], [13,23], [24,25]];
+  let B = [[1,5], [8,12], [15,24], [25,26]];
+  output += '区间 A: ' + JSON.stringify(A) + '\n';
+  output += '区间 B: ' + JSON.stringify(B) + '\n';
+
+  let intersection = intersect(A, B);
+  output += '交集: ' + JSON.stringify(intersection) + '\n';
+
+  function intersect(A, B) {
+    let i = 0, j = 0, result = [];
+    while (i < A.length && j < B.length) {
+      let start = Math.max(A[i][0], B[j][0]);
+      let end = Math.min(A[i][1], B[j][1]);
+      if (start <= end) result.push([start, end]);
+      if (A[i][1] < B[j][1]) i++;
+      else j++;
+    }
+    return result;
+  }
+
+  output += '\n=== 区间插入 ===\n\n';
+  let intervals2 = [[1,3],[6,9]];
+  let newInterval = [2,5];
+  let inserted = insert(intervals2, newInterval);
+  output += '原有区间: ' + JSON.stringify(intervals2) + '\n';
+  output += '插入: ' + JSON.stringify(newInterval) + '\n';
+  output += '结果: ' + JSON.stringify(inserted) + '\n';
+
+  function insert(intervals, newI) {
+    let result = [], i = 0;
+    // 添加所有在新区间之前的
+    while (i < intervals.length && intervals[i][1] < newI[0]) {
+      result.push(intervals[i++]);
+    }
+    // 合并重叠区间
+    while (i < intervals.length && intervals[i][0] <= newI[1]) {
+      newI[0] = Math.min(newI[0], intervals[i][0]);
+      newI[1] = Math.max(newI[1], intervals[i][1]);
+      i++;
+    }
+    result.push(newI);
+    // 添加剩余区间
+    while (i < intervals.length) result.push(intervals[i++]);
+    return result;
+  }
+
+  document.getElementById('result').textContent = output;
+}
+</script>
+</body></html>

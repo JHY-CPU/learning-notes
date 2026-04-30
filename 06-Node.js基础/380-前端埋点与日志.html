@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>前端埋点与日志</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>前端埋点与日志</h2><p>手动埋点/无痕埋点、性能数据采集、pv/uv 统计、上报策略(Beacon)。</p></div>
+    <div class="card">
+        <h2>埋点 API</h2>
+        <div class="code">// ========== 手动埋点 ==========
+function track(event, data) {
+    navigator.sendBeacon('/api/track', JSON.stringify({
+        event, data,
+        time: Date.now(),
+        url: location.href,
+        userAgent: navigator.userAgent
+    }));
+}
+
+// ========== 无痕埋点 (自动) ==========
+document.addEventListener('click', (e) => {
+    const path = getEventPath(e.target);
+    track('click', { path, text: e.target.textContent?.slice(0, 20) });
+});
+
+// ========== PV/UV 统计 ==========
+// PV (Page View): 页面访问次数
+// UV (Unique Visitor): 独立访客数
+// 页面加载时上报: track('pv', { url: location.href, referrer });
+
+// ========== 性能数据 ==========
+const observer = new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+        track('performance', { name: entry.name, value: entry.startTime });
+    }
+});
+observer.observe({ entryTypes: ['paint', 'largest-contentful-paint'] });</div>
+    </div>
+    <div class="card">
+        <h2>演示：埋点与日志</h2>
+        <button onclick="demoManual()">手动埋点</button>
+        <button onclick="demoAuto()">无痕埋点</button>
+        <button onclick="demoPV()">PV/UV</button>
+        <button onclick="demoStrategy()">上报策略</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoManual() {
+            result.innerHTML = '';
+            log('📝 手动埋点:');
+            log('');
+
+            log('1️⃣ 什么是手动埋点?');
+            log('   在代码中显式调用跟踪函数');
+            log('   精确控制上报时机和数据');
+            log('');
+
+            log('2️⃣ 基本实现:');
+            log('   function track(eventName, eventData = {}) {');
+            log('     const payload = {');
+            log('       event: eventName,');
+            log('       data: eventData,');
+            log('       time: Date.now(),');
+            log('       url: location.href,');
+            log('       referrer: document.referrer,');
+            log('       screen: `${screen.width}x${screen.height}`,');
+            log('       sid: getSessionId()  // 会话 ID');
+            log('     };');
+            log('     navigator.sendBeacon("/api/track", JSON.stringify(payload));');
+            log('   }');
+            log('');
+
+            log('3️⃣ 典型埋点:');
+            log('   // 页面浏览');
+            log('   track("page_view", { page: "/home" });');
+            log('');
+            log('   // 按钮点击');
+            log('   track("button_click", {');
+            log('     name: "submit_order",');
+            log('     page: "/checkout"');
+            log('   });');
+            log('');
+            log('   // 表单提交');
+            log('   track("form_submit", {');
+            log('     form: "register",');
+            log('     result: "success"');
+            log('   });');
+            log('');
+
+            log('4️⃣ 埋点分类:');
+            log('   • 交互埋点 — 点击/输入/滚动');
+            log('   • 页面埋点 — PV/停留时间/跳出');
+            log('   • 业务埋点 — 下单/支付/注册');
+            log('   • 性能埋点 — LCP/FID/CLS');
+            log('   • 错误埋点 — JS异常/请求失败');
+        }
+
+        function demoAuto() {
+            result.innerHTML = '';
+            log('🤖 无痕埋点 (自动):');
+            log('');
+
+            log('1️⃣ 什么是无痕埋点?');
+            log('   通过事件代理自动收集用户行为');
+            log('   无需手动调用 track()');
+            log('');
+
+            log('2️⃣ 点击自动埋点:');
+            log('   document.addEventListener("click", (e) => {');
+            log('     const target = e.target;');
+            log('     track("click", {');
+            log('       tag: target.tagName,');
+            log('       id: target.id,');
+            log('       class: target.className,');
+            log('       text: target.textContent?.trim()?.slice(0, 50),');
+            log('       path: getDomPath(target)  // 唯一路径');
+            log('     });');
+            log('   });');
+            log('');
+
+            log('3️⃣ getDomPath (元素路径):');
+            log('   function getDomPath(el) {');
+            log('     const parts = [];');
+            log('     while (el && el !== document.body) {');
+            log('       let selector = el.tagName.toLowerCase();');
+            log('       if (el.id) {');
+            log('         selector += "#" + el.id;');
+            log('         parts.unshift(selector);');
+            log('         break;');
+            log('       }');
+            log('       const sibling = el.parentNode?.children;');
+            log('       if (sibling && sibling.length > 1) {');
+            log('         const idx = Array.from(sibling).indexOf(el) + 1;');
+            log('         selector += `:nth-child(${idx})`;');
+            log('       }');
+            log('       parts.unshift(selector);');
+            log('       el = el.parentNode;');
+            log('     }');
+            log('     return parts.join(" > ");');
+            log('   }');
+            log('');
+
+            log('4️⃣ 其他自动埋点:')
+            log('   // 页面滚动深度');
+            log('   window.addEventListener("scroll", () => {');
+            log('     const depth = Math.round((scrollY + window.innerHeight)');
+            log('       / document.documentElement.scrollHeight * 100);');
+            log('     if (depth % 25 === 0) track("scroll", { depth });');
+            log('   });');
+            log('');
+            log('   // 页面停留时长');
+            log('   let start = Date.now();');
+            log('   window.addEventListener("beforeunload", () => {');
+            log('     track("page_duration", {');
+            log('       duration: Date.now() - start');
+            log('     });');
+            log('   });');
+        }
+
+        function demoPV() {
+            result.innerHTML = '';
+            log('📊 PV/UV 统计:');
+            log('');
+
+            log('1️⃣ PV (Page View):');
+            log('   页面被访问的次数');
+            log('   每加载一次页面就 +1');
+            log('   刷新页面也会增加');
+            log('');
+
+            log('2️⃣ UV (Unique Visitor):');
+            log('   独立访客数');
+            log('   通过 Cookie/LocalStorage 标识用户');
+            log('   同一用户多次访问只算 1');
+            log('');
+
+            log('3️⃣ PV 统计实现:');
+            log('   // 页面加载时上报');
+            log('   track("pv", {');
+            log('     url: location.href,');
+            log('     referrer: document.referrer,');
+            log('     title: document.title,');
+            log('     timestamp: Date.now()');
+            log('   });');
+            log('');
+
+            log('4️⃣ UV 统计实现:');
+            log('   function getUserId() {');
+            log('     let uid = localStorage.getItem("_uid");');
+            log('     if (!uid) {');
+            log('       uid = crypto.randomUUID();');
+            log('       localStorage.setItem("_uid", uid);');
+            log('     }');
+            log('     return uid;');
+            log('   }');
+            log('');
+
+            log('5️⃣ 会话 (Session):');
+            log('   // 一次访问会话');
+            log('   // 30 分钟无操作 = 新会话');
+            log('   function getSessionId() {');
+            log('     let sid = sessionStorage.getItem("_sid");');
+            log('     if (!sid) {');
+            log('       sid = crypto.randomUUID();');
+            log('       sessionStorage.setItem("_sid", sid);');
+            log('     }');
+            log('     return sid;');
+            log('   }');
+            log('');
+
+            log('6️⃣ 常用指标:');
+            log('   • PV     — 页面浏览量');
+            log('   • UV     — 独立访客');
+            log('   • IP     — 独立 IP');
+            log('   • 跳出率  — 只访问一页的比例');
+            log('   • 停留时间 — 平均访问时长');
+        }
+
+        function demoStrategy() {
+            result.innerHTML = '';
+            log('📤 上报策略:');
+            log('');
+
+            log('1️⃣ 上报方式对比:');
+            log('   ┌──────────┬──────┬──────┬─────────┐');
+            log('   │ 方式      │ 可靠 │ 性能 │ 页面关闭 │');
+            log('   ├──────────┼──────┼──────┼─────────┤');
+            log('   │ Image    │ 高   │ 低   │ 可能丢  │');
+            log('   │ XHR      │ 高   │ 中   │ 可能丢  │');
+            log('   │ fetch    │ 高   │ 中   │ 可能丢  │');
+            log('   │ Beacon   │ 高   │ 低   │ 不丢    │');
+            log('   │ keepalive│ 高   │ 低   │ 不丢    │');
+            log('   └──────────┴──────┴──────┴─────────┘');
+            log('');
+
+            log('2️⃣ navigator.sendBeacon:')
+            log('   // 可靠的异步上报');
+            log('   // 页面关闭/卸载时也能发送');
+            log('   // 不阻塞页面关闭');
+            log('   const blob = new Blob([JSON.stringify(data)], {');
+            log('     type: "application/json"');
+            log('   });');
+            log('   navigator.sendBeacon("/api/track", blob);');
+            log('');
+
+            log('3️⃣ 批量上报:');
+            log('   // 合并多个事件一次性发送');
+            log('   const queue = [];');
+            log('   function track(event) {');
+            log('     queue.push(event);');
+            log('     if (queue.length >= 10) flush();');
+            log('   }');
+            log('   setInterval(flush, 5000);  // 每 5 秒刷一次');
+            log('   function flush() {');
+            log('     if (queue.length === 0) return;');
+            log('     navigator.sendBeacon("/api/track", JSON.stringify(queue));');
+            log('     queue.length = 0;');
+            log('   }');
+            log('');
+
+            log('4️⃣ 采样率控制:');
+            log('   // 按比例采样');
+            log('   const sampleRate = 0.1;  // 10%');
+            log('   if (Math.random() > sampleRate) return;');
+            log('');
+
+            log('5️⃣ 优先级:');
+            log('   // 关键事件 (立即发送)');
+            log('   if (event.priority === "high") flush();');
+            log('');
+            log('   // 普通事件 (批量)');
+            log('   queue.push(event);');
+        }
+
+        console.log('=== 前端埋点与日志 ===');
+        document.getElementById('output').textContent =
+            `前端埋点: 手动埋点 / 无痕埋点 / PV/UV / sendBeacon / 批量上报 / 采样\n` +
+            `✅ 前端埋点演示完成！`;
+    </script>
+</body>
+</html>

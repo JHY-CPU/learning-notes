@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docker 多阶段构建与进阶</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔧 Docker 多阶段构建与进阶</h2><p>多阶段构建模式、健康检查 HEALTHCHECK、资源限制 (memory/cpus)、Volume 深入、网络配置、存储驱动。</p></div>
+    <div class="card">
+        <h2>多阶段构建</h2>
+        <div class="code">// ========== 多阶段构建 ==========
+// 在一个 Dockerfile 中使用多个 FROM
+// 每个 FROM 是一个新阶段, 可以命名
+// 最终镜像只包含最后一个阶段
+
+// ========== Go 多阶段 ==========
+// 阶段 1: 编译
+FROM golang:1.22-alpine AS builder
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -ldflags="-w -s" -o /app/server
+
+// 阶段 2: 运行 (alpine)
+FROM alpine:3.19
+RUN adduser -D appuser
+COPY --from=builder /app/server /server
+COPY --from=builder /etc/ssl/certs /etc/ssl/certs
+USER appuser
+EXPOSE 8080
+CMD ["/server"]
+
+// ========== Node.js 多阶段 ==========
+// 阶段 1: 构建
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+// 阶段 2: 运行
+FROM node:20-alpine
+WORKDIR /app
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY package*.json ./
+EXPOSE 3000
+USER node
+CMD ["node", "dist/index.js"]
+
+// ========== Java 多阶段 ==========
+FROM maven:3.9-eclipse-temurin-21 AS builder
+WORKDIR /build
+COPY pom.xml .
+RUN mvn dependency:go-offline
+COPY src ./src
+RUN mvn package -DskipTests
+
+FROM eclipse-temurin:21-jre-alpine
+COPY --from=builder /build/target/*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/app.jar"]
+
+// ========== 命名阶段 ==========
+// AS 关键字命名
+// FROM node:20-alpine AS dependencies
+// FROM node:20-alpine AS build
+// FROM node:20-alpine AS release
+
+// 复制指定阶段产物:
+// COPY --from=dependencies /app/node_modules ./node_modules
+// COPY --from=build /app/dist ./dist
+
+// ========== 只构建特定阶段 ==========
+// docker build --target=builder -t myapp:build .
+// docker build --target=test -t myapp:test .
+
+// 可用于 CI:
+// docker build --target=test -t myapp:test .
+// docker run myapp:test  // 运行测试</div>
+    </div>
+    <div class="card">
+        <h2>健康检查</h2>
+        <div class="code">// ========== HEALTHCHECK ==========
+// Docker 定期检查容器是否健康
+
+// Dockerfile:
+// HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+//     CMD curl -f http://localhost:8080/health || exit 1
+
+// 参数:
+//   --interval=30s     : 每 30s 检查一次
+//   --timeout=3s       : 单次检查最长 3s
+//   --start-period=5s  : 容器启动后 5s 开始检查
+//   --retries=3        : 连续失败 3 次标记为 unhealthy
+
+// 退出码:
+//   0 = healthy
+//   1 = unhealthy
+
+// 查看容器健康状态:
+// docker ps 显示 healthy/unhealthy
+// docker inspect --format='{{.State.Health.Status}}' container
+
+// ========== 在 Compose 中配置 ==========
+// services:
+//   app:
+//     healthcheck:
+//       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+//       interval: 30s
+//       timeout: 3s
+//       retries: 3
+//       start_period: 10s
+
+// 依赖等待健康:
+//   depends_on:
+//     db:
+//       condition: service_healthy
+
+// ========== 数据库健康检查 ==========
+// PostgreSQL:
+//   healthcheck:
+//     test: ["CMD-SHELL", "pg_isready -U postgres"]
+//     interval: 10s
+//     timeout: 5s
+//     retries: 5
+
+// Redis:
+//   healthcheck:
+//     test: ["CMD", "redis-cli", "ping"]
+//     interval: 10s
+//     timeout: 3s
+//     retries: 5</div>
+    </div>
+    <div class="card">
+        <h2>资源限制</h2>
+        <div class="code">// ========== 内存限制 ==========
+// docker run -m 512m nginx           // 最大 512MB
+// docker run --memory=1g nginx       // 最大 1GB
+// docker run --memory="256m" --memory-swap="512m" nginx  // 内存+swap
+
+// ========== CPU 限制 ==========
+// docker run --cpus=1.5 nginx        // 1.5 核
+// docker run --cpuset-cpus=0,2 nginx // 绑定 CPU 0 和 2
+// docker run --cpu-shares=512 nginx  // 相对权重 (默认 1024)
+
+// ========== 查看资源使用 ==========
+// docker stats                        // 实时资源
+// docker stats --no-stream            // 一次快照
+// docker inspect container | grep -A 5 HostConfig
+
+// ========== 在 Compose 中配置 ==========
+// services:
+//   app:
+//     deploy:
+//       resources:
+//         limits:
+//           cpus: '0.5'
+//           memory: 256M
+//         reservations:
+//           cpus: '0.25'
+//           memory: 128M
+
+// ========== OOM 处理 ==========
+// 内存超限 → OOM Kill
+// docker run --memory=100m --oom-kill-disable nginx
+// (不推荐禁用, 可能导致系统不稳定)
+
+// ========== Volume 深入 ==========
+// 创建卷:
+// docker volume create nginx-data
+
+// 查看卷:
+// docker volume ls
+// docker volume inspect nginx-data
+// 实际路径: /var/lib/docker/volumes/nginx-data/_data
+
+// 备份卷:
+// docker run --rm -v nginx-data:/data -v $(pwd):/backup alpine \
+//     tar czf /backup/nginx-data.tar.gz -C /data .
+
+// 恢复卷:
+// docker run --rm -v nginx-data:/data -v $(pwd):/backup alpine \
+//     tar xzf /backup/nginx-data.tar.gz -C /data
+
+// ========== 卷驱动 ==========
+// local: 默认, 宿主机存储
+// nfs: 网络文件系统
+// cloudstor: AWS EFS
+// 第三方: REX-Ray, Portworx
+
+// docker volume create --driver nfs \
+//   --opt type=nfs \
+//   --opt o=addr=10.0.0.1,rw \
+//   --opt device=:/exports/volume \
+//   nfs-volume</div>
+    </div>
+    <div class="card">
+        <h2>网络模式深入</h2>
+        <div class="code">// ========== Overlay 网络 ==========
+// 跨宿主机通信, 用于 Docker Swarm
+
+// docker network create -d overlay my-overlay
+// docker service create --network my-overlay nginx
+
+// ========== Macvlan 网络 ==========
+// 给容器分配 MAC 地址, 直接连接物理网络
+
+// docker network create -d macvlan \
+//   --subnet=192.168.1.0/24 \
+//   --gateway=192.168.1.1 \
+//   -o parent=eth0 my-macvlan
+
+// ========== 网络性能 ==========
+// host > macvlan > overlay > bridge
+// host: 无额外开销
+// bridge: 轻微 NAT 开销
+// overlay: 封装开销 (VXLAN)
+
+// ========== 网络故障排查 ==========
+// docker network inspect bridge
+// docker exec -it container sh
+//   ping google.com
+//   curl http://service:8080
+//   nslookup service
+
+// ========== DNS 配置 ==========
+// docker run --dns 8.8.8.8 nginx
+// docker run --dns-search example.com nginx
+// docker run --hostname myhost nginx
+
+// ========== 存储驱动 ==========
+// Docker 使用存储驱动管理层数据
+//
+// overlay2: 默认 (Linux, 推荐)
+// fuse-overlayfs: rootless
+// devicemapper: 旧版
+// aufs: 旧版
+
+// 查看当前驱动:
+// docker info | grep "Storage Driver"</div>
+        <div class="note">💡 进阶要点: 多阶段构建 (builder → release) 减镜像体积; --target 构建特定阶段; HEALTHCHECK + service_healthy 依赖等待; 资源限制 --memory/--cpus; docker stats 监控; Volume 备份/恢复; Overlay 跨宿主机网络; Macvlan 直接连接物理网络; 存储驱动 overlay2 最优; 非 root 用户安全; OOM 配置注意。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoMulti()">多阶段</button>
+        <button onclick="demoHealth()">健康检查</button>
+        <button onclick="demoResource()">资源限制</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoMulti() {
+            result.innerHTML = '';
+            log('# 多阶段构建');
+            log('');
+            log('FROM golang:alpine AS builder');
+            log('  # 编译阶段');
+            log('');
+            log('FROM alpine:3.19');
+            log('  COPY --from=builder /app/server /server');
+            log('');
+            log('优点:');
+            log('  最终镜像只含运行所需');
+            log('  构建工具不进入 production');
+            log('  镜像体积减小 50-90%');
+        }
+
+        function demoHealth() {
+            result.innerHTML = '';
+            log('# 健康检查');
+            log('');
+            log('Dockerfile:');
+            log('  HEALTHCHECK --interval=30s --timeout=3s \\');
+            log('    CMD curl -f http://localhost || exit 1');
+            log('');
+            log('Compose:');
+            log('  healthcheck:');
+            log('    test: ["CMD", "curl", "-f", "http://localhost"]');
+            log('  depends_on:');
+            log('    condition: service_healthy');
+        }
+
+        function demoResource() {
+            result.innerHTML = '';
+            log('# 资源限制');
+            log('');
+            log('内存:');
+            log('  docker run -m 512m nginx');
+            log('  docker run --memory="256m" nginx');
+            log('');
+            log('CPU:');
+            log('  docker run --cpus=1.5 nginx');
+            log('  docker run --cpuset-cpus=0,2 nginx');
+            log('');
+            log('监控:');
+            log('  docker stats');
+            log('  docker inspect container');
+        }
+    </script>
+</body>
+</html>

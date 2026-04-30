@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 实战: Redis 缓存与中间件</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚡ Go 实战: Redis 缓存与中间件</h2><p>go-redis 客户端、缓存模式 (Cache Aside/Read-Through)、分布式限流、会话存储、消息队列、缓存中间件。</p></div>
+    <div class="card">
+        <h2>go-redis 基础</h2>
+        <div class="code">// ========== go-redis 客户端 ==========
+// import "github.com/redis/go-redis/v9"
+
+type RedisClient struct {
+    *redis.Client
+}
+
+func NewRedisClient(addr, password string, db int) (*RedisClient, error) {
+    client := redis.NewClient(&redis.Options{
+        Addr:         addr,
+        Password:     password,
+        DB:           db,
+        PoolSize:     10,                // 连接池大小
+        MinIdleConns: 5,                 // 最小空闲连接
+        DialTimeout:  5 * time.Second,
+        ReadTimeout:  3 * time.Second,
+        WriteTimeout: 3 * time.Second,
+        PoolTimeout:  4 * time.Second,
+    })
+
+    // 验证连接
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    if err := client.Ping(ctx).Err(); err != nil {
+        return nil, fmt.Errorf("redis connect: %w", err)
+    }
+
+    return &RedisClient{client}, nil
+}
+
+// ========== 基本操作 ==========
+func redisBasicOps(client *redis.Client) {
+    ctx := context.Background()
+
+    // String
+    err := client.Set(ctx, "key", "value", 10*time.Minute).Err()
+    val, err := client.Get(ctx, "key").Result()
+    // 返回: value (string)
+    // 不存在: redis.Nil
+
+    // 过期
+    client.Expire(ctx, "key", 30*time.Second)
+    ttl, _ := client.TTL(ctx, "key").Result()
+
+    // 删除
+    client.Del(ctx, "key")
+
+    // 批量
+    client.MSet(ctx, "k1", "v1", "k2", "v2")
+    vals, _ := client.MGet(ctx, "k1", "k2").Result()
+
+    _ = err
+    _ = val
+    _ = ttl
+    _ = vals
+}
+
+// ========== 哈希操作 ==========
+func hashOps(client *redis.Client) {
+    ctx := context.Background()
+
+    // HSET
+    client.HSet(ctx, "user:1", map[string]interface{}{
+        "name":  "John",
+        "email": "john@test.com",
+        "age":   30,
+    })
+
+    // HGETALL
+    user, _ := client.HGetAll(ctx, "user:1").Result()
+    fmt.Println(user["name"])
+
+    // HGET / HMGET
+    name, _ := client.HGet(ctx, "user:1", "name").Result()
+    values, _ := client.HMGet(ctx, "user:1", "name", "email").Result()
+
+    // HINCRBY
+    client.HIncrBy(ctx, "user:1", "login_count", 1)
+
+    _ = name
+    _ = values
+}
+
+// ========== List / Set / ZSet ==========
+func listOps(client *redis.Client) {
+    ctx := context.Background()
+
+    // List (队列)
+    client.LPush(ctx, "queue", "task1", "task2")
+    task, _ := client.RPop(ctx, "queue").Result()
+
+    // Set
+    client.SAdd(ctx, "tags:go", "concurrency", "channels")
+    members, _ := client.SMembers(ctx, "tags:go").Result()
+    isMember, _ := client.SIsMember(ctx, "tags:go", "concurrency").Result()
+
+    // ZSet (排行榜)
+    client.ZAdd(ctx, "leaderboard", redis.Z{Score: 100, Member: "player1"})
+    top10, _ := client.ZRevRangeWithScores(ctx, "leaderboard", 0, 9).Result()
+
+    _ = task
+    _ = members
+    _ = isMember
+    _ = top10
+}</div>
+    </div>
+    <div class="card">
+        <h2>缓存模式</h2>
+        <div class="code">// ========== Cache Aside 模式 ==========
+// 读: 先查缓存 → 命中返回 → 未命中查DB → 写入缓存
+// 写: 先更新DB → 删除缓存
+
+type CacheAside struct {
+    rdb *redis.Client
+    db  *sql.DB
+}
+
+func (c *CacheAside) GetUser(ctx context.Context, id int) (*User, error) {
+    key := fmt.Sprintf("user:%d", id)
+
+    // 1. 查缓存
+    data, err := c.rdb.Get(ctx, key).Bytes()
+    if err == nil {
+        var user User
+        if err := json.Unmarshal(data, &user); err == nil {
+            return &user, nil
+        }
+    }
+
+    // 2. 缓存未命中, 查数据库
+    user, err := queryUserFromDB(c.db, id)
+    if err != nil {
+        return nil, err
+    }
+
+    // 3. 写入缓存 (设置过期时间)
+    jsonData, _ := json.Marshal(user)
+    c.rdb.Set(ctx, key, jsonData, 30*time.Minute)
+
+    return user, nil
+}
+
+func (c *CacheAside) UpdateUser(ctx context.Context, user *User) error {
+    // 1. 更新数据库
+    err := updateUserInDB(c.db, user)
+    if err != nil {
+        return err
+    }
+
+    // 2. 删除缓存 (不是更新!)
+    key := fmt.Sprintf("user:%d", user.ID)
+    c.rdb.Del(ctx, key)
+
+    return nil
+}
+
+// ========== Read-Through 模式 ==========
+// 缓存层负责回源, 业务层无感知
+
+type ReadThroughCache struct {
+    rdb    *redis.Client
+    loader func(ctx context.Context, key string) (interface{}, error)
+}
+
+func (c *ReadThroughCache) Get(ctx context.Context, key string, dest interface{}) error {
+    // 1. 查缓存
+    data, err := c.rdb.Get(ctx, key).Bytes()
+    if err == nil {
+        return json.Unmarshal(data, dest)
+    }
+
+    // 2. 回源加载
+    result, err := c.loader(ctx, key)
+    if err != nil {
+        return err
+    }
+
+    // 3. 写入缓存
+    jsonData, _ := json.Marshal(result)
+    c.rdb.Set(ctx, key, jsonData, 30*time.Minute)
+
+    // 4. 返回结果
+    jsonData, _ = json.Marshal(result)
+    return json.Unmarshal(jsonData, dest)
+}
+
+// ========== 缓存穿透防护 ==========
+// 查不到也缓存空值 (短过期)
+func (c *CacheAside) GetUserSafe(ctx context.Context, id int) (*User, error) {
+    key := fmt.Sprintf("user:%d", id)
+
+    data, err := c.rdd.Get(ctx, key).Bytes()
+    if err == nil {
+        if len(data) == 0 { // 空值缓存
+            return nil, fmt.Errorf("user not found")
+        }
+        var user User
+        json.Unmarshal(data, &user)
+        return &user, nil
+    }
+
+    user, err := queryUserFromDB(c.db, id)
+    if err != nil {
+        // 缓存空值, 防止缓存穿透
+        c.rdd.Set(ctx, key, []byte{}, 1*time.Minute)
+        return nil, err
+    }
+
+    jsonData, _ := json.Marshal(user)
+    c.rdd.Set(ctx, key, jsonData, 30*time.Minute)
+    return user, nil
+}</div>
+    </div>
+    <div class="card">
+        <h2>分布式限流中间件</h2>
+        <div class="code">// ========== 令牌桶限流 (Redis) ==========
+// 基于 Redis 的分布式限流
+
+type RateLimiter struct {
+    rdb     *redis.Client
+    rate    int           // 每秒请求数
+    burst   int           // 突发上限
+    window  time.Duration // 时间窗口
+}
+
+func NewRateLimiter(rdb *redis.Client, rate, burst int, window time.Duration) *RateLimiter {
+    return &RateLimiter{rdb: rdb, rate: rate, burst: burst, window: window}
+}
+
+// 滑动窗口限流 (Lua 脚本, 原子操作)
+var slidingWindowScript = redis.NewScript(`
+    local key = KEYS[1]
+    local window = tonumber(ARGV[1])
+    local limit = tonumber(ARGV[2])
+    local now = tonumber(ARGV[3])
+
+    -- 清除窗口外的旧记录
+    redis.call("ZREMRANGEBYSCORE", key, 0, now - window)
+
+    -- 获取当前窗口请求数
+    local count = redis.call("ZCARD", key)
+    if count >= limit then
+        return 0
+    end
+
+    -- 记录当前请求
+    redis.call("ZADD", key, now, now .. ":" .. math.random())
+    redis.call("EXPIRE", key, window + 1)
+
+    return 1
+`)
+
+func (rl *RateLimiter) Allow(ctx context.Context, userID string) (bool, error) {
+    key := fmt.Sprintf("ratelimit:%s", userID)
+    now := time.Now().UnixMilli()
+    windowMs := rl.window.Milliseconds()
+
+    result, err := slidingWindowScript.Run(ctx, rl.rdb,
+        []string{key},
+        windowMs, rl.burst, now,
+    ).Int()
+
+    if err != nil {
+        return false, err
+    }
+    return result == 1, nil
+}
+
+// ========== 限流 Gin 中间件 ==========
+func RateLimitMiddleware(rdb *redis.Client, rate, burst int) gin.HandlerFunc {
+    limiter := NewRateLimiter(rdb, rate, burst, time.Second)
+
+    return func(c *gin.Context) {
+        userID := c.GetString("user_id")
+        if userID == "" {
+            userID = c.ClientIP()
+        }
+
+        allowed, err := limiter.Allow(c.Request.Context(), userID)
+        if err != nil || !allowed {
+            c.Header("Retry-After", "1")
+            c.AbortWithStatusJSON(429, gin.H{
+                "error": "too many requests",
+            })
+            return
+        }
+        c.Next()
+    }
+}
+
+// ========== 缓存中间件 ==========
+func CacheMiddleware(rdb *redis.Client, ttl time.Duration) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        if c.Request.Method != "GET" {
+            c.Next()
+            return
+        }
+
+        key := fmt.Sprintf("cache:%s:%s", c.Request.Method, c.Request.URL.RequestURI())
+
+        // 尝试从缓存获取
+        cached, err := rdb.Get(c.Request.Context(), key).Bytes()
+        if err == nil {
+            c.Data(200, "application/json", cached)
+            c.Abort()
+            return
+        }
+
+        // 捕获响应
+        writer := &cacheResponseWriter{body: &bytes.Buffer{}, ResponseWriter: c.Writer}
+        c.Writer = writer
+        c.Next()
+
+        // 写入缓存 (仅 2xx)
+        if c.Writer.Status() >= 200 && c.Writer.Status() < 300 {
+            rdb.Set(c.Request.Context(), key, writer.body.Bytes(), ttl)
+        }
+    }
+}
+
+type cacheResponseWriter struct {
+    gin.ResponseWriter
+    body *bytes.Buffer
+}
+
+func (w *cacheResponseWriter) Write(data []byte) (int, error) {
+    w.body.Write(data)
+    return w.ResponseWriter.Write(data)
+}</div>
+    </div>
+    <div class="card">
+        <h2>会话存储与消息队列</h2>
+        <div class="code">// ========== Redis 会话存储 ==========
+type SessionStore struct {
+    rdb *redis.Client
+}
+
+func NewSessionStore(rdb *redis.Client) *SessionStore {
+    return &SessionStore{rdb: rdb}
+}
+
+func (s *SessionStore) CreateSession(ctx context.Context, userID int) (string, error) {
+    sessionID := uuid.New().String()
+    key := fmt.Sprintf("session:%s", sessionID)
+
+    session := map[string]interface{}{
+        "user_id":    userID,
+        "created_at": time.Now().Unix(),
+        "ip":         "",
+    }
+
+    err := s.rdb.HSet(ctx, key, session).Err()
+    if err != nil {
+        return "", err
+    }
+
+    // 30 分钟过期
+    s.rdb.Expire(ctx, key, 30*time.Minute)
+    return sessionID, nil
+}
+
+func (s *SessionStore) GetUserID(ctx context.Context, sessionID string) (int, error) {
+    key := fmt.Sprintf("session:%s", sessionID)
+    userID, err := s.rdb.HGet(ctx, key, "user_id").Int()
+    if err == redis.Nil {
+        return 0, fmt.Errorf("session expired")
+    }
+    return userID, err
+}
+
+func (s *SessionStore) Refresh(ctx context.Context, sessionID string) error {
+    key := fmt.Sprintf("session:%s", sessionID)
+    return s.rdb.Expire(ctx, key, 30*time.Minute).Err()
+}
+
+func (s *SessionStore) Delete(ctx context.Context, sessionID string) error {
+    return s.rdb.Del(ctx, fmt.Sprintf("session:%s", sessionID)).Err()
+}
+
+// ========== Redis 消息队列 ==========
+// List 做简单队列
+
+type TaskQueue struct {
+    rdb *redis.Client
+    key string
+}
+
+func (q *TaskQueue) Enqueue(ctx context.Context, task interface{}) error {
+    data, _ := json.Marshal(task)
+    return q.rdb.LPush(ctx, q.key, data).Err()
+}
+
+func (q *TaskQueue) Dequeue(ctx context.Context, timeout time.Duration) ([]byte, error) {
+    // BRPOP: 阻塞弹出, 支持超时
+    result, err := q.rdb.BRPop(ctx, timeout, q.key).Result()
+    if err != nil {
+        return nil, err
+    }
+    // result[0] = key, result[1] = value
+    return []byte(result[1]), nil
+}
+
+// ========== Redis 分布式锁 ==========
+func AcquireLock(ctx context.Context, rdb *redis.Client, key string, ttl time.Duration) (bool, error) {
+    return rdb.SetNX(ctx, key, "1", ttl).Result()
+}
+
+func ReleaseLock(ctx context.Context, rdb *redis.Client, key string) error {
+    return rdb.Del(ctx, key).Err()
+}
+
+// 使用:
+// locked, err := AcquireLock(ctx, rdb, "lock:order:1", 10*time.Second)
+// if locked {
+//     defer ReleaseLock(ctx, rdb, "lock:order:1")
+//     // 处理订单
+// }
+
+// ========== 完整示例: Gin + Redis ==========
+func setupRedisApp() *gin.Engine {
+    rdb, _ := NewRedisClient("localhost:6379", "", 0)
+    r := gin.Default()
+
+    // 全局缓存中间件
+    r.Use(CacheMiddleware(rdb, 5*time.Minute))
+
+    // 限流
+    r.Use(RateLimitMiddleware(rdb, 100, 200))
+
+    // 路由
+    r.GET("/api/users/:id", func(c *gin.Context) {
+        id := c.Param("id")
+        // 缓存由中间件处理
+        c.JSON(200, gin.H{"user_id": id})
+    })
+
+    return r
+}</div>
+        <div class="note">💡 Redis 实战要点: go-redis 客户端连接池配置; String/Hash/List/Set/ZSet 操作; redis.Nil 判断键不存在; Cache Aside 模式 (读缓存→回源DB→写缓存, 写DB→删缓存); 缓存穿透防护 (空值缓存); 滑动窗口限流 Lua 脚本; 缓存中间件捕获响应体; 会话存储 HSet + Expire; 消息队列 LPUSH + BRPop; 分布式锁 SetNX + Del。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoRedis()">go-redis</button>
+        <button onclick="demoCache()">缓存模式</button>
+        <button onclick="demoLimit()">限流</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoRedis() {
+            result.innerHTML = '';
+            log('# go-redis 基础');
+            log('');
+            log('连接:');
+            log('  redis.NewClient(&redis.Options{...})');
+            log('  client.Ping(ctx)');
+            log('');
+            log('操作:');
+            log('  Set/Get/Del/Expire');
+            log('  HSet/HGet/HGetAll/HIncrBy');
+            log('  LPush/RPop/LPush+BRPop');
+            log('  SAdd/SMembers/SIsMember');
+            log('  ZAdd/ZRevRangeWithScores');
+        }
+
+        function demoCache() {
+            result.innerHTML = '';
+            log('# 缓存模式');
+            log('');
+            log('Cache Aside:');
+            log('  读: 缓存→未命中→DB→写缓存');
+            log('  写: 更新DB→删缓存');
+            log('');
+            log('Read-Through:');
+            log('  缓存层自动回源');
+            log('  loader func(ctx, key) (interface{}, error)');
+            log('');
+            log('穿透防护:');
+            log('  空值缓存 + 短过期 (1min)');
+            log('  Bloom Filter 前置过滤');
+        }
+
+        function demoLimit() {
+            result.innerHTML = '';
+            log('# 分布式限流');
+            log('');
+            log('滑动窗口 (Lua):');
+            log('  ZREMRANGEBYSCORE 清理旧记录');
+            log('  ZCARD 统计数量');
+            log('  ZADD 记录新请求');
+            log('  EXPIRE 自动清理');
+            log('');
+            log('中间件:');
+            log('  RateLimitMiddleware(rdb, 100, 200)');
+            log('  userID or ClientIP 限流');
+            log('  429 + Retry-After');
+        }
+    </script>
+</body>
+</html>

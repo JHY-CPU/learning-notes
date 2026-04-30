@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 并发设计模式与应用</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🧩 Go 并发设计模式与应用</h2><p>并发模式分类 (数据/任务/协调)、生产者-消费者、管道过滤、扇出/扇入、发布-订阅、并发安全单例、速率限制、熔断器模式实现。</p></div>
+    <div class="card">
+        <h2>生产者-消费者</h2>
+        <div class="code">// ========== 生产者-消费者 ==========
+// 最基础的并发模式
+
+type ProducerConsumer struct {
+    bufferSize int
+}
+
+func (pc *ProducerConsumer) Run() {
+    // 缓冲 channel 解耦生产和消费
+    jobs := make(chan int, pc.bufferSize)
+    done := make(chan struct{})
+
+    // 生产者 (多个)
+    go func() {
+        for i := 0; i < 20; i++ {
+            jobs <- i
+            fmt.Println("生产:", i)
+        }
+        close(jobs)
+    }()
+
+    // 消费者 (多个)
+    for w := 0; w < 3; w++ {
+        go func(id int) {
+            for job := range jobs {
+                fmt.Printf("消费者 %d 消费: %d\n", id, job)
+            }
+            done <- struct{}{}
+        }(w)
+    }
+
+    // 等待所有消费者完成
+    for w := 0; w < 3; w++ {
+        <-done
+    }
+}
+
+// ========== 发布-订阅 (Pub/Sub) ==========
+type PubSub struct {
+    mu       sync.RWMutex
+    subscribers map[string][]chan interface{}
+}
+
+func NewPubSub() *PubSub {
+    return &PubSub{
+        subscribers: make(map[string][]chan interface{}),
+    }
+}
+
+func (ps *PubSub) Subscribe(topic string) <-chan interface{} {
+    ps.mu.Lock()
+    defer ps.mu.Unlock()
+
+    ch := make(chan interface{}, 1)
+    ps.subscribers[topic] = append(ps.subscribers[topic], ch)
+    return ch
+}
+
+func (ps *PubSub) Publish(topic string, msg interface{}) {
+    ps.mu.RLock()
+    defer ps.mu.RUnlock()
+
+    for _, ch := range ps.subscribers[topic] {
+        // 非阻塞发送 (如果订阅者慢则丢弃)
+        select {
+        case ch <- msg:
+        default:
+            // 丢弃消息 (或记录日志)
+        }
+    }
+}
+
+func (ps *PubSub) Close() {
+    ps.mu.Lock()
+    defer ps.mu.Unlock()
+
+    for _, subs := range ps.subscribers {
+        for _, ch := range subs {
+            close(ch)
+        }
+    }
+}
+
+// 使用:
+// ps := NewPubSub()
+// ch1 := ps.Subscribe("events")
+// go func() {
+//     for msg := range ch1 { fmt.Println(msg) }
+// }()
+// ps.Publish("events", "hello")</div>
+    </div>
+    <div class="card">
+        <h2>速率限制与熔断</h2>
+        <div class="code">// ========== 令牌桶限流 ==========
+type TokenBucket struct {
+    rate     float64       // 令牌生成速率
+    capacity float64       // 桶容量
+    tokens   float64       // 当前令牌
+    lastFill time.Time
+    mu       sync.Mutex
+}
+
+func NewTokenBucket(rate, capacity float64) *TokenBucket {
+    return &TokenBucket{
+        rate:     rate,
+        capacity: capacity,
+        tokens:   capacity,
+        lastFill: time.Now(),
+    }
+}
+
+func (tb *TokenBucket) Allow() bool {
+    tb.mu.Lock()
+    defer tb.mu.Unlock()
+
+    // 补充令牌
+    now := time.Now()
+    elapsed := now.Sub(tb.lastFill).Seconds()
+    tb.tokens = math.Min(tb.capacity, tb.tokens+elapsed*tb.rate)
+    tb.lastFill = now
+
+    if tb.tokens >= 1 {
+        tb.tokens--
+        return true
+    }
+    return false
+}
+
+// 使用:
+// bucket := NewTokenBucket(10, 20) // 每秒 10 个, 突发 20 个
+// if bucket.Allow() { process() }
+
+// ========== 速率限制 + Context ==========
+func rateLimit(ctx context.Context, fn func() error, rateLimit float64) error {
+    limiter := NewTokenBucket(rateLimit, rateLimit)
+
+    for {
+        select {
+        case <-ctx.Done():
+            return ctx.Err()
+        default:
+            if limiter.Allow() {
+                return fn()
+            }
+            time.Sleep(time.Duration(1000/rateLimit) * time.Millisecond)
+        }
+    }
+}
+
+// ========== 熔断器 (Circuit Breaker) ==========
+type State int
+
+const (
+    StateClosed State = iota    // 正常
+    StateOpen                   // 熔断 (拒绝请求)
+    StateHalfOpen               // 半开 (尝试恢复)
+)
+
+type CircuitBreaker struct {
+    mu              sync.Mutex
+    state           State
+    failures        int
+    threshold       int           // 失败阈值
+    recoveryTimeout time.Duration // 恢复超时
+    lastFailure     time.Time
+}
+
+func NewCircuitBreaker(threshold int, timeout time.Duration) *CircuitBreaker {
+    return &CircuitBreaker{
+        state:           StateClosed,
+        threshold:       threshold,
+        recoveryTimeout: timeout,
+    }
+}
+
+func (cb *CircuitBreaker) Execute(fn func() error) error {
+    cb.mu.Lock()
+
+    if cb.state == StateOpen {
+        if time.Since(cb.lastFailure) > cb.recoveryTimeout {
+            cb.state = StateHalfOpen
+        } else {
+            cb.mu.Unlock()
+            return fmt.Errorf("circuit breaker open")
+        }
+    }
+    cb.mu.Unlock()
+
+    err := fn()
+
+    cb.mu.Lock()
+    defer cb.mu.Unlock()
+
+    if err != nil {
+        cb.failures++
+        cb.lastFailure = time.Now()
+        if cb.failures >= cb.threshold {
+            cb.state = StateOpen
+        }
+        return err
+    }
+
+    // 成功
+    if cb.state == StateHalfOpen {
+        cb.state = StateClosed  // 恢复
+    }
+    cb.failures = 0
+    return nil
+}
+
+// ========== 超时 + 重试 + 熔断 ==========
+func robustCall(ctx context.Context, fn func() error, maxRetries int) error {
+    cb := NewCircuitBreaker(5, 10*time.Second)
+
+    for i := 0; i < maxRetries; i++ {
+        err := cb.Execute(func() error {
+            done := make(chan error, 1)
+            go func() { done <- fn() }()
+
+            select {
+            case err := <-done:
+                return err
+            case <-ctx.Done():
+                return ctx.Err()
+            }
+        })
+
+        if err == nil {
+            return nil
+        }
+
+        // 检查是否可重试
+        if errors.Is(err, context.DeadlineExceeded) ||
+           errors.Is(err, context.Canceled) {
+            return err  // 不重试
+        }
+
+        time.Sleep(time.Duration(1<<i) * 100 * time.Millisecond)
+    }
+    return fmt.Errorf("重试 %d 次后失败", maxRetries)
+}</div>
+    </div>
+    <div class="card">
+        <h2>并发安全单例</h2>
+        <div class="code">// ========== 单例模式 4 种实现 ==========
+
+// 1. 包级别变量 (最简单的单例)
+var GlobalConfig = loadConfig()
+func loadConfig() *Config {
+    return &Config{Host: "localhost", Port: 8080}
+}
+
+// 2. sync.Once (懒加载, 线程安全)
+var (
+    config     *Config
+    configOnce sync.Once
+)
+
+func GetConfig() *Config {
+    configOnce.Do(func() {
+        config = loadConfig()
+    })
+    return config
+}
+
+// 3. init() 函数 (程序启动时初始化)
+var dbPool *sql.DB
+
+func init() {
+    var err error
+    dbPool, err = sql.Open("postgres", dsn)
+    if err != nil {
+        log.Fatal(err)
+    }
+}
+
+// 4. 原子指针 (懒加载 + 无锁)
+var configPtr atomic.Pointer[Config]
+
+func GetConfigAtomic() *Config {
+    if c := configPtr.Load(); c != nil {
+        return c
+    }
+
+    // 慢路径: 创建并原子存储
+    c := loadConfig()
+    configPtr.Store(c)
+    return c
+}
+
+// ========== 并行处理模式 ==========
+
+// 1. 分而治之
+func divideAndConquer(items []int, fn func(int) int) []int {
+    if len(items) < 100 {
+        // 小数据直接处理
+        result := make([]int, len(items))
+        for i, item := range items {
+            result[i] = fn(item)
+        }
+        return result
+    }
+
+    // 大数据分半处理
+    mid := len(items) / 2
+    var wg sync.WaitGroup
+    var result1, result2 []int
+
+    wg.Add(2)
+    go func() {
+        result1 = divideAndConquer(items[:mid], fn)
+        wg.Done()
+    }()
+    go func() {
+        result2 = divideAndConquer(items[mid:], fn)
+        wg.Done()
+    }()
+    wg.Wait()
+
+    return append(result1, result2...)
+}
+
+// 2. MapReduce (简化版)
+func MapReduce[T, U, V any](
+    items []T,
+    mapper func(T) U,
+    reducer func(V, U) V,
+    initial V,
+    workers int,
+) V {
+    input := make(chan T, len(items))
+    output := make(chan U, len(items))
+
+    // Map
+    var mapWg sync.WaitGroup
+    for i := 0; i < workers; i++ {
+        mapWg.Add(1)
+        go func() {
+            defer mapWg.Done()
+            for item := range input {
+                output <- mapper(item)
+            }
+        }()
+    }
+
+    // 发送输入
+    for _, item := range items {
+        input <- item
+    }
+    close(input)
+
+    // 等待 Map 完成, 关闭 output
+    go func() {
+        mapWg.Wait()
+        close(output)
+    }()
+
+    // Reduce (单线程)
+    result := initial
+    for v := range output {
+        result = reducer(result, v)
+    }
+    return result
+}
+
+// 使用:
+// sum := MapReduce([]int{1,2,3,4,5},
+//     func(v int) int { return v * 2 },     // map
+//     func(acc, v int) int { return acc + v }, // reduce
+//     0, 3)</div>
+    </div>
+    <div class="card">
+        <h2>并发模式选择指南</h2>
+        <div class="code">// ========== 并发模式决策树 ==========
+//
+// 1. 数据流向
+//    单向 (A→B) → Pipeline / 生产者-消费者
+//    双向 (A↔B) → channel 通信
+//    广播 (1→N) → Pub/Sub
+//    聚合 (N→1) → Fan-In
+//
+// 2. 任务特征
+//    独立任务 → Fan-Out (多个 worker)
+//    分阶段 → Pipeline
+//    需合并 → MapReduce
+//    需降级 → 熔断器
+//    需限速 → 令牌桶
+//
+// 3. 协调需求
+//    同步等待 → WaitGroup
+//    取消信号 → Context
+//    单次初始化 → Once
+//    并发限制 → Semaphore (channel)
+//    条件等待 → sync.Cond / channel
+
+// ========== 并发模型的权衡 ==========
+// channel: 通信 + 同步, 但增加了 goroutine 管理开销
+// mutex:   直接, 高效, 但容易出错 (死锁)
+// atomic:  最快, 但只适用于简单状态
+
+// 经验法则:
+// 1. 优先使用 channel 通信 (Go 哲学)
+// 2. 共享状态用 mutex 保护
+// 3. 简单计数器用 atomic
+// 4. 有超时/取消用 context
+// 5. 控制并发数用 semaphore
+
+// ========== 并发安全指南 ==========
+// 1. 谁创建, 谁负责
+//    - 创建 goroutine 的函数应负责其退出
+// 2. 明确 ownership
+//    - channel 的创建者负责关闭
+//    - mutex 的持有者负责解锁
+// 3. 不要猜并发安全性
+//    - 默认不是并发安全的
+//    - 文档说明并发安全性
+// 4. 数据竞争用 -race 检测
+//    go run -race main.go
+//    go test -race ./...
+
+// ========== 完整代码: 并发版 Web 爬虫 ==========
+type Crawler struct {
+    urls   chan string
+    done   chan struct{}
+    wg     sync.WaitGroup
+    result sync.Map  // URL → 状态
+}
+
+func NewCrawler(workers int) *Crawler {
+    c := &Crawler{
+        urls: make(chan string, 100),
+        done: make(chan struct{}),
+    }
+
+    // 启动 workers
+    for i := 0; i < workers; i++ {
+        c.wg.Add(1)
+        go func() {
+            defer c.wg.Done()
+            for {
+                select {
+                case url, ok := <-c.urls:
+                    if !ok {
+                        return
+                    }
+                    status := c.fetch(url)
+                    c.result.Store(url, status)
+                case <-c.done:
+                    return
+                }
+            }
+        }()
+    }
+
+    return c
+}
+
+func (c *Crawler) fetch(url string) int {
+    resp, err := http.Get(url)
+    if err != nil {
+        return 0
+    }
+    defer resp.Body.Close()
+    return resp.StatusCode
+}
+
+func (c *Crawler) Add(url string) {
+    c.urls <- url
+}
+
+func (c *Crawler) Close() {
+    close(c.done)
+    c.wg.Wait()
+}</div>
+        <div class="note">💡 并发设计模式: 生产者-消费者 (缓冲 channel 解耦); Pub/Sub (topic → list[chan]); 令牌桶限流; 熔断器 (closed/open/half-open); 单例 (Once/原子指针/init); MapReduce 分治; 决策树: 数据单向→Pipeline, 独立任务→Fan-Out, 需合并→Fan-In; 通道优先, Mutex 保护共享状态, atomic 简单计数, context 控制生命周期; 谁创建谁负责; -race 检测数据竞争。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoProdCons()">生产者-消费者</button>
+        <button onclick="demoCircuit()">熔断器</button>
+        <button onclick="demoDecision()">模式选择</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoProdCons() {
+            result.innerHTML = '';
+            log('# 生产者-消费者');
+            log('');
+            log('jobs := make(chan int, bufferSize)');
+            log('');
+            log('生产者 → jobs → 消费者');
+            log('');
+            log('变体:');
+            log('  1. 多生产 → 单消费');
+            log('  2. 单生产 → 多消费 (Fan-Out)');
+            log('  3. 多生产 → 多消费');
+            log('');
+            log('Pub/Sub 模式:');
+            log('  Subscribe(topic) → <-chan');
+            log('  Publish(topic, msg)');
+        }
+
+        function demoCircuit() {
+            result.innerHTML = '';
+            log('# 熔断器 Circuit Breaker');
+            log('');
+            log('状态机:');
+            log('  Closed (正常)');
+            log('    ↓ 失败数 > 阈值');
+            log('  Open (熔断)');
+            log('    ↓ 超时恢复');
+            log('  Half-Open (半开)');
+            log('    ↓ 成功 → Closed');
+            log('    ↓ 失败 → Open');
+            log('');
+            log('使用:');
+            log('  cb := NewCircuitBreaker(5, 10s)');
+            log('  cb.Execute(fn)');
+        }
+
+        function demoDecision() {
+            result.innerHTML = '';
+            log('# 并发模式选择');
+            log('');
+            log('数据流向:');
+            log('  A→B    → Pipeline');
+            log('  1→N    → Pub/Sub');
+            log('  N→1    → Fan-In');
+            log('');
+            log('任务特征:');
+            log('  独立   → Fan-Out');
+            log('  分阶段 → Pipeline');
+            log('  需合并 → MapReduce');
+            log('');
+            log('原语选择:');
+            log('  channel → 通信');
+            log('  Mutex   → 共享状态');
+            log('  atomic  → 简单计数');
+            log('  Context → 取消/超时');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>引用与拷贝</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>引用与拷贝</h2><p>原始类型按值传递，对象类型按引用传递。</p></div>
+    <div class="card">
+        <h2>值类型 vs 引用类型</h2>
+        <div class="code">// 值类型（存储在栈中）
+let a = 10;
+let b = a;  // 复制值
+a = 20;
+console.log(b);  // 10（互不影响）
+
+// 引用类型（存储在堆中，变量存的是地址）
+let obj1 = { name: 'Alice' };
+let obj2 = obj1;  // 复制引用（地址）
+obj1.name = 'Bob';
+console.log(obj2.name);  // 'Bob'（都被改了！）</div>
+    </div>
+    <div class="card">
+        <h2>浅拷贝</h2>
+        <div class="code">// 只复制第一层，嵌套对象还是共享引用
+
+// 方式一：展开运算符（推荐）
+const original = { name: 'Alice', address: { city: 'Beijing' } };
+const copy1 = { ...original };
+
+// 方式二：Object.assign
+const copy2 = Object.assign({}, original);
+
+// 问题：嵌套对象仍是引用
+copy1.address.city = 'Shanghai';
+console.log(original.address.city);  // 'Shanghai'（也被改了！）</div>
+    </div>
+    <div class="card">
+        <h2>深拷贝</h2>
+        <div class="code">// 完全复制所有层级，互不影响
+
+// 方式一：JSON 法（最简单，但有局限）
+const deepCopy = JSON.parse(JSON.stringify(original));
+
+// 局限：
+// - 不支持函数、undefined、Symbol
+// - 不支持循环引用
+// - Date → 字符串
+// - RegExp → {}
+
+// 方式二：structuredClone（现代浏览器，推荐）
+// const deepCopy = structuredClone(original);
+
+// 局限：
+// - 不支持函数、Symbol
+// - 支持循环引用、Date、RegExp、Map、Set</div>
+    </div>
+    <div class="card">
+        <h2>对比示例</h2>
+        <div class="code">const original = {
+    num: 0,
+    str: 'hello',
+    bool: true,
+    arr: [1, 2, { nested: 'object' }],
+    obj: { x: 10 },
+    fn: function() { return 42; },
+    date: new Date(),
+    undef: undefined
+};
+
+// 浅拷贝
+const shallow = { ...original };
+
+// JSON 深拷贝
+const jsonDeep = JSON.parse(JSON.stringify(original));
+// 丢失: fn, undef, date变成字符串
+
+// structuredClone
+// const clone = structuredClone(original);
+// 保留: date, arr, obj, 循环引用
+// 丢失: fn</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== 值类型 vs 引用类型 ===');
+        let a = 10;
+        let b = a;
+        a = 20;
+        console.log('值类型 - a:', a, 'b:', b);  // 20, 10
+
+        let obj1 = { value: 10 };
+        let obj2 = obj1;
+        obj1.value = 20;
+        console.log('引用类型 - obj1:', obj1.value, 'obj2:', obj2.value);  // 20, 20
+
+        console.log('=== 浅拷贝 ===');
+        const original = {
+            name: 'Alice',
+            scores: { math: 90, english: 85 }
+        };
+
+        const shallow = { ...original };
+        shallow.name = 'Bob';
+        console.log('修改浅拷贝的name:', original.name);  // 'Alice'（不受影响）
+
+        shallow.scores.math = 95;
+        console.log('修改浅拷贝的嵌套对象:', original.scores.math);  // 95（被影响了！）
+
+        console.log('=== 深拷贝（JSON法） ===');
+        const deep = JSON.parse(JSON.stringify(original));
+        deep.scores.math = 60;
+        console.log('深拷贝后原对象:', original.scores.math);  // 95（不受影响）
+
+        console.log('=== 数组的引用 ===');
+        const arr1 = [1, 2, 3];
+        const arr2 = arr1;
+        arr1.push(4);
+        console.log('arr1:', arr1, 'arr2:', arr2);  // 都是 [1,2,3,4]
+
+        const arr3 = [...arr1];  // 浅拷贝数组
+        arr1.push(5);
+        console.log('arr1:', arr1, 'arr3:', arr3);  // arr3 不受影响
+
+        document.getElementById('output').textContent =
+            `值类型: a=20, b=10（独立）\n` +
+            `引用类型: 浅拷贝修改嵌套对象会影响原对象\n` +
+            `深拷贝: JSON.parse(JSON.stringify()) 完全独立\n` +
+            `✅ 引用与拷贝演示完成！`;
+    </script>
+</body>
+</html>

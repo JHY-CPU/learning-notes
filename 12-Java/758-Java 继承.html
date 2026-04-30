@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java 继承</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🧬 Java 继承</h2><p>extends 关键字、super 关键字、方法重写 @Override、继承链、构造器链、Object 类、final 关键字与继承。</p></div>
+    <div class="card">
+        <h2>继承基础</h2>
+        <div class="code">// ========== 继承 (Inheritance) ==========
+// is-a 关系: Dog is-a Animal
+// 子类 extends 父类
+// 子类继承父类的非 private 成员
+// Java 单继承: 每个类只能有一个直接父类
+
+// ========== 基类 (父类/超类) ==========
+class Animal {
+    String name;
+    int age;
+
+    public Animal(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    void eat() {
+        System.out.println(name + " is eating");
+    }
+
+    void sleep() {
+        System.out.println(name + " is sleeping");
+    }
+
+    // 子类可以重写的方法
+    void makeSound() {
+        System.out.println(name + " makes a sound");
+    }
+}
+
+// ========== 派生类 (子类) ==========
+class Dog extends Animal {
+    String breed;  // 子类新增字段
+
+    public Dog(String name, int age, String breed) {
+        super(name, age);  // 调用父类构造器 (必须第一行)
+        this.breed = breed;
+    }
+
+    // 子类新增方法
+    void wagTail() {
+        System.out.println(name + " is wagging tail");
+    }
+
+    // ========== 方法重写 (@Override) ==========
+    @Override
+    void makeSound() {
+        System.out.println(name + " barks: Woof! Woof!");
+    }
+
+    // super. 访问父类被重写的方法
+    @Override
+    void eat() {
+        super.eat();  // 先调用父类方法
+        System.out.println(name + " eats dog food");
+    }
+}
+
+class Cat extends Animal {
+    public Cat(String name, int age) {
+        super(name, age);
+    }
+
+    @Override
+    void makeSound() {
+        System.out.println(name + " meows: Meow~");
+    }
+}
+
+// ========== 使用继承 ==========
+public class InheritanceDemo {
+    public static void main(String[] args) {
+        Dog dog = new Dog("Buddy", 3, "Golden Retriever");
+        Cat cat = new Cat("Whiskers", 2);
+
+        dog.eat();         // 继承自 Animal
+        dog.sleep();       // 继承自 Animal
+        dog.makeSound();   // 重写的方法
+        dog.wagTail();     // Dog 独有的方法
+
+        cat.makeSound();   // "Whiskers meows: Meow~"
+
+        // instanceof 检查
+        System.out.println(dog instanceof Dog);     // true
+        System.out.println(dog instanceof Animal);  // true (is-a)
+        System.out.println(dog instanceof Object);  // true
+
+        // 父类引用指向子类对象 (多态)
+        Animal a = new Dog("Max", 1, "Beagle");
+        a.makeSound();  // 动态绑定 → Dog 的 makeSound()
+        // a.wagTail();  // ❌ 编译错误! Animal 没有 wagTail()
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>super 关键字</h2>
+        <div class="code">// ========== super 关键字 ==========
+// 1. super() — 调用父类构造器 (必须在第一行)
+// 2. super.xxx — 访问父类成员 (被隐藏的字段/被重写的方法)
+
+class Parent {
+    String value = "parent value";
+
+    Parent() {
+        System.out.println("Parent constructor");
+    }
+
+    Parent(String msg) {
+        System.out.println("Parent constructor: " + msg);
+    }
+
+    void show() {
+        System.out.println("Parent show: " + value);
+    }
+}
+
+class Child extends Parent {
+    String value = "child value";  // 隐藏父类字段 (不推荐)
+
+    Child() {
+        // 默认调用 super() — 即使不写
+        System.out.println("Child constructor");
+    }
+
+    Child(String msg) {
+        super(msg);  // 调用父类有参构造器
+        System.out.println("Child constructor with msg");
+    }
+
+    @Override
+    void show() {
+        System.out.println("Child show: " + this.value);
+        System.out.println("Parent value: " + super.value);  // 访问父类字段
+        super.show();  // 调用父类被重写的方法
+    }
+}
+
+// ========== 构造器链 ==========
+// 创建子类对象时:
+// 1. 先调用父类构造器 (从最顶层开始)
+// 2. 再初始化子类字段
+// 3. 执行子类构造器体
+
+class A {
+    A() { System.out.println("A"); }
+}
+
+class B extends A {
+    B() { System.out.println("B"); }
+}
+
+class C extends B {
+    C() { System.out.println("C"); }
+}
+
+// new C() 输出:
+// A
+// B
+// C
+
+// ========== 继承中的注意事项 ==========
+// 1. 子类构造器必须调用父类构造器 (显式 super() 或默认)
+// 2. 如果父类没有无参构造器, 子类必须显式调用 super(参数)
+// 3. final 类不能被继承 (如 String, Math, System)
+// 4. final 方法不能被重写
+// 5. static 方法不参与重写 (隐藏, 不是重写)
+// 6. private 成员不能继承
+// 7. 不同包中, 子类只能访问 protected/public 成员</div>
+    </div>
+    <div class="card">
+        <h2>方法重写规则</h2>
+        <div class="code">// ========== 方法重写 @Override ==========
+// 子类重新定义父类的方法
+
+class OverrideRules {
+
+    // ========== 重写规则 ==========
+    // 1. 方法签名必须相同 (方法名 + 参数列表)
+    // 2. 返回类型: 相同 或 子类 (协变返回类型)
+    // 3. 访问修饰符: 不能更严格 (可以更宽松)
+    //    private → 不能重写
+    //    default → protected/public
+    //    protected → public
+    //    public → public (只能相同)
+    // 4. 抛出的异常: 不能更宽泛 (可以更具体或更少)
+    // 5. 必须是非 static 方法
+
+    // ========== @Override 注解 ==========
+    // 不是必须的, 但强烈建议
+    // 编译器检查是否真的重写了
+    // 防止拼写错误/签名不匹配
+}
+
+class Base {
+    protected Number calculate(int x) throws Exception {
+        return x * 2;
+    }
+}
+
+class Derived extends Base {
+    // ✅ 正确重写:
+    // - 相同签名 calculate(int)
+    // - 返回 Integer (Number 的子类)
+    // - 权限 public (比 protected 宽松)
+    // - 不抛异常 (比 Exception 更少)
+    @Override
+    public Integer calculate(int x) {
+        return x * 3;
+    }
+}
+
+// ========== 重写 vs 重载 ==========
+// 重写 (Override): 父子类, 同签名, 运行时多态
+// 重载 (Overload): 同类, 不同参数, 编译时多态
+
+class Comparison {
+    // 重载: 同类, 参数不同
+    void process(int x) {}
+    void process(String s) {}
+
+    // 重写: 在子类中 @Override
+}
+
+// ========== 隐藏字段和方法 ==========
+// 字段: 子类定义同名字段 → 隐藏父类字段 (不是重写!)
+// 静态方法: 子类定义相同静态方法 → 隐藏父类静态方法
+// 通过引用类型决定调用哪个, 不是实际对象类型!
+
+class HideBase {
+    static String msg = "base";
+    static void greet() { System.out.println("Base hello"); }
+}
+
+class HideSub extends HideBase {
+    static String msg = "sub";  // 隐藏父类字段
+    static void greet() { System.out.println("Sub hello"); }  // 隐藏
+}
+
+// HideBase.greet();   // "Base hello"
+// HideSub.greet();    // "Sub hello"
+// HideBase b = new HideSub();
+// b.greet();          // "Base hello" (静态方法: 编译时类型决定!)</div>
+    </div>
+    <div class="card">
+        <h2>Object 类与继承链</h2>
+        <div class="code">// ========== Object 类 ==========
+// 所有类的根父类 (一切皆对象)
+// 如果没有显式 extends, 默认继承 Object
+
+// class MyClass { }  // 等价于 class MyClass extends Object { }
+
+// ========== Object 的方法 ==========
+class ObjectMethods {
+    // 1. toString() — 返回字符串表示
+    // 默认: 类名@哈希码 → 建议重写
+
+    // 2. equals(Object obj) — 比较相等
+    // 默认: == 比较引用 → 建议重写
+
+    // 3. hashCode() — 哈希码
+    // 约定: equals 相等 → hashCode 必须相等
+    //       equals 不等 → hashCode 最好不等
+
+    // 4. getClass() — 返回运行时类 (final)
+    // 5. clone() — 对象克隆 (需实现 Cloneable)
+    // 6. finalize() — GC 前调用 (已废弃)
+    // 7. wait()/notify()/notifyAll() — 线程间通信
+}
+
+// ========== 正确重写 equals/hashCode ==========
+import java.util.Objects;
+
+class Person {
+    private String name;
+    private int age;
+
+    @Override
+    public String toString() {
+        return "Person{name='" + name + "', age=" + age + "}";
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;          // 同一引用
+        if (obj == null) return false;          // null
+        if (getClass() != obj.getClass()) return false;  // 类型相同
+
+        Person other = (Person) obj;            // 类型转换
+        return age == other.age &&
+               Objects.equals(name, other.name); // 比较字段
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(name, age);  // 用相同字段计算
+    }
+    // 如果用 HashSet/HashMap, 必须重写 equals + hashCode!
+}
+
+// ========== instanceof 模式匹配 (Java 16+) ==========
+// 传统:
+// if (obj instanceof String) {
+//     String s = (String) obj;
+//     System.out.println(s.length());
+// }
+
+// Java 16+:
+// if (obj instanceof String s) {
+//     System.out.println(s.length());  // 自动转型!
+// }
+
+// ========== final 与继承 ==========
+// final class 不能被继承
+final class FinalClass { }
+// class Sub extends FinalClass { }  // ❌ 编译错误!
+
+// final 方法不能被重写
+class FinalMethod {
+    final void cannotOverride() { }
+}
+
+// final 变量: 值不能修改 (常量)</div>
+        <div class="note">💡 继承要点: extends 单继承; super() 调父类构造器 (第一行); @Override 重写方法 (签名相同 + 权限不更严 + 返回类型协变); 构造器链从顶向下; Object 是所有类的根; 重写 equals 必须同时重写 hashCode; final 类/方法禁止继承/重写; static 方法隐藏而非重写; instanceof 检查类型。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoExtends()">继承基础</button>
+        <button onclick="demoOverride()">重写规则</button>
+        <button onclick="demoObject()">Object 类</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoExtends() {
+            result.innerHTML = '';
+            log('# 继承 (extends)');
+            log('');
+            log('class Animal { }');
+            log('class Dog extends Animal { }');
+            log('');
+            log('子类继承父类非 private 成员');
+            log('super(name, age) 调用父类构造器');
+            log('super.method() 调用父类方法');
+            log('');
+            log('Java 单继承: 一个类只有一个父类');
+        }
+
+        function demoOverride() {
+            result.innerHTML = '';
+            log('# @Override 重写规则');
+            log('');
+            log('✓ 方法签名相同');
+            log('✓ 返回类型相同或子类');
+            log('✓ 权限不能更严格');
+            log('✓ 异常不能更宽泛');
+            log('');
+            log('重写 vs 重载:');
+            log('  Override: 父子类, 同签名');
+            log('  Overload: 同类, 不同参数');
+            log('');
+            log('static 方法不重写, 只隐藏');
+        }
+
+        function demoObject() {
+            result.innerHTML = '';
+            log('# Object 类');
+            log('');
+            log('所有类的根父类');
+            log('默认继承: class A extends Object');
+            log('');
+            log('重要方法:');
+            log('  toString()   字符串表示');
+            log('  equals()     相等判断');
+            log('  hashCode()   哈希码');
+            log('  getClass()   运行时类型');
+            log('');
+            log('重写 equals() 必须重写 hashCode()');
+        }
+    </script>
+</body>
+</html>

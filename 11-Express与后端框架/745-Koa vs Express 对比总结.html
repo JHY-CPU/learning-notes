@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Koa vs Express 对比总结</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚖️ Koa vs Express 对比总结</h2><p>核心差异 (中间件模型/上下文/错误处理/生态)、性能对比、选型指南、Koa 和 Express 互相迁移、Phase 8 Node.js 后端全栈图谱。</p></div>
+    <div class="card">
+        <h2>核心差异对比</h2>
+        <div class="code">// ========== Koa vs Express ==========
+
+// ┌──────────────────┬─────────────────────┬──────────────────────┐
+// │                  │      Express        │       Koa           │
+// ├──────────────────┼─────────────────────┼──────────────────────┤
+// │ 中间件模型        │ 线性 (顺序执行)      │ 洋葱模型 (双向)      │
+// │                  │ next() 后不执行      │ await next() 前后执行 │
+// ├──────────────────┼─────────────────────┼──────────────────────┤
+// │ 异步处理          │ 回调 → 需 asyncWrap  │ 原生 async/await     │
+// ├──────────────────┼─────────────────────┼──────────────────────┤
+// │ 请求/响应         │ req/res 对象         │ ctx 统一封装          │
+// ├──────────────────┼─────────────────────┼──────────────────────┤
+// │ 内置功能          │ 路由/静态文件/模板    │ 无绑定 (最小核心)     │
+// ├──────────────────┼─────────────────────┼──────────────────────┤
+// │ 错误处理          │ 4参数中间件           │ try/catch 更自然      │
+// ├──────────────────┼─────────────────────┼──────────────────────┤
+// │ 生态系统          │ 最大                 │ 较小但够用            │
+// ├──────────────────┼─────────────────────┼──────────────────────┤
+// │ 性能              │ 中等                 │ 稍快 (更轻量)         │
+// ├──────────────────┼─────────────────────┼──────────────────────┤
+// │ 学习曲线          │ 低 (入门容易)         │ 中 (理解洋葱模型)     │
+// ├──────────────────┼─────────────────────┼──────────────────────┤
+// │ 适合场景          │ 通用/快速开发         │ 需要精细控制中间件    │
+// └──────────────────┴─────────────────────┴──────────────────────┘
+
+// ========== 代码对比 ==========
+
+// ——— Express ———
+const express = require('express');
+const app = express();
+
+// 中间件
+app.use((req, res, next) => {
+    console.log('Time:', Date.now());
+    next();  // 调用后不再回来
+});
+
+// 路由
+app.get('/users', async (req, res) => {
+    try {
+        const users = await User.find();
+        res.json(users);
+    } catch (err) {
+        next(err);  // 手动传给错误处理
+    }
+});
+
+// 错误处理 (必须 4 个参数)
+app.use((err, req, res, next) => {
+    res.status(500).json({ error: err.message });
+});
+
+// ——— Koa ———
+const Koa = require('koa');
+const Router = require('@koa/router');
+const app = new Koa();
+const router = new Router();
+
+// 中间件 (洋葱)
+app.use(async (ctx, next) => {
+    console.log('Time:', Date.now());
+    await next();  // 会回来!
+    console.log('After response');
+});
+
+// 路由
+router.get('/users', async (ctx) => {
+    ctx.body = await User.find();  // 自动 JSON
+});
+
+// 错误处理 (try/catch)
+app.use(async (ctx, next) => {
+    try {
+        await next();
+    } catch (err) {
+        ctx.status = err.status || 500;
+        ctx.body = { error: err.message };
+    }
+});</div>
+    </div>
+    <div class="card">
+        <h2>互相迁移指南</h2>
+        <div class="code">// ========== Express → Koa 迁移 ==========
+
+// ========== req/res → ctx ==========
+// Express: req.params.id, req.query, req.body
+// Koa:     ctx.params.id, ctx.query, ctx.request.body
+
+// Express: res.json(), res.status(200).send()
+// Koa:     ctx.body = {}, ctx.status = 200
+
+// ========== 中间件适配 ==========
+// koa-connect 可以兼容 Express 中间件
+const { use } = require('koa-connect');
+const cors = require('cors');  // Express cors
+
+app.use(use(cors({ origin: '*', credentials: true })));
+
+// ========== 路由迁移 ==========
+// Express:
+router.get('/users/:id', controller);
+
+// Koa:
+router.get('/users/:id', async (ctx) => {
+    await controller(ctx);  // 或重写 controller
+});
+
+// ========== 错误处理迁移 ==========
+// Express: (err, req, res, next) → 4 参数
+// Koa:     try/catch → ctx.throw → app.on('error')
+
+// ========== 第三方中间件对照 ==========
+// Express          →  Koa 对应
+// cors             →  @koa/cors
+// express.json()   →  koa-body
+// multer           →  @koa/multer 或 koa-body
+// express-session  →  koa-session
+// morgan           →  koa-logger
+// helmet           →  koa-helmet
+// compression      →  koa-compress
+// express.static   →  koa-static
+// passport         →  koa-passport
+
+// ========== 什么时候选 Express ==========
+// ✅ 你已经熟悉 Express
+// ✅ 项目需要快速启动
+// ✅ 依赖大量 Express 中间件
+// ✅ 团队都是 Express 经验
+// ✅ 需要成熟的教程和文档
+
+// ========== 什么时候选 Koa ==========
+// ✅ 你想要洋葱模型控制中间件
+// ✅ 项目需要更干净的异步代码
+// ✅ 你喜欢最小核心, 自由组合
+// ✅ 需要精细的中间件顺序控制
+// ✅ 你想要更好的错误处理体验
+
+// ========== 性能对比 ==========
+// 基准测试 (Hello World):
+// Express: ~8000 req/s
+// Koa:     ~10000 req/s
+//
+// Koa 轻量约 20-30%
+// 但实际应用差异不大 (数据库是瓶颈)
+
+// ========== 实际选择建议 ==========
+// 新项目: 选你熟悉的技术
+// 微服务: Koa (轻量)
+// REST API: Express 或 Koa 都可
+// 大型应用: Express (生态丰富)
+// 学习目的: 两个都试试</div>
+    </div>
+    <div class="card">
+        <h2>Phase 8 总结</h2>
+        <div class="code">// ========== Phase 8 全栈图谱 ==========
+// Node.js 后端深入学习路线 (696-745)
+
+// ┌─────────────────────────────────────────────────────────────────┐
+// │                    Express/Koa 后端开发                          │
+// ├────────────┬──────────────┬──────────────┬──────────────────────┤
+// │  基础      │  核心         │  认证授权     │  实时通信             │
+// │ 696 Express│ 699 中间件    │ 714 JWT      │ 720 Socket.io 基础   │
+// │ 697 路由   │ 701 错误处理  │ 715 Bcrypt   │ 721 房间与命名空间   │
+// │ 698 请求响应│ 702 Body解析 │ 716 Session  │ 722 认证中间件       │
+// │           │ 703 CORS      │ 717 Passport │ 723 聊天实现         │
+// │           │ 704 Morgan    │ 718 OAuth    │ 724 生产扩展         │
+// │           │ 705 限流安全  │ 719 权限控制  │                     │
+// ├────────────┼──────────────┼──────────────┼──────────────────────┤
+// │  文件处理   │  生产实践    │  数据库       │  Koa.js              │
+// │ 725 Multer │ 731 Dotenv   │ 737 PG       │ 743 Koa 基础         │
+// │ 726 Sharp  │ 732 Winston  │ 738 Knex     │ 744 中间件           │
+// │ 727 S3     │ 733 Pino     │ 739 Mongoose │ 745 Express vs Koa  │
+// │ 728 流式   │ 734 压缩     │ 740 ioredis  │                     │
+// │ 729 文件管理│ 735 Cluster │ 741 Prisma   │                     │
+// │ 730 最佳实践│ 736 PM2     │ 742 总结     │                     │
+// └────────────┴──────────────┴──────────────┴──────────────────────┘
+
+// ========== 50 个文件覆盖 ==========
+// Express 核心: 696-713 (18 个)
+// 认证授权: 714-719 (6 个)
+// Socket.io: 720-724 (5 个)
+// 文件处理: 725-730 (6 个)
+// 生产实践: 731-736 (6 个)
+// 数据库: 737-742 (6 个)
+// Koa.js: 743-745 (3 个)
+
+// ========== 下一个阶段 ==========
+// Phase 9: Java + Spring Boot (746-815)
+// Java 基础 → OOP → 集合 → Spring Boot → JPA</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCompare()">Koa vs Express</button>
+        <button onclick="demoMigrate()">迁移示例</button>
+        <button onclick="demoPhase8()">Phase 8 总览</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCompare() {
+            result.innerHTML = '';
+            log('# Koa vs Express 核心差异');
+            log('');
+            log('中间件模型:');
+            log('  Express: 线性 (next() 不回头)');
+            log('  Koa:     洋葱 (await next() 双向)');
+            log('');
+            log('错误处理:');
+            log('  Express: (err, req, res, next)');
+            log('  Koa:     try/catch + ctx.throw');
+            log('');
+            log('生态:');
+            log('  Express: 最大, 中间件最多');
+            log('  Koa:     较新, 够用');
+        }
+
+        function demoMigrate() {
+            result.innerHTML = '';
+            log('# Express → Koa 迁移');
+            log('');
+            log('req.params.id → ctx.params.id');
+            log('req.query     → ctx.query');
+            log('req.body      → ctx.request.body');
+            log('res.json()    → ctx.body =');
+            log('res.status()  → ctx.status =');
+            log('next(err)     → ctx.throw()');
+            log('');
+            log('中间件适配:');
+            log('koa-connect 兼容 Express 中间件');
+            log('app.use(use(cors()))');
+        }
+
+        function demoPhase8() {
+            result.innerHTML = '';
+            log('# Phase 8 Node.js 后端总结');
+            log('');
+            log('已创建 50 个文件 (696-745)');
+            log('');
+            log('Express 核心: 18 个文件');
+            log('认证授权: 6 个文件');
+            log('Socket.io: 5 个文件');
+            log('文件上传: 6 个文件');
+            log('生产实践: 6 个文件');
+            log('数据库集成: 6 个文件');
+            log('Koa.js: 3 个文件');
+            log('');
+            log('下一阶段:');
+            log('Phase 9: Java + Spring Boot');
+        }
+    </script>
+</body>
+</html>

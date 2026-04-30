@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python字典详解</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📙 Python 字典详解</h2><p>字典创建、增删改查、遍历、常用方法、嵌套字典、defaultdict、Counter。</p></div>
+    <div class="card">
+        <h2>创建字典</h2>
+        <div class="code">// ========== 创建方式 ==========
+// 字典: 键值对集合,键唯一,键必须可哈希
+
+// 花括号:
+user = {"name": "Alice", "age": 25, "city": "Beijing"}
+
+// dict() 构造函数:
+dict(name="Alice", age=25)              # {"name": "Alice", "age": 25}
+dict([("name", "Alice"), ("age", 25)])  # 从键值对列表
+
+// 键列表 + 值列表:
+keys = ["name", "age", "city"]
+values = ["Alice", 25, "Beijing"]
+dict(zip(keys, values))                 # 压缩成字典
+
+// 空字典:
+empty = {}                               # 空字典
+empty2 = dict()                          # 空字典
+
+// fromkeys:
+dict.fromkeys(["a", "b", "c"], 0)       # {"a": 0, "b": 0, "c": 0}
+
+// ========== 字典基础操作 ==========
+user = {"name": "Alice", "age": 25}
+
+// 访问:
+user["name"]               # "Alice"
+// user["country"]          # KeyError!
+
+// 安全访问:
+user.get("name")           # "Alice"
+user.get("country")        # None (不存在返回 None)
+user.get("country", "中国") # "中国" (不存在返回默认值)
+
+// 修改与添加:
+user["age"] = 26           # 修改已有键
+user["email"] = "alice@example.com"  # 添加新键</div>
+    </div>
+    <div class="card">
+        <h2>增删改查</h2>
+        <div class="code">// ========== 增加 ==========
+user = {}
+
+user["name"] = "Alice"           # 新增键值对
+user["age"] = 25
+user.setdefault("role", "user")  # 键不存在才设置
+user.setdefault("role", "admin") # 不生效,因为 role 已存在
+
+// update: 批量更新/合并
+user.update({"age": 26, "city": "Beijing"})  # 更新多个
+user.update(age=26, city="Beijing")           # 关键字参数
+
+// 合并 (Python 3.9+):
+d1 = {"a": 1, "b": 2}
+d2 = {"b": 3, "c": 4}
+merged = d1 | d2                  # {"a": 1, "b": 3, "c": 4}
+d1 |= d2                          # 原地合并
+
+// ========== 删除 ==========
+user = {"name": "Alice", "age": 25, "city": "Beijing"}
+
+del user["city"]                 # 删除键值对
+// del user["country"]            # KeyError!
+
+user.pop("age")                  # 删除并返回值: 25
+user.pop("country", "N/A")       # 不存在返回默认值,不抛异常
+
+user.popitem()                   # 删除并返回(键, 值), LIFO (Python 3.7+)
+user.clear()                     # 清空字典
+
+// ========== 检查 ==========
+user = {"name": "Alice", "age": 25}
+
+"name" in user                   # True (检查键!)
+"Alice" in user                  # False (不检查值)
+"Alice" in user.values()         # True
+
+len(user)                        # 2 (键值对数量)</div>
+    </div>
+    <div class="card">
+        <h2>遍历字典</h2>
+        <div class="code">// ========== 遍历方式 ==========
+user = {"name": "Alice", "age": 25, "city": "Beijing"}
+
+// 遍历键 (默认):
+for key in user:
+    print(key)                # name, age, city
+
+for key in user.keys():
+    print(key)                # 同上,更明确
+
+// 遍历值:
+for value in user.values():
+    print(value)              # Alice, 25, Beijing
+
+// 遍历键值对:
+for key, value in user.items():
+    print(f"{key}: {value}")
+
+// ========== 视图对象 ==========
+// keys(), values(), items() 返回的是视图
+// 视图会随原字典变化而变化!
+
+keys = user.keys()             # dict_keys(["name", "age", "city"])
+values = user.values()         # dict_values(["Alice", 25, "Beijing"])
+items = user.items()           # dict_items([("name", "Alice"), ...])
+
+user["email"] = "alice@test.com"
+print(keys)                    # 包含新增的 email! (视图实时更新)
+
+// 视图支持集合运算:
+d1 = {"a": 1, "b": 2, "c": 3}
+d2 = {"b": 4, "c": 3, "d": 5}
+
+d1.keys() & d2.keys()          # {"b", "c"} (交集)
+d1.keys() - d2.keys()          # {"a"} (差集)
+d1.items() & d2.items()        # {("c", 3)} (共同键值对)</div>
+    </div>
+    <div class="card">
+        <h2>高级字典技巧</h2>
+        <div class="code">// ========== 嵌套字典 ==========
+users = {
+    "alice": {"age": 25, "city": "Beijing"},
+    "bob": {"age": 30, "city": "Shanghai"},
+}
+
+users["alice"]["age"]          # 25
+users.get("charlie", {}).get("age", "未知")  # 安全访问嵌套
+
+// ========== defaultdict ==========
+from collections import defaultdict
+
+// 自动为不存在的键创建默认值
+grouped = defaultdict(list)    # 默认值是空列表
+
+data = [("fruit", "apple"), ("fruit", "banana"), ("color", "red")]
+for category, item in data:
+    grouped[category].append(item)  # 不必检查键是否存在!
+
+print(grouped)
+# {"fruit": ["apple", "banana"], "color": ["red"]}
+
+// 其他默认值:
+int_dict = defaultdict(int)     # 默认值 0
+int_dict["count"] += 1          # {"count": 1} (自动初始化)
+
+set_dict = defaultdict(set)     # 默认值 set()
+
+// ========== Counter ==========
+from collections import Counter
+
+text = "hello world"
+Counter(text)                  # {"l": 3, "o": 2, "h": 1, "e": 1, ...}
+
+freq = Counter(["a", "b", "a", "c", "b", "a"])
+freq.most_common(2)            # [("a", 3), ("b", 2)] (前 2 高频)
+freq["a"]                      # 3
+
+// ========== 排序字典 ==========
+scores = {"Alice": 95, "Bob": 82, "Charlie": 91}
+
+// 按键排序:
+dict(sorted(scores.items()))                   # 按键字母排序
+
+// 按值排序:
+dict(sorted(scores.items(), key=lambda x: x[1]))  # 按值升序
+dict(sorted(scores.items(), key=lambda x: x[1], reverse=True))  # 降序</div>
+        <div class="note">💡 字典要点: (1) 键必须不可变 (字符串/数字/元组); (2) get() 比直接访问更安全; (3) setdefault() 一次完成检查+设置; (4) defaultdict 自动处理缺失键; (5) Counter 是统计神器; (6) dict 3.7+ 保持插入顺序。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoDict()">字典基础演示</button>
+        <button onclick="demoAdvanced()">高级用法演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoDict() {
+            result.innerHTML = '';
+            log('# Python 字典演示');
+            log('');
+            log('创建:');
+            log('  user = {"name": "Alice", "age": 25}');
+            log('');
+            log('访问:');
+            log('  user["name"]     → Alice');
+            log('  user.get("age")  → 25');
+            log('  user.get("x", 0) → 0 (默认值)');
+            log('');
+            log('遍历:');
+            log('  for k, v in user.items():');
+            log('      print(k, v)');
+            log('');
+            log('检查键:');
+            log('  "name" in user    →', true);
+            log('  "Alice" in user   →', false, '(检查键，非值)');
+        }
+
+        function demoAdvanced() {
+            result.innerHTML = '';
+            log('# 字典高级用法演示');
+            log('');
+            log('defaultdict:');
+            log('  from collections import defaultdict');
+            log('  d = defaultdict(list)');
+            log('  d["key"].append(1)  # 无需初始化');
+            log('');
+            log('Counter:');
+            log('  Counter("hello")');
+            log('  → {"l": 2, "h": 1, "e": 1, "o": 1}');
+            log('');
+            log('合并 (3.9+):');
+            log('  {"a": 1} | {"b": 2}  → {"a": 1, "b": 2}');
+            log('');
+            log('按值排序:');
+            log('  sorted(d.items(), key=lambda x: x[1])');
+        }
+    </script>
+</body>
+</html>

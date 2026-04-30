@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>63-布隆过滤器 (Bloom Filter)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Bloom Filter</h2>
+  <div class="code">布隆过滤器是一种空间高效的集合数据结构，允许一定的假阳性误判。</div>
+  <pre>class BloomFilter {
+  constructor(size=100, hashCount=3) {
+    this.bits = new Array(size).fill(false);
+    this.size = size;
+    this.hashCount = hashCount;
+  }
+  _hash(item, seed) {
+    let h = 0;
+    for (let i = 0; i < item.length; i++)
+      h = (h * 31 + item.charCodeAt(i) + seed) % this.size;
+    return h;
+  }
+  add(item) {
+    for (let i = 0; i < this.hashCount; i++)
+      this.bits[this._hash(item, i)] = true;
+  }
+  has(item) {
+    for (let i = 0; i < this.hashCount; i++)
+      if (!this.bits[this._hash(item, i)]) return false;
+    return true;
+  }
+}</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  class BF{
+    constructor(s=100,h=3){this.b=new Array(s).fill(false);this.s=s;this.h=h;}
+    _h(item,seed){let h=0;for(let i=0;i<item.length;i++)h=(h*31+item.charCodeAt(i)+seed)%this.s;return h;}
+    add(item){for(let i=0;i<this.h;i++)this.b[this._h(item,i)]=true;}
+    has(item){for(let i=0;i<this.h;i++)if(!this.b[this._h(item,i)])return false;return true;}
+  }
+  const bf=new BF();
+  bf.add("apple");bf.add("banana");
+  document.getElementById('result').textContent =
+    `apple? ${bf.has("apple")}\nbanana? ${bf.has("banana")}\ngrape? ${bf.has("grape")}`;
+}
+</script>
+</body>
+</html>

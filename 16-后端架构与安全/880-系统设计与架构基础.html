@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统设计与架构基础</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🏗️ 系统设计与架构基础</h2><p>单体 vs 微服务架构、水平/垂直扩展、负载均衡算法、数据库读写分离与分片、CDN 内容分发。</p></div>
+    <div class="card">
+        <h2>架构模式</h2>
+        <div class="code">// ========== 单体架构 (Monolith) ==========
+// 所有功能在同一个应用中
+// 优点:
+//   - 简单开发部署
+//   - 容易测试
+//   - 调用延迟低 (进程内)
+//   - 事务一致性容易
+// 缺点:
+//   - 代码膨胀 → 难以维护
+//   - 局部修改 → 整体部署
+//   - 无法独立扩展 (全部扩)
+//   - 技术栈锁定
+// 适合: 小团队, 早期产品, 原型
+
+// ========== 微服务架构 (Microservices) ==========
+// 每个服务独立部署运行
+// 优点:
+//   - 独立开发/部署/扩展
+//   - 故障隔离
+//   - 技术栈灵活
+//   - 团队自治
+// 缺点:
+//   - 分布式复杂性 (网络/数据一致性)
+//   - 服务间调用延迟
+//   - 测试/调试困难
+//   - 运维成本高 (监控/日志/部署)
+// 适合: 大团队, 复杂业务, 需要独立扩缩
+
+// ========== 分层架构 ==========
+// Presentation Layer   (Controller)
+//   → Application Layer (Service)
+//     → Domain Layer     (Business Logic)
+//       → Infrastructure Layer (DB/External)
+
+// ========== 六边形架构 (端口适配器) ==========
+//          ┌─────────────┐
+//          │   Adapter   │
+//          │  (HTTP API) │
+//          └──────┬──────┘
+//       ┌─────────┴─────────┐
+//       │   Application     │
+//       │   (Use Cases)     │
+//       ├───────────────────┤
+//       │     Domain        │
+//       │   (Business)      │
+//       └─────────┬─────────┘
+//          ┌──────┴──────┐
+//          │   Adapter   │
+//          │    (DB)     │
+//          └─────────────┘</div>
+    </div>
+    <div class="card">
+        <h2>扩展策略 (Scaling)</h2>
+        <div class="code">// ========== 垂直扩展 (Scale Up) ==========
+// 升级单机: 更多 CPU/内存/SSD
+// 优点: 简单, 不改代码
+// 缺点: 有上限, 成本高, 单点故障
+// 适合: 数据库, 小应用
+
+// ========== 水平扩展 (Scale Out) ==========
+// 增加机器数量
+// 优点: 近乎无限, 低成本, 高可用
+// 缺点: 需改架构 (无状态/分布式)
+// 适合: Web 服务, 微服务
+
+// ========== 无状态设计 ==========
+// 所有状态存在外部 (Redis/DB)
+// 任意节点可处理请求
+// 水平扩展: 加节点就行
+// 缩容: 直接减节点
+
+// ========== 负载均衡算法 ==========
+// 1. 轮询 (Round Robin)
+//    依次分发, 简单公平
+//    适合: 请求处理时间相近
+
+// 2. 最少连接 (Least Connections)
+//    发给活跃连接最少的后端
+//    适合: 请求处理时间差异大
+
+// 3. IP 哈希 (IP Hash)
+//    hash(client_ip) → 固定后端
+//    适合: 需要会话保持 (session)
+
+// 4. 一致性哈希 (Consistent Hashing)
+//    哈希环 + 虚拟节点
+//    增减节点影响最小 (仅相邻)
+//    适合: 分布式缓存 (Redis/Memcached)
+//    解决: 普通哈希扩容大量失效
+
+// Nginx 配置示例:
+// upstream backend {
+//     least_conn;                    // 最少连接
+//     server 10.0.0.1:8080 weight=3; // 权重
+//     server 10.0.0.2:8080;
+//     server 10.0.0.3:8080 backup;   // 备用
+// }
+//
+// server {
+//     location /api/ {
+//         proxy_pass http://backend;
+//         proxy_set_header X-Real-IP $remote_addr;
+//     }
+// }</div>
+    </div>
+    <div class="card">
+        <h2>数据库架构</h2>
+        <div class="code">// ========== 读写分离 ==========
+// 主库 (Master): 写操作 (INSERT/UPDATE/DELETE)
+// 从库 (Replica): 读操作 (SELECT)
+// 主 → 从异步复制 (seconds behind master)
+//
+// 优点:
+//   读扩展 (加从库)
+//   故障转移 (从升级为主)
+//
+// 缺点:
+//   读写延迟 (最终一致性)
+//   应用层需路由读写
+
+// 实现方式:
+// 1. 应用层: 两个数据源
+// 2. 中间件: ProxySQL / MySQL Router
+// 3. 自动: @ReadOnly 注解
+
+// ========== 数据库分片 (Sharding) ==========
+// 将数据分布到多个数据库实例
+//
+// 分片键选择 (Shard Key):
+//   user_id, order_id, region
+//
+// 分片策略:
+// 1. 范围分片 (Range)
+//    shard 0: id 1-10000
+//    shard 1: id 10001-20000
+//    优点: 范围查询友好
+//    缺点: 数据倾斜, 热点
+
+// 2. 哈希分片 (Hash)
+//    shard = hash(id) % N
+//    优点: 数据均匀分布
+//    缺点: 扩缩容需重新哈希
+
+// 3. 目录分片 (Directory)
+//    查表确定数据位置
+//    优点: 灵活
+//    缺点: 单点/性能瓶颈
+
+// ========== 分片挑战 ==========
+// 1. 跨分片查询: 需要聚合
+// 2. 分布式事务: 2PC / Saga
+// 3. 全局唯一 ID: Snowflake / UUID
+// 4. 数据再平衡: 迁移成本高
+// 5. JOIN 跨分片: 应用层合并
+
+// ========== Snowflake ID ==========
+// 64-bit ID:
+// | 符号位(1) | 时间戳(41) | 机器ID(10) | 序列号(12) |
+//
+// 特点:
+//   全局唯一, 趋势递增
+//   不依赖数据库
+//   高吞吐 (4096/ms/节点)
+//   可根据时间戳解码</div>
+    </div>
+    <div class="card">
+        <h2>CDN 与全局架构</h2>
+        <div class="code">// ========== CDN (内容分发网络) ==========
+// 全球分布边缘节点, 缓存静态内容
+//
+// 流程:
+// 1. 用户请求 → 最近 CDN 边缘节点
+// 2. 有缓存 → 直接返回 (缓存命中)
+// 3. 无缓存 → 回源到源服务器
+//
+// 缓存策略:
+//   Cache-Control: public, max-age=31536000
+//   CDN 节点根据 TTL 缓存
+//   无效化: 刷新 CDN 缓存
+
+// 优点:
+//   降低延迟 (地理就近)
+//   减轻源服务器压力
+//   抗流量冲击
+//   全球加速
+
+// 适用内容:
+//   静态: JS/CSS/图片/视频
+//   动态: 可缓存的 API 响应
+//   流媒体: HLS/DASH 分段
+
+// ========== 全局负载均衡 (GSLB) ==========
+// 多区域部署, DNS 智能解析
+// 用户 → 最近的数据中心
+//
+// DNS 返回最优 IP:
+//   基于地理位置
+//   基于延迟探测
+//   基于可用性
+//
+// 容灾:
+//   主区域故障 → 流量切到备用区域
+//   跨区域数据同步</div>
+        <div class="note">💡 系统设计要点: 单体简单但难扩展, 微服务灵活但复杂; 水平扩展需无状态设计; 负载均衡: 轮询/最少连接/IP哈希/一致性哈希; 数据库读写分离 + 分片; 分片挑战: 跨分片查询/分布式事务/全局ID; CDN 缓存静态内容, GSLB 多区域容灾。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoArch()">架构模式</button>
+        <button onclick="demoScaling()">扩展策略</button>
+        <button onclick="demoShard()">分片</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoArch() {
+            result.innerHTML = '';
+            log('# 架构模式对比');
+            log('');
+            log('单体 Monolith:');
+            log('  所有功能一个应用');
+            log('  简单部署, 整体扩展');
+            log('  适合早期产品');
+            log('');
+            log('微服务:');
+            log('  独立服务独立部署');
+            log('  独立扩缩, 技术多样');
+            log('  需处理分布式复杂性');
+            log('');
+            log('分层架构:');
+            log('  Controller → Service → Repository');
+            log('  关注点分离, 职责清晰');
+        }
+
+        function demoScaling() {
+            result.innerHTML = '';
+            log('# 扩展策略');
+            log('');
+            log('垂直扩展 (Scale Up):');
+            log('  更大机器, 有上限');
+            log('');
+            log('水平扩展 (Scale Out):');
+            log('  更多机器, 近乎无限');
+            log('');
+            log('负载均衡算法:');
+            log('  轮询: 请求均匀');
+            log('  最少连接: 动态分配');
+            log('  IP哈希: 会话保持');
+            log('  一致性哈希: 缓存最优');
+        }
+
+        function demoShard() {
+            result.innerHTML = '';
+            log('# 数据库分片');
+            log('');
+            log('分片策略:');
+            log('  范围: 按ID范围分');
+            log('  哈希: hash(id)%N');
+            log('  目录: 查表路由');
+            log('');
+            log('挑战:');
+            log('  跨分片查询 → 聚合');
+            log('  分布式事务 → Saga');
+            log('  全局ID → Snowflake');
+            log('  数据再平衡 → 迁移');
+        }
+    </script>
+</body>
+</html>

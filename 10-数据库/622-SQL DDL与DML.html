@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL DDL与DML</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📝 SQL DDL 与 DML</h2><p>CREATE/DROP/ALTER 表结构、INSERT/UPDATE/DELETE 数据操作、约束 (NOT NULL/UNIQUE/CHECK/DEFAULT)、TRUNCATE vs DELETE。</p></div>
+    <div class="card">
+        <h2>CREATE 创建表</h2>
+        <div class="code">// ========== CREATE TABLE ==========
+-- 创建数据库
+CREATE DATABASE blog;
+USE blog;
+
+-- 创建表
+CREATE TABLE users (
+    id INT PRIMARY KEY AUTO_INCREMENT,   -- 主键自增
+    username VARCHAR(50) NOT NULL UNIQUE, -- 非空且唯一
+    email VARCHAR(100) NOT NULL,
+    password_hash VARCHAR(128) NOT NULL,
+    age INT DEFAULT 0,                   -- 默认值
+    bio TEXT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+);
+
+-- 创建带外键的表
+CREATE TABLE posts (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    title VARCHAR(200) NOT NULL,
+    content TEXT NOT NULL,
+    user_id INT NOT NULL,
+    status ENUM('draft', 'published', 'archived') DEFAULT 'draft',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+    -- 外键约束
+    FOREIGN KEY (user_id) REFERENCES users(id)
+        ON DELETE CASCADE
+        ON UPDATE CASCADE,
+
+    -- 索引
+    INDEX idx_posts_user (user_id),
+    INDEX idx_posts_status (status)
+);
+
+-- ========== 约束 ==========
+CREATE TABLE products (
+    id INT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    quantity INT DEFAULT 0,
+
+    -- CHECK 约束 (MySQL 8.0+)
+    CONSTRAINT chk_price_positive CHECK (price > 0),
+    CONSTRAINT chk_qty_non_negative CHECK (quantity >= 0),
+
+    -- UNIQUE 约束
+    CONSTRAINT uk_name UNIQUE (name)
+);</div>
+    </div>
+    <div class="card">
+        <h2>ALTER / DROP</h2>
+        <div class="code">// ========== ALTER TABLE ==========
+-- 添加列
+ALTER TABLE users ADD COLUMN phone VARCHAR(20);
+ALTER TABLE users ADD COLUMN last_login DATETIME AFTER email;
+
+-- 修改列
+ALTER TABLE users MODIFY COLUMN phone VARCHAR(30);     -- MySQL
+ALTER TABLE users ALTER COLUMN phone TYPE VARCHAR(30); -- PostgreSQL
+
+-- 重命名列
+ALTER TABLE users RENAME COLUMN phone TO phone_number; -- MySQL 8.0+
+
+-- 删除列
+ALTER TABLE users DROP COLUMN phone;
+
+-- 添加/删除约束
+ALTER TABLE users ADD CONSTRAINT uk_email UNIQUE (email);
+ALTER TABLE users DROP CONSTRAINT uk_email;
+
+-- 添加/删除索引
+CREATE INDEX idx_users_email ON users(email);
+DROP INDEX idx_users_email ON users;
+
+-- ========== DROP / TRUNCATE ==========
+-- DROP: 删除整个表 (结构和数据)
+DROP TABLE users;
+DROP TABLE IF EXISTS users;
+
+-- TRUNCATE: 清空表数据 (保留结构)
+-- 比 DELETE 快 (不逐行删除,不触发触发器)
+TRUNCATE TABLE logs;
+
+-- DELETE: 逐行删除 (可带 WHERE,可回滚)
+DELETE FROM logs WHERE created_at < '2024-01-01';
+
+-- ========== 临时表 ==========
+CREATE TEMPORARY TABLE temp_users AS
+SELECT * FROM users WHERE age > 18;
+-- 会话结束时自动删除</div>
+    </div>
+    <div class="card">
+        <h2>INSERT 插入</h2>
+        <div class="code">// ========== INSERT ==========
+-- 单行插入
+INSERT INTO users (username, email, password_hash)
+VALUES ('alice', 'alice@test.com', 'hash123');
+
+-- 多行插入
+INSERT INTO users (username, email, password_hash) VALUES
+    ('bob', 'bob@test.com', 'hash456'),
+    ('charlie', 'charlie@test.com', 'hash789'),
+    ('diana', 'diana@test.com', 'hash000');
+
+-- 插入全部列
+INSERT INTO users VALUES
+    (DEFAULT, 'eve', 'eve@test.com', 'hash111', 25, '...', TRUE, NOW(), NOW());
+
+-- 从查询插入
+INSERT INTO archive_users (id, username, email)
+SELECT id, username, email FROM users WHERE created_at < '2023-01-01';
+
+-- INSERT IGNORE (跳过错误)
+INSERT IGNORE INTO users (username, email) VALUES ('alice', 'a@test.com');
+
+-- ON DUPLICATE KEY UPDATE (冲突时更新)
+INSERT INTO users (id, username, email) VALUES (1, 'alice', 'new@test.com')
+ON DUPLICATE KEY UPDATE email = VALUES(email);
+
+-- PostgreSQL: ON CONFLICT
+-- INSERT INTO users (id, username) VALUES (1, 'alice')
+-- ON CONFLICT (id) DO UPDATE SET username = EXCLUDED.username;
+
+-- REPLACE (删除后插入)
+REPLACE INTO users (id, username, email) VALUES (1, 'alice2', 'a2@test.com');</div>
+    </div>
+    <div class="card">
+        <h2>UPDATE / DELETE</h2>
+        <div class="code">// ========== UPDATE ==========
+-- 基本更新
+UPDATE users SET age = 26 WHERE id = 1;
+
+-- 多列更新
+UPDATE users
+SET
+    age = 30,
+    bio = 'Updated bio',
+    updated_at = NOW()
+WHERE username = 'alice';
+
+-- 不带 WHERE = 更新所有行!
+UPDATE users SET last_login = NOW();
+
+-- 使用其他表的更新
+-- MySQL:
+UPDATE users u
+JOIN orders o ON u.id = o.user_id
+SET u.total_orders = u.total_orders + 1
+WHERE o.status = 'completed';
+
+-- 子查询更新
+UPDATE products
+SET price = price * 1.1
+WHERE category_id IN (SELECT id FROM categories WHERE name = 'Electronics');
+
+-- UPDATE LIMIT (限制更新行数)
+UPDATE users SET is_active = 0 ORDER BY last_login ASC LIMIT 100;
+
+-- ========== DELETE ==========
+-- 删除特定行
+DELETE FROM users WHERE id = 10;
+
+-- 删除所有行 (保留结构)
+DELETE FROM users;   -- 逐行删除,可回滚
+TRUNCATE users;      -- 快速清空,不可回滚
+
+-- 带 JOIN 的删除
+DELETE u FROM users u
+LEFT JOIN orders o ON u.id = o.user_id
+WHERE o.id IS NULL;  -- 删除无订单的用户
+
+-- 子查询删除
+DELETE FROM products
+WHERE id NOT IN (SELECT DISTINCT product_id FROM order_items);
+
+-- ========== 安全提示 ==========
+-- 1. 生产环境 UPDATE/DELETE 前先 SELECT 确认
+-- 2. 使用事务包裹: BEGIN; ... ; COMMIT;
+-- 3. WHERE 条件务必准确
+-- 4. 考虑 LIMIT 限制影响行数</div>
+    </div>
+    <div class="card">
+        <h2>约束详解</h2>
+        <div class="code">// ========== 约束类型 ==========
+// NOT NULL     - 列不能为 NULL
+// UNIQUE       - 列值唯一 (NULL 可重复)
+// PRIMARY KEY  - NOT NULL + UNIQUE
+// FOREIGN KEY  - 引用其他表的主键
+// CHECK        - 条件检查 (MySQL 8.0+)
+// DEFAULT      - 默认值
+
+-- 综合示例:
+CREATE TABLE orders (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    order_no VARCHAR(20) NOT NULL UNIQUE,        -- 唯一订单号
+    user_id INT NOT NULL,
+    total DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+    status ENUM('pending','paid','shipped','done','cancelled') NOT NULL DEFAULT 'pending',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    -- 复合唯一约束
+    CONSTRAINT uk_user_order UNIQUE (user_id, order_no),
+
+    -- CHECK 约束
+    CONSTRAINT chk_total_positive CHECK (total >= 0),
+
+    -- 外键
+    FOREIGN KEY (user_id) REFERENCES users(id)
+);
+
+-- ========== 查看约束 ==========
+-- MySQL:
+-- SHOW CREATE TABLE orders;
+-- DESC orders;
+
+-- PostgreSQL:
+-- \d orders</div>
+        <div class="note">💡 DDL/DML 要点: CREATE/ALTER/DROP 管理结构; INSERT/UPDATE/DELETE 操作数据; 使用约束维护数据完整性; UPDATE/DELETE 前先 SELECT 确认; TRUNCATE 比 DELETE 快但不可回滚。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCreate()">CREATE 演示</button>
+        <button onclick="demoCRUD()">CRUD 演示</button>
+        <button onclick="demoConstraints()">约束演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCreate() {
+            result.innerHTML = '';
+            log('# CREATE TABLE');
+            log('');
+            log('CREATE TABLE users (');
+            log('    id INT PRIMARY KEY AUTO_INCREMENT,');
+            log('    username VARCHAR(50) NOT NULL UNIQUE,');
+            log('    email VARCHAR(100) NOT NULL,');
+            log('    age INT DEFAULT 0,');
+            log('    created_at DATETIME DEFAULT NOW(),');
+            log('    FOREIGN KEY (role_id) REFERENCES roles(id)');
+            log(');');
+        }
+
+        function demoCRUD() {
+            result.innerHTML = '';
+            log('# DML 操作');
+            log('');
+            log('INSERT INTO users (...) VALUES (...)');
+            log('INSERT INTO users (...) VALUES (...), (...), (...)');
+            log('UPDATE users SET age = 30 WHERE id = 1');
+            log('DELETE FROM users WHERE id = 10');
+            log('');
+            log('安全: UPDATE/DELETE 前先 SELECT');
+            log('TRUNCATE: 快速清空 (不可回滚)');
+        }
+
+        function demoConstraints() {
+            result.innerHTML = '';
+            log('# 约束类型');
+            log('');
+            log('NOT NULL  - 不能为空');
+            log('UNIQUE    - 值唯一');
+            log('PRIMARY KEY = NOT NULL + UNIQUE');
+            log('FOREIGN KEY - 引用完整性');
+            log('CHECK       - 条件检查');
+            log('DEFAULT     - 默认值');
+        }
+    </script>
+</body>
+</html>

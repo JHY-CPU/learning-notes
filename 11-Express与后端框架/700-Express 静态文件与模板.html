@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express 静态文件与模板</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📄 Express 静态文件与模板</h2><p>express.static 配置多目录、虚拟路径前缀、缓存控制、EJS 模板引擎 (标签/变量/循环/条件/布局)、Pug 对比、服务端渲染 vs 客户端渲染、模板最佳实践。</p></div>
+    <div class="card">
+        <h2>静态文件服务</h2>
+        <div class="code">// ========== express.static ==========
+// 内置中间件, 服务静态文件 (CSS/JS/图片)
+
+// ========== 基本使用 ==========
+// public/ 目录下的文件可以直接访问:
+app.use(express.static('public'));
+
+// public/style.css → http://localhost:3000/style.css
+// public/js/app.js → http://localhost:3000/js/app.js
+// public/images/logo.png → http://localhost:3000/images/logo.png
+
+// ========== 虚拟路径前缀 ==========
+// 添加路径前缀, 不暴露真实目录结构:
+app.use('/static', express.static('public'));
+
+// 现在访问: http://localhost:3000/static/style.css
+
+// ========== 多目录 ==========
+// 多个静态目录, 按顺序查找:
+app.use(express.static('public'));
+app.use(express.static('uploads'));
+
+// ========== 高级配置 ==========
+const path = require('path');
+
+app.use('/static', express.static(path.join(__dirname, 'public'), {
+    maxAge: '1d',                       // 缓存 1 天
+    etag: true,                         // ETag 支持
+    lastModified: true,                 // Last-Modified
+    setHeaders: (res, filePath) => {
+        // 对 CSS/JS 设置不同缓存:
+        if (filePath.endsWith('.css')) {
+            res.setHeader('Cache-Control', 'public, max-age=86400');
+        }
+        if (filePath.endsWith('.js')) {
+            res.setHeader('Cache-Control', 'public, max-age=604800');
+        }
+        // 禁止 HTML 缓存:
+        if (filePath.endsWith('.html')) {
+            res.setHeader('Cache-Control', 'no-cache');
+        }
+    },
+    dotfiles: 'ignore',                 // 隐藏文件
+    index: false                        // 禁用目录索引
+}));
+
+// ========== 安全注意 ==========
+// ❌ 不要将 node_modules 暴露!
+// ❌ 不要将 .env 放在 public 目录
+// ✅ 用 path.join(__dirname, 'public') 绝对路径
+// ✅ 使用虚拟路径前缀隐藏真实路径</div>
+    </div>
+    <div class="card">
+        <h2>EJS 模板引擎</h2>
+        <div class="code">// ========== EJS ==========
+// Embedded JavaScript, 最流行的 Express 模板引擎
+
+// ========== 安装配置 ==========
+npm install ejs
+
+app.set('view engine', 'ejs');           // 设置模板引擎
+app.set('views', './views');             // 模板目录
+
+// ========== 渲染模板 ==========
+app.get('/', (req, res) => {
+    res.render('index', {
+        title: 'Home Page',
+        user: { name: 'Alice', role: 'admin' },
+        items: ['Item 1', 'Item 2', 'Item 3']
+    });
+});
+
+// ========== EJS 语法 ==========
+// views/index.ejs:
+
+// 输出变量:
+// <%= title %>           → 转义输出
+// <%- htmlContent %>     → 不转义输出 (原始 HTML)
+
+// JavaScript 代码:
+// <% if (user) { %>
+//   <h1>Welcome, <%= user.name %></h1>
+// <% } %>
+
+// 循环:
+// <ul>
+//   <% items.forEach(item => { %>
+//     <li><%= item %></li>
+//   <% }) %>
+// </ul>
+
+// ========== 局部模板 (include) ==========
+// views/partials/header.ejs:
+// <header><h1><%= title %></h1></header>
+
+// 引用:
+// <%- include('partials/header') %>
+// <%- include('partials/footer') %>
+
+// ========== 传递数据到所有模板 ==========
+app.use((req, res, next) => {
+    res.locals.siteName = 'My App';
+    res.locals.currentUser = req.user || null;
+    res.locals.flashMessages = req.flash();
+    next();
+});
+
+// 模板中直接使用:
+// <footer><%= siteName %> © 2024</footer></div>
+    </div>
+    <div class="card">
+        <h2>Pug 模板 (对比)</h2>
+        <div class="code">// ========== Pug (原 Jade) ==========
+// 缩进驱动的模板引擎, 更简洁
+
+// ========== 安装配置 ==========
+npm install pug
+
+app.set('view engine', 'pug');
+app.set('views', './views');
+
+// ========== 语法对比 ==========
+// ┌──────────────────┬────────────────────────┐
+// │ EJS              │ Pug                    │
+// ├──────────────────┼────────────────────────┤
+// │ <h1><%= title %></h1> │ h1= title          │
+// │ <% if (user) { %> │ if user                │
+// │   <p>Hi</p>      │   p Hi                 │
+// │ <% } %>          │                        │
+// │ <% items.forEach(item => { %>  │ each item in items │
+// │   <li><%= item %></li>         │ li= item            │
+// │ <% }) %>         │                        │
+// └──────────────────┴────────────────────────┘
+
+// ========== Pug 示例 ==========
+// views/index.pug:
+doctype html
+html
+  head
+    title= title
+    link(rel='stylesheet', href='/style.css')
+  body
+    header
+      h1= title
+      if user
+        p Welcome, #{user.name}
+      else
+        a(href='/login') Login
+
+    ul
+      each item in items
+        li= item
+
+    include partials/footer
+
+// ========== 模板引擎选择 ==========
+// EJS:   类 HTML, 学习成本低, JS 语法
+// Pug:   简洁, 缩进敏感, 适合纯后端
+// Handlebars: 逻辑少, Mustache 语法
+// Nunjucks:   Jinja2 风格, 功能丰富
+
+// ========== SSR vs CSR ==========
+// SSR (服务端渲染): EJS/Pug
+//   SEO 好, 首屏快, 服务器负载高
+//   适合: 内容网站/博客/电商
+
+// CSR (客户端渲染): React/Vue
+//   交互强, 服务器负载低, SEO 差
+//   适合: 后台/仪表盘/应用
+
+// ========== 最佳实践 ==========
+// 1. 不要用 res.render 传大量数据 (用 res.locals)
+// 2. 模板间共享的变量用 res.locals
+// 3. 静态文件用 CDN 加速
+// 4. 生产环境启用模板缓存 (自动)
+// 5. EJS 的 <%- 注意 XSS 风险, 只信任数据</div>
+        <div class="note">💡 静态文件要点: express.static() 配置缓存策略; 用虚拟路径前缀隐藏目录; 多目录时顺序查找; 不要暴露敏感文件。模板: EJS 最常用 (类 HTML); Pug 更简洁但缩进敏感; SSR 首屏快/SEO 好; 生产启用缓存; res.locals 传递全局模板变量。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoStatic()">静态文件</button>
+        <button onclick="demoEJS()">EJS 模板</button>
+        <button onclick="demoSSR()">SSR vs CSR</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoStatic() {
+            result.innerHTML = '';
+            log('# 静态文件配置');
+            log('');
+            log('app.use(express.static("public"));');
+            log('// public/style.css → /style.css');
+            log('');
+            log('app.use("/static", express.static("public"));');
+            log('// public/style.css → /static/style.css');
+            log('');
+            log('// 缓存:');
+            log('app.use("/static", express.static("public", {');
+            log('  maxAge: "1d",');
+            log('  etag: true');
+            log('}));');
+        }
+
+        function demoEJS() {
+            result.innerHTML = '';
+            log('# EJS 模板');
+            log('');
+            log('// 渲染:');
+            log('res.render("index", { title: "Home" });');
+            log('');
+            log('// 模板语法:');
+            log('<%= variable %>   转义输出');
+            log('<%- html %>       原始 HTML');
+            log('<% if (cond) %>   JS 代码');
+            log('');
+            log('// Include:');
+            log('<%- include("partials/header") %>');
+        }
+
+        function demoSSR() {
+            result.innerHTML = '';
+            log('# SSR vs CSR');
+            log('');
+            log('SSR (EJS/Pug):');
+            log('  ✓ SEO 好');
+            log('  ✓ 首屏快');
+            log('  ✗ 服务器负载高');
+            log('');
+            log('CSR (React/Vue):');
+            log('  ✓ 交互流畅');
+            log('  ✓ 服务器负载低');
+            log('  ✗ SEO 差');
+            log('');
+            log('选型: 内容网站用 SSR, 应用用 CSR');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>this-new与箭头函数</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>this — new 绑定与箭头函数</h2><p>new 创建新对象并绑定 this，箭头函数不绑定 this。</p></div>
+    <div class="card">
+        <h2>new 绑定</h2>
+        <div class="code">// new 做了四件事：
+// 1. 创建空对象
+// 2. 该对象链接到构造函数的 prototype
+// 3. this 指向该对象
+// 4. 返回该对象（除非构造函数返回对象）
+
+function Person(name, age) {
+    // this = {}（new 创建的空对象）
+    this.name = name;
+    this.age = age;
+    // return this（默认）
+}
+
+const p1 = new Person('Alice', 25);
+console.log(p1.name);  // 'Alice'
+console.log(p1 instanceof Person);  // true
+
+// ⚠️ 构造函数也有返回值优先级
+function Special(name) {
+    this.name = name;
+    return { custom: true };  // 如果返回对象，则返回这个对象而不是 this
+}
+const s = new Special('test');
+console.log(s.name);    // undefined
+console.log(s.custom);  // true
+
+// 如果返回基本类型，则忽略
+function Normal(name) {
+    this.name = name;
+    return 123;  // 基本类型被忽略
+}
+const n = new Normal('ok');
+console.log(n.name);  // 'ok'</div>
+    </div>
+    <div class="card">
+        <h2>箭头函数 — 没有自己的 this</h2>
+        <div class="code">// 箭头函数不会创建自己的 this
+// 它从外层作用域继承 this（词法 this）
+
+const obj = {
+    name: 'Alice',
+    // 普通函数：有自己的 this
+    normal() {
+        console.log(this.name);  // 取决于调用方式
+    },
+    // 箭头函数：没有自己的 this
+    arrow: () => {
+        console.log(this.name);  // 指向外层（定义时的 this）
+    }
+};
+
+obj.normal();  // 'Alice'
+obj.arrow();   // undefined（window.name，如果外层是全局）
+
+// ✅ 箭头函数修复嵌套 this
+const outer = {
+    name: 'outer',
+    say() {
+        const inner = () => {
+            console.log(this.name);  // 'outer'（从 say 继承 this）
+        };
+        inner();
+    }
+};
+outer.say();  // 'outer'
+
+// ❌ 普通函数嵌套问题
+const outer2 = {
+    name: 'outer2',
+    say() {
+        function inner() {
+            console.log(this.name);  // undefined（this 是 window）
+        }
+        inner();
+    }
+};
+outer2.say();  // undefined</div>
+    </div>
+    <div class="card">
+        <h2>箭头函数不能做的事</h2>
+        <div class="code">// 1. 不能用作构造函数（不能 new）
+const Fn = () => {};
+// new Fn();  // ❌ TypeError: Fn is not a constructor
+
+// 2. 没有 prototype 属性
+console.log(Fn.prototype);  // undefined
+
+// 3. 不能使用 arguments
+const fn = () => {
+    // console.log(arguments);  // ❌ ReferenceError
+    console.log(...arguments);  // ❌ 也会报错
+};
+// 需要改用 rest 参数
+const fn2 = (...args) => {
+    console.log(args);
+};
+
+// 4. 不能 call/apply/bind 改变 this
+const obj = { x: 1 };
+const arrow = () => console.log(this);
+arrow.call(obj);  // this 不会被改变（仍然是外层 this）
+
+// 5. 没有 super
+// class 中箭头函数的 this 固定为实例</div>
+    </div>
+    <div class="card">
+        <h2>箭头函数的应用场景</h2>
+        <div class="code">// 1. 回调函数（数组方法）
+const nums = [1, 2, 3, 4, 5];
+const doubled = nums.map(n => n * 2);
+
+// 2. 定时器/事件监听中保持 this
+class Timer {
+    constructor() {
+        this.seconds = 0;
+    }
+    start() {
+        // 箭头函数自动捕获外层的 this（Timer 实例）
+        setInterval(() => {
+            this.seconds++;
+            console.log(this.seconds);
+        }, 1000);
+    }
+}
+
+// 3. 简写小函数
+const add = (a, b) => a + b;
+
+// 4. 返回对象时用 () 包裹
+const getUser = () => ({ name: 'Alice', age: 25 });
+
+// 5. Promise 链中保持 this
+class Fetcher {
+    constructor(url) { this.url = url; }
+    fetch() {
+        return fetch(this.url)
+            .then(res => res.json())
+            .then(data => {
+                this.data = data;  // this 指向实例
+            });
+    }
+}</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== new 绑定 ===');
+        function Person(name, age) {
+            this.name = name;
+            this.age = age;
+        }
+        const p1 = new Person('Alice', 25);
+        console.log('name:', p1.name, 'age:', p1.age);
+        console.log('instanceof:', p1 instanceof Person);
+
+        console.log('=== 箭头函数 this ===');
+        const obj = {
+            name: 'Alice',
+            normal() {
+                console.log('普通函数:', this.name);
+            },
+            arrow: () => {
+                console.log('箭头函数:', this.name);
+            }
+        };
+        obj.normal();
+        obj.arrow();
+
+        console.log('=== 箭头修复嵌套 ===');
+        const outer = {
+            name: 'outer',
+            say() {
+                const inner = () => {
+                    console.log('箭头嵌套:', this.name);
+                };
+                inner();
+            }
+        };
+        outer.say();
+
+        console.log('=== 箭头函数不能 new ===');
+        const Fn = () => {};
+        console.log('箭头函数 prototype:', Fn.prototype);
+        console.log('是构造函数吗:', Fn.hasOwnProperty('prototype'));
+
+        document.getElementById('output').textContent =
+            `new Person: ${p1.name}, ${p1.age}\n` +
+            `箭头函数 this: ${this === window ? 'window' : '非window'}\n` +
+            `✅ this new与箭头函数演示完成！`;
+    </script>
+</body>
+</html>

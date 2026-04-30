@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python 性能分析</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📊 Python 性能分析</h2><p>cProfile 性能剖析、py-spy 采样分析、memory_profiler 内存分析、timeit 微基准、优化策略。</p></div>
+    <div class="card">
+        <h2>timeit 微基准</h2>
+        <div class="code">// ========== timeit ==========
+import timeit
+
+# timeit: 精确测量小段代码执行时间
+
+# 方式 1: 命令行
+# python -m timeit -n 1000 -r 5 "sum(range(100))"
+
+# 方式 2: 字符串方式
+time = timeit.timeit(
+    "sum(range(100))",
+    number=10000  # 执行 10000 次
+)
+print(f"耗时: {time:.4f}s")
+
+# 方式 3: 函数方式
+def test_func():
+    return sum(i * i for i in range(100))
+
+time = timeit.timeit(test_func, number=10000)
+
+# 方式 4: 重复多次取最优
+times = timeit.repeat(
+    "sum(range(100))",
+    number=1000,
+    repeat=5,
+)
+print(f"最佳: {min(times):.4f}s, 平均: {sum(times)/len(times):.4f}s")
+
+# ========== 比较不同实现 ==========
+# 列表推导 vs for 循环
+setup = "items = list(range(1000))"
+
+list_comp = timeit.timeit(
+    "[x * 2 for x in items]",
+    setup=setup,
+    number=10000,
+)
+
+for_loop = timeit.timeit(
+    """
+result = []
+for x in items:
+    result.append(x * 2)
+""",
+    setup=setup,
+    number=10000,
+)
+
+print(f"列表推导: {list_comp:.4f}s")
+print(f"For 循环: {for_loop:.4f}s")</div>
+    </div>
+    <div class="card">
+        <h2>cProfile 性能剖析</h2>
+        <div class="code">// ========== cProfile ==========
+import cProfile
+import pstats
+
+# cProfile: 找出代码中的性能瓶颈
+# 统计每个函数的调用次数和耗时
+
+def slow_function():
+    total = 0
+    for i in range(1000000):
+        total += i ** 2
+    return total
+
+def fast_function():
+    return sum(i ** 2 for i in range(1000000))
+
+def main():
+    slow_function()
+    fast_function()
+
+# 方式 1: 命令行
+# python -m cProfile -o output.prof script.py
+
+# 方式 2: 代码中运行
+profiler = cProfile.Profile()
+profiler.enable()
+main()
+profiler.disable()
+
+# 保存结果
+profiler.dump_stats("profile_output.prof")
+
+# 分析结果:
+stats = pstats.Stats(profiler)
+stats.sort_stats("cumtime")  # 按累积时间排序
+stats.print_stats(10)        # 显示前 10 行
+
+# 排序选项:
+# "cumtime": 累积时间 (函数+子函数)
+# "tottime": 自身时间 (不含子函数)
+# "ncalls":  调用次数
+# "name":    函数名
+
+# ========== 使用 pstats ==========
+stats = pstats.Stats("profile_output.prof")
+
+# 只查看特定模块
+stats.sort_stats("time")
+stats.print_stats("main")  # 只显示 main 相关的
+
+# 按调用者查看
+stats.sort_stats("cumtime")
+stats.print_callers(10)  # 谁调用了谁</div>
+    </div>
+    <div class="card">
+        <h2>py-spy 采样分析</h2>
+        <div class="code">// ========== py-spy ==========
+# pip install py-spy
+
+# py-spy: 采样分析器,无需修改代码
+# 适合: 生产环境 / 长时间运行进程
+
+# 1. 分析正在运行的进程:
+# py-spy record -o profile.svg --pid 12345
+# py-spy record -o profile.svg -- python script.py
+
+# 2. 实时查看:
+# py-spy top --pid 12345
+
+# 3. 生成火焰图:
+# py-spy record -o flamegraph.svg --duration 30 python slow_script.py
+
+# ========== 火焰图解读 ==========
+# 顶部: 当前正在执行的函数
+# 底部: 调用栈的根
+# 宽度: 占用的 CPU 时间比例
+# 颜色: 无特殊含义 (随机)
+
+# 宽顶条 = 热点函数 = 需要优化
+
+# ========== 示例 ==========
+import time
+
+def work():
+    for _ in range(10):
+        time.sleep(0.1)
+        compute()
+
+def compute():
+    sum(i * i for i in range(100000))
+
+if __name__ == "__main__":
+    work()
+
+# 运行: py-spy record -o flame.svg -- python this_script.py
+# 打开 flame.svg 查看火焰图</div>
+    </div>
+    <div class="card">
+        <h2>memory_profiler</h2>
+        <div class="code">// ========== memory_profiler ==========
+# pip install memory_profiler
+
+# memory_profiler: 逐行分析内存使用
+
+# 方式 1: 装饰器
+from memory_profiler import profile
+
+@profile
+def memory_intensive():
+    # 创建大列表
+    large_list = [i for i in range(1000000)]
+    # 创建字典
+    large_dict = {i: i**2 for i in range(100000)}
+    # 字符串操作
+    text = "x" * 10000000
+    return len(text)
+
+if __name__ == "__main__":
+    memory_intensive()
+
+# 运行: python -m memory_profiler script.py
+
+# 方式 2: 逐行分析函数
+# @profile 装饰器后,运行会输出:
+# Line #    Mem usage    Increment   Line Contents
+# ================================================
+#     4     20.5 MiB      0.0 MiB   @profile
+#     5                                 def func():
+#     6     48.2 MiB     27.7 MiB       large = [0] * 1000000
+
+# ========== 内存使用监控 ==========
+import psutil
+import os
+
+def get_memory_usage():
+    process = psutil.Process(os.getpid())
+    mem = process.memory_info()
+    return {
+        "rss": mem.rss / 1024 / 1024,  # MB
+        "vms": mem.vms / 1024 / 1024,  # MB
+    }
+
+print(f"当前内存: {get_memory_usage()}")
+
+# ========== tracemalloc ==========
+import tracemalloc
+
+# tracemalloc: 追踪内存分配来源 (Python 3.4+)
+
+tracemalloc.start()
+
+# 执行代码
+data = [bytearray(1000) for _ in range(1000)]
+
+snapshot = tracemalloc.take_snapshot()
+top_stats = snapshot.statistics("lineno")
+
+print("内存占用 TOP 5:")
+for stat in top_stats[:5]:
+    print(stat)</div>
+    </div>
+    <div class="card">
+        <h2>优化策略</h2>
+        <div class="code">// ========== 性能优化策略 ==========
+import time
+
+# 1. 使用合适的数据结构
+# list: O(n) 查找
+# set/dict: O(1) 查找
+
+# ❌ 慢:
+def find_in_list():
+    items = list(range(10000))
+    return [x for x in range(10000) if x in items]
+
+# ✅ 快:
+def find_in_set():
+    items = set(range(10000))
+    return [x for x in range(10000) if x in items]
+
+# 2. 列表推导式替代 for 循环
+# ❌
+result = []
+for i in range(1000):
+    result.append(i * 2)
+
+# ✅
+result = [i * 2 for i in range(1000)]
+
+# 3. 局部变量加速
+# ❌
+def slow():
+    for i in range(1000000):
+        sum(range(100))
+
+# ✅
+def fast():
+    local_sum = sum
+    local_range = range
+    for i in range(1000000):
+        local_sum(local_range(100))
+
+# 4. 字符串拼接
+# ❌
+s = ""
+for i in range(10000):
+    s += str(i)
+
+# ✅
+parts = [str(i) for i in range(10000)]
+s = "".join(parts)
+
+# 5. 生成器惰性计算
+# ❌ 占用大量内存
+squares = [i**2 for i in range(1000000)]
+
+# ✅ 惰性求值
+squares = (i**2 for i in range(1000000))
+
+# 6. 缓存重复计算 (见缓存章节)
+# @lru_cache / cachetools / Redis</div>
+        <div class="note">💡 性能分析要点: timeit 微基准; cProfile 函数级剖析; py-spy 采样(适用于生产); memory_profiler 内存分析; set/dict O(1) 查找; 列表推导式; 局部变量加速; 生成器节约内存。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoProfile()">cProfile 演示</button>
+        <button onclick="demoOptimize()">优化策略演示</button>
+        <button onclick="demoMemory()">内存分析演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoProfile() {
+            result.innerHTML = '';
+            log('# cProfile');
+            log('');
+            log('profiler = cProfile.Profile()');
+            log('profiler.enable()');
+            log('main()');
+            log('profiler.disable()');
+            log('');
+            log('排序:');
+            log('  cumtime: 累积时间');
+            log('  tottime: 自身时间');
+            log('  ncalls: 调用次数');
+        }
+
+        function demoOptimize() {
+            result.innerHTML = '';
+            log('# 优化策略');
+            log('');
+            log('数据结构:');
+            log('  list O(n) → set O(1)');
+            log('');
+            log('列表推导: [x*2 for x in items]');
+            log('生成器: (x*2 for x in items)');
+            log('局部变量: local_sum = sum');
+            log('字符串: "".join(parts)');
+        }
+
+        function demoMemory() {
+            result.innerHTML = '';
+            log('# 内存分析');
+            log('');
+            log('@profile');
+            log('def func():');
+            log('    large = [0] * 1000000');
+            log('');
+            log('# python -m memory_profiler script.py');
+            log('');
+            log('tracemalloc:');
+            log('  snapshot = tracemalloc.take_snapshot()');
+            log('  top_stats = snapshot.statistics("lineno")');
+        }
+    </script>
+</body>
+</html>

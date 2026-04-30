@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Popover与Dialog</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        [popover] { padding: 20px; border: none; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); max-width: 300px; }
+        [popover]::backdrop { background: rgba(0,0,0,0.3); }
+        dialog { border: none; border-radius: 12px; padding: 24px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); max-width: 400px; }
+        dialog::backdrop { background: rgba(0,0,0,0.4); }
+        dialog form { display: flex; flex-direction: column; gap: 10px; }
+        dialog input { padding: 8px; border: 2px solid #ddd; border-radius: 4px; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Popover 与 Dialog</h2><p>浏览器原生弹出面板和对话框 API。</p></div>
+    <div class="card">
+        <h2>Popover API</h2>
+        <div class="code">// HTML 声明式（最简用法）
+// &lt;button popovertarget="my-popover"&gt;打开&lt;/button&gt;
+// &lt;div id="my-popover" popover&gt;内容&lt;/div&gt;
+
+// JS API
+const popover = document.getElementById('my-popover');
+popover.showPopover();       // 打开
+popover.hidePopover();       // 关闭
+popover.togglePopover();     // 切换
+
+// popover 属性值
+// popover="auto" — 默认，点击外部/ESC 自动关闭（一次只能打开一个）
+// popover="manual" — 必须手动关闭
+
+// 事件
+popover.addEventListener('beforetoggle', (e) => {
+    if (e.newState === 'open') { }
+    if (e.newState === 'closed') { }
+});
+popover.addEventListener('toggle', (e) => { });
+
+// CSS 伪类
+// [popover]:popover-open { }  — 打开状态
+// [popover]::backdrop { }     — 背景层</div>
+    </div>
+    <div class="card">
+        <h2>Dialog API</h2>
+        <div class="code">// 创建
+const dialog = document.getElementById('my-dialog');
+
+// 打开
+dialog.show();              // 非模态（可操作外部）
+dialog.showModal();          // 模态（阻止外部操作，焦点自动管理）
+
+// 关闭
+dialog.close();              // 关闭
+dialog.close('result');      // 带返回值
+
+// 事件
+dialog.addEventListener('close', () => {
+    console.log(dialog.returnValue); // 获取关闭时的返回值
+});
+dialog.addEventListener('cancel', () => {
+    // ESC 键关闭时触发
+});
+
+// 表单集成
+// &lt;form method="dialog"&gt; 提交时自动关闭 dialog
+// &lt;button value="ok"&gt;确定&lt;/button&gt;
+
+// CSS 伪类
+// dialog::backdrop { background: rgba(0,0,0,0.5); }</div>
+        <div class="note">💡 showModal() 自动处理焦点陷阱（Tab 循环在对话框内）。<br>
+        💡 Popover 适合轻量提示/tooltip，Dialog 适合正式对话框/表单。<br>
+        🤝 Popover API 较新（Chrome 114+），Dialog 支持更广泛。</div>
+    </div>
+    <div class="card">
+        <h2>演示：Popover</h2>
+        <button popovertarget="demo-popover">📢 打开 Popover</button>
+        <div id="demo-popover" popover="auto">
+            <h3 style="margin:0 0 10px 0;">📋 Popover 内容</h3>
+            <p>这是一个原生 popover 面板。</p>
+            <p style="font-size:12px;color:#7f8c8d;">点击外部或 ESC 关闭</p>
+            <button popovertarget="demo-popover" popovertargetaction="hide">关闭</button>
+        </div>
+    </div>
+    <div class="card">
+        <h2>演示：Dialog</h2>
+        <button onclick="openModal()">📋 打开模态对话框</button>
+        <button onclick="openNonModal()">📋 打开非模态对话框</button>
+        <dialog id="demo-dialog">
+            <h3 style="margin:0 0 10px 0;">📝 对话框</h3>
+            <form method="dialog">
+                <label>姓名：<input type="text" name="name" value="张三" autofocus></label>
+                <label>邮箱：<input type="email" name="email" value="test@example.com"></label>
+                <div style="display:flex;gap:10px;margin-top:10px;">
+                    <button value="ok" style="background:#2ecc71;">✅ 确定</button>
+                    <button value="cancel" style="background:#95a5a6;" formnovalidate>❌ 取消</button>
+                </div>
+            </form>
+        </dialog>
+        <div id="dialog-result" style="font-size:13px;color:#7f8c8d;margin-top:5px;"></div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const demoDialog = document.getElementById('demo-dialog');
+        const dialogResult = document.getElementById('dialog-result');
+
+        function openModal() {
+            demoDialog.showModal();
+            console.log('打开模态对话框');
+        }
+
+        function openNonModal() {
+            demoDialog.show();
+            console.log('打开非模态对话框');
+        }
+
+        demoDialog.addEventListener('close', () => {
+            const val = demoDialog.returnValue;
+            dialogResult.textContent = `对话框关闭，返回值: ${val}`;
+            console.log(`dialog 关闭: ${val}`);
+        });
+
+        demoDialog.addEventListener('cancel', (e) => {
+            e.preventDefault(); // 阻止 ESC 关闭（可选）
+            console.log('cancel (ESC 按下)');
+        });
+
+        // Popover 事件
+        const popover = document.getElementById('demo-popover');
+        popover.addEventListener('toggle', (e) => {
+            console.log(`popover: ${e.newState}`);
+        });
+
+        console.log('=== Popover & Dialog ===');
+        console.log('Popover 支持:', !!HTMLElement.prototype.showPopover);
+        console.log('Dialog 支持:', !!HTMLDialogElement);
+
+        document.getElementById('output').textContent =
+            `Popover: showPopover/hidePopover/togglePopover\n` +
+            `Dialog: show/showModal/close/returnValue\n` +
+            `CSS: ::backdrop / [popover]:popover-open\n` +
+            `✅ Popover & Dialog 演示完成！`;
+    </script>
+</body>
+</html>

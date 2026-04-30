@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 基准测试与性能分析</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📊 Go 基准测试与性能分析</h2><p>Benchmark 编写与运行、内存分配分析、编译器优化、性能对比、pprof 可视化、优化方法论。</p></div>
+    <div class="card">
+        <h2>Benchmark 基础</h2>
+        <div class="code">// ========== 基本 Benchmark ==========
+// 文件名: xxx_test.go
+// 函数: func BenchmarkXxx(b *testing.B)
+
+// go test -bench=. ./...
+// go test -bench=BenchmarkXxx
+
+func BenchmarkStringConcat(b *testing.B) {
+    s := ""
+    for i := 0; i < b.N; i++ {
+        s += "a"
+    }
+    _ = s
+}
+
+// 运行: go test -bench=BenchmarkStringConcat -benchmem
+// 结果:
+// BenchmarkStringConcat-8    1000000    2500 ns/op    4096 B/op    8 allocs/op
+// (调用次数)                (每次ns)    (每次字节)    (每次分配次数)
+
+// ========== ResetTimer 排除准备时间 ==========
+func BenchmarkComplex(b *testing.B) {
+    data := generateLargeData()  // 准备数据不计时
+    b.ResetTimer()               // 重置计时器
+
+    for i := 0; i < b.N; i++ {
+        processData(data)
+    }
+}
+
+// ========== StopTimer / StartTimer ==========
+func BenchmarkWithPause(b *testing.B) {
+    data := generateLargeData()
+
+    for i := 0; i < b.N; i++ {
+        b.StopTimer()       // 暂停计时
+        result := transform(data)
+        b.StartTimer()      // 恢复计时
+
+        _ = result
+        expensiveFunc()
+    }
+}
+
+// ========== 并行 Benchmark ==========
+func BenchmarkParallel(b *testing.B) {
+    b.RunParallel(func(pb *testing.PB) {
+        // 每个 goroutine 独立执行
+        for pb.Next() {
+            doWork()
+        }
+    })
+}
+
+// 结果示例:
+// BenchmarkParallel-8    5000000    300 ns/op
+
+// ========== 内存分配分析 ==========
+// -benchmem 显示分配统计
+// 关注 allocs/op (分配次数) 和 B/op (分配字节)
+
+func BenchmarkMemory(b *testing.B) {
+    b.ReportAllocs()  // 也可以在代码中启用
+
+    for i := 0; i < b.N; i++ {
+        // 避免在热路径分配
+        _ = make([]int, 100)
+    }
+}
+
+// 优化目标:
+// 1. 减少 allocs/op (分配次数更重要)
+// 2. 减少 B/op
+// 3. 分配次数 0 是理想情况</div>
+    </div>
+    <div class="card">
+        <h2>性能对比与优化</h2>
+        <div class="code">// ========== 对比不同实现 ==========
+func BenchmarkSum(b *testing.B) {
+    nums := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10}
+
+    b.Run("for循环", func(b *testing.B) {
+        for i := 0; i < b.N; i++ {
+            sum := 0
+            for _, n := range nums {
+                sum += n
+            }
+            _ = sum
+        }
+    })
+
+    b.Run("reduce模式", func(b *testing.B) {
+        for i := 0; i < b.N; i++ {
+            result := 0
+            for _, n := range nums {
+                result += n
+            }
+            _ = result
+        }
+    })
+}
+
+// 对比运行:
+// go test -bench=BenchmarkSum -benchmem
+// go test -bench=BenchmarkSum -benchmem -count=5  // 多次运行
+
+// ========== Benchmark 对比不同数据结构 ==========
+func BenchmarkMapVsSlice(b *testing.B) {
+    size := 1000
+
+    b.Run("Map写", func(b *testing.B) {
+        for i := 0; i < b.N; i++ {
+            m := make(map[int]int, size)
+            for j := 0; j < size; j++ {
+                m[j] = j
+            }
+        }
+    })
+
+    b.Run("Slice写", func(b *testing.B) {
+        for i := 0; i < b.N; i++ {
+            s := make([]int, size)
+            for j := 0; j < size; j++ {
+                s[j] = j
+            }
+        }
+    })
+}
+
+// ========== 预分配 vs 动态增长 ==========
+func BenchmarkPreallocate(b *testing.B) {
+    n := 1000
+
+    b.Run("无预分配", func(b *testing.B) {
+        for i := 0; i < b.N; i++ {
+            s := make([]int, 0)
+            for j := 0; j < n; j++ {
+                s = append(s, j)
+            }
+        }
+    })
+
+    b.Run("预分配", func(b *testing.B) {
+        for i := 0; i < b.N; i++ {
+            s := make([]int, 0, n)
+            for j := 0; j < n; j++ {
+                s = append(s, j)
+            }
+        }
+    })
+}
+
+// 结果对比:
+// 无预分配: 500000    3000 ns/op    35792 B/op    20 allocs/op
+// 预分配:   1000000   1500 ns/op    8192 B/op     1 allocs/op
+
+// ========== 字符串拼接对比 ==========
+func BenchmarkStringConcat2(b *testing.B) {
+    words := []string{"hello", "world", "foo", "bar", "baz"}
+
+    b.Run("+=", func(b *testing.B) {
+        for i := 0; i < b.N; i++ {
+            s := ""
+            for _, w := range words {
+                s += w
+            }
+            _ = s
+        }
+    })
+
+    b.Run("strings.Join", func(b *testing.B) {
+        for i := 0; i < b.N; i++ {
+            _ = strings.Join(words, "")
+        }
+    })
+
+    b.Run("strings.Builder", func(b *testing.B) {
+        for i := 0; i < b.N; i++ {
+            var sb strings.Builder
+            for _, w := range words {
+                sb.WriteString(w)
+            }
+            _ = sb.String()
+        }
+    })
+}
+
+// 结果: strings.Builder > strings.Join > +=</div>
+    </div>
+    <div class="card">
+        <h2>pprof 性能分析</h2>
+        <div class="code">// ========== 生成 CPU Profile ==========
+// go test -bench=. -cpuprofile=cpu.pprof
+// go test -bench=. -memprofile=mem.pprof
+// go test -bench=. -blockprofile=block.pprof
+
+// 或者通过代码:
+func BenchmarkWithProfile(b *testing.B) {
+    f, _ := os.Create("cpu.pprof")
+    pprof.StartCPUProfile(f)
+    defer pprof.StopCPUProfile()
+
+    for i := 0; i < b.N; i++ {
+        doHeavyWork()
+    }
+}
+
+// ========== 分析 Profile ==========
+// 交互式:
+// go tool pprof cpu.pprof
+// (pprof) top        // 最耗时的函数
+// (pprof) list Foo   // 查看 Foo 函数详情
+// (pprof) web        // 浏览器 SVG
+// (pprof) peek Bar   // 查看调用者/被调用者
+
+// Web UI:
+// go tool pprof -http=:8080 cpu.pprof
+// 可查看: Graph, Flame Graph, Peek, Source
+
+// ========== 内存分析 ==========
+// go test -bench=. -memprofile=mem.pprof -memprofilerate=1
+
+// 分析:
+// go tool pprof -http=:8080 mem.pprof
+// top 显示分配最多的函数
+// 重点关注: alloc_objects, alloc_space
+
+// ========== 基准测试结果比较 ==========
+// 使用 benchstat 比较多次运行
+// go install golang.org/x/perf/cmd/benchstat@latest
+//
+// go test -bench=. -count=10 > old.txt
+// // 优化后
+// go test -bench=. -count=10 > new.txt
+// benchstat old.txt new.txt
+
+// 输出:
+// name        old time/op  new time/op  delta
+// StringConcat  2.5µs       1.2µs       -52.0%
+
+// ========== 编译器优化注意事项 ==========
+// 编译器可能优化掉无副作用的代码
+
+func BenchmarkSink(b *testing.B) {
+    // 使用全局变量防止优化
+    var result int
+    for i := 0; i < b.N; i++ {
+        result = compute(i)
+    }
+    Result = result  // 全局变量
+}
+
+var Result int  // 防止编译器优化
+
+// 更好的方式: b.StopTimer/b.StartTimer 模式</div>
+    </div>
+    <div class="card">
+        <h2>优化方法论</h2>
+        <div class="code">// ========== 性能分析步骤 ==========
+// 1. 基准测试 — 建立基线
+//    go test -bench=. -benchmem ./...
+//
+// 2. Profile 定位瓶颈
+//    go test -bench=. -cpuprofile=cpu.pprof -memprofile=mem.pprof
+//    go tool pprof -http=:8080 cpu.pprof
+//
+// 3. 优化
+//    - 减少内存分配
+//    - 减少锁竞争
+//    - 优化算法
+//    - 使用对象池
+//
+// 4. 再次基准测试 — 验证改进
+//    benchstat old.txt new.txt
+
+// ========== 常见优化模式 ==========
+// 1. 预分配切片/Map
+// 2. 使用 strings.Builder 代替 +
+// 3. 使用 sync.Pool 复用对象
+// 4. 避免不必要的 []byte <-> string 转换
+// 5. 结构体对齐优化
+// 6. 内联小函数
+
+// ========== ResetTimer + 子 Benchmark ==========
+func BenchmarkComposite(b *testing.B) {
+    data := prepare()
+
+    b.Run("Fast", func(b *testing.B) {
+        b.ReportAllocs()
+        for i := 0; i < b.N; i++ {
+            fastProcess(data)
+        }
+    })
+
+    b.Run("Slow", func(b *testing.B) {
+        b.ReportAllocs()
+        for i := 0; i < b.N; i++ {
+            slowProcess(data)
+        }
+    })
+}
+
+// ========== SetBytes ==========
+// 报告每秒处理的字节数
+func BenchmarkSetBytes(b *testing.B) {
+    data := make([]byte, 1<<20)  // 1MB
+    b.SetBytes(int64(len(data))) // 报告吞吐量
+
+    for i := 0; i < b.N; i++ {
+        hash(data)
+    }
+}
+// 结果: 30 MB/s
+
+// ========== Benchmem 关键指标 ==========
+// allocs/op — 每次操作分配次数 (最重要)
+// B/op      — 每次操作分配字节数
+// ns/op     — 每次操作耗时
+// MB/s      — 吞吐量
+
+// 优先优化 allocs/op, 其次 B/op
+// 一次分配比多次分配好
+// 零分配最好</div>
+        <div class="note">💡 基准测试要点: b.N 自动调整; b.ResetTimer/StopTimer/StartTimer 控制计时; b.RunParallel 并行测试; -benchmem 分析内存分配; 预分配 vs 动态增长性能差异大; strings.Builder 最优拼接; pprof cpu/mem/block profile; go tool pprof -http=:8080 可视化; benchstat 比较结果; 优化步骤: 基准 → Profile → 优化 → 再基准; allocs/op 比 ns/op 更重要。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoBench()">Benchmark</button>
+        <button onclick="demoCompare2()">性能对比</button>
+        <button onclick="demoProfile()">pprof</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoBench() {
+            result.innerHTML = '';
+            log('# 基准测试');
+            log('');
+            log('基本:');
+            log('  func BenchmarkXxx(b *testing.B) {');
+            log('    for i := 0; i < b.N; i++ {');
+            log('      doWork()');
+            log('    }');
+            log('  }');
+            log('');
+            log('运行:');
+            log('  go test -bench=. -benchmem');
+            log('');
+            log('控制:');
+            log('  b.ResetTimer()  // 重置计时');
+            log('  b.StopTimer()   // 暂停');
+            log('  b.StartTimer()  // 恢复');
+            log('  b.SetBytes(n)   // 吞吐量');
+        }
+
+        function demoCompare2() {
+            result.innerHTML = '';
+            log('# 性能对比');
+            log('');
+            log('子 Benchmark:');
+            log('  b.Run("A", func(b *testing.B) { ... })');
+            log('  b.Run("B", func(b *testing.B) { ... })');
+            log('');
+            log('指标:');
+            log('  ns/op     — 每次操作耗时');
+            log('  B/op      — 每次分配字节');
+            log('  allocs/op — 每次分配次数');
+            log('');
+            log('比较:');
+            log('  go test -count=10 > old.txt');
+            log('  benchstat old.txt new.txt');
+        }
+
+        function demoProfile() {
+            result.innerHTML = '';
+            log('# pprof 性能分析');
+            log('');
+            log('生成:');
+            log('  go test -bench=. -cpuprofile=cpu.pprof');
+            log('  go test -bench=. -memprofile=mem.pprof');
+            log('');
+            log('分析:');
+            log('  go tool pprof cpu.pprof');
+            log('  top / list / web / peek');
+            log('  go tool pprof -http=:8080 cpu.pprof');
+            log('');
+            log('火焰图:');
+            log('  浏览器 → Graph / Flame Graph');
+        }
+    </script>
+</body>
+</html>

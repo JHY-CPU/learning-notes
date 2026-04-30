@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python生成器与yield</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚡ Python 生成器与 yield</h2><p>生成器函数 yield、生成器表达式、生成器 vs 列表、惰性求值优势、send/throw/close、yield from 委托。</p></div>
+    <div class="card">
+        <h2>生成器基础</h2>
+        <div class="code">// ========== 什么是生成器 ==========
+// 生成器: 用 yield 关键字的函数,返回一个迭代器
+// 每次调用 next() 执行到下一个 yield 暂停
+// 节省内存,惰性求值
+
+// 普通函数:
+def normal_range(n):
+    result = []
+    i = 0
+    while i < n:
+        result.append(i)
+        i += 1
+    return result          # 一次返回全部
+
+// 生成器函数:
+def gen_range(n):
+    i = 0
+    while i < n:
+        yield i            # 暂停,返回 i,下次从这里继续
+        i += 1
+
+// 调用生成器函数返回生成器对象,不会立即执行
+g = gen_range(3)
+print(g)                   # &lt;generator object gen_range at 0x...&gt;
+
+// 用 next() 逐个取值:
+print(next(g))             # 0
+print(next(g))             # 1
+print(next(g))             # 2
+print(next(g))             # StopIteration!
+
+// 用 for 循环自动捕获 StopIteration:
+for i in gen_range(3):
+    print(i)               # 0, 1, 2
+
+// ========== yield 的工作原理 ==========
+def simple_gen():
+    print("开始")
+    yield 1
+    print("中间")
+    yield 2
+    print("结束")
+
+g = simple_gen()
+print(next(g))  # 打印 "开始", 返回 1
+print(next(g))  # 打印 "中间", 返回 2
+print(next(g))  # 打印 "结束", StopIteration!
+
+// yield 像是一个"暂停点":
+// - 遇到 yield 就暂停,返回右侧表达式的值
+// - 下次 next() 从 yield 后面继续执行</div>
+    </div>
+    <div class="card">
+        <h2>生成器表达式</h2>
+        <div class="code">// ========== 生成器表达式 vs 列表推导式 ==========
+// 语法相似,但生成器表达式用 () 而不是 []
+// 生成器表达式返回生成器对象,惰性求值
+
+# 列表推导式 (立即计算全部):
+list_squares = [x ** 2 for x in range(10)]
+print(list_squares)          # [0, 1, 4, 9, ..., 81]
+print(type(list_squares))    # &lt;class 'list'&gt;
+
+# 生成器表达式 (惰性求值):
+gen_squares = (x ** 2 for x in range(10))
+print(gen_squares)           # &lt;generator object &lt;genexpr&gt; at 0x...&gt;
+print(type(gen_squares))     # &lt;class 'generator'&gt;
+
+for n in gen_squares:
+    print(n, end=" ")        # 0 1 4 9 ... 81
+
+// ========== 什么时候用生成器 ==========
+// 1. 大数据集 (节省内存)
+import sys
+
+# 列表占用:
+big_list = [x for x in range(1000000)]
+print(sys.getsizeof(big_list))  # ~8MB
+
+# 生成器占用:
+big_gen = (x for x in range(1000000))
+print(sys.getsizeof(big_gen))   # ~112B (固定大小!)
+
+// 2. 无限序列 (列表不可能)
+def fibonacci():
+    a, b = 0, 1
+    while True:              # 无限循环!
+        yield a
+        a, b = b, a + b
+
+fib = fibonacci()
+for _ in range(10):
+    print(next(fib), end=" ")  # 0 1 1 2 3 5 8 13 21 34
+
+// 3. 管道处理 (链式操作)
+def read_large(filename):
+    """逐行读取大文件 (不加载全部到内存)"""
+    with open(filename) as f:
+        for line in f:
+            yield line.strip()</div>
+    </div>
+    <div class="card">
+        <h2>生成器方法: send/throw/close</h2>
+        <div class="code">// ========== send() — 发送值到生成器 ==========
+// 生成器不仅可以产出值,还可以接收值
+
+def echo():
+    print("生成器启动")
+    while True:
+        received = yield   # yield 右侧的值返回给调用者
+        print(f"收到: {received}")
+
+g = echo()
+next(g)                    # 启动生成器 (执行到第一个 yield)
+# 打印 "生成器启动"
+
+g.send("Hello")            # 发送值给 yield 表达式
+# 打印 "收到: Hello"
+
+g.send(42)                 # 打印 "收到: 42"
+
+// ========== 计数器的 send 用法 ==========
+def counter():
+    count = 0
+    while True:
+        increment = yield count   # yield 返回当前值,send 修改行为
+        if increment is not None:
+            count += increment
+        else:
+            count += 1
+
+c = counter()
+print(next(c))              # 0 (启动,返回 count=0)
+print(next(c))              # 1 (默认步长 1)
+print(c.send(5))            # 6 (步长 5)
+print(c.send(-2))           # 4 (步长 -2)
+print(next(c))              # 5 (默认步长 1)
+
+// ========== throw() — 向生成器抛异常 ==========
+def gen():
+    try:
+        yield 1
+        yield 2
+        yield 3
+    except ValueError:
+        print("捕获 ValueError!")
+    yield 4                  # 异常后可以继续产出
+
+g = gen()
+print(next(g))              # 1
+g.throw(ValueError, "错误!")
+# 捕获 ValueError!
+# 打印 4 (继续下一个 yield)
+
+// ========== close() — 关闭生成器 ==========
+def simple():
+    try:
+        yield 1
+        yield 2
+    finally:
+        print("清理资源")
+
+g = simple()
+print(next(g))              # 1
+g.close()                   # 触发 GeneratorExit 异常,执行 finally
+# 打印 "清理资源"
+print(next(g))              # StopIteration (已关闭)</div>
+    </div>
+    <div class="card">
+        <h2>生成器实战</h2>
+        <div class="code">// ========== 实战 1: 大数据分块处理 ==========
+def chunks(data, size):
+    """将数据分块"""
+    for i in range(0, len(data), size):
+        yield data[i:i + size]
+
+data = [1, 2, 3, 4, 5, 6, 7, 8]
+for chunk in chunks(data, 3):
+    print(chunk)             # [1,2,3] [4,5,6] [7,8]
+
+// ========== 实战 2: 流水线处理 ==========
+# 文件行 → 过滤 → 转换 → 输出
+def read_lines(filename):
+    with open(filename, encoding="utf-8") as f:
+        for line in f:
+            yield line.rstrip()
+
+def grep(lines, pattern):
+    for line in lines:
+        if pattern in line:
+            yield line
+
+def uppercase(lines):
+    for line in lines:
+        yield line.upper()
+
+# 组合管道:
+lines = read_lines("data.txt")
+filtered = grep(lines, "ERROR")
+upper = uppercase(filtered)
+
+for line in upper:
+    print(line)
+
+// ========== 实战 3: 生成器协程 (数据流) ==========
+def running_average():
+    """实时计算平均值"""
+    total = 0
+    count = 0
+    average = None
+    while True:
+        value = yield average
+        total += value
+        count += 1
+        average = total / count
+
+avg = running_average()
+next(avg)                    # 启动
+print(avg.send(10))          # 10.0
+print(avg.send(20))          # 15.0
+print(avg.send(30))          # 20.0
+
+// ========== 实战 4: 深度优先遍历树 ==========
+def tree_traverse(node):
+    """递归生成器: 遍历树的所有节点"""
+    yield node["value"]
+    for child in node.get("children", []):
+        yield from tree_traverse(child)  # yield from 委托
+
+tree = {
+    "value": 1,
+    "children": [
+        {"value": 2, "children": [{"value": 4}, {"value": 5}]},
+        {"value": 3}
+    ]
+}
+
+print(list(tree_traverse(tree)))  # [1, 2, 4, 5, 3]</div>
+        <div class="note">💡 生成器要点: (1) yield 暂停函数,保存执行状态; (2) 生成器表达式 () 比列表推导式 [] 省内存; (3) send() 双向通信,throw() 抛异常,close() 清理; (4) 生成器适合大数据/无限序列/管道处理; (5) yield from 委托给另一个生成器。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoGenerator()">生成器基础演示</button>
+        <button onclick="demoGeneratorPipeline()">生成器管道演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoGenerator() {
+            result.innerHTML = '';
+            log('# 生成器演示');
+            log('');
+            log('def gen_range(n):');
+            log('    i = 0');
+            log('    while i < n:');
+            log('        yield i');
+            log('        i += 1');
+            log('');
+            // JS 模拟
+            log('gen_range(5) → 0, 1, 2, 3, 4');
+            log('');
+            log('生成器 vs 列表:');
+            log('  列表: 全部算出,占内存');
+            log('  生成器: 惰性求值,省内存');
+            log('');
+            log('适用场景:');
+            log('  ✅ 大数据集');
+            log('  ✅ 无限序列');
+            log('  ✅ 管道处理');
+            log('  ✅ 树遍历');
+        }
+
+        function demoGeneratorPipeline() {
+            result.innerHTML = '';
+            log('# 生成器管道演示');
+            log('');
+            log('def read(filename):');
+            log('    for line in f:');
+            log('        yield line.strip()');
+            log('');
+            log('def grep(lines, pat):');
+            log('    for line in lines:');
+            log('        if pat in line:');
+            log('            yield line');
+            log('');
+            log('def upper(lines):');
+            log('    for line in lines:');
+            log('        yield line.upper()');
+            log('');
+            log('组合:');
+            log('  upper(grep(read("f.txt"), "ERROR"))');
+            log('');
+            log('特点:');
+            log('  - 数据按需流动');
+            log('  - 没有中间列表');
+            log('  - 像 Unix 管道一样!');
+        }
+    </script>
+</body>
+</html>

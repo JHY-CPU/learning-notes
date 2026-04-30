@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>replace与replaceAll</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #replace-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; margin: 5px 0; width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>replace 与 replaceAll</h2><p>String.replace / replaceAll、$ 引用、函数作为 replacer。</p></div>
+    <div class="card">
+        <h2>replace 语法</h2>
+        <div class="code">// ========== String.replace() ==========
+// 替换第一个匹配 (字符串或正则)
+'Hello World'.replace('World', 'JS');     // 'Hello JS'
+'Hello World'.replace(/World/, 'JS');     // 'Hello JS'
+'Hello World'.replace(/l/g, 'L');         // 'HeLLo WorLd' (全局)
+
+// ========== String.replaceAll() (ES2021) ==========
+// 替换所有匹配 (必须全局或字符串)
+'Hello World'.replaceAll('o', 'O');       // 'HellO WOrld'
+'Hello World'.replaceAll(/o/g, 'O');      // 'HellO WOrld'
+
+// ========== $ 引用模式 ==========
+// $&  — 匹配的子串
+// $`  — 匹配左侧文本
+// $'  — 匹配右侧文本
+// $n  — 第 n 个捕获组
+// $<name> — 命名捕获组
+// $$  — $ 字面量
+
+// ========== 函数 replacer ==========
+'2024-01-15'.replace(/(\d{4})-(\d{2})-(\d{2})/g,
+    (match, year, month, day, offset, string) => {
+        return `${month}/${day}/${year}`;
+    }
+);
+// '01/15/2024'
+
+// 命名组 replacer
+str.replace(/(?&lt;year>\d{4})-(?&lt;month>\d{2})-(?&lt;day>\d{2})/g,
+    (...args) => {
+        const groups = args.at(-1); // 最后一个参数是 groups
+        return `${groups.month}/${groups.day}/${groups.year}`;
+    }
+);</div>
+    </div>
+    <div class="card">
+        <h2>演示：replace 用法</h2>
+        <input id="replaceInput" value="Hello World! Hello JavaScript!" placeholder="输入文本">
+        <button onclick="demoReplace()">replace 演示</button>
+        <button onclick="demoReplaceFn()">函数 replacer</button>
+        <div id="replace-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const replaceResult = document.getElementById('replace-result');
+
+        function log(msg) {
+            replaceResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoReplace() {
+            replaceResult.innerHTML = '';
+            const text = document.getElementById('replaceInput').value;
+            log(`📋 原始文本: "${text}"`);
+            log('');
+
+            log('1️⃣ replace 基本:');
+            log(`   replace("Hello", "Hi"): "${text.replace('Hello', 'Hi')}"`);
+            log(`   replace(/Hello/, "Hi"): "${text.replace(/Hello/, 'Hi')}"`);
+            log('');
+
+            log('2️⃣ replaceAll:');
+            log(`   replaceAll("Hello", "Hi"): "${text.replaceAll('Hello', 'Hi')}"`);
+            log(`   replaceAll(/Hello/g, "Hi"): "${text.replaceAll(/Hello/g, 'Hi')}"`);
+            log('');
+
+            log('3️⃣ $ 引用:');
+            const date = '2024-01-15';
+            log(`   原始日期: "${date}"`);
+            log(`   $1/$2/$3: "${date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$2/$3/$1')}"`);
+            log(`   $&: "${date.replace(/\d+/g, '[$&]')}"`);
+            log(`   $\` 和 $': "${date.replace(/-/, "『$`』-『$'』")}"`);
+        }
+
+        function demoReplaceFn() {
+            replaceResult.innerHTML = '';
+            const text = document.getElementById('replaceInput').value;
+            log(`📋 原始文本: "${text}"`);
+            log('');
+
+            log('1️⃣ 函数 replacer 基本:');
+            const r1 = text.replace(/Hello/g, (match, offset) => {
+                return `${match}(${offset})`;
+            });
+            log(`   Hello → Hello(位置): "${r1}"`);
+            log('');
+
+            log('2️⃣ 日期格式化 (捕获组):');
+            const dates = '2024-01-15 和 2025-06-20';
+            const r2 = dates.replace(
+                /(\d{4})-(\d{2})-(\d{2})/g,
+                (match, year, month, day, offset, str) => {
+                    return `${year}年${month}月${day}日`;
+                }
+            );
+            log(`   原始: "${dates}"`);
+            log(`   结果: "${r2}"`);
+            log('');
+
+            log('3️⃣ 数字格式化:');
+            const nums = '价格: 1234.56, 折扣: 789';
+            const r3 = nums.replace(/\d+(\.\d+)?/g, (match) => {
+                return Number(match).toLocaleString('en');
+            });
+            log(`   原始: "${nums}"`);
+            log(`   结果: "${r3}"`);
+            log('');
+
+            log('4️⃣ if/then 模式:');
+            const r4 = text.replace(/\b\w+\b/g, (match) => {
+                if (match.length <= 3) return match.toUpperCase();
+                if (match.startsWith('H')) return `[${match}]`;
+                return match;
+            });
+            log(`   条件替换: "${r4}"`);
+        }
+
+        console.log('=== replace 与 replaceAll ===');
+
+        document.getElementById('output').textContent =
+            `replace / replaceAll: $引用 / 函数 replacer / 命名组\n` +
+            `$& $` + "`" + ` $' $n $<name> $$  / replaceAll 需全局\n` +
+            `✅ replace 与 replaceAll 演示完成！`;
+    </script>
+</body>
+</html>

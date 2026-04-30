@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 日期时间函数</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📅 SQL 日期时间函数</h2><p>NOW/CURDATE/DATE_FORMAT, 日期加减 (DATE_ADD/DATE_SUB), EXTRACT 提取, DATEDIFF/TIMESTAMPDIFF, 时区处理, MySQL vs PostgreSQL 日期函数对照。</p></div>
+    <div class="card">
+        <h2>获取当前日期时间</h2>
+        <div class="code">// ========== 当前时间函数 ==========
+
+-- MySQL:
+SELECT NOW();              -- 2024-01-15 14:30:00 (当前日期时间)
+SELECT CURDATE();          -- 2024-01-15 (当前日期)
+SELECT CURTIME();          -- 14:30:00 (当前时间)
+SELECT SYSDATE();          -- 同 NOW(),但执行时获取
+SELECT UTC_TIMESTAMP();    -- UTC 时间
+
+-- PostgreSQL:
+-- SELECT NOW();             -- 同 MySQL
+-- SELECT CURRENT_DATE;      -- 2024-01-15
+-- SELECT CURRENT_TIME;      -- 14:30:00.123+08
+-- SELECT CURRENT_TIMESTAMP; -- 2024-01-15 14:30:00+08
+-- SELECT LOCALTIMESTAMP;    -- 无时区
+
+-- ========== 日期时间组件提取 ==========
+
+-- MySQL:
+SELECT YEAR(NOW());          -- 2024
+SELECT MONTH(NOW());         -- 1
+SELECT DAY(NOW());           -- 15
+SELECT HOUR(NOW());          -- 14
+SELECT MINUTE(NOW());        -- 30
+SELECT SECOND(NOW());        -- 0
+SELECT DAYOFWEEK(NOW());     -- 2 (周日=1,周一=2...)
+SELECT DAYOFYEAR(NOW());     -- 15 (一年中的第几天)
+SELECT WEEK(NOW());          -- 3 (一年中的第几周)
+SELECT QUARTER(NOW());       -- 1 (季度)
+
+-- PostgreSQL:
+-- SELECT EXTRACT(YEAR FROM NOW()); -- 2024
+-- SELECT EXTRACT(MONTH FROM NOW());
+-- SELECT EXTRACT(DAY FROM NOW());
+-- SELECT EXTRACT(DOW FROM NOW());  -- 1 (周一=1...)
+-- SELECT DATE_PART('year', NOW());
+
+-- ========== 格式化日期 ==========
+
+-- MySQL: DATE_FORMAT
+SELECT DATE_FORMAT(NOW(), '%Y-%m-%d');           -- 2024-01-15
+SELECT DATE_FORMAT(NOW(), '%Y年%m月%d日');       -- 2024年01月15日
+SELECT DATE_FORMAT(NOW(), '%Y-%m-%d %H:%i:%s');  -- 2024-01-15 14:30:00
+SELECT DATE_FORMAT(NOW(), '%W %M %Y');            -- Monday January 2024
+SELECT DATE_FORMAT(NOW(), '%H:%i:%s');             -- 14:30:00
+
+-- 常用格式符:
+-- %Y: 4位年, %y: 2位年
+-- %m: 01-12月, %c: 1-12月(无前导0)
+-- %d: 01-31日
+-- %H: 00-23时, %h: 01-12时
+-- %i: 00-59分
+-- %s: 00-59秒
+-- %W: 星期名称, %a: 星期缩写
+
+-- PostgreSQL:
+-- SELECT TO_CHAR(NOW(), 'YYYY-MM-DD');      -- 2024-01-15
+-- SELECT TO_CHAR(NOW(), 'YYYY-MM-DD HH24:MI:SS');</div>
+    </div>
+    <div class="card">
+        <h2>日期运算</h2>
+        <div class="code">// ========== 日期加减 ==========
+
+-- MySQL: DATE_ADD / DATE_SUB
+SELECT DATE_ADD('2024-01-15', INTERVAL 1 DAY);     -- 2024-01-16
+SELECT DATE_ADD('2024-01-15', INTERVAL 1 MONTH);   -- 2024-02-15
+SELECT DATE_ADD('2024-01-15', INTERVAL 1 YEAR);    -- 2025-01-15
+SELECT DATE_ADD('2024-01-15', INTERVAL 7 DAY);     -- 2024-01-22
+
+SELECT DATE_SUB('2024-01-15', INTERVAL 3 DAY);     -- 2024-01-12
+SELECT DATE_SUB('2024-01-15', INTERVAL 1 WEEK);    -- 2024-01-08
+
+-- 支持的时间单位:
+-- MICROSECOND, SECOND, MINUTE, HOUR, DAY
+-- WEEK, MONTH, QUARTER, YEAR
+-- SECOND_MICROSECOND, MINUTE_MICROSECOND ...
+
+-- 简便写法:
+SELECT '2024-01-15' + INTERVAL 1 DAY;    -- 2024-01-16
+SELECT '2024-01-15' - INTERVAL 3 DAY;    -- 2024-01-12
+
+-- PostgreSQL:
+-- SELECT '2024-01-15'::DATE + INTERVAL '1 day';
+-- SELECT '2024-01-15'::DATE + INTERVAL '1 month';
+-- SELECT '2024-01-15'::DATE - INTERVAL '3 days';
+
+-- ========== 日期差 ==========
+
+-- MySQL:
+SELECT DATEDIFF('2024-01-20', '2024-01-15');     -- 5 (天数差)
+
+SELECT TIMESTAMPDIFF(DAY, '2024-01-15', '2024-01-20');     -- 5
+SELECT TIMESTAMPDIFF(MONTH, '2024-01-15', '2024-03-20');   -- 2
+SELECT TIMESTAMPDIFF(YEAR, '2020-01-15', '2024-01-15');    -- 4
+SELECT TIMESTAMPDIFF(HOUR, '2024-01-15 10:00', '2024-01-15 14:30');  -- 4
+
+-- PostgreSQL:
+-- SELECT '2024-01-20'::DATE - '2024-01-15'::DATE;  -- 5 (天数差)
+-- SELECT AGE('2024-01-20', '2024-01-15');            -- 5 days
+
+-- ========== 综合计算 ==========
+-- MySQL:
+SELECT
+    order_id,
+    created_at,
+    DATE_ADD(created_at, INTERVAL 30 DAY) AS expires_at,
+    DATEDIFF(NOW(), created_at) AS days_ago,
+    TIMESTAMPDIFF(HOUR, created_at, NOW()) AS hours_ago
+FROM orders;</div>
+    </div>
+    <div class="card">
+        <h2>日期函数实战</h2>
+        <div class="code">// ========== 1. 按日/周/月/年聚合 ==========
+
+-- 按日统计
+SELECT
+    DATE(created_at) AS day,
+    COUNT(*) AS orders,
+    SUM(amount) AS revenue
+FROM orders
+GROUP BY DATE(created_at)
+ORDER BY day;
+
+-- 按月统计
+SELECT
+    DATE_FORMAT(created_at, '%Y-%m') AS month,
+    COUNT(*) AS orders,
+    SUM(amount) AS revenue
+FROM orders
+GROUP BY month
+ORDER BY month;
+
+-- PostgreSQL:
+-- SELECT DATE_TRUNC('month', created_at) AS month, ...
+
+-- 按周统计
+SELECT
+    DATE_FORMAT(created_at, '%Y-%u') AS week,   -- %u 周数
+    COUNT(*) AS orders,
+    SUM(amount) AS revenue
+FROM orders
+GROUP BY week
+ORDER BY week;
+
+-- ========== 2. 时间范围过滤 ==========
+
+-- 今天
+SELECT * FROM orders WHERE DATE(created_at) = CURDATE();
+
+-- 昨天
+SELECT * FROM orders WHERE DATE(created_at) = DATE_SUB(CURDATE(), INTERVAL 1 DAY);
+
+-- 最近 7 天
+SELECT * FROM orders WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY);
+
+-- 本月
+SELECT * FROM orders WHERE DATE_FORMAT(created_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m');
+
+-- 上月
+SELECT * FROM orders
+WHERE DATE_FORMAT(created_at, '%Y-%m') = DATE_FORMAT(DATE_SUB(NOW(), INTERVAL 1 MONTH), '%Y-%m');
+
+-- 本季度
+SELECT * FROM orders WHERE QUARTER(created_at) = QUARTER(NOW())
+  AND YEAR(created_at) = YEAR(NOW());
+
+-- ========== 3. 时间戳转换 ==========
+
+-- MySQL:
+SELECT UNIX_TIMESTAMP();                       -- 1705312200 (当前 Unix 时间戳)
+SELECT UNIX_TIMESTAMP('2024-01-15 14:30:00');   -- 1705312200
+SELECT FROM_UNIXTIME(1705312200);               -- 2024-01-15 14:30:00
+
+-- PostgreSQL:
+-- SELECT EXTRACT(EPOCH FROM NOW());
+-- SELECT TO_TIMESTAMP(1705312200);</div>
+    </div>
+    <div class="card">
+        <h2>时区与高级处理</h2>
+        <div class="code">// ========== MySQL 时区处理 ==========
+
+-- 查看时区
+SELECT @@global.time_zone, @@session.time_zone;
+-- SYSTEM 表示使用系统时区
+
+-- 设置时区
+SET time_zone = '+08:00';   -- 东八区 (北京时间)
+SET time_zone = 'UTC';      -- UTC 时间
+
+-- 时区转换
+SELECT CONVERT_TZ('2024-01-15 14:30:00', '+00:00', '+08:00');
+-- 2024-01-15 22:30:00 (UTC → 北京)
+
+-- ========== 日期函数注意事项 ==========
+
+-- 1. 时区问题
+-- TIMESTAMP 存储时区相关, DATETIME 不相关
+-- TIMESTAMP 在 MySQL 中自动转 UTC 存储
+
+-- 2. 索引失效
+-- ❌ 不要在 WHERE 中对日期列使用函数!
+SELECT * FROM orders WHERE DATE(created_at) = '2024-01-15';
+-- 应使用范围查询:
+SELECT * FROM orders WHERE created_at >= '2024-01-15 00:00:00'
+                        AND created_at < '2024-01-16 00:00:00';
+
+-- 3. 函数嵌套
+-- 尽量避免,影响可读性
+
+-- 4. MySQL vs PostgreSQL 差异
+-- MySQL:    DATE_FORMAT, STR_TO_DATE
+-- PostgreSQL: TO_CHAR, TO_DATE, TO_TIMESTAMP
+
+-- 5. 默认值
+-- MySQL:
+-- created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+-- updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+
+-- PostgreSQL:
+-- created_at TIMESTAMP DEFAULT NOW()
+-- updated_at TIMESTAMP DEFAULT NOW()  -- 需要触发器自动更新</div>
+        <div class="note">💡 日期函数: NOW() 当前时间; DATE_FORMAT 格式化; DATE_ADD/DATE_SUB 日期加减; DATEDIFF/TIMESTAMPDIFF 日期差; WHERE 中避免函数包裹索引列; 时区不一致时用 CONVERT_TZ 或统一 UTC。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoNow()">当前时间</button>
+        <button onclick="demoStats()">时间统计</button>
+        <button onclick="demoRange()">日期范围</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoNow() {
+            result.innerHTML = '';
+            log('# 当前时间函数');
+            log('');
+            log('NOW()        → 2024-01-15 14:30:00');
+            log('CURDATE()    → 2024-01-15');
+            log('CURTIME()    → 14:30:00');
+            log('YEAR(NOW())  → 2024');
+            log('MONTH(NOW()) → 1');
+            log('DAY(NOW())   → 15');
+            log('');
+            log("DATE_FORMAT(NOW(), '%Y-%m-%d') → 2024-01-15");
+        }
+
+        function demoStats() {
+            result.innerHTML = '';
+            log('# 按时间统计');
+            log('');
+            log("-- 按月统计销售额");
+            log("SELECT DATE_FORMAT(created_at, '%Y-%m') AS month,");
+            log("       SUM(amount) AS revenue");
+            log("FROM orders");
+            log("GROUP BY month");
+            log("ORDER BY month;");
+            log('');
+            log("-- 常用聚合周期:");
+            log("  DAY:    DATE(created_at)");
+            log("  WEEK:   DATE_FORMAT(d, '%Y-%u')");
+            log("  MONTH:  DATE_FORMAT(d, '%Y-%m')");
+            log("  YEAR:   YEAR(created_at)");
+        }
+
+        function demoRange() {
+            result.innerHTML = '';
+            log('# 日期范围查询');
+            log('');
+            log("-- 最近 7 天:");
+            log("WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
+            log('');
+            log("-- 本月:");
+            log("WHERE DATE_FORMAT(created_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')");
+            log('');
+            log("-- 避免索引失效:");
+            log("❌ WHERE DATE(col) = '2024-01-15'");
+            log("✅ WHERE col >= '2024-01-15' AND col < '2024-01-16'");
+        }
+    </script>
+</body>
+</html>

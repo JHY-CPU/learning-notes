@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>async-await原理</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #await-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>async/await 原理</h2><p>Generator + Promise 模拟 async/await、自执行生成器。</p></div>
+    <div class="card">
+        <h2>async/await 本质</h2>
+        <div class="code">// ========== async/await 本质 ==========
+// async 函数返回 Promise
+// await 是 then 的语法糖
+
+// 这段代码:
+async function fetchData() {
+    const data = await fetch('/api/data');
+    return data.json();
+}
+
+// 相当于:
+function fetchData() {
+    return fetch('/api/data').then(r => r.json());
+}
+
+// ========== Generator + Promise 模拟 ==========
+// async/await = Generator + 自执行器
+
+function asyncToGenerator(genFn) {
+    return function (...args) {
+        const gen = genFn.apply(this, args);
+
+        return new Promise((resolve, reject) => {
+            function step(key, arg) {
+                try {
+                    const result = gen[key](arg);
+                    const { value, done } = result;
+                    if (done) {
+                        resolve(value);
+                    } else {
+                        Promise.resolve(value).then(
+                            v => step('next', v),
+                            e => step('throw', e)
+                        );
+                    }
+                } catch (err) {
+                    reject(err);
+                }
+            }
+            step('next');
+        });
+    };
+}
+
+// ========== 手写 async 函数 ==========
+// function* 模拟 async
+// yield 模拟 await
+// 自执行器驱动 Generator
+
+const asyncFn = asyncToGenerator(function* () {
+    const a = yield Promise.resolve(1);
+    const b = yield Promise.resolve(a + 2);
+    return b + 3; // 最终: 6
+});
+
+asyncFn().then(console.log); // 6</div>
+    </div>
+    <div class="card">
+        <h2>演示：模拟 async/await</h2>
+        <button onclick="demoAsyncToGen()">Generator 模拟</button>
+        <button onclick="demoRealAsync()">真实 async/await</button>
+        <div id="await-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const awaitResult = document.getElementById('await-result');
+
+        function log(msg) {
+            awaitResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // ========== 自执行 Generator (模拟 async) ==========
+        function asyncToGenerator(genFn) {
+            return function (...args) {
+                const gen = genFn.apply(this, args);
+                return new Promise((resolve, reject) => {
+                    function step(key, arg) {
+                        try {
+                            const { value, done } = gen[key](arg);
+                            if (done) {
+                                resolve(value);
+                            } else {
+                                Promise.resolve(value).then(
+                                    v => step('next', v),
+                                    e => step('throw', e)
+                                );
+                            }
+                        } catch (err) {
+                            reject(err);
+                        }
+                    }
+                    step('next');
+                });
+            };
+        }
+
+        // 模拟异步任务
+        function delay(ms, value) {
+            return new Promise(resolve => setTimeout(() => resolve(value), ms));
+        }
+
+        function demoAsyncToGen() {
+            awaitResult.innerHTML = '';
+            log('🔄 Generator 模拟 async/await:');
+            log('');
+
+            const simulatedAsync = asyncToGenerator(function* () {
+                log('   开始执行...');
+                const user = yield delay(300, { id: 1, name: 'Alice' });
+                log(`   拿到用户: ${user.name}`);
+
+                const posts = yield delay(300, ['帖子1', '帖子2']);
+                log(`   拿到帖子: ${posts.join(', ')}`);
+
+                const friends = yield delay(200, ['Bob', 'Charlie']);
+                log(`   拿到好友: ${friends.join(', ')}`);
+
+                return { user, posts, friends };
+            });
+
+            log('⏳ 调用模拟 async 函数...\n');
+            simulatedAsync().then(result => {
+                log(`\n✅ 最终结果: ${JSON.stringify(result)}`);
+                log('');
+                log('📌 原理说明:');
+                log('   • function* 替代 async');
+                log('   • yield 替代 await');
+                log('   • 自执行器驱动 Generator');
+                log('   • Promise 包装最终结果');
+            });
+        }
+
+        async function demoRealAsync() {
+            awaitResult.innerHTML = '';
+            log('⚡ 真实 async/await 对比:');
+            log('');
+
+            async function realAsync() {
+                log('   开始执行...');
+                const user = await delay(300, { id: 1, name: 'Bob' });
+                log(`   拿到用户: ${user.name}`);
+
+                const posts = await delay(300, ['文章A', '文章B']);
+                log(`   拿到帖子: ${posts.join(', ')}`);
+
+                return { user, posts };
+            }
+
+            log('⏳ 调用 async 函数...\n');
+            const result = await realAsync();
+            log(`\n✅ 最终结果: ${JSON.stringify(result)}`);
+            log('');
+            log('📌 async/await 语法糖:');
+            log('   • async → function*');
+            log('   • await → yield');
+            log('   • 自动执行 → 自执行器');
+            log('   • 更直观的错误处理 try/catch');
+        }
+
+        console.log('=== async/await 原理 ===');
+
+        document.getElementById('output').textContent =
+            `async/await 原理: Generator + Promise + 自执行器\n` +
+            `async → function* | await → yield | 自执行器驱动\n` +
+            `✅ async/await 原理演示完成！`;
+    </script>
+</body>
+</html>

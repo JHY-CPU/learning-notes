@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实战-拖拽排序</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; max-width: 500px; margin: 0 auto; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        /* Drag & Drop 排序列表 */
+        .sort-list { list-style: none; padding: 0; margin: 10px 0; }
+        .sort-item { display: flex; align-items: center; padding: 10px 12px; margin-bottom: 4px; background: white; border: 1px solid #e0e0e0; border-radius: 6px; cursor: grab; transition: transform 0.15s, box-shadow 0.15s; user-select: none; }
+        .sort-item:hover { border-color: #3498db; }
+        .sort-item:active { cursor: grabbing; }
+        .sort-item.dragging { opacity: 0.5; transform: scale(0.95); }
+        .sort-item.drag-over { border-color: #3498db; background: #f0f8ff; box-shadow: 0 2px 8px rgba(52,152,219,0.2); transform: scale(1.02); }
+        .sort-item .handle { margin-right: 12px; color: #bbb; cursor: grab; font-size: 16px; }
+        .sort-item .handle:active { cursor: grabbing; }
+        .sort-item .icon { margin-right: 10px; font-size: 18px; }
+        .sort-item .name { flex: 1; font-size: 14px; color: #2c3e50; }
+        .sort-item .badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #f0f4f8; color: #666; }
+        .sort-item .remove-btn { background: none; border: none; color: #e74c3c; cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; opacity: 0; transition: opacity 0.15s; }
+        .sort-item:hover .remove-btn { opacity: 1; }
+        .sort-item .remove-btn:hover { background: #fdf0ef; }
+        /* 手柄拖拽区域 */
+        .handle-drag .sort-item { cursor: default; }
+        .handle-drag .sort-item .handle { cursor: grab; }
+        .handle-drag .sort-item .handle:active { cursor: grabbing; }
+        /* 过渡动画 */
+        .sort-list .sort-item { transition: all 0.2s ease; }
+        /* 空状态 */
+        .empty-state { text-align: center; color: #95a5a6; padding: 30px; font-size: 14px; }
+        .controls { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+        .controls button { padding: 6px 14px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-size: 12px; }
+        .controls button:hover { opacity: 0.9; }
+        .controls button.danger { background: #e74c3c; }
+        .controls button.secondary { background: #95a5a6; }
+        .controls span { font-size: 12px; color: #95a5a6; padding: 6px 0; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>🔀 拖拽排序</h2>
+        <p style="color:#7f8c8d;font-size:13px;">Drag & Drop 排序、手柄拖拽、列表动画、保存顺序。</p>
+        <div class="controls">
+            <button onclick="addItem()">➕ 新增项目</button>
+            <button onclick="toggleHandle()" id="handleToggle">🖐 手柄模式: 关</button>
+            <button onclick="resetList()" class="danger">↺ 重置</button>
+            <button onclick="saveOrder()" class="secondary">💾 保存顺序</button>
+            <span id="orderInfo">顺序未保存</span>
+        </div>
+        <ul class="sort-list" id="sortList">
+            <!-- 由 JS 动态生成 -->
+        </ul>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('🔀 拖拽排序演示:');
+        log('');
+
+        // ========== 数据 ==========
+        const defaultItems = [
+            { id: 1, icon: '📄', name: '项目文档', badge: '3 个文件' },
+            { id: 2, icon: '🎨', name: '设计稿', badge: '2 个文件' },
+            { id: 3, icon: '⚡', name: '前端代码', badge: '12 个文件' },
+            { id: 4, icon: '🖥️', name: '后端 API', badge: '8 个文件' },
+            { id: 5, icon: '🗄️', name: '数据库脚本', badge: '4 个文件' },
+            { id: 6, icon: '📦', name: '静态资源', badge: '20 个文件' },
+            { id: 7, icon: '🔧', name: '配置文件', badge: '5 个文件' },
+        ];
+        let items = [...defaultItems];
+        let nextId = 100;
+        let useHandleMode = false;
+        let draggedEl = null;
+        let dragOverEl = null;
+
+        // ========== 渲染 ==========
+        function render() {
+            const list = document.getElementById('sortList');
+            list.innerHTML = items.map(item => `
+                <li class="sort-item" draggable="true" data-id="${item.id}">
+                    <span class="handle" draggable="true">⠿</span>
+                    <span class="icon">${item.icon}</span>
+                    <span class="name">${item.name}</span>
+                    <span class="badge">${item.badge}</span>
+                    <button class="remove-btn" onclick="removeItem(${item.id})">✕</button>
+                </li>
+            `).join('');
+            // 绑定拖拽事件
+            list.querySelectorAll('.sort-item').forEach(el => {
+                el.addEventListener('dragstart', onDragStart);
+                el.addEventListener('dragend', onDragEnd);
+                el.addEventListener('dragover', onDragOver);
+                el.addEventListener('dragenter', onDragEnter);
+                el.addEventListener('dragleave', onDragLeave);
+                el.addEventListener('drop', onDrop);
+            });
+            // 手柄模式
+            if (useHandleMode) {
+                list.classList.add('handle-drag');
+                list.querySelectorAll('.sort-item').forEach(el => {
+                    el.draggable = false;
+                });
+                list.querySelectorAll('.handle').forEach(h => {
+                    h.addEventListener('dragstart', onDragStart);
+                });
+            } else {
+                list.classList.remove('handle-drag');
+            }
+        }
+
+        // ========== 拖拽事件 ==========
+        function onDragStart(e) {
+            draggedEl = e.target.closest('.sort-item');
+            if (!draggedEl) return;
+            draggedEl.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', draggedEl.dataset.id);
+            // 防止手柄拖拽时选中文本
+            if (useHandleMode && e.target.classList.contains('handle')) {
+                e.dataTransfer.setDragImage(draggedEl, 0, 0);
+            }
+        }
+
+        function onDragEnd(e) {
+            draggedEl.classList.remove('dragging');
+            document.querySelectorAll('.sort-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+            draggedEl = null;
+        }
+
+        function onDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function onDragEnter(e) {
+            const el = e.target.closest('.sort-item');
+            if (el && el !== draggedEl) {
+                el.classList.add('drag-over');
+                dragOverEl = el;
+            }
+        }
+
+        function onDragLeave(e) {
+            const el = e.target.closest('.sort-item');
+            if (el) el.classList.remove('drag-over');
+        }
+
+        function onDrop(e) {
+            e.preventDefault();
+            const targetEl = e.target.closest('.sort-item');
+            if (!targetEl || !draggedEl || targetEl === draggedEl) {
+                document.querySelectorAll('.sort-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+                return;
+            }
+
+            const fromId = parseInt(draggedEl.dataset.id);
+            const toId = parseInt(targetEl.dataset.id);
+            const fromIdx = items.findIndex(i => i.id === fromId);
+            const toIdx = items.findIndex(i => i.id === toId);
+
+            if (fromIdx === -1 || toIdx === -1) return;
+
+            const [moved] = items.splice(fromIdx, 1);
+            items.splice(toIdx, 0, moved);
+
+            document.querySelectorAll('.sort-item.drag-over').forEach(el => el.classList.remove('drag-over'));
+            render();
+            log(`🔀 移动: "${moved.name}" → 位置 ${toIdx + 1}`);
+        }
+
+        // ========== 操作 ==========
+        function addItem() {
+            const names = ['📝 笔记', '📊 报表', '📈 图表', '🔄 工作流', '🧪 测试用例', '📚 文档', '🔌 插件'];
+            const name = names[Math.floor(Math.random() * names.length)];
+            const badge = `${Math.floor(Math.random() * 30) + 1} 个文件`;
+            items.push({ id: nextId++, icon: name.slice(0,2), name, badge });
+            render();
+            log(`➕ 新增: "${name}"`);
+        }
+
+        function removeItem(id) {
+            const idx = items.findIndex(i => i.id === id);
+            if (idx === -1) return;
+            const removed = items.splice(idx, 1)[0];
+            render();
+            log(`🗑️ 删除: "${removed.name}"`);
+        }
+
+        function resetList() {
+            items = [...defaultItems];
+            render();
+            document.getElementById('orderInfo').textContent = '顺序已重置';
+            log('↺ 列表已重置');
+        }
+
+        function saveOrder() {
+            const order = items.map((i, idx) => `${idx + 1}. ${i.name}`).join(' → ');
+            log(`💾 保存顺序: ${order}`);
+            document.getElementById('orderInfo').textContent = `已保存 (${items.length} 项)`;
+        }
+
+        function toggleHandle() {
+            useHandleMode = !useHandleMode;
+            document.getElementById('handleToggle').textContent = `🖐 手柄模式: ${useHandleMode ? '开' : '关'}`;
+            render();
+            log(`🖐 手柄模式: ${useHandleMode ? '开启 (仅手柄可拖拽)' : '关闭 (整行可拖拽)'}`);
+        }
+
+        // ========== 初始化 ==========
+        render();
+        log('✅ 拖拽排序就绪');
+    </script>
+</body>
+</html>

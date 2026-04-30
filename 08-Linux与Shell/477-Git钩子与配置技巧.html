@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Git钩子与配置技巧</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔧 Git 钩子与配置技巧</h2><p>Git Hooks、husky/lint-staged、Git 属性、高级配置、子模块、bisect。</p></div>
+    <div class="card">
+        <h2>Git Hooks</h2>
+        <div class="code">// ========== Git Hooks 概念 ==========
+// 在特定 Git 事件触发时自动执行的脚本
+// 位于 .git/hooks/ 目录
+// 文件名必须精确匹配
+
+// ========== 内置钩子 ==========
+// 客户端钩子:
+
+// pre-commit          提交前运行 (最常用)
+// prepare-commit-msg  生成默认提交信息
+// commit-msg          检查提交信息格式
+// post-commit         提交后运行
+// pre-push            推送前运行
+// post-merge          合并后运行
+// post-checkout       切换分支后运行
+
+// 服务端钩子:
+// pre-receive         收到推送时
+// update              每个分支更新时
+// post-receive         推送完成后
+
+// ========== 示例: pre-commit ==========
+// .git/hooks/pre-commit
+#!/bin/bash
+echo "运行 pre-commit 检查..."
+
+# 检查是否有调试代码
+if grep -r "debugger" --include="*.js" .; then
+    echo "错误: 发现 debugger 语句!"
+    exit 1
+fi
+
+# 检查是否有 TODO (警告)
+if grep -r "TODO" --include="*.js" .; then
+    echo "⚠️ 有 TODO 待处理"
+fi
+
+// 注意: 钩子文件必须可执行
+// chmod +x .git/hooks/pre-commit</div>
+    </div>
+    <div class="card">
+        <h2>Husky + lint-staged</h2>
+        <div class="code">// ========== husky ==========
+// 在 package.json 中管理 Git Hooks
+// 解决 .git/hooks 里写脚本难以共享的问题
+
+// 安装:
+npm install husky --save-dev
+npx husky init
+
+// package.json 配置:
+{
+  "scripts": {
+    "prepare": "husky"
+  }
+}
+
+// 创建 husky pre-commit:
+// .husky/pre-commit
+npx lint-staged
+
+// ========== lint-staged ==========
+// 只对暂存区的文件运行 linter
+// 速度更快,避免检查整个项目
+
+// package.json:
+{
+  "lint-staged": {
+    "*.{js,ts}": ["eslint --fix", "prettier --write"],
+    "*.css": ["prettier --write"],
+    "*.md": ["prettier --write"]
+  }
+}
+
+// 完整流程:
+// 1. git add 暂存文件
+// 2. git commit 触发 pre-commit
+// 3. husky 运行 lint-staged
+// 4. lint-staged 对暂存文件运行 ESLint + Prettier
+// 5. 如果 lint 失败,提交中止
+
+// ========== 共享 Hooks ==========
+// .git/hooks 不提交到 Git
+// 共享钩子有两种方法:
+// 1. 放在 .githooks/ 目录并配置
+git config core.hooksPath .githooks
+
+// 2. 用 husky (Node.js 项目推荐)</div>
+    </div>
+    <div class="card">
+        <h2>.gitattributes</h2>
+        <div class="code">// ========== .gitattributes ==========
+// 控制 Git 如何处理特定文件
+
+// ========== 行尾设置 ==========
+// 自动转换换行符
+* text=auto
+
+# 明确设置
+*.sh text eol=lf          # Shell 脚本: LF
+*.bat text eol=crlf       # Windows 批处理: CRLF
+*.js text eol=lf          # JavaScript: LF
+*.{png,jpg,gif} binary    # 图片: 二进制 (不转换)
+
+// ========== diff 设置 ==========
+# 标记文本文件的语言 (diff 更准确)
+*.js diff=javascript
+*.py diff=python
+*.java diff=java
+*.go diff=golang
+*.html diff=html
+*.md diff=markdown
+
+# 锁文件不比较
+package-lock.json -diff
+yarn.lock -diff
+
+// ========== 合并策略 ==========
+# 特定文件使用自定义合并驱动
+*.pkg merge=ours           # 总是保留我们的版本
+CHANGELOG.md merge=union   # 合并两方内容
+
+// ========== 用 git lfs 管理大文件 ==========
+# Git LFS (Large File Storage)
+*.psd filter=lfs diff=lfs merge=lfs -text
+*.zip filter=lfs diff=lfs merge=lfs -text
+*.mp4 filter=lfs diff=lfs merge=lfs -text</div>
+    </div>
+    <div class="card">
+        <h2>Git 高级配置</h2>
+        <div class="code">// ========== 别名大全 ==========
+[alias]
+    co = checkout
+    br = branch
+    ci = commit
+    st = status
+    lg = log --oneline --graph --decorate --all
+    lgg = log --oneline --graph --decorate --all --simplify-by-decoration
+    last = log -1 HEAD
+    unstage = reset HEAD --
+    undo = reset --soft HEAD~1
+    amend = commit --amend --no-edit
+    fixup = commit --fixup
+    squash = commit --squash
+    rv = revert
+    ch = cherry-pick
+    rbi = rebase -i
+    rbc = rebase --continue
+    rba = rebase --abort
+    mg = merge --no-ff
+    home = "!cd ~ && pwd"
+    current-branch = rev-parse --abbrev-ref HEAD
+    contributors = shortlog -sn
+    graph = log --graph --all --oneline --decorate
+    tags = tag -n --sort=-v:refname
+
+// ========== 差异化配置 ==========
+[core]
+    excludesfile = ~/.gitignore              # 全局忽略
+    editor = vim
+    autocrlf = input                         # 提交时 LF
+    safecrlf = true                          # 检查换行符
+    precomposeunicode = true                 # Mac 文件名编码
+    fsmonitor = true                         # 文件监控加速
+    untrackedCache = true                    # untracked 缓存
+
+[diff]
+    tool = vimdiff                           # diff 工具
+    algorithm = histogram                    # diff 算法
+    colorMoved = zebra                       # 移动行染色
+
+[push]
+    default = current
+    autoSetupRemote = true                   # 自动追踪远程
+    followTags = true                        # 推送附注标签
+
+[fetch]
+    prune = true                             # 自动清理远程分支引用
+
+[rerere]
+    enabled = true                           # 自动记录冲突解决
+
+[help]
+    autocorrect = 10                         # 自动纠正命令
+
+// 一次性配置:
+git config --global core.fsmonitor true
+git config --global core.untrackedCache true</div>
+    </div>
+    <div class="card">
+        <h2>git bisect — 二分查找</h2>
+        <div class="code">// ========== git bisect ==========
+// 用二分搜索找 bug 是在哪个 commit 引入的
+// 在 1000 个 commit 中 ≈ 10 步
+
+// ========== 基本用法 ==========
+# 开始二分查找
+git bisect start
+
+# 标记当前 (坏的)
+git bisect bad
+
+# 标记已知好的版本
+git bisect good v1.0.0
+
+# Git 会自动 checkout 中间的 commit
+# 测试这个 commit 有没有 bug
+
+# 有 bug → 标记 bad, 继续二分
+git bisect bad
+
+# 没 bug → 标记 good, 继续二分
+git bisect good
+
+# 重复直到找到第一个 bad commit
+# Git 会显示: abc123 is the first bad commit
+
+# 结束 bisect
+git bisect reset
+
+// ========== 自动 bisect ==========
+# 用脚本自动测试
+git bisect start
+git bisect bad HEAD
+git bisect good v1.0.0
+git bisect run npm test   # 用测试脚本判断
+
+# 脚本退出码:
+# 0 = good (没有 bug)
+# 非 0 = bad (有 bug)
+
+// ========== 子模块 ==========
+// 在一个 Git 仓库中包含另一个 Git 仓库
+// 用于依赖管理
+
+git submodule add https://github.com/user/lib.git libs/lib
+git submodule update --init --recursive    # 拉取所有子模块
+git clone --recursive <url>                # 克隆包括子模块
+
+// 更新子模块:
+git submodule update --remote
+git submodule foreach git pull origin main</div>
+        <div class="note">💡 git bisect 是"找 bug 的最好方式"——不用人肉猜,bisect 自动二分搜索。100 个 commit 只需 7 步。git submodule 虽然有用但容易踩坑,新人建议先避免,等需要时再学。Hooks 用 husky 管理,团队共享更容易。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoHooks()">Hooks 演示</button>
+        <button onclick="demoAlias()">别名演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoHooks() {
+            result.innerHTML = '';
+            log('# Git Hooks 演示');
+            log('');
+            log('pre-commit 钩子示例:');
+            log('');
+            log('#!/bin/bash');
+            log('echo "🔍 运行代码检查..."');
+            log('');
+            log('# 检查 ESLint');
+            log('npx eslint . --max-warnings=0 || exit 1');
+            log('');
+            log('# 检查调试语句');
+            log('if grep -rn "console.log" src/ --include="*.js" | grep -v "test"; then');
+            log('  echo "⚠️ 有 console.log 残留"');
+            log('fi');
+            log('');
+            log('# 运行测试');
+            log('npm test || exit 1');
+            log('');
+            log('husky (Node.js 项目):');
+            log('  npx husky init');
+            log('  .husky/pre-commit: npx lint-staged');
+            log('  package.json 中配置 lint-staged');
+        }
+
+        function demoAlias() {
+            result.innerHTML = '';
+            log('# Git 别名演示');
+            log('');
+            log('配置在 ~/.gitconfig [alias] 部分:');
+            log('');
+            log('  co = checkout');
+            log('  br = branch');
+            log('  ci = commit');
+            log('  st = status');
+            log('  lg = log --oneline --graph --decorate --all');
+            log('  unstage = reset HEAD --');
+            log('  undo = reset --soft HEAD~1');
+            log('  amend = commit --amend --no-edit');
+            log('  rbi = rebase -i');
+            log('  mg = merge --no-ff');
+            log('');
+            log('使用:');
+            log('  $ git lg     → 漂亮的提交图');
+            log('  $ git undo   → 撤销上次提交');
+            log('  $ git amend  → 修改上次提交');
+        }
+    </script>
+</body>
+</html>

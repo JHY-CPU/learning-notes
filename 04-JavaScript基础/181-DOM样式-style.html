@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOM样式-style</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #d35400; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        #style-demo { padding: 20px; border-radius: 8px; margin: 10px 0; transition: all 0.3s; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>DOM 样式 — style 属性</h2><p>通过 JavaScript 操作元素的行内样式。</p></div>
+    <div class="card">
+        <h2>style 属性（行内样式）</h2>
+        <div class="code">// style 属性是 CSSStyleDeclaration 对象
+// 可读写元素的行内样式（非计算样式）
+
+const el = document.getElementById('demo');
+
+// 设置单个样式属性（驼峰命名）
+el.style.color = 'red';
+el.style.backgroundColor = '#f0f0f0';  // background-color → backgroundColor
+el.style.fontSize = '24px';            // font-size → fontSize
+el.style.borderRadius = '8px';         // border-radius → borderRadius
+el.style.marginTop = '10px';
+el.style.display = 'flex';
+
+// CSS 属性名转换规则：
+// CSS:  background-color  → JS:  backgroundColor
+// CSS:  font-size        → JS:  fontSize
+// CSS:  margin-left      → JS:  marginLeft
+// CSS:  border-top-width → JS:  borderTopWidth
+// CSS:  float            → JS:  cssFloat（float 是保留字）
+
+// 特殊值
+el.style.display = 'none';       // 隐藏
+el.style.visibility = 'hidden';  // 隐藏（保留空间）
+el.style.opacity = '0.5';        // 半透明
+
+// ⚠️ 设置的值必须是字符串（带单位）
+el.style.width = 100;      // ❌ 无效
+el.style.width = '100px';  // ✅
+
+// ⚠️ 读取未设置的样式返回空字符串
+console.log(el.style.marginLeft);  // ''（如果没设过）</div>
+    </div>
+    <div class="card">
+        <h2>cssText — 批量设置样式</h2>
+        <div class="code">// cssText — 用字符串设置多个样式
+// 会覆盖所有已存在的行内样式
+
+// 批量设置（替换所有行内样式）
+el.style.cssText = 'color: red; background: blue; font-size: 20px;';
+
+// 追加（不推荐，会覆盖）
+el.style.cssText += '; border: 1px solid black';
+
+// 对比：分别设置（推荐，不影响其他样式）
+el.style.color = 'red';
+el.style.background = 'blue';
+el.style.fontSize = '20px';
+
+// 清除行内样式
+el.style.cssText = '';          // 方式1
+el.removeAttribute('style');     // 方式2</div>
+    </div>
+    <div class="card">
+        <h2>getComputedStyle — 获取计算样式</h2>
+        <div class="code">// style 只能读取行内样式
+// getComputedStyle 获取最终计算后的样式（包括 CSS 文件中的）
+
+const el = document.getElementById('demo');
+
+// 获取计算样式（只读）
+const computed = getComputedStyle(el);
+// 或 window.getComputedStyle(el)
+
+console.log(computed.color);           // 'rgb(255, 0, 0)'
+console.log(computed.fontSize);        // '24px'
+console.log(computed.backgroundColor); // 'rgb(240, 240, 240)'
+
+// 获取伪元素样式
+const beforeStyle = getComputedStyle(el, '::before');
+const afterStyle = getComputedStyle(el, '::after');
+
+console.log(beforeStyle.content);  // 伪元素的 content
+
+// ⚠️ getComputedStyle 是只读的！
+// ⚠️ 返回的值可能是相对值（如 em、%）经过计算后的绝对值（px）
+// ⚠️ 颜色值标准化为 rgb/rgba 格式</div>
+    </div>
+    <div class="card">
+        <h2>style vs getComputedStyle</h2>
+        <div class="code">// style（行内样式）
+// ✅ 可读写
+// ✅ 只反映行内样式（style 属性）
+// ❌ 不能读取 CSS 文件中的样式
+// ❌ 未设置的属性返回空字符串
+
+// getComputedStyle（计算样式）
+// ✅ 最终生效样式（CSS + 行内 + 继承）
+// ✅ 伪元素样式
+// ❌ 只读
+// ❌ 触发重排（性能开销）
+
+// 使用场景：
+// 设置样式 → style
+// 读取最终样式 → getComputedStyle
+// 只需要行内样式 → style
+// 要判断元素是否隐藏 → getComputedStyle(el).display</div>
+    </div>
+    <div id="style-demo" style="background:#ecf0f1;padding:15px;border:1px solid #bdc3c7;">
+        这是一个样式演示元素
+    </div>
+    <div style="display:flex;gap:10px;margin:10px 0;flex-wrap:wrap;">
+        <button onclick="setRed()">变红</button>
+        <button onclick="setBlue()">变蓝</button>
+        <button onclick="setBig()">放大</button>
+        <button onclick="showComputed()">显示计算样式</button>
+        <button onclick="resetStyle()">重置</button>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const demo = document.getElementById('style-demo');
+        const out = document.getElementById('output');
+
+        function setRed() {
+            demo.style.backgroundColor = '#e74c3c';
+            demo.style.color = 'white';
+            out.textContent = '背景: #e74c3c, 颜色: white';
+        }
+        function setBlue() {
+            demo.style.backgroundColor = '#3498db';
+            demo.style.color = 'white';
+            out.textContent = '背景: #3498db, 颜色: white';
+        }
+        function setBig() {
+            const cur = parseInt(demo.style.fontSize) || 16;
+            demo.style.fontSize = (cur + 4) + 'px';
+            demo.style.padding = '25px';
+            out.textContent = '字号: ' + demo.style.fontSize + ', padding: 25px';
+        }
+        function showComputed() {
+            const c = getComputedStyle(demo);
+            out.textContent =
+                '字号: ' + c.fontSize + '\n' +
+                '背景: ' + c.backgroundColor + '\n' +
+                '颜色: ' + c.color + '\n' +
+                '内边距: ' + c.padding;
+        }
+        function resetStyle() {
+            demo.style.cssText = 'background:#ecf0f1;padding:15px;border:1px solid #bdc3c7;';
+            out.textContent = '已重置';
+        }
+
+        console.log('=== style 属性 ===');
+        demo.style.fontWeight = 'bold';
+        console.log('fontWeight:', demo.style.fontWeight);
+
+        console.log('=== getComputedStyle ===');
+        const computed = getComputedStyle(demo);
+        console.log('computed font-size:', computed.fontSize);
+        console.log('computed background:', computed.backgroundColor);
+
+        console.log('=== 驼峰命名 ===');
+        // CSS → JS 属性名映射
+        const cssToJs = {
+            'background-color': 'backgroundColor',
+            'font-size': 'fontSize',
+            'border-radius': 'borderRadius',
+            'margin-left': 'marginLeft',
+            'z-index': 'zIndex',
+            'float': 'cssFloat'
+        };
+        console.log('CSS→JS 映射:', cssToJs);
+
+        console.log('=== 设置样式 ===');
+        demo.style.boxShadow = '0 4px 8px rgba(0,0,0,0.1)';
+        console.log('boxShadow 已设置');
+
+        document.getElementById('output').textContent =
+            `当前背景: ${demo.style.backgroundColor}\n` +
+            `字号: ${demo.style.fontSize || '默认'}\n` +
+            `✅ DOM 样式-style 演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python变量作用域LEGB</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🎯 Python 变量作用域 LEGB</h2><p>Local、Enclosing、Global、Built-in 作用域规则、global 关键字、nonlocal 关键字、变量查找顺序。</p></div>
+    <div class="card">
+        <h2>LEGB 规则</h2>
+        <div class="code">// ========== LEGB 查找顺序 ==========
+// Python 查找变量时按照:
+//
+// L — Local (局部)        当前函数内部
+// E — Enclosing (闭包)    外层函数 (嵌套函数)
+// G — Global (全局)       模块级别
+// B — Built-in (内置)     Python 内置名称
+
+// ========== 示例 ==========
+x = "global"               # G: 全局变量
+
+def outer():
+    x = "enclosing"        # E: 闭包变量
+
+    def inner():
+        x = "local"        # L: 局部变量
+        print(x)
+
+    inner()
+
+outer()                    # "local"
+
+// ========== 去掉内层 x ==========
+x = "global"
+
+def outer():
+    x = "enclosing"
+
+    def inner():
+        print(x)           # 找不到 Local → 找 Enclosing
+        # x = "local"      # 如果加上这行但放在print之后会报错!
+
+    inner()
+
+outer()                    # "enclosing"
+
+// ========== 继续去掉 ==========
+x = "global"
+
+def outer():
+    def inner():
+        print(x)           # Local 无 → Enclosing 无 → Global
+
+    inner()
+
+outer()                    # "global"
+
+// ========== 内置作用域 ==========
+// B: Built-in 包含 print, len, int, range...
+// 不要覆盖内置函数!
+len = 10                   # ❌ 覆盖了内置 len()
+print(len([1, 2, 3]))      # TypeError: 'int' object is not callable</div>
+    </div>
+    <div class="card">
+        <h2>global 关键字</h2>
+        <div class="code">// ========== 函数内修改全局变量 ==========
+// 在函数内不能直接修改全局变量
+// 会创建一个新的局部变量
+
+count = 0
+
+def increment():
+    count += 1             # ❌ UnboundLocalError!
+    # 解释器看到 count += 1,认为 count 是局部变量
+    # 但局部变量还没赋值就被引用了
+
+// ========== 用 global 声明 ==========
+count = 0
+
+def increment():
+    global count           # 声明 count 是全局变量
+    count += 1
+
+increment()
+print(count)               # 1
+
+// ========== 读取全局变量不需要 global ==========
+name = "Alice"
+
+def greet():
+    print(f"Hello, {name}")  # 读取全局变量,不需要 global
+
+greet()                    # Hello, Alice
+
+// ========== global 最佳实践 ==========
+// 尽量少用全局变量!
+// 全局变量导致:
+// - 函数不纯粹 (有副作用)
+// - 难以测试
+// - 多线程不安全
+
+// 替代方案:
+// 1. 用参数传递:
+def increment(count):
+    return count + 1
+
+count = 0
+count = increment(count)  # 返回新值
+
+// 2. 用类封装:
+class Counter:
+    def __init__(self):
+        self.count = 0
+    def increment(self):
+        self.count += 1
+
+c = Counter()
+c.increment()</div>
+    </div>
+    <div class="card">
+        <h2>nonlocal 关键字</h2>
+        <div class="code">// ========== nonlocal 修改闭包变量 ==========
+// nonlocal 用于嵌套函数中修改外层函数的变量
+
+def outer():
+    count = 0
+
+    def inner():
+        nonlocal count     # 声明 count 来自外层函数
+        count += 1
+        return count
+
+    return inner
+
+counter = outer()
+print(counter())           # 1
+print(counter())           # 2
+print(counter())           # 3
+
+// ========== 没有 nonlocal 会怎样 ==========
+def outer():
+    count = 0
+
+    def inner():
+        # nonlocal count   # 不加这行
+        count += 1         # ❌ UnboundLocalError!
+        return count
+
+    return inner
+
+// ========== nonlocal vs global ==========
+x = "global"
+
+def outer():
+    x = "enclosing"
+
+    def inner():
+        # global x         # 修改全局 x
+        # nonlocal x       # 修改闭包 x
+        x = "local"
+        print(x)
+
+    inner()
+    print(x)
+
+outer()
+print(x)
+
+// 输出取决于用哪个关键字
+
+// ========== 闭包计数器的实际应用 ==========
+def make_counter(start=0):
+    """创建计数器"""
+    count = start
+
+    def counter():
+        nonlocal count
+        count += 1
+        return count
+
+    return counter
+
+counter_a = make_counter(10)
+counter_b = make_counter(0)
+
+print(counter_a())         # 11
+print(counter_a())         # 12
+print(counter_b())         # 1 (独立计数器)</div>
+    </div>
+    <div class="card">
+        <h2>作用域最佳实践</h2>
+        <div class="code">// ========== 变量查找图 ==========
+// inner() 查找 x:
+// 1. inner 局部  → x? 没有
+// 2. outer 闭包  → x? 有 → 用 enclosing 的 x
+// 3. 模块全局    → x? 没有
+// 4. 内置        → x? 没有 → NameError!
+
+// ========== 常见陷阱 ==========
+// 陷阱 1: 函数内引用全局变量后赋值
+x = 10
+def func():
+    print(x)               # ❌ UnboundLocalError
+    x = 20                 # 解释器认为 x 是局部变量
+
+// 陷阱 2: 列表推导式中的变量泄露 (Python 2, Python 3 已修复)
+// Python 3: 推导式有自己的作用域
+x = "global"
+[x for x in range(3)]
+print(x)                   # Python 3: "global" (不受影响)
+
+// 陷阱 3: 闭包延迟绑定
+def make_functions():
+    funcs = []
+    for i in range(3):
+        def f():
+            return i
+        funcs.append(f)
+    return funcs
+
+for f in make_functions():
+    print(f())             # 2, 2, 2 (都是最后的 i=2!)
+
+// 修复: 用默认参数绑定当前 i
+def make_functions():
+    funcs = []
+    for i in range(3):
+        def f(i=i):        # 默认参数在定义时求值
+            return i
+        funcs.append(f)
+    return funcs
+
+for f in make_functions():
+    print(f())             # 0, 1, 2 ✅</div>
+        <div class="note">💡 作用域要点: (1) LEGB 是变量查找顺序: Local→Enclosing→Global→Built-in; (2) 函数内修改全局变量用 global; (3) 嵌套函数中修改外层变量用 nonlocal; (4) 尽量少用全局变量,用参数传递或类封装; (5) 闭包延迟绑定陷阱:用默认参数修复。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoLEGB()">LEGB 演示</button>
+        <button onclick="demoClosure()">闭包计数器演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoLEGB() {
+            result.innerHTML = '';
+            log('# LEGB 作用域演示');
+            log('');
+            log('查找顺序: Local → Enclosing → Global → Built-in');
+            log('');
+            log('x = "global"');
+            log('def outer():');
+            log('    x = "enclosing"');
+            log('    def inner():');
+            log('        print(x)  # 找哪个?');
+            log('');
+            log('结果:');
+            log('  - inner 有 x → local');
+            log('  - inner 无 x → enclosing');
+            log('  - outer 也无 → global');
+            log('  - 全局也无  → Built-in');
+            log('  - 都没有    → NameError!');
+        }
+
+        function demoClosure() {
+            result.innerHTML = '';
+            log('# 闭包计数器演示');
+            log('');
+            log('def make_counter(start=0):');
+            log('    count = start');
+            log('    def counter():');
+            log('        nonlocal count');
+            log('        count += 1');
+            log('        return count');
+            log('    return counter');
+            log('');
+            log('c1 = make_counter(10)');
+            log('c2 = make_counter(0)');
+            log('c1() → 11');
+            log('c1() → 12');
+            log('c2() → 1  (独立)');
+            log('');
+            log('global: 修改全局变量');
+            log('nonlocal: 修改外层函数变量');
+        }
+    </script>
+</body>
+</html>

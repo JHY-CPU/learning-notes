@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator基础</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #gen-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Generator 基础</h2><p>function*、yield、next()、done/value、手动控制迭代流程。</p></div>
+    <div class="card">
+        <h2>Generator 语法</h2>
+        <div class="code">// ========== Generator 函数定义 ==========
+function* genFunc() {
+    yield 1;
+    yield 2;
+    yield 3;
+}
+
+// Generator 表达式
+const genFunc2 = function*() {
+    yield 'a';
+    yield 'b';
+};
+
+// 对象方法简写
+const obj = {
+    *gen() {
+        yield 'x';
+    }
+};
+
+// 类方法
+class MyClass {
+    *gen() {
+        yield 'y';
+    }
+}
+
+// ========== 调用方式 ==========
+const gen = genFunc();   // 返回 Generator 对象（不执行函数体）
+console.log(gen.next()); // { value: 1, done: false }
+console.log(gen.next()); // { value: 2, done: false }
+console.log(gen.next()); // { value: 3, done: false }
+console.log(gen.next()); // { value: undefined, done: true }
+
+// ========== Generator 是可迭代对象 ==========
+for (const val of genFunc()) {
+    console.log(val); // 1, 2, 3
+}
+
+// 展开运算符
+const arr = [...genFunc()]; // [1, 2, 3]
+
+// 解构
+const [a, b, c] = genFunc();
+
+// ========== Generator 特点 ==========
+// ✅ 暂停执行 — 遇到 yield 暂停
+// ✅ 惰性求值 — 按需产生值
+// ✅ 双向通信 — next() 可传值
+// ✅ 可无限序列 — 不一次性计算所有值</div>
+    </div>
+    <div class="card">
+        <h2>演示：Generator 基础</h2>
+        <button onclick="demoGenerator()">Generator 基础演示</button>
+        <button onclick="demoInfinite()">无限序列</button>
+        <div id="gen-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const genResult = document.getElementById('gen-result');
+
+        function log(msg) {
+            genResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function* numberGen() {
+            yield 1;
+            yield 2;
+            yield 3;
+            yield 4;
+            yield 5;
+        }
+
+        function* fibonacciGen() {
+            let a = 0, b = 1;
+            while (true) {
+                yield a;
+                [a, b] = [b, a + b];
+            }
+        }
+
+        function* rangeGen(start, end, step = 1) {
+            for (let i = start; i <= end; i += step) {
+                yield i;
+            }
+        }
+
+        function demoGenerator() {
+            genResult.innerHTML = '';
+
+            log('1️⃣ 基本 Generator:');
+            const gen = numberGen();
+            let result = gen.next();
+            while (!result.done) {
+                log(`   yield: ${result.value}`);
+                result = gen.next();
+            }
+            log('');
+
+            log('2️⃣ for...of 遍历:');
+            for (const val of rangeGen(1, 5)) {
+                log(`   range: ${val}`);
+            }
+            log('');
+
+            log('3️⃣ 展开运算符:');
+            const arr = [...rangeGen(10, 15)];
+            log(`   [...rangeGen(10, 15)] = [${arr}]`);
+            log('');
+
+            log('4️⃣ generator 状态: done 表示是否完成');
+            const g2 = numberGen();
+            log(`   ${JSON.stringify(g2.next())}`);
+            log(`   ${JSON.stringify(g2.next())}`);
+            log(`   ${JSON.stringify(g2.next())}`);
+            log(`   ${JSON.stringify(g2.next())}`);
+            log(`   ${JSON.stringify(g2.next())}`);
+            log(`   ${JSON.stringify(g2.next())} (done: true)`);
+        }
+
+        function demoInfinite() {
+            genResult.innerHTML = '';
+
+            log('♾️ 无限斐波那契序列 (惰性求值):');
+            const fib = fibonacciGen();
+            for (let i = 0; i < 15; i++) {
+                const { value } = fib.next();
+                log(`   fib(${i}) = ${value}`);
+            }
+            log('');
+            log('✅ Generator 不会一次性计算所有值');
+            log('✅ 每次 next() 才计算下一个值');
+            log('✅ 适合大数据集或无限序列');
+        }
+
+        console.log('=== Generator 基础 ===');
+
+        document.getElementById('output').textContent =
+            `Generator 基础: function* / yield / next() / done / value\n` +
+            `惰性求值 / 可迭代 / 暂停恢复 / 无限序列\n` +
+            `✅ Generator 基础演示完成！`;
+    </script>
+</body>
+</html>

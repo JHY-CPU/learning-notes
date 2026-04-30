@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot Jackson 序列化</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔄 Spring Boot Jackson 序列化</h2><p>Jackson 注解 (@JsonIgnore/@JsonFormat/@JsonInclude/@JsonProperty)、全局配置、自定义序列化/反序列化、Java 8 时间类型、多态处理。</p></div>
+    <div class="card">
+        <h2>Jackson 注解</h2>
+        <div class="code">// ========== Jackson ==========
+// Spring Boot 默认 JSON 处理框架
+// 自动序列化 Java 对象 ↔ JSON
+
+// ========== @JsonIgnore ==========
+// 忽略字段 (不序列化/反序列化)
+@Data
+public class User {
+    private Long id;
+    private String username;
+
+    @JsonIgnore                          // 密码不返回给前端
+    private String password;
+
+    @JsonIgnore
+    private String token;
+}
+
+// ========== @JsonProperty ==========
+// 自定义 JSON 字段名
+@Data
+public class Product {
+    @JsonProperty("product_id")          // JSON 中显示 product_id
+    private Long id;
+
+    @JsonProperty("product_name")
+    private String name;
+
+    @JsonProperty("created_at")
+    private LocalDateTime createdAt;
+}
+
+// JSON 输出:
+// {"product_id": 1, "product_name": "手机", "created_at": "2026-04-29T14:30:00"}
+
+// ========== @JsonFormat ==========
+// 日期格式
+@Data
+public class Order {
+    private Long id;
+
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss", timezone = "Asia/Shanghai")
+    private LocalDateTime createTime;
+
+    @JsonFormat(pattern = "yyyy-MM-dd")
+    private LocalDate orderDate;
+
+    @JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+    private Instant timestamp;
+}
+
+// ========== @JsonInclude ==========
+// 控制 null/空值的序列化
+@Data
+@JsonInclude(JsonInclude.Include.NON_NULL)       // 忽略 null 字段
+public class ApiResponse&lt;T&gt; {
+    private int code;
+    private String message;
+    private T data;
+
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)  // 忽略空字符串/空集合
+    private List&lt;String&gt; errors;
+}
+
+// Include 选项:
+// ALWAYS        — 总是包含 (默认)
+// NON_NULL      — 非 null 才包含
+// NON_ABSENT    — 非 null 和 Optional 非空
+// NON_EMPTY     — 非 null + 非空字符串 + 非空集合
+// NON_DEFAULT   — 非默认值才包含
+// USE_DEFAULTS  — 使用类默认值</div>
+    </div>
+    <div class="card">
+        <h2>全局 Jackson 配置</h2>
+        <div class="code">// ========== application.yml 全局配置 ==========
+spring:
+  jackson:
+    # 日期格式
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+
+    # 序列化策略
+    default-property-inclusion: non_null    # 全局忽略 null
+    serialization:
+      write-dates-as-timestamps: false     # 日期不使用时间戳
+      write-durations-as-timestamps: false
+      indent-output: true                  # 美化输出 (开发环境)
+      fail-on-empty-beans: false
+
+    # 反序列化策略
+    deserialization:
+      fail-on-unknown-properties: false    # 忽略未知字段
+      accept-single-value-as-array: true   # 单值转数组
+
+    # 属性命名策略
+    property-naming-strategy: LOWER_CAMEL_CASE  # 驼峰命名
+
+    # 序列化包含
+    default-property-inclusion: non_null
+
+    # 允许字段名不加引号
+    parser:
+      allow-unquoted-field-names: true
+      allow-single-quotes: true
+
+// ========== Java 配置 ==========
+@Configuration
+public class JacksonConfig {
+
+    @Bean
+    public Jackson2ObjectMapperBuilderCustomizer jsonCustomizer() {
+        return builder -> {
+            // 日期格式
+            builder.simpleDateFormat("yyyy-MM-dd HH:mm:ss");
+            builder.timeZone(TimeZone.getTimeZone("Asia/Shanghai"));
+
+            // 忽略 null
+            builder.serializationInclusion(JsonInclude.Include.NON_NULL);
+
+            // 特性
+            builder.featuresToDisable(
+                SerializationFeature.WRITE_DATES_AS_TIMESTAMPS,
+                DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES
+            );
+
+            // Java 8 时间模块
+            builder.modules(new JavaTimeModule());
+        };
+    }
+}
+
+// ========== ObjectMapper Bean ==========
+// 直接定制 ObjectMapper
+@Configuration
+public class JacksonConfig {
+
+    @Bean
+    public ObjectMapper objectMapper() {
+        ObjectMapper mapper = new ObjectMapper();
+
+        // 配置
+        mapper.setSerializationInclusion(JsonInclude.Include.NON_NULL);
+        mapper.setDateFormat(new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"));
+        mapper.setTimeZone(TimeZone.getTimeZone("Asia/Shanghai"));
+
+        // 注册模块
+        mapper.registerModule(new JavaTimeModule());
+        mapper.registerModule(new ParameterNamesModule());
+
+        // 禁用特性
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+        mapper.disable(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES);
+
+        // 启用美化
+        mapper.enable(SerializationFeature.INDENT_OUTPUT);
+
+        return mapper;
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>自定义序列化/反序列化</h2>
+        <div class="code">// ========== 自定义序列化器 ==========
+
+// ========== 场景: 金额分转元 ==========
+// 数据库存分 (Long), API 返回元 (BigDecimal)
+
+public class MoneySerializer extends JsonSerializer&lt;Long&gt; {
+    @Override
+    public void serialize(Long value, JsonGenerator gen,
+                          SerializerProvider serializers) throws IOException {
+        // 分 → 元
+        BigDecimal yuan = BigDecimal.valueOf(value).divide(new BigDecimal(100));
+        gen.writeNumber(yuan.setScale(2, RoundingMode.HALF_UP));
+    }
+}
+
+// ========== 场景: 手机号脱敏 ==========
+public class PhoneMaskSerializer extends JsonSerializer&lt;String&gt; {
+    @Override
+    public void serialize(String phone, JsonGenerator gen,
+                          SerializerProvider serializers) throws IOException {
+        if (phone != null && phone.length() == 11) {
+            gen.writeString(phone.substring(0, 3) + "****" + phone.substring(7));
+        } else {
+            gen.writeString(phone);
+        }
+    }
+}
+
+// ========== 使用自定义序列化器 ==========
+@Data
+public class Order {
+    private Long id;
+
+    @JsonSerialize(using = MoneySerializer.class)
+    private Long totalFee;              // 数据库 1000 分 → JSON "10.00"
+
+    @JsonSerialize(using = PhoneMaskSerializer.class)
+    private String phone;               // 13812345678 → 138****5678
+}
+
+// ========== 自定义反序列化器 ==========
+public class MoneyDeserializer extends JsonDeserializer&lt;Long&gt; {
+    @Override
+    public Long deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+        // 元 → 分
+        BigDecimal yuan = p.getDecimalValue();
+        return yuan.multiply(new BigDecimal(100)).longValue();
+    }
+}
+
+@JsonProperty("totalFee")
+@JsonDeserialize(using = MoneyDeserializer.class)
+private Long totalFee;                  // JSON "10.00" → 数据库 1000 分
+
+// ========== 全局注册自定义序列化器 ==========
+@Bean
+public Jackson2ObjectMapperBuilderCustomizer customizer() {
+    return builder -> {
+        builder.serializerByType(Long.class, new MoneySerializer());
+        builder.deserializerByType(Long.class, new MoneyDeserializer());
+    };
+}
+
+// ========== @JsonComponent ==========
+// Spring Boot 注解, 自动注册到 ObjectMapper
+@JsonComponent
+public class MoneyConverter {
+
+    public static class Serializer extends JsonSerializer&lt;Long&gt; {
+        @Override
+        public void serialize(Long value, JsonGenerator gen, SerializerProvider serializers)
+                throws IOException {
+            gen.writeNumber(BigDecimal.valueOf(value).divide(new BigDecimal(100))
+                .setScale(2, RoundingMode.HALF_UP));
+        }
+    }
+
+    public static class Deserializer extends JsonDeserializer&lt;Long&gt; {
+        @Override
+        public Long deserialize(JsonParser p, DeserializationContext ctxt) throws IOException {
+            return p.getDecimalValue().multiply(new BigDecimal(100)).longValue();
+        }
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>视图与多态序列化</h2>
+        <div class="code">// ========== @JsonView ==========
+// 不同场景返回不同字段
+
+public class UserViews {
+    public interface Summary {}              // 摘要
+    public interface Detail extends Summary {} // 详情
+}
+
+@Data
+public class User {
+    @JsonView(UserViews.Summary.class)
+    private Long id;
+
+    @JsonView(UserViews.Summary.class)
+    private String username;
+
+    @JsonView(UserViews.Detail.class)       // 仅详情视图可见
+    private String email;
+
+    @JsonView(UserViews.Detail.class)
+    private String phone;
+
+    @JsonIgnore                              // 始终隐藏
+    private String password;
+}
+
+@RestController
+public class UserController {
+
+    // 列表: 只返回 Summary 字段
+    @GetMapping("/users")
+    @JsonView(UserViews.Summary.class)
+    public List&lt;User&gt; listUsers() { ... }
+
+    // 详情: 返回 Detail 字段
+    @GetMapping("/users/{id}")
+    @JsonView(UserViews.Detail.class)
+    public User getUser(@PathVariable Long id) { ... }
+}
+
+// ========== @JsonTypeInfo 多态 ==========
+// 序列化多态对象时包含类型信息
+
+@JsonTypeInfo(
+    use = JsonTypeInfo.Id.NAME,              // 用类名标识
+    include = JsonTypeInfo.As.PROPERTY,      // 作为属性
+    property = "type"                        // 属性名
+)
+@JsonSubTypes({
+    @JsonSubTypes.Type(value = Circle.class, name = "circle"),
+    @JsonSubTypes.Type(value = Rectangle.class, name = "rectangle")
+})
+public abstract class Shape { ... }
+
+public class Circle extends Shape {
+    private double radius;
+}
+
+public class Rectangle extends Shape {
+    private double width;
+    private double height;
+}
+
+// JSON:
+// {"type": "circle", "radius": 5.0}
+// {"type": "rectangle", "width": 3.0, "height": 4.0}
+
+// ========== @JsonRawValue ==========
+// 嵌入原始 JSON 字符串
+@Data
+public class Message {
+    private String title;
+
+    @JsonRawValue                          // 直接嵌入, 不转义
+    private String metadata;               // "{\"key\":\"value\"}" → 保留为 JSON 对象
+}</div>
+    </div>
+    <div class="card">
+        <h2>最佳实践</h2>
+        <div class="code">// ========== Jackson 最佳实践 ==========
+
+// ========== 1. 统一日期格式 ==========
+// application.yml 全局配置
+// 使用 yyyy-MM-dd HH:mm:ss 而不是 ISO 时间戳
+// 避免时区问题
+
+// ========== 2. 忽略 null ==========
+// 全局: spring.jackson.default-property-inclusion=non_null
+// 减少响应体积, 字段缺失比 null 更清晰
+
+// ========== 3. DTO 与 Entity 分离 ==========
+// ❌ 不要用 @JsonIgnore 修改 Entity
+// ✅ 用 DTO 控制序列化
+
+// Entity: 不含 Jackson 注解
+@Entity
+public class UserEntity {
+    private Long id;
+    private String username;
+    private String password;               // 不返回
+}
+
+// DTO: 注解控制序列化
+@Data
+public class UserDTO {
+    private Long id;
+    private String username;
+    // 不含 password 字段
+}
+
+// ========== 4. 脱敏敏感信息 ==========
+// 手机号: 138****5678
+// 身份证: 110***************1234
+// 用自定义 @JsonSerialize 统一处理
+
+// ========== 5. 避免循环引用 ==========
+// @JsonIgnoreProperties 或 @JsonManagedReference/@JsonBackReference
+
+// @JsonIgnoreProperties({"products"})   // 忽略 category 中的 products 字段
+private Category category;
+
+// ========== 6. 使用 @JsonComponent ==========
+// 而非手动注册, 更 Spring Boot 原生
+
+// ========== 7. 空对象不要抛异常 ==========
+spring.jackson.serialization.fail-on-empty-beans=false
+
+// ========== 8. 测试 JSON ==========
+@JsonTest                              // 专门测试 JSON 序列化
+class UserJsonTest {
+
+    @Autowired
+    private JacksonTester&lt;User&gt; json;
+
+    @Test
+    void testSerialize() throws IOException {
+        User user = new User(1L, "Alice", "secret");
+        assertThat(json.write(user)).isEqualToJson("expected.json");
+    }
+}</div>
+        <div class="note">💡 Jackson 要点: @JsonIgnore 隐藏字段; @JsonProperty 自定义字段名; @JsonFormat 日期格式; @JsonInclude 控制 null; 全局 spring.jackson.* 配置; @JsonSerialize/@JsonDeserialize 自定义; @JsonView 不同视图; @JsonComponent 自动注册; DTO 与 Entity 分离; 敏感信息脱敏; 全局非空忽略。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoAnno()">注解</button>
+        <button onclick="demoConfig()">全局配置</button>
+        <button onclick="demoCustom()">自定义</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoAnno() {
+            result.innerHTML = '';
+            log('# Jackson 注解');
+            log('');
+            log('@JsonIgnore       — 忽略字段');
+            log('@JsonProperty     — 自定义字段名');
+            log('@JsonFormat       — 日期格式 (pattern+timezone)');
+            log('@JsonInclude      — 控制 null/空值');
+            log('@JsonSerialize    — 自定义序列化');
+            log('@JsonDeserialize  — 自定义反序列化');
+            log('@JsonView         — 视图控制');
+            log('@JsonRawValue     — 嵌入原始 JSON');
+        }
+
+        function demoConfig() {
+            result.innerHTML = '';
+            log('# 全局 Jackson 配置');
+            log('');
+            log('application.yml:');
+            log('  spring.jackson.date-format=yyyy-MM-dd HH:mm:ss');
+            log('  spring.jackson.time-zone=Asia/Shanghai');
+            log('  spring.jackson.default-property-inclusion=non_null');
+            log('  spring.jackson.serialization.write-dates-as-timestamps=false');
+            log('  spring.jackson.deserialization.fail-on-unknown-properties=false');
+        }
+
+        function demoCustom() {
+            result.innerHTML = '';
+            log('# 自定义序列化');
+            log('');
+            log('@JsonSerialize(using = MoneySerializer.class)');
+            log('  分 → 元: 1000 → 10.00');
+            log('');
+            log('@JsonSerialize(using = PhoneMaskSerializer.class)');
+            log('  脱敏: 13812345678 → 138****5678');
+            log('');
+            log('@JsonComponent = Serializer + Deserializer');
+            log('  自动注册到 ObjectMapper');
+        }
+    </script>
+</body>
+</html>

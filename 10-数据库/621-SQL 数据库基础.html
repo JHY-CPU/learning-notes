@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 数据库基础</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🗄️ SQL 数据库基础</h2><p>关系型数据库核心概念、表/行/列、主键与外键、数据类型、NULL 三值逻辑、关系模型。</p></div>
+    <div class="card">
+        <h2>关系型数据库概念</h2>
+        <div class="code">// ========== 关系模型 ==========
+// 关系型数据库: 以表 (关系) 组织数据
+// 1970 年 E.F. Codd 提出关系模型
+
+// 核心概念:
+// 表 (Table)     = 关系 (Relation)
+// 行 (Row)       = 元组 (Tuple)
+// 列 (Column)    = 属性 (Attribute)
+// 主键 (PK)      = 唯一标识一行
+// 外键 (FK)      = 引用其他表的主键
+
+// ========== 示例: 博客数据库 ==========
+// users 表:
+// ┌─────┬───────────┬──────────────────┐
+// │ id  │ username  │ email            │ ← 行
+// ├─────┼───────────┼──────────────────┤
+// │ 1   │ alice     │ alice@test.com   │
+// │ 2   │ bob       │ bob@test.com     │
+// │ 3   │ charlie   │ charlie@test.com │
+// └─────┴───────────┴──────────────────┘
+//   ↑       ↑
+// 主键     列
+
+// posts 表:
+// ┌────┬──────────┬──────────┬─────────┐
+// │ id │ title    │ user_id  │ content │
+// ├────┼──────────┼──────────┼─────────┤
+// │ 1  │ post1    │ 1        │ ...     │ ← FK→users.id
+// │ 2  │ post2    │ 1        │ ...     │
+// │ 3  │ post3    │ 2        │ ...     │
+// └────┴──────────┴──────────┴─────────┘
+//             ↑
+//         外键 (引用 users.id)</div>
+    </div>
+    <div class="card">
+        <h2>主键与外键</h2>
+        <div class="code">// ========== 主键 (Primary Key) ==========
+// 主键: 唯一标识表中每一行
+// 特点:
+// - 唯一性 (UNIQUE)
+// - 非空 (NOT NULL)
+// - 一个表只能有一个主键
+// - 可单个列或多个列 (复合主键)
+
+// 自然主键: 业务含义 (如身份证号)
+// 代理主键: 无业务含义 (如自增 ID) ← 更推荐
+
+// 常用主键类型:
+// 1. 自增整数 (INT AUTO_INCREMENT / SERIAL)
+// 2. UUID (全局唯一,适合分布式)
+// 3. 雪花算法 ID (分布式+有序)
+
+// ========== 外键 (Foreign Key) ==========
+// 外键: 引用其他表的主键
+// 作用: 维护数据完整性 (参照完整性)
+
+// 外键约束选项:
+// ON DELETE CASCADE:   父表删除时,子表自动删除
+// ON DELETE SET NULL:  父表删除时,子表设为 NULL
+// ON DELETE RESTRICT:  有子记录时禁止删除父记录
+// ON DELETE NO ACTION: 同 RESTRICT
+// ON UPDATE CASCADE:   父表更新时,子表同步更新
+
+// ========== 索引 (Index) ==========
+// 索引: 加速查询的数据结构 (B-Tree)
+// 主键自动建立索引
+// 外键通常也建索引
+// 经常查询的列适合加索引</div>
+    </div>
+    <div class="card">
+        <h2>数据类型</h2>
+        <div class="code">// ========== 常见 SQL 数据类型 ==========
+// ===== 数值类型 =====
+// INT / INTEGER       整数 (-2^31 ~ 2^31-1)
+// BIGINT              大整数 (-2^63 ~ 2^63-1)
+// SMALLINT            小整数
+// TINYINT             极小整数 (0~255)
+// DECIMAL(p,s)        精确小数 (如 DECIMAL(10,2))
+// FLOAT / REAL        浮点数 (近似)
+// DOUBLE              双精度浮点
+
+// ===== 字符串类型 =====
+// CHAR(n)             定长 (如 CHAR(11),性能好)
+// VARCHAR(n)          变长 (如 VARCHAR(255))
+// TEXT                长文本 (最大 64KB)
+// MEDIUMTEXT          中等文本 (最大 16MB)
+// LONGTEXT            长文本 (最大 4GB)
+
+// ===== 日期时间 =====
+// DATE                日期 (2024-01-15)
+// TIME                时间 (14:30:00)
+// DATETIME            日期时间 (2024-01-15 14:30:00)
+// TIMESTAMP           时间戳 (时区敏感)
+// YEAR                年份
+
+// ===== 布尔 =====
+// BOOLEAN / BOOL      TRUE / FALSE / NULL
+// (MySQL 中 TINYINT(1) 实现)
+
+// ===== 二进制 =====
+// BLOB               二进制大对象 (图片/文件)
+// JSON               JSON 数据 (5.7+)
+// ENUM               枚举 (ENUM('a','b','c'))</div>
+    </div>
+    <div class="card">
+        <h2>NULL 三值逻辑</h2>
+        <div class="code">// ========== NULL 处理 ==========
+// NULL: 表示"未知"或"不存在"
+// 不是 0,也不是空字符串!
+
+// 三值逻辑:
+// TRUE AND NULL  = NULL (未知)
+// FALSE AND NULL = FALSE
+// NULL OR NULL   = NULL
+// NULL = NULL    = NULL (不是 TRUE!)
+// NULL IS NULL   = TRUE  ✅ (正确比较)
+
+// ========== 常见陷阱 ==========
+SELECT * FROM users WHERE age = NULL;   -- ❌ 错误! 不会返回任何行
+SELECT * FROM users WHERE age IS NULL;  -- ✅ 正确
+
+SELECT * FROM users WHERE age != 25;    -- ❌ NULL 不会包含
+SELECT * FROM users WHERE age != 25 OR age IS NULL;  -- ✅
+
+// ========== NULL 处理函数 ==========
+-- MySQL:
+SELECT IFNULL(age, 0) FROM users;      -- NULL → 0
+SELECT COALESCE(age, email, 'default') FROM users;  -- 第一个非 NULL
+
+-- PostgreSQL:
+SELECT COALESCE(age, 0) FROM users;
+SELECT NULLIF(a, b);  -- a == b 返回 NULL
+
+-- 通用:
+SELECT * FROM users WHERE age IS NOT NULL;
+
+// ========== 约束与 NULL ==========
+// NOT NULL: 禁止 NULL
+// UNIQUE:   NULL 不受 UNIQUE 限制 (多个 NULL 可以)
+// 主键:     自动 NOT NULL + UNIQUE</div>
+    </div>
+    <div class="card">
+        <h2>SQL 语句分类</h2>
+        <div class="code">// ========== SQL 四大类 ==========
+// 1. DDL (数据定义语言)
+//    CREATE / ALTER / DROP / TRUNCATE
+//    操作数据库/表结构
+
+// 2. DML (数据操作语言)
+//    SELECT / INSERT / UPDATE / DELETE
+//    操作数据内容
+
+// 3. DCL (数据控制语言)
+//    GRANT / REVOKE
+//    权限管理
+
+// 4. TCL (事务控制语言)
+//    BEGIN / COMMIT / ROLLBACK / SAVEPOINT
+//    事务管理
+
+// ========== 数据库产品对比 ==========
+// 特性         MySQL         PostgreSQL     SQLite
+// ------------------------------------------------
+// 开源        GPL           MIT             Public
+// ACID        ✅ (InnoDB)   ✅              ✅
+// 并发        一般           优秀            只读好
+// JSON        ✅             ✅ (更强)        ❌
+// 扩展性      好             优秀            嵌入式
+// 全文索引    ✅             ✅              ❌
+// GIS         ✅             ✅ (PostGIS)    ❌
+// 适用场景    Web应用        复杂查询        小/本地
+// 默认端口    3306           5432            -
+
+// 选型建议:
+// MySQL:    LAMP 栈 / WordPress / 简单场景
+// PostgreSQL: 复杂查询 / GIS / JSON / 金融
+// SQLite:  开发测试 / 移动端 / 嵌入式</div>
+        <div class="note">💡 数据库基础: 关系模型以表组织数据; 主键唯一标识行; 外键维护参照完整性; NULL 用 IS NULL 判断; 选 NOSQL 还是 SQL 取决于数据结构化程度。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoConcept()">概念演示</button>
+        <button onclick="demoTypes()">数据类型演示</button>
+        <button onclick="demoNull()">NULL 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoConcept() {
+            result.innerHTML = '';
+            log('# 数据库核心概念');
+            log('');
+            log('表 = 关系, 行 = 元组, 列 = 属性');
+            log('主键: 唯一标识 (NOT NULL + UNIQUE)');
+            log('外键: 引用其他表 (参照完整性)');
+            log('索引: 加速查询 (B-Tree)');
+            log('');
+            log('CASCADE: 级联删除/更新');
+            log('RESTRICT: 阻止删除');
+        }
+
+        function demoTypes() {
+            result.innerHTML = '';
+            log('# 数据类型');
+            log('');
+            log('INT / BIGINT / DECIMAL(10,2)');
+            log('VARCHAR(255) / TEXT');
+            log('DATE / DATETIME / TIMESTAMP');
+            log('BOOLEAN / JSON / ENUM');
+            log('');
+            log('选型原则:');
+            log('  够用就好,不要过度设计');
+            log('  索引列尽量小');
+        }
+
+        function demoNull() {
+            result.innerHTML = '';
+            log('# NULL 三值逻辑');
+            log('');
+            log('❌ WHERE age = NULL   # 永远不返回');
+            log('✅ WHERE age IS NULL');
+            log('✅ WHERE age IS NOT NULL');
+            log('');
+            log('处理函数:');
+            log('  IFNULL(age, 0)');
+            log('  COALESCE(age, email, "default")');
+        }
+    </script>
+</body>
+</html>

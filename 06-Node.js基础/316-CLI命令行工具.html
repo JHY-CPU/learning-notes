@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CLI命令行工具</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #cli-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>CLI 命令行工具</h2><p>命令行参数解析、stdin/stdout/stderr、交互输入 readline。</p></div>
+    <div class="card">
+        <h2>CLI 开发</h2>
+        <div class="code">// ========== shebang ==========
+#!/usr/bin/env node
+// 放在文件第一行，标识 Node.js 运行
+
+// ========== 参数解析 ==========
+// process.argv 获取原始参数
+const args = process.argv.slice(2);
+
+// 简易解析
+const options = {};
+for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith('--')) {
+        const key = args[i].slice(2);
+        options[key] = args[i + 1]?.startsWith('--') ? true : args[i + 1];
+    }
+}
+
+// ========== 使用 commander (推荐) ==========
+const { Command } = require('commander');
+const program = new Command();
+program
+    .name('my-cli')
+    .version('1.0.0')
+    .option('-n, --name <name>', '你的名字')
+    .option('-v, --verbose', '详细输出')
+    .parse(process.argv);
+
+// ========== stdin/stdout/stderr ==========
+process.stdout.write('输出到控制台\n');
+process.stderr.write('错误输出\n');
+
+// 管道输入读取
+process.stdin.on('data', (chunk) => {
+    console.log('输入:', chunk.toString());
+});
+
+// ========== readline 交互 ==========
+const readline = require('readline');
+const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+});
+
+rl.question('你叫什么名字？', (answer) => {
+    console.log(`你好, ${answer}!`);
+    rl.close();
+});</div>
+    </div>
+    <div class="card">
+        <h2>演示：CLI 工具</h2>
+        <button onclick="demoCLI()">CLI 参数解析</button>
+        <button onclick="demoReadline()">模拟 readline</button>
+        <div id="cli-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const cliResult = document.getElementById('cli-result');
+
+        function log(msg) {
+            cliResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoCLI() {
+            cliResult.innerHTML = '';
+            log('🖥️ CLI 命令行工具演示:');
+            log('');
+
+            // 模拟命令行参数
+            const mockArgv = [
+                '/usr/bin/node',
+                '/home/user/my-cli.js',
+                '--name', 'Alice',
+                '--verbose',
+                '--port', '3000',
+                '--format', 'json',
+            ];
+
+            log('原始命令:');
+            log(`   $ node my-cli.js --name Alice --verbose --port 3000 --format json`);
+            log('');
+
+            // 解析参数
+            function parseArgs(argv) {
+                const args = argv.slice(2);
+                const options = {};
+                const positional = [];
+
+                for (let i = 0; i < args.length; i++) {
+                    if (args[i].startsWith('--')) {
+                        const key = args[i].slice(2);
+                        if (i + 1 < args.length && !args[i + 1].startsWith('--')) {
+                            options[key] = args[i + 1];
+                            i++;
+                        } else {
+                            options[key] = true;
+                        }
+                    } else if (args[i].startsWith('-')) {
+                        const key = args[i].slice(1);
+                        if (i + 1 < args.length && !args[i + 1].startsWith('-')) {
+                            options[key] = args[i + 1];
+                            i++;
+                        } else {
+                            options[key] = true;
+                        }
+                    } else {
+                        positional.push(args[i]);
+                    }
+                }
+                return { options, positional };
+            }
+
+            const { options, positional } = parseArgs(mockArgv);
+            log('解析结果:');
+            log(`   选项 (options): ${JSON.stringify(options, null, 2)}`);
+            log(`   位置参数: ${positional.length > 0 ? JSON.stringify(positional) : '无'}`);
+            log('');
+
+            log('📌 常用 CLI 库:');
+            log('   • commander — 功能完整');
+            log('   • yargs — 功能丰富');
+            log('   • cac — 轻量快速');
+            log('   • meow — 极简');
+        }
+
+        function demoReadline() {
+            cliResult.innerHTML = '';
+            log('💬 readline 交互模拟:');
+            log('');
+
+            const questions = [
+                { key: 'name', question: '你叫什么名字？', default: '用户' },
+                { key: 'age', question: '你多大了？', default: '25' },
+                { key: 'city', question: '你住在哪个城市？', default: '北京' },
+            ];
+
+            log('模拟 readline 交互:');
+            log('');
+
+            let answers = {};
+            let idx = 0;
+
+            function askNext() {
+                if (idx >= questions.length) {
+                    log('\n📋 收集完毕:');
+                    log(`   名字: ${answers.name}`);
+                    log(`   年龄: ${answers.age}`);
+                    log(`   城市: ${answers.city}`);
+                    log('');
+                    log('📌 readline 特性:');
+                    log('   • 交互式提问');
+                    log('   • 支持默认值');
+                    log('   • tab 自动补全');
+                    log('   • 历史记录');
+                    return;
+                }
+
+                const q = questions[idx];
+                log(`❓ ${q.question} [${q.default}]`);
+                log(`   → 输入: ${q.default} (模拟自动输入)`);
+                answers[q.key] = q.default;
+                idx++;
+                setTimeout(askNext, 300);
+            }
+
+            askNext();
+        }
+
+        console.log('=== CLI 命令行工具 ===');
+
+        document.getElementById('output').textContent =
+            `CLI 工具: process.argv / stdin/stdout/stderr / readline\n` +
+            `参数解析 / 交互输入 / commander / 颜色输出\n` +
+            `✅ CLI 命令行工具完成！`;
+    </script>
+</body>
+</html>

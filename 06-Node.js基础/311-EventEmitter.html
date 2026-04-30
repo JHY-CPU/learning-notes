@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EventEmitter</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #ee-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>EventEmitter</h2><p>on/emit/once/off/listeners、事件参数、错误事件、继承 EventEmitter。</p></div>
+    <div class="card">
+        <h2>EventEmitter API</h2>
+        <div class="code">// ========== EventEmitter 核心 ==========
+const EventEmitter = require('events');
+const emitter = new EventEmitter();
+
+// 注册事件
+emitter.on('event', handler);        // 监听
+emitter.once('event', handler);      // 只触发一次
+emitter.addListener('event', handler); // 同 on
+
+// 触发事件
+emitter.emit('event', arg1, arg2);
+
+// 移除事件
+emitter.off('event', handler);       // 移除
+emitter.removeListener('event', handler); // 同 off
+emitter.removeAllListeners('event'); // 移除所有
+
+// 其他方法
+emitter.listeners('event');   // 获取所有监听器
+emitter.listenerCount('event'); // 监听器数量
+emitter.eventNames();         // 所有事件名
+emitter.rawListeners('event'); // 原始监听器
+
+// ========== 错误事件 ==========
+// 特殊事件: 'error'
+// 如果 emit('error') 没有监听器，会抛出异常
+emitter.on('error', (err) => {
+    console.error('错误:', err.message);
+});
+
+// ========== 继承 EventEmitter ==========
+class MyClass extends EventEmitter {
+    constructor() { super(); }
+    doSomething() {
+        this.emit('data', 'result');
+    }
+}
+
+// ========== 事件参数传递 ==========
+emitter.emit('user:login', { id: 1, name: 'Alice' });
+emitter.on('user:login', (user) => {
+    console.log(`用户 ${user.name} 登录`);
+});</div>
+    </div>
+    <div class="card">
+        <h2>演示：EventEmitter</h2>
+        <button onclick="demoEventEmitter()">EventEmitter 演示</button>
+        <button onclick="demoOnce()">once vs on</button>
+        <div id="ee-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const eeResult = document.getElementById('ee-result');
+
+        function log(msg) {
+            eeResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // 简易 EventEmitter
+        class MyEventEmitter {
+            constructor() {
+                this._events = {};
+            }
+
+            on(event, handler) {
+                (this._events[event] ||= []).push(handler);
+                return this;
+            }
+
+            once(event, handler) {
+                const wrapped = (...args) => {
+                    this.off(event, wrapped);
+                    handler(...args);
+                };
+                wrapped._original = handler;
+                this.on(event, wrapped);
+                return this;
+            }
+
+            off(event, handler) {
+                if (!this._events[event]) return this;
+                if (handler) {
+                    this._events[event] = this._events[event]
+                        .filter(h => h !== handler && h._original !== handler);
+                } else {
+                    delete this._events[event];
+                }
+                return this;
+            }
+
+            emit(event, ...args) {
+                if (!this._events[event]) {
+                    if (event === 'error') throw new Error(args[0]);
+                    return false;
+                }
+                this._events[event].forEach(handler => handler(...args));
+                return true;
+            }
+
+            listeners(event) {
+                return this._events[event] || [];
+            }
+
+            listenerCount(event) {
+                return this.listeners(event).length;
+            }
+
+            eventNames() {
+                return Object.keys(this._events);
+            }
+        }
+
+        function demoEventEmitter() {
+            eeResult.innerHTML = '';
+            log('📡 EventEmitter 演示:');
+            log('');
+
+            const ee = new MyEventEmitter();
+
+            // 注册事件
+            const handler1 = (msg) => log(`   处理程序1: "${msg}"`);
+            const handler2 = (msg) => log(`   处理程序2: "${msg}" (大写: ${msg.toUpperCase()})`);
+
+            ee.on('message', handler1);
+            ee.on('message', handler2);
+
+            log('1️⃣ 触发 "message" 事件 (2个监听器):');
+            ee.emit('message', 'Hello EventEmitter!');
+            log('');
+
+            log('2️⃣ 监听器数量:');
+            log(`   listenerCount("message"): ${ee.listenerCount('message')}`);
+            log(`   eventNames(): [${ee.eventNames().join(', ')}]`);
+            log('');
+
+            log('3️⃣ 移除 handler1:');
+            ee.off('message', handler1);
+            ee.emit('message', '只有 handler2 收到');
+            log('');
+
+            log('4️⃣ 错误事件:');
+            ee.on('error', (err) => log(`   捕获错误: ${err}`));
+            ee.emit('error', '这是一个错误消息');
+        }
+
+        function demoOnce() {
+            eeResult.innerHTML = '';
+            log('🔄 once vs on 对比:');
+            log('');
+
+            const ee = new MyEventEmitter();
+
+            ee.on('greet', (name) => log(`   on: Hello ${name}! (每次触发)`));
+            ee.once('greet', (name) => log(`   once: Hello ${name}! (仅一次)`));
+
+            log('第1次触发:');
+            ee.emit('greet', 'Alice');
+
+            log('第2次触发:');
+            ee.emit('greet', 'Bob');
+
+            log('第3次触发:');
+            ee.emit('greet', 'Charlie');
+
+            log('');
+            log('📌 once 自动注销，on 一直保留');
+            log('📌 应用: 一次性初始化、首次连接');
+        }
+
+        console.log('=== EventEmitter ===');
+
+        document.getElementById('output').textContent =
+            `EventEmitter: on/emit/once/off/listeners/eventNames\n` +
+            `错误事件 / 继承 EventEmitter / 参数传递\n` +
+            `✅ EventEmitter 演示完成！`;
+    </script>
+</body>
+</html>

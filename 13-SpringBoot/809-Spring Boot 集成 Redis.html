@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot 集成 Redis</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📀 Spring Boot 集成 Redis</h2><p>RedisTemplate 操作、Spring Data Redis 配置、RedisRepository 注解、分布式锁 Redisson、Session 共享、发布订阅、缓存与限流。</p></div>
+    <div class="card">
+        <h2>Redis 配置</h2>
+        <div class="code">// ========== Spring Data Redis ==========
+// 操作 Redis 的核心: RedisTemplate &lt;String, Object&gt;
+
+// ========== 依赖 ==========
+// &lt;dependency&gt;
+//     &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+//     &lt;artifactId&gt;spring-boot-starter-data-redis&lt;/artifactId&gt;
+// &lt;/dependency&gt;
+// &lt;dependency&gt;
+//     &lt;groupId&gt;org.apache.commons&lt;/groupId&gt;
+//     &lt;artifactId&gt;commons-pool2&lt;/artifactId&gt;
+// &lt;/dependency&gt;  <!-- 连接池 -->
+
+// ========== 配置 ==========
+// application.yml:
+spring:
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password:                         # 无密码
+      database: 0                       # 默认 0
+      timeout: 2000ms                   # 连接超时
+      lettuce:
+        pool:
+          max-active: 16                # 最大连接数
+          max-idle: 8                   # 最大空闲
+          min-idle: 4                   # 最小空闲
+          max-wait: -1ms                # 获取连接最大等待 (默认 -1 无限)
+
+// ========== RedisTemplate 配置 ==========
+@Configuration
+public class RedisConfig {
+
+    @Bean
+    public RedisTemplate&lt;String, Object&gt; redisTemplate(
+            RedisConnectionFactory factory) {
+        RedisTemplate&lt;String, Object&gt; template = new RedisTemplate&lt;&gt;();
+        template.setConnectionFactory(factory);
+
+        // JSON 序列化 (值)
+        GenericJackson2JsonRedisSerializer jsonSerializer =
+            new GenericJackson2JsonRedisSerializer();
+
+        // String 序列化 (键)
+        StringRedisSerializer stringSerializer = new StringRedisSerializer();
+
+        template.setKeySerializer(stringSerializer);
+        template.setHashKeySerializer(stringSerializer);
+        template.setValueSerializer(jsonSerializer);
+        template.setHashValueSerializer(jsonSerializer);
+
+        template.afterPropertiesSet();
+        return template;
+    }
+
+    // StringRedisTemplate: key & value 都是 String
+    @Bean
+    public StringRedisTemplate stringRedisTemplate(
+            RedisConnectionFactory factory) {
+        return new StringRedisTemplate(factory);
+    }
+}
+
+// ========== Redis 连接工厂配置 ==========
+// 默认使用 Lettuce (Netty 异步)
+// 可选: Jedis (阻塞)
+
+// Lettuce 优势:
+// - 异步/响应式 (RedisReactiveCommands)
+// - 连接池可选
+// - 线程安全
+
+// 切换到 Jedis (不推荐):
+// &lt;dependency&gt;
+//     &lt;groupId&gt;redis.clients&lt;/groupId&gt;
+//     &lt;artifactId&gt;jedis&lt;/artifactId&gt;
+// &lt;/dependency&gt;
+// spring.data.redis.client-type=jedis</div>
+    </div>
+    <div class="card">
+        <h2>RedisTemplate 操作</h2>
+        <div class="code">// ========== RedisTemplate 操作 ==========
+
+@Service
+@RequiredArgsConstructor
+public class RedisService {
+
+    private final RedisTemplate&lt;String, Object&gt; redisTemplate;
+    private final StringRedisTemplate stringRedisTemplate;
+
+    // ========== String 操作 ==========
+    public void setString(String key, String value) {
+        stringRedisTemplate.opsForValue().set(key, value);
+    }
+
+    public void setStringWithExpire(String key, String value, long timeout, TimeUnit unit) {
+        stringRedisTemplate.opsForValue().set(key, value, timeout, unit);
+    }
+
+    public String getString(String key) {
+        return stringRedisTemplate.opsForValue().get(key);
+    }
+
+    // ========== Object 操作 (JSON) ==========
+    public void setObject(String key, Object value) {
+        redisTemplate.opsForValue().set(key, value);
+    }
+
+    public void setObject(String key, Object value, long timeout, TimeUnit unit) {
+        redisTemplate.opsForValue().set(key, value, timeout, unit);
+    }
+
+    public &lt;T&gt; T getObject(String key, Class&lt;T&gt; clazz) {
+        Object value = redisTemplate.opsForValue().get(key);
+        if (clazz.isInstance(value)) {
+            return clazz.cast(value);
+        }
+        // 某些序列化方式可能需要手动转换
+        return null;
+    }
+
+    // ========== List 操作 ==========
+    public void leftPush(String key, Object value) {
+        redisTemplate.opsForList().leftPush(key, value);
+    }
+
+    public void rightPush(String key, Object value) {
+        redisTemplate.opsForList().rightPush(key, value);
+    }
+
+    public Object leftPop(String key) {
+        return redisTemplate.opsForList().leftPop(key);
+    }
+
+    public List&lt;Object&gt; range(String key, long start, long end) {
+        return redisTemplate.opsForList().range(key, start, end);
+    }
+
+    // ========== Hash 操作 ==========
+    public void putHash(String key, String hashKey, Object value) {
+        redisTemplate.opsForHash().put(key, hashKey, value);
+    }
+
+    public Object getHash(String key, String hashKey) {
+        return redisTemplate.opsForHash().get(key, hashKey);
+    }
+
+    public Map&lt;Object, Object&gt; entries(String key) {
+        return redisTemplate.opsForHash().entries(key);
+    }
+
+    // ========== Set 操作 ==========
+    public void addToSet(String key, Object... values) {
+        redisTemplate.opsForSet().add(key, values);
+    }
+
+    public Set&lt;Object&gt; members(String key) {
+        return redisTemplate.opsForSet().members(key);
+    }
+
+    public boolean isMember(String key, Object value) {
+        return Boolean.TRUE.equals(redisTemplate.opsForSet().isMember(key, value));
+    }
+
+    // ========== ZSet (有序集合) ==========
+    public void addToZSet(String key, Object value, double score) {
+        redisTemplate.opsForZSet().add(key, value, score);
+    }
+
+    public Set&lt;Object&gt; rangeByScore(String key, double min, double max) {
+        return redisTemplate.opsForZSet().rangeByScore(key, min, max);
+    }
+
+    // ========== Key 操作 ==========
+    public void expire(String key, long timeout, TimeUnit unit) {
+        redisTemplate.expire(key, timeout, unit);
+    }
+
+    public void delete(String key) {
+        redisTemplate.delete(key);
+    }
+
+    public boolean hasKey(String key) {
+        return Boolean.TRUE.equals(redisTemplate.hasKey(key));
+    }
+
+    // ========== 原子操作 ==========
+    public Long increment(String key) {
+        return redisTemplate.opsForValue().increment(key);
+    }
+
+    public Long incrementBy(String key, long delta) {
+        return redisTemplate.opsForValue().increment(key, delta);
+    }
+
+    // ========== setIfAbsent (分布式锁) ==========
+    public boolean setIfAbsent(String key, Object value, long timeout, TimeUnit unit) {
+        return Boolean.TRUE.equals(
+            redisTemplate.opsForValue().setIfAbsent(key, value, timeout, unit));
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>Redis 实战场景</h2>
+        <div class="code">// ========== 1. 分布式锁 ==========
+
+@Service
+@RequiredArgsConstructor
+public class DistributedLockService {
+
+    private final RedisTemplate&lt;String, Object&gt; redisTemplate;
+
+    private static final String LOCK_PREFIX = "lock:";
+
+    // 手动实现 Redis 分布式锁
+    public boolean tryLock(String key, String value, long expireMs) {
+        return Boolean.TRUE.equals(
+            redisTemplate.opsForValue()
+                .setIfAbsent(LOCK_PREFIX + key, value, expireMs, TimeUnit.MILLISECONDS));
+    }
+
+    public void unlock(String key, String value) {
+        // Lua 脚本: 只有 value 匹配才删除 (防止误删)
+        String script = """
+            if redis.call('get', KEYS[1]) == ARGV[1] then
+                return redis.call('del', KEYS[1])
+            else
+                return 0
+            end
+            """;
+        redisTemplate.execute(
+            new DefaultRedisScript&lt;&gt;(script, Long.class),
+            List.of(LOCK_PREFIX + key), value);
+    }
+}
+
+// ========== 2. 限流器 ==========
+
+@Service
+public class RateLimiterService {
+
+    private final RedisTemplate&lt;String, Object&gt; redisTemplate;
+
+    // 滑动窗口限流
+    public boolean allowRequest(String key, int maxRequests, long windowMs) {
+        String windowKey = "ratelimit:" + key;
+        long now = System.currentTimeMillis();
+
+        // Lua 脚本实现窗口限流
+        String script = """
+            local key = KEYS[1]
+            local now = tonumber(ARGV[1])
+            local window = tonumber(ARGV[2])
+            local max = tonumber(ARGV[3])
+
+            redis.call('ZREMRANGEBYSCORE', key, 0, now - window)
+            local count = redis.call('ZCARD', key)
+
+            if count < max then
+                redis.call('ZADD', key, now, now)
+                redis.call('EXPIRE', key, math.ceil(window / 1000))
+                return 1
+            else
+                return 0
+            end
+            """;
+
+        DefaultRedisScript&lt;Long&gt; redisScript =
+            new DefaultRedisScript&lt;&gt;(script, Long.class);
+
+        Long result = redisTemplate.execute(
+            redisScript, List.of(windowKey),
+            String.valueOf(now), String.valueOf(windowMs), String.valueOf(maxRequests));
+
+        return Long.valueOf(1).equals(result);
+    }
+
+    // 使用: 每个用户每秒最多 10 次
+    // if (!rateLimiter.allowRequest("user:" + userId, 10, 1000)) {
+    //     throw new RuntimeException("请求过于频繁");
+    // }
+}
+
+// ========== 3. 排行榜 ==========
+
+@Service
+public class LeaderboardService {
+
+    private final RedisTemplate&lt;String, Object&gt; redisTemplate;
+
+    private static final String LEADERBOARD_KEY = "leaderboard:scores";
+
+    // 更新分数
+    public void updateScore(String playerId, double score) {
+        redisTemplate.opsForZSet()
+            .add(LEADERBOARD_KEY, playerId, score);
+    }
+
+    // 前 N 名
+    public Set&lt;Object&gt; topN(int n) {
+        return redisTemplate.opsForZSet()
+            .reverseRange(LEADERBOARD_KEY, 0, n - 1);
+    }
+
+    // 带分数
+    public Set&lt;ZSetOperations.TypedTuple&lt;Object&gt;&gt; topNWithScores(int n) {
+        return redisTemplate.opsForZSet()
+            .reverseRangeWithScores(LEADERBOARD_KEY, 0, n - 1);
+    }
+
+    // 某玩家排名
+    public Long getRank(String playerId) {
+        return redisTemplate.opsForZSet()
+            .reverseRank(LEADERBOARD_KEY, playerId);
+    }
+
+    // 某玩家分数
+    public Double getScore(String playerId) {
+        return redisTemplate.opsForZSet()
+            .score(LEADERBOARD_KEY, playerId);
+    }
+}
+
+// ========== 4. 计数器 (日活/访问量) ==========
+
+@Service
+public class CounterService {
+
+    private final StringRedisTemplate stringRedisTemplate;
+
+    // PV (页面访问量)
+    public void incrementPV(String page) {
+        String key = "pv:" + LocalDate.now() + ":" + page;
+        stringRedisTemplate.opsForValue().increment(key);
+        stringRedisTemplate.expire(key, 2, TimeUnit.DAYS);
+    }
+
+    // UV (独立访客) — HyperLogLog (误差 ~0.81%)
+    public void addUV(String page, String userId) {
+        String key = "uv:" + LocalDate.now() + ":" + page;
+        stringRedisTemplate.opsForHyperLogLog().add(key, userId);
+        stringRedisTemplate.expire(key, 2, TimeUnit.DAYS);
+    }
+
+    public long getUV(String page) {
+        String key = "uv:" + LocalDate.now() + ":" + page;
+        Long count = stringRedisTemplate.opsForHyperLogLog().size(key);
+        return count != null ? count : 0;
+    }
+
+    // DAU (日活跃用户) — BitMap
+    public void setUserActive(long userId) {
+        String key = "dau:" + LocalDate.now();
+        stringRedisTemplate.opsForValue().setBit(key, userId, true);
+    }
+
+    public boolean isUserActive(long userId) {
+        String key = "dau:" + LocalDate.now();
+        return Boolean.TRUE.equals(
+            stringRedisTemplate.opsForValue().getBit(key, userId));
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>Session 共享与 Pub/Sub</h2>
+        <div class="code">// ========== 1. Redis Session 共享 ==========
+// 多实例部署时共享 Session
+
+// 依赖:
+// &lt;dependency&gt;
+//     &lt;groupId&gt;org.springframework.session&lt;/groupId&gt;
+//     &lt;artifactId&gt;spring-session-data-redis&lt;/artifactId&gt;
+// &lt;/dependency&gt;
+
+@Configuration
+@EnableRedisHttpSession(maxInactiveIntervalInSeconds = 1800)
+public class SessionConfig {
+    // @EnableRedisHttpSession:
+    // - Session 存储到 Redis
+    // - 所有实例共享 Session
+    // - 应用重启 Session 不丢失
+}
+
+// application.yml:
+// spring:
+//   session:
+//     store-type: redis
+//     redis:
+//       namespace: myapp:session
+//       flush-mode: on_save
+
+// ========== 2. 发布/订阅 ==========
+
+// 消息发布者
+@Service
+@RequiredArgsConstructor
+public class RedisPublisher {
+
+    private final RedisTemplate&lt;String, Object&gt; redisTemplate;
+
+    public void publish(String channel, Object message) {
+        redisTemplate.convertAndSend(channel, message);
+        log.info("发布消息到 {}: {}", channel, message);
+    }
+}
+
+// 消息监听器
+@Component
+@Slf4j
+public class RedisMessageSubscriber implements MessageListener {
+
+    @Override
+    public void onMessage(Message message, byte[] pattern) {
+        String channel = new String(message.getChannel());
+        String body = new String(message.getBody());
+        log.info("收到消息 [{}]: {}", channel, body);
+    }
+}
+
+// 配置监听器容器
+@Configuration
+public class RedisPubSubConfig {
+
+    @Bean
+    public MessageListenerAdapter messageListener(
+            RedisMessageSubscriber subscriber) {
+        return new MessageListenerAdapter(subscriber);
+    }
+
+    @Bean
+    public RedisMessageListenerContainer redisContainer(
+            RedisConnectionFactory factory,
+            MessageListenerAdapter listener) {
+        RedisMessageListenerContainer container =
+            new RedisMessageListenerContainer();
+        container.setConnectionFactory(factory);
+        container.addMessageListener(listener,
+            ChannelTopic.of("user:events"));
+        container.addMessageListener(listener,
+            new PatternTopic("order:*"));
+        return container;
+    }
+}
+
+// ========== 3. Redis Repository (Spring Data Redis) ==========
+// 类似 JPA, 用注解定义 Redis Hash
+
+@RedisHash("users")                       // Key 前缀: users:{id}
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class RedisUser {
+
+    @Id
+    private String id;                     // Redis Key: users:{id}
+
+    @Indexed                               // 可查询字段
+    private String username;
+
+    private String email;
+
+    @Indexed
+    private String status;
+
+    private LocalDateTime createdAt;
+}
+
+// Repository 接口
+@Repository
+public interface RedisUserRepository
+        extends CrudRepository&lt;RedisUser, String&gt; {
+
+    // 派生查询 (需 @Indexed)
+    List&lt;RedisUser&gt; findByStatus(String status);
+    List&lt;RedisUser&gt; findByUsername(String username);
+}
+
+// 使用:
+@Service
+@RequiredArgsConstructor
+public class RedisRepoService {
+
+    private final RedisUserRepository userRepository;
+
+    public RedisUser save(RedisUser user) {
+        return userRepository.save(user);
+    }
+
+    public Optional&lt;RedisUser&gt; findById(String id) {
+        return userRepository.findById(id);
+    }
+
+    public void deleteById(String id) {
+        userRepository.deleteById(id);
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>最佳实践</h2>
+        <div class="code">// ========== Redis 最佳实践 ==========
+
+// ========== 1. Key 命名规范 ==========
+// 格式: 业务名:对象名:ID:字段
+// 例如:
+//   user:profile:1001
+//   order:status:ORD-2024-001
+//   cache:product:list
+//   lock:inventory:2001
+//   ratelimit:user:1001
+
+// ========== 2. 合理设置过期时间 ==========
+// 所有 key 都应设置 TTL
+// 缓存: 5-30 分钟
+// Session: 30 分钟 - 2 小时
+// 锁: 自动释放时间 (如 10 秒)
+// 计数器: 按统计周期
+
+// ========== 3. 避免大 Key ==========
+// 大 Key 阻塞 Redis, 影响性能
+// 大 Value: 拆分/压缩
+// 大集合: 分片/scAN 替代 KEYS
+// 单个 String 建议 < 10KB
+
+// ========== 4. 管道批量操作 ==========
+// 减少网络往返
+
+public void batchSet(Map&lt;String, Object&gt; map) {
+    redisTemplate.executePipelined((RedisCallback&lt;Object&gt;) connection -> {
+        map.forEach((key, value) -> {
+            try {
+                byte[] rawKey = stringSerializer.serialize(key);
+                byte[] rawValue = jsonSerializer.serialize(value);
+                connection.stringCommands().set(rawKey, rawValue);
+            } catch (Exception e) {
+                log.error("序列化失败: {}", key, e);
+            }
+        });
+        return null;
+    });
+}
+
+// ========== 5. 序列化选择 ==========
+// 推荐: GenericJackson2JsonRedisSerializer
+// 注意: 类路径变化反序列化会失败
+// 备选: Protobuf, Kryo (性能更好)
+
+// ========== 6. 连接池配置 ==========
+// 根据并发量调整
+// 生产: max-active=16~32, max-idle=8, min-idle=4
+
+// ========== 7. 监控 ==========
+// Redis INFO 命令
+// RedisInsight / Redis Commander
+// Spring Boot Actuator + Redis 指标
+// Redis 慢查询日志 SLOWLOG
+
+// ========== 8. 事务 ==========
+// Redis 事务: MULTI/EXEC (不支持回滚)
+// Spring: @Transactional 需要配置
+// 使用 Lua 脚本保证原子性更好
+
+// ========== 9. 连接安全 ==========
+// Redis ACL 用户管理 (Redis 6+)
+// TLS 加密连接
+// 生产环境设置密码 requirepass</div>
+        <div class="note">💡 Redis 要点: RedisTemplate/ StringRedisTemplate 操作 5 种数据结构; GenericJackson2JsonRedisSerializer JSON 序列化; setIfAbsent 分布式锁; ZSet 排行榜; HyperLogLog UV 统计; BitMap DAU; @EnableRedisHttpSession Session 共享; Pub/Sub 消息; RedisRepository CRUD; Lua 脚本原子性; 管道批量; Key 规范命名+TTL。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoOps()">Redis 操作</button>
+        <button onclick="demoLock()">分布式锁</button>
+        <button onclick="demoScene()">实战场景</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoOps() {
+            result.innerHTML = '';
+            log('# RedisTemplate 操作');
+            log('');
+            log('String: opsForValue()');
+            log('  set/get/setIfAbsent/increment');
+            log('');
+            log('List: opsForList()');
+            log('  leftPush/rightPush/leftPop/range');
+            log('');
+            log('Hash: opsForHash()');
+            log('  put/get/entries');
+            log('');
+            log('Set: opsForSet()');
+            log('  add/members/isMember');
+            log('');
+            log('ZSet: opsForZSet()');
+            log('  add/rangeByScore/reverseRange');
+        }
+
+        function demoLock() {
+            result.innerHTML = '';
+            log('# Redis 分布式锁');
+            log('');
+            log('加锁:');
+            log('  setIfAbsent(key, value, expire)');
+            log('  SET key value NX EX 10');
+            log('');
+            log('解锁 (Lua 保证原子性):');
+            log('  if redis.call("get", KEYS[1]) == ARGV[1]');
+            log('  then return redis.call("del", KEYS[1])');
+            log('  else return 0 end');
+            log('');
+            log('要点:');
+            log('  value=UUID (防误删)');
+            log('  设置过期时间 (防死锁)');
+        }
+
+        function demoScene() {
+            result.innerHTML = '';
+            log('# Redis 实战场景');
+            log('');
+            log('📊 排行榜: ZSet');
+            log('  topN() / reverseRange');
+            log('');
+            log('🚦 限流器: ZSet + Lua');
+            log('  滑动窗口统计请求数');
+            log('');
+            log('📈 UV 统计: HyperLogLog');
+            log('  误差 0.81%, 12KB 存无限数据');
+            log('');
+            log('👤 DAU: BitMap');
+            log('  1 亿用户仅 12MB');
+            log('');
+            log('🔒 分布式锁: SET NX EX');
+            log('📨 发布订阅: Pub/Sub');
+        }
+    </script>
+</body>
+</html>

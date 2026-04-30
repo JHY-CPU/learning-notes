@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>10-图遍历对比 (BFS vs DFS)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>BFS vs DFS 对比</h2>
+  <table>
+    <tr><th>特性</th><th>BFS</th><th>DFS</th></tr>
+    <tr><td>数据结构</td><td>队列 (Queue)</td><td>栈 (Stack) / 递归</td></tr>
+    <tr><td>空间复杂度</td><td>O(V) 最坏</td><td>O(V) 最坏</td></tr>
+    <tr><td>最短路径（无权图）</td><td>是</td><td>否</td></tr>
+    <tr><td>连通分量</td><td>可以</td><td>可以</td></tr>
+    <tr><td>拓扑排序</td><td>Kahn 算法</td><td>DFS 后序</td></tr>
+    <tr><td>环检测</td><td>可以</td><td>可以</td></tr>
+    <tr><td>内存使用</td><td>存储整层</td><td>存储一条路径</td></tr>
+  </table>
+</div>
+<div class="card">
+  <h2>选择指南</h2>
+  <ul>
+    <li>需要最短路径 <b>→</b> BFS</li>
+    <li>需要探索所有路径 <b>→</b> DFS</li>
+    <li>树/图为分层结构 <b>→</b> BFS</li>
+    <li>检测环路 <b>→</b> DFS</li>
+    <li>内存受限但很深 <b>→</b> BFS</li>
+  </ul>
+</div>
+<div class="card">
+  <h2>交互演示</h2>
+  <button onclick="runBFS()">BFS 遍历</button>
+  <button onclick="runDFS()">DFS 遍历</button>
+  <div id="result"></div>
+</div>
+<script>
+const g = { A:['B','C'], B:['A','D','E'], C:['A','F','G'], D:['B'], E:['B','F'], F:['C','E'], G:['C'] };
+function runBFS() {
+  const order=[], q=['A'], s=new Set(['A']);
+  while(q.length){const v=q.shift();order.push(v);for(const w of g[v])if(!s.has(w)){s.add(w);q.push(w);}}
+  document.getElementById('result').textContent = 'BFS: ' + order.join(' → ');
+}
+function runDFS() {
+  const order=[], s=new Set();
+  (function rec(v){s.add(v);order.push(v);for(const w of g[v])if(!s.has(w))rec(w);})('A');
+  document.getElementById('result').textContent = 'DFS: ' + order.join(' → ');
+}
+</script>
+</body></html>

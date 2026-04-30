@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>媒体捕捉</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        canvas { border: 1px solid #ddd; margin: 10px 0; background: white; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>媒体捕捉</h2><p>getUserMedia 摄像头、拍照、录屏、MediaRecorder、滤镜。</p></div>
+    <div class="card">
+        <h2>媒体捕捉 API</h2>
+        <div class="code">// ========== 获取媒体流 ==========
+const stream = await navigator.mediaDevices.getUserMedia({
+    video: { width: 1920, height: 1080, frameRate: 30 },
+    audio: { echoCancellation: true, noiseSuppression: true }
+});
+
+// ========== 屏幕共享 ==========
+const displayStream = await navigator.mediaDevices.getDisplayMedia({
+    video: { cursor: 'always' },
+    audio: true
+});
+
+// ========== 拍照 ==========
+canvas.width = video.videoWidth;
+canvas.height = video.videoHeight;
+ctx.drawImage(video, 0, 0);
+const dataUrl = canvas.toDataURL('image/png');
+
+// ========== 录制 ==========
+const recorder = new MediaRecorder(stream);
+recorder.ondataavailable = (e) => chunks.push(e.data);
+recorder.start();
+recorder.stop();</div>
+    </div>
+    <div class="card">
+        <h2>演示：媒体捕捉</h2>
+        <button onclick="demoCamera()">摄像头</button>
+        <button onclick="demoPhoto()">拍照</button>
+        <button onclick="demoScreen()">屏幕共享</button>
+        <button onclick="demoConstraints()">约束与滤镜</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <canvas id="canvas" width="400" height="300"></canvas>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        // Mock MediaStream
+        class MockMediaStream {
+            constructor(tracks = []) {
+                this._tracks = tracks;
+                this.active = true;
+            }
+            getTracks() { return this._tracks; }
+            getVideoTracks() { return this._tracks.filter(t => t.kind === 'video'); }
+            getAudioTracks() { return this._tracks.filter(t => t.kind === 'audio'); }
+            addTrack(track) { this._tracks.push(track); }
+            removeTrack(track) {
+                this._tracks = this._tracks.filter(t => t !== track);
+            }
+        }
+
+        class MockMediaTrack {
+            constructor(kind, label = '') {
+                this.kind = kind;
+                this.label = label;
+                this.enabled = true;
+                this.muted = false;
+                this.readyState = 'live';
+            }
+            stop() {
+                this.readyState = 'ended';
+                console.log(`Track "${this.label}" stopped`);
+            }
+            getSettings() {
+                return {
+                    width: 1280, height: 720, frameRate: 30,
+                    deviceId: 'mock-device-id',
+                    facingMode: 'user'
+                };
+            }
+            getCapabilities() {
+                return {
+                    width: { min: 320, max: 3840 },
+                    height: { min: 240, max: 2160 },
+                    frameRate: { min: 15, max: 60 },
+                    facingMode: ['user', 'environment']
+                };
+            }
+            applyConstraints(constraints) {
+                log(`   约束已应用: ${JSON.stringify(constraints)}`);
+            }
+        }
+
+        // Mock navigator.mediaDevices
+        if (!navigator.mediaDevices) {
+            navigator.mediaDevices = {};
+        }
+        navigator.mediaDevices.getUserMedia = async (constraints) => {
+            log(`   getUserMedia 请求: ${JSON.stringify(constraints)}`);
+            const tracks = [];
+            if (constraints.video) {
+                tracks.push(new MockMediaTrack('video', '摄像头'));
+            }
+            if (constraints.audio) {
+                tracks.push(new MockMediaTrack('audio', '麦克风'));
+            }
+            const stream = new MockMediaStream(tracks);
+            log(`   媒体流已获取: ${tracks.length} 个轨道`);
+            // Draw fake camera
+            drawFakeCamera();
+            return stream;
+        };
+        navigator.mediaDevices.getDisplayMedia = async (constraints) => {
+            log(`   getDisplayMedia 请求`);
+            const tracks = [
+                new MockMediaTrack('video', '屏幕'),
+                new MockMediaTrack('audio', '系统音频')
+            ];
+            const stream = new MockMediaStream(tracks);
+            log(`   屏幕共享流已获取`);
+            drawFakeScreen();
+            return stream;
+        };
+
+        function drawFakeCamera() {
+            let frame = 0;
+            function draw() {
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, 400, 300);
+                // Camera frame
+                ctx.strokeStyle = '#3498db';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(20, 20, 360, 260);
+
+                ctx.fillStyle = '#2c3e50';
+                ctx.font = '14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('📷 摄像头画面', 200, 60);
+                ctx.fillText('🎤 麦克风已就绪', 200, 90);
+
+                // Simulate face detection
+                ctx.beginPath();
+                ctx.arc(200, 180, 40, 0, Math.PI * 2);
+                ctx.fillStyle = '#f1c40f';
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(185, 170, 5, 0, Math.PI * 2);
+                ctx.arc(215, 170, 5, 0, Math.PI * 2);
+                ctx.fillStyle = '#2c3e50';
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(200, 190, 10, 0, Math.PI);
+                ctx.stroke();
+
+                ctx.fillStyle = '#95a5a6';
+                ctx.font = '11px sans-serif';
+                ctx.fillText('🎥 模拟摄像头 (1280x720 @30fps)', 200, 280);
+                ctx.textAlign = 'left';
+
+                if (frame < 60) {
+                    frame++;
+                    requestAnimationFrame(draw);
+                }
+            }
+            draw();
+        }
+
+        function drawFakeScreen() {
+            ctx.fillStyle = '#f8f9fa';
+            ctx.fillRect(0, 0, 400, 300);
+            ctx.strokeStyle = '#e74c3c';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([5, 5]);
+            ctx.strokeRect(5, 5, 390, 290);
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = '#e74c3c';
+            ctx.font = '12px sans-serif';
+            ctx.fillText('🔴 录制中', 15, 25);
+
+            ctx.fillStyle = '#2c3e50';
+            ctx.font = '16px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('💻 屏幕共享 (1920x1080)', 200, 150);
+            ctx.font = '13px sans-serif';
+            ctx.fillStyle = '#7f8c8d';
+            ctx.fillText('点击"停止共享"结束', 200, 180);
+            ctx.textAlign = 'left';
+
+            // Window mockups
+            for (let i = 0; i < 2; i++) {
+                ctx.fillStyle = '#3498db';
+                ctx.fillRect(50 + i * 180, 200, 140, 60);
+                ctx.fillStyle = 'white';
+                ctx.font = '11px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(`窗口 ${i + 1}`, 120 + i * 180, 235);
+                ctx.textAlign = 'left';
+            }
+        }
+
+        function demoCamera() {
+            result.innerHTML = '';
+            log('📷 摄像头:');
+            log('');
+
+            log('1️⃣ 基本调用:');
+            log('   const stream = await navigator.mediaDevices.getUserMedia({');
+            log('     video: true,');
+            log('     audio: true');
+            log('   });');
+            log('');
+
+            log('2️⃣ 视频约束 (video constraints):');
+            log('   {');
+            log('     video: {');
+            log('       width: { ideal: 1280, min: 640, max: 1920 },');
+            log('       height: { ideal: 720, min: 480, max: 1080 },');
+            log('       frameRate: { ideal: 30, max: 60 },');
+            log('       facingMode: "user",      // 前置摄像头');
+            log('       // facingMode: "environment"  // 后置');
+            log('       aspectRatio: 16/9,');
+            log('     }');
+            log('   }');
+            log('');
+
+            log('3️⃣ 音频约束 (audio constraints):');
+            log('   audio: {');
+            log('     echoCancellation: true,   // 回声消除');
+            log('     noiseSuppression: true,    // 降噪');
+            log('     autoGainControl: true,     // 自动增益');
+            log('     sampleRate: 44100,         // 采样率');
+            log('     channelCount: 1,           // 单声道');
+            log('   }');
+            log('');
+
+            log('4️⃣ 轨道操作:');
+            log('   const track = stream.getVideoTracks()[0];');
+            log('   track.stop();                    // 关闭摄像头');
+            log('   track.enabled = false;           // 禁用 (静音/黑屏)');
+            log('   track.getSettings();             // 当前设置');
+            log('   track.getCapabilities();         // 能力范围');
+            log('   track.applyConstraints(constraints); // 动态调整');
+            log('');
+
+            log('5️⃣ 切换摄像头:');
+            log('   const devices = await navigator.mediaDevices.enumerateDevices();');
+            log('   const cameras = devices.filter(d => d.kind === "videoinput");');
+            log('   // 切换设备: 使用 deviceId');
+        }
+
+        function demoPhoto() {
+            result.innerHTML = '';
+            log('📸 拍照:');
+            log('');
+
+            log('1️⃣ 拍照实现:');
+            log('   function takePhoto(video, canvas) {');
+            log('     canvas.width = video.videoWidth;');
+            log('     canvas.height = video.videoHeight;');
+            log('     canvas.getContext("2d").drawImage(video, 0, 0);');
+            log('     return canvas.toDataURL("image/png");');
+            log('   }');
+            log('');
+
+            // Simulate taking photo
+            ctx.fillStyle = '#f8f9fa';
+            ctx.fillRect(0, 0, 400, 300);
+
+            // Draw flash effect
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, 400, 300);
+            setTimeout(() => {
+                // Photo result
+                ctx.fillStyle = '#2c3e50';
+                ctx.fillRect(20, 20, 360, 260);
+                ctx.fillStyle = '#f1c40f';
+                ctx.beginPath();
+                ctx.arc(200, 120, 30, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.fillStyle = '#3498db';
+                ctx.fillRect(100, 200, 200, 40);
+                ctx.fillStyle = 'white';
+                ctx.font = '14px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('📸 照片已拍摄', 200, 225);
+                ctx.textAlign = 'left';
+
+                log('   📸 照片已拍摄!');
+                log('   格式: PNG (也可用 JPEG/WEBP)');
+            }, 200);
+
+            log('');
+            log('2️⃣ 图片格式:');
+            log('   canvas.toDataURL("image/png")           — PNG (无损)');
+            log('   canvas.toDataURL("image/jpeg", 0.9)    — JPEG (可调质量)');
+            log('   canvas.toDataURL("image/webp", 0.8)    — WebP (高效)');
+            log('');
+
+            log('3️⃣ 前后处理:');
+            log('   // 滤镜: 拍照前或拍照后');
+            log('   ctx.filter = "grayscale(100%)";');
+            log('   ctx.filter = "sepia(100%)";');
+            log('   ctx.filter = "brightness(120%)";');
+            log('');
+
+            log('4️⃣ 连拍模式:');
+            log('   setInterval(() => {');
+            log('     const dataUrl = takePhoto(video, canvas);');
+            log('     photos.push(dataUrl);');
+            log('   }, 1000);  // 每秒一张');
+        }
+
+        function demoScreen() {
+            result.innerHTML = '';
+            log('🖥️ 屏幕共享:');
+            log('');
+
+            log('1️⃣ 基本调用:');
+            log('   const stream = await navigator.mediaDevices.getDisplayMedia({');
+            log('     video: { cursor: "always" },');
+            log('     audio: true');
+            log('   });');
+            log('');
+
+            log('2️⃣ cursor 选项:');
+            log('   "always" — 始终显示鼠标');
+            log('   "motion" — 仅鼠标移动时显示');
+            log('   "never"  — 隐藏鼠标');
+            log('');
+
+            log('3️⃣ 屏幕共享选择:');
+            log('   浏览器弹出选择框:');
+            log('   ① 整个屏幕');
+            log('   ② 应用窗口');
+            log('   ③ Chrome 标签页');
+            log('');
+
+            log('4️⃣ 录制屏幕:');
+            log('   const recorder = new MediaRecorder(displayStream, {');
+            log('     mimeType: "video/webm;codecs=vp9"');
+            log('   });');
+            log('   recorder.ondataavailable = (e) => {');
+            log('     chunks.push(e.data);');
+            log('   };');
+            log('   recorder.start(1000);  // 每秒生成数据');
+            log('');
+
+            // Draw screen preview
+            drawFakeScreen();
+
+            log('5️⃣ 停止共享:');
+            log('   // 方式一: 用户点击浏览器"停止共享"');
+            log('   // 方式二: 代码停止');
+            log('   displayStream.getTracks().forEach(t => t.stop());');
+            log('');
+
+            log('6️⃣ 检测共享结束:');
+            log('   const track = displayStream.getVideoTracks()[0];');
+            log('   track.onended = () => {');
+            log('     console.log("屏幕共享已结束");');
+            log('   };');
+        }
+
+        function demoConstraints() {
+            result.innerHTML = '';
+            log('⚙️ 约束与滤镜:');
+            log('');
+
+            log('1️⃣ 设备枚举:');
+            log('   const devices = await navigator.mediaDevices.enumerateDevices();');
+            log('   // videoinput  — 摄像头');
+            log('   // audioinput  — 麦克风');
+            log('   // audiooutput — 扬声器');
+            log('');
+
+            log('2️⃣ 动态切换约束:');
+            log('   // 切换分辨率');
+            log('   await track.applyConstraints({');
+            log('     width: { exact: 1920 },');
+            log('     height: { exact: 1080 }');
+            log('   });');
+            log('');
+            log('   // 切换前后摄像头');
+            log('   await track.applyConstraints({');
+            log('     facingMode: "environment"');
+            log('   });');
+            log('');
+
+            log('3️⃣ CSS 滤镜:');
+            log('   // 直接应用于 video 元素');
+            log('   video.style.filter = "grayscale(100%)";');
+            log('   video.style.filter = "sepia(80%) hue-rotate(90deg)";');
+            log('   video.style.filter = "blur(4px) brightness(120%)";');
+            log('');
+
+            log('4️⃣ Canvas 滤镜 (pixel processing):');
+            log('   ctx.drawImage(video, 0, 0);');
+            log('   const imageData = ctx.getImageData(0, 0, w, h);');
+            log('   // 像素级处理...');
+            log('   ctx.putImageData(imageData, 0, 0);');
+            log('');
+
+            log('5️⃣ 常用滤镜效果:');
+            log('   • 灰度: R = G = B = 0.299R + 0.587G + 0.114B');
+            log('   • 怀旧 (sepia): 偏棕色调');
+            log('   • 反色: R = 255 - R');
+            log('   • 模糊: 卷积核 (Box/ Gaussian)');
+            log('   • 美颜: 边缘模糊 + 亮度提升');
+            log('');
+
+            log('6️⃣ MediaRecorder 选项:');
+            log('   const recorder = new MediaRecorder(stream, {');
+            log('     mimeType: "video/webm;codecs=vp9",');
+            log('     videoBitsPerSecond: 2500000,  // 2.5 Mbps');
+            log('     audioBitsPerSecond: 128000    // 128 kbps');
+            log('   });');
+            log('   // 支持的格式: webm/mp4 (浏览器相关)');
+        }
+
+        console.log('=== 媒体捕捉 ===');
+        document.getElementById('output').textContent =
+            `媒体捕捉: getUserMedia / 拍照 / 屏幕共享 / MediaRecorder / 约束与滤镜\n` +
+            `✅ 媒体捕捉演示完成！`;
+    </script>
+</body>
+</html>

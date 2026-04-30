@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOM内容操作</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        .demo-area { background: white; border: 2px dashed #3498db; padding: 15px; border-radius: 8px; margin: 10px 0; min-height: 50px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>DOM 内容操作</h2><p>innerHTML / textContent / innerText — 修改元素内容。</p></div>
+    <div class="card">
+        <h2>innerHTML — 解析 HTML</h2>
+        <div class="code">// 获取元素内的 HTML 字符串
+const content = element.innerHTML;
+
+// 设置 HTML（会解析标签）
+element.innerHTML = '&lt;strong&gt;加粗&lt;/strong&gt; 和 &lt;em&gt;斜体&lt;/em&gt;';
+
+// 追加 HTML
+element.innerHTML += '&lt;span&gt;追加内容&lt;/span&gt;';
+
+// ⚠️ 安全风险：不要用 innerHTML 插入用户输入
+// ❌ element.innerHTML = userInput;  // XSS 漏洞！
+
+// ✅ 如果需要插入用户输入，用 textContent
+// ✅ 或使用 setAttribute / createElement + textContent
+
+// ⚠️ 性能：innerHTML += 会重建所有 DOM
+// 频繁操作时用 createElement / insertAdjacentHTML 代替
+
+// ⚠️ 会移除已有的事件监听
+// 设置 innerHTML 会重新解析，之前绑定的事件丢失</div>
+    </div>
+    <div class="card">
+        <h2>textContent — 纯文本</h2>
+        <div class="code">// 获取所有文本内容（忽略 HTML 标签）
+const text = element.textContent;
+
+// 设置纯文本（自动转义 HTML）
+element.textContent = '这是 &lt;b&gt;文本&lt;/b&gt;';
+// 页面显示：这是 &lt;b&gt;文本&lt;/b&gt;（标签被转义）
+
+// 比 innerText 更高效（不触发重排）
+// 包含隐藏元素的文本（display:none 的元素也能获取）
+
+// ⚠️ 会替换所有子元素
+element.textContent = '新内容';  // 删掉所有子元素，替换为文本节点</div>
+    </div>
+    <div class="card">
+        <h2>innerText — 可见文本</h2>
+        <div class="code">// 获取"可见"文本内容
+const visibleText = element.innerText;
+
+// 与 textContent 的区别：
+// 1. innerText 尊重 CSS（不返回隐藏元素的文本）
+// 2. innerText 会触发重排（因为要计算样式）
+// 3. innerText 会格式化换行（像用户看到的那样）
+
+// textContent vs innerText：
+// textContent：所有文本，包括隐藏元素，更高效
+// innerText：只返回可见文本，会格式化输出
+
+// 建议：优先用 textContent（除非需要可见文本）</div>
+    </div>
+    <div class="card">
+        <h2>insertAdjacentHTML — 高效插入</h2>
+        <div class="code">// 在指定位置插入 HTML（比 innerHTML += 更高效）
+// 不破坏已有元素的事件监听
+
+element.insertAdjacentHTML('beforebegin', '&lt;p&gt;在前面&lt;/p&gt;');
+element.insertAdjacentHTML('afterbegin', '&lt;p&gt;内部开头&lt;/p&gt;');
+element.insertAdjacentHTML('beforeend', '&lt;p&gt;内部结尾&lt;/p&gt;');
+element.insertAdjacentHTML('afterend', '&lt;p&gt;在后面&lt;/p&gt;');
+
+// 位置说明：
+// beforebegin  → &lt;div&gt;（元素自身之前）
+// afterbegin   → 内容（元素内部第一个子元素之前）
+// beforeend    → 内容（元素内部最后一个子元素之后）
+// afterend     → &lt;/div&gt;（元素自身之后）
+
+// 对应的 text 版本
+element.insertAdjacentText('beforeend', '纯文本');</div>
+    </div>
+    <div class="card">
+        <h2>outerHTML — 包含自身</h2>
+        <div class="code">// innerHTML 是元素内部的内容
+// outerHTML 包含元素自身
+
+const div = document.querySelector('.demo-area');
+console.log(div.innerHTML);  // 内部 HTML
+console.log(div.outerHTML);  // 包括 &lt;div&gt;...&lt;/div&gt;
+
+// 设置 outerHTML 会替换整个元素
+div.outerHTML = '&lt;section&gt;替换了原 div&lt;/section&gt;';
+// ⚠️ 原 div 的引用不再在 DOM 中（变量仍指向原元素）</div>
+    </div>
+    <div class="demo-area" id="content-demo">
+        <strong>原始</strong>内容 <em>在这里</em>
+    </div>
+    <div style="display:flex;gap:10px;margin:10px 0;flex-wrap:wrap;">
+        <button onclick="demoInnerHTML()">innerHTML</button>
+        <button onclick="demoTextContent()">textContent</button>
+        <button onclick="demoInsertAdjacent()">insertAdjacentHTML</button>
+        <button onclick="demoReset()">重置</button>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const demo = document.getElementById('content-demo');
+        const output = document.getElementById('output');
+
+        function updateOutput(msg) {
+            const p = document.createElement('div');
+            p.textContent = msg;
+            output.appendChild(p);
+        }
+
+        function demoInnerHTML() {
+            demo.innerHTML = '<span style="color:#e74c3c">被 innerHTML <b>替换</b>了</span>';
+            updateOutput('innerHTML 设置后，HTML 被解析渲染');
+        }
+
+        function demoTextContent() {
+            demo.textContent = '这是 textContent 设置的文本，<b>标签被转义</b>';
+            updateOutput('textContent 设置后，标签被转义为纯文本');
+        }
+
+        function demoInsertAdjacent() {
+            demo.textContent = '原始内容';
+            demo.insertAdjacentHTML('beforeend', ' — <strong style="color:#2ecc71">追加的 HTML</strong>');
+            updateOutput('insertAdjacentHTML 追加内容，不破坏原内容');
+        }
+
+        function demoReset() {
+            demo.innerHTML = '<strong>原始</strong>内容 <em>在这里</em>';
+            updateOutput('已重置');
+        }
+
+        console.log('=== innerHTML ===');
+        console.log('innerHTML:', demo.innerHTML);
+        console.log('outerHTML:', demo.outerHTML.substring(0, 50) + '...');
+
+        console.log('=== textContent ===');
+        console.log('textContent:', demo.textContent);
+
+        console.log('=== innerText ===');
+        console.log('innerText:', demo.innerText);
+
+        // 演示 textContent vs innerText 对隐藏元素的处理
+        const hiddenSpan = document.createElement('span');
+        hiddenSpan.style.display = 'none';
+        hiddenSpan.textContent = '隐藏文本';
+        demo.appendChild(hiddenSpan);
+        console.log('textContent 包含隐藏:', demo.textContent.includes('隐藏'));
+        console.log('innerText 不包含隐藏:', demo.innerText.includes('隐藏'));
+
+        document.getElementById('output').textContent =
+            `innerHTML: ${demo.innerHTML.substring(0, 50)}\n` +
+            `textContent: ${demo.textContent}\n` +
+            `✅ DOM 内容操作演示完成！`;
+    </script>
+</body>
+</html>

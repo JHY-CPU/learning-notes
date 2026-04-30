@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后台任务与nohup</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⏳ 后台任务与 nohup</h2><p>前台/后台任务切换、&、jobs/bg/fg、nohup、disown、screen/tmux。</p></div>
+    <div class="card">
+        <h2>前台与后台</h2>
+        <div class="code">// ========== 前台 vs 后台 ==========
+// 前台进程: 占用终端,等待完成
+// 后台进程: 在终端启动但不占用终端
+// 后台进程仍然绑定终端
+
+// ========== & — 后台运行 ==========
+// 在命令末尾加 & 使其在后台运行
+sleep 30 &           # 后台运行 sleep
+node server.js &     # 后台运行 Node 服务
+
+// 后台启动时打印:
+// [1] 12345
+// [1] = 作业号
+// 12345 = PID
+
+// ========== Ctrl+Z — 暂停前台 ==========
+// 前台运行命令时,按 Ctrl+Z 暂停
+// 会打印: [1]+  Stopped  command
+
+// 然后可以用 bg 在后台继续运行
+bg                   # 在后台继续运行暂停的任务
+
+// ========== jobs — 查看任务 ==========
+jobs                 # 列出所有作业
+jobs -l              # 显示 PID
+jobs -p              # 只显示 PID
+jobs -r              # 只显示运行中
+jobs -s              # 只显示已停止
+
+// 输出:
+// [1]-  Running                 node app.js &
+// [2]+  Stopped                 vim file.txt
+// [3]   Running                 tail -f log &
+
+// + 表示当前默认作业, - 表示上一个默认作业
+
+// ========== fg / bg ==========
+// fg — 将后台作业带到前台
+// bg — 让暂停的作业在后台继续
+
+fg                   # 将最近的后台作业带到前台
+fg %1                # 将作业 1 带到前台
+bg %1                # 在后台继续作业 1
+
+// 引用作业的方式:
+// %n          作业号
+// %string     命令开头匹配
+// %?string    命令任意位置匹配
+// %%          当前作业 (同 %+)
+// %-          上一个作业</div>
+    </div>
+    <div class="card">
+        <h2>nohup — 脱离终端</h2>
+        <div class="code">// ========== nohup 概念 ==========
+// nohup = no hang up (不挂断)
+// 即使终端关闭,进程继续运行
+// 自动将 stdout/stderr 重定向到 nohup.out
+
+// ========== 基本用法 ==========
+nohup long_running_task &
+nohup node server.js &
+nohup python main.py > output.log 2>&1 &
+
+// ========== nohup 细节 ==========
+// 1. nohup 会忽略 SIGHUP 信号
+// 2. 自动重定向输出到 nohup.out (如果未指定)
+// 3. 进程 PPID 变为 1 (init/systemd)
+// 4. 仍然要用 & 放到后台
+
+// ========== nohup + 日志 ==========
+nohup node app.js > /var/log/app.log 2>&1 &
+echo $! > /var/run/app.pid   # 保存 PID
+
+// 查看 nohup 输出:
+tail -f nohup.out
+cat nohup.out
+
+// ========== 标准输出重定向模式 ==========
+// nohup 命令 &                 → 输出到 nohup.out
+// nohup 命令 > file &         → 输出到 file
+// nohup 命令 >> file 2>&1 &   → 追加到 file
+// nohup 命令 > /dev/null 2>&1 & → 丢弃所有输出
+
+// ========== 验证进程是否存活 ==========
+// 方法 1:
+kill -0 $PID 2>/dev/null && echo "存活" || echo "已死"
+
+// 方法 2:
+ps -p $PID > /dev/null && echo "存活" || echo "已死"
+
+// 方法 3 (进程名匹配):
+pgrep -f "node app.js" > /dev/null && echo "运行中"
+
+// ========== setsid 替代 ==========
+// setsid 也可以让进程脱离终端
+setsid long_running_task &
+// 区别: nohup 只忽略 SIGHUP,setsid 创建新会话</div>
+            <div class="note">💡 nohup + & 是后端部署中最常用的组合。但现代 Linux 服务推荐用 systemd service 管理进程,它提供了更完善的自动重启、日志、依赖管理功能。nohup 适合临时的、简单的场景。</div>
+    </div>
+    <div class="card">
+        <h2>disown — 从 Shell 分离</h2>
+        <div class="code">// ========== disown ==========
+// 从当前 Shell 的作业表中移除作业
+// 即使 Shell 退出,进程继续运行
+
+// 场景: 忘记用 nohup 启动了,现在想把进程从 Shell 分离
+
+// 步骤:
+// 1. Ctrl+Z 暂停前台进程
+// 2. bg    让它在后台继续
+// 3. disown 从 Shell 分离
+
+// 直接分离后台作业:
+disown                # 分离最近的后台作业
+disown %1             # 分离作业 1
+disown -a             # 分离所有作业
+disown -r             # 分离所有运行中的作业
+
+// ========== disown vs nohup ==========
+// nohup: 启动时预防
+// disown: 启动后补救
+
+// 示例:
+$ long_task           # 前台运行,忘了加 &
+^Z                    # Ctrl+Z 暂停
+[1]+  Stopped         long_task
+$ bg %1              # 后台继续
+$ disown %1          # 从 Shell 分离
+$ exit                # Shell 退出,进程仍在
+
+// ========== 配合 & 使用 ==========
+$ node server.js &
+[1] 12345
+$ disown
+# 现在关闭终端,服务继续运行</div>
+    </div>
+    <div class="card">
+        <h2>screen / tmux — 终端复用器</h2>
+        <div class="code">// ========== screen ==========
+// 创建虚拟终端,进程在其中运行,随时断开/重连
+
+// 安装:
+apt install screen
+yum install screen
+
+// 基本用法:
+screen -S mysession   # 创建新会话
+# 在 screen 中正常跑命令
+# 按 Ctrl+A, 然后按 d 分离 (detach)
+
+screen -ls            # 列出所有会话
+screen -r mysession   # 重新连接 (reattach)
+screen -r 12345       # 按会话 ID 连接
+screen -d -r mysession # 踢掉其他人,自己连接
+
+// screen 快捷键 (Ctrl+A 前缀):
+// Ctrl+A d    分离
+// Ctrl+A c    创建新窗口
+// Ctrl+A n/p  下一个/上一个窗口
+// Ctrl+A "    窗口列表
+// Ctrl+A k    杀死当前窗口
+// Ctrl+A ?    帮助
+
+// ========== tmux (推荐) ==========
+// tmux = Terminal Multiplexer,比 screen 更强
+
+// 安装:
+apt install tmux
+yum install tmux
+
+// 基本用法:
+tmux new -s mysession  # 创建新会话
+tmux ls                # 列出会话
+tmux attach -t mysession # 连接
+tmux kill-session -t mysession # 删除会话
+
+// tmux 快捷键 (Ctrl+B 前缀):
+// Ctrl+B d    分离
+// Ctrl+B c    创建新窗口
+// Ctrl+B n/p  下一个/上一个窗口
+// Ctrl+B ,    重命名窗口
+// Ctrl+B %    垂直分割面板
+// Ctrl+B "    水平分割面板
+// Ctrl+B 方向键 切换面板
+// Ctrl+B [    进入滚动模式 (PgUp/PgDn)
+// Ctrl+B s    选择会话
+
+// ========== 实战: tmux 开发环境 ==========
+tmux new -s dev
+
+// 创建窗口布局:
+// Ctrl+B c → 创建窗口"editor" (vim)
+// Ctrl+B c → 创建窗口"server" (npm run dev)
+// Ctrl+B c → 创建窗口"logs" (tail -f)
+// Ctrl+B c → 创建窗口"git" (git status)
+
+// 每个窗口可以独立运行不同任务</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoBg()">后台任务演示</button>
+        <button onclick="demoNohup()">nohup 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoBg() {
+            result.innerHTML = '';
+            log('# Bash 后台任务演示');
+            log('');
+            log('$ sleep 100 &          # 后台运行 sleep');
+            log('  [1] 12345');
+            log('$ jobs                 # 查看后台任务');
+            log('  [1]+  Running        sleep 100');
+            log('$ fg %1               # 带到前台');
+            log('  sleep 100');
+            log('  ^Z                   # Ctrl+Z 暂停');
+            log('$ bg %1               # 后台继续');
+            log('$ disown %1           # 从 Shell 分离');
+            log('$ exit                # 退出,进程仍在');
+            log('');
+            log('jobs 状态符号:');
+            log('  Running   运行中');
+            log('  Stopped   已暂停');
+            log('  Done      已完成');
+            log('  Terminated 被终止');
+        }
+
+        function demoNohup() {
+            result.innerHTML = '';
+            log('# nohup 后台运行演示');
+            log('');
+            log('$ nohup node server.js > app.log 2>&1 &');
+            log('  [1] 12345');
+            log('  nohup: 忽略输入并将输出追加到"app.log"');
+            log('');
+            log('$ tail -f app.log');
+            log('  Server running on port 3000');
+            log('  [INFO] 请求 /api/users');
+            log('  [INFO] 数据库查询完成');
+            log('');
+            log('$ ps aux | grep node');
+            log('  alice  12345  0.5  2.0  ...  node server.js');
+            log('');
+            log('# 保存 PID 以便管理:');
+            log('$ echo $! > app.pid');
+            log('$ kill $(cat app.pid)  # 停止服务');
+        }
+    </script>
+</body>
+</html>

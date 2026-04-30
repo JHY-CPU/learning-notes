@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XSS跨站脚本</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        .vuln-demo { background: #fdf0ef; border: 1px solid #e74c3c; border-radius: 4px; padding: 10px; margin: 10px 0; font-size: 13px; }
+        .safe-demo { background: #eafaf1; border: 1px solid #2ecc71; border-radius: 4px; padding: 10px; margin: 10px 0; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>XSS 跨站脚本</h2><p>反射型/存储型/DOM 型 XSS、转义策略、CSP 防御、XSS 检测。</p></div>
+    <div class="card">
+        <h2>XSS API</h2>
+        <div class="code">// ========== 反射型 XSS ==========
+// URL 参数直接注入到页面
+// https://site.com/search?q=<script>alert(1)</script>
+
+// ========== 存储型 XSS ==========
+// 恶意代码存入数据库，其他用户访问时执行
+// 评论/留言/用户资料等
+
+// ========== DOM 型 XSS ==========
+// 客户端 JS 将用户输入插入 DOM
+element.innerHTML = userInput;  // ❌
+
+// ========== 防御 ==========
+// 1. 输出转义 (HTML Entity)
+function escapeHTML(str) {
+    return str.replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;')
+              .replace(/"/g, '&quot;')
+              .replace(/'/g, '&#039;');
+}
+// 2. 使用 textContent 代替 innerHTML
+// 3. CSP 策略
+// 4. 输入验证</div>
+    </div>
+    <div class="card">
+        <h2>演示：XSS</h2>
+        <button onclick="demoReflected()">反射型 XSS</button>
+        <button onclick="demoStored()">存储型 XSS</button>
+        <button onclick="demoDOM()">DOM 型 XSS</button>
+        <button onclick="demoDefense()">防御方案</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoReflected() {
+            result.innerHTML = '';
+            log('🪞 反射型 XSS:');
+            log('');
+
+            log('1️⃣ 原理:');
+            log('   恶意代码通过 URL 参数传入');
+            log('   服务器未过滤直接渲染到页面');
+            log('   攻击者发送恶意链接给受害者');
+            log('');
+
+            log('2️⃣ 示例:');
+            log('   https://site.com/search?q=<script>alert("XSS")</script>');
+            log('');
+            log('   服务器返回:');
+            log('   <div>搜索结果: <script>alert("XSS")</script></div>');
+            log('');
+
+            log('3️⃣ 攻击流程:');
+            log('   ① 攻击者构造恶意链接');
+            log('   ② 通过邮件/短信发送给用户');
+            log('   ③ 用户点击后脚本在浏览器执行');
+            log('   ④ 窃取 Cookie/Token/个人信息');
+            log('');
+
+            log('4️⃣ 常见传播方式:');
+            log('   • 邮件中的链接');
+            log('   • 社交媒体帖子');
+            log('   • 短链接服务 (隐藏真实 URL)');
+            log('   • QR 码');
+            log('');
+
+            log('5️⃣ 检测方法:');
+            log('   // 测试 payload');
+            log('   <script>alert(1)</script>');
+            log('   "><script>alert(1)</script>');
+            log('   <img src=x onerror=alert(1)>');
+            log('   <svg onload=alert(1)>');
+        }
+
+        function demoStored() {
+            result.innerHTML = '';
+            log('💾 存储型 XSS:');
+            log('');
+
+            log('1️⃣ 原理:');
+            log('   恶意代码提交到服务器 (存入数据库)');
+            log('   其他用户访问页面时触发');
+            log('   危害更大 (影响所有用户)');
+            log('');
+
+            log('2️⃣ 常见攻击点:');
+            log('   • 评论/留言板');
+            log('   • 用户昵称/签名');
+            log('   • 富文本内容');
+            log('   • 文件上传 (SVG/HTML)');
+            log('');
+
+            log('3️⃣ 攻击示例 (评论):');
+            log('   用户提交评论:');
+            log('   <textarea>');
+            log('   不错的文章! <script>fetch("/api/steal", {');
+            log('     method: "POST",');
+            log('     body: document.cookie');
+            log('   })</script>');
+            log('   </textarea>');
+            log('');
+
+            log('4️⃣ 蠕虫传播:');
+            log('   // XSS 蠕虫 (Samy 蠕虫 2005)');
+            log('   脚本自动发布新评论/动态');
+            log('   每个访问者都成为传播者');
+            log('   指数级扩散');
+            log('');
+
+            log('5️⃣ 存储型 XSS 检测:');
+            log('   提交包含特殊字符的内容:');
+            log('   < > " \' & <script> <img <svg');
+            log('   查看输出是否被转义');
+        }
+
+        function demoDOM() {
+            result.innerHTML = '';
+            log('🌳 DOM 型 XSS:');
+            log('');
+
+            log('1️⃣ 原理:');
+            log('   客户端 JS 不安全地处理用户输入');
+            log('   不使用 innerHTML/textContent 等危险方法');
+            log('   数据源: URL/location.hash/document.referrer');
+            log('');
+
+            log('2️⃣ 危险 API:');
+            log('   element.innerHTML = data;          // ❌');
+            log('   element.outerHTML = data;          // ❌');
+            log('   document.write(data);              // ❌');
+            log('   element.insertAdjacentHTML(html);  // ❌');
+            log('   eval(data);                        // ❌');
+            log('   setTimeout("alert(" + data + ")"); // ❌');
+            log('   new Function(data);                // ❌');
+            log('');
+
+            log('3️⃣ 经典示例:');
+            log('   // URL 中获取参数并直接插入');
+            log('   const name = new URL(location).searchParams.get("name");');
+            log('   document.getElementById("welcome").innerHTML =');
+            log('     "欢迎, " + name;  // ❌ XSS');
+            log('');
+
+            log('4️⃣ DOM XSS 数据源:');
+            log('   • document.URL');
+            log('   • location.hash / location.search');
+            log('   • document.cookie');
+            log('   • document.referrer');
+            log('   • window.name');
+            log('   • postMessage 数据');
+            log('   • localStorage / sessionStorage');
+            log('');
+
+            log('5️⃣ jQuery 中的 XSS:');
+            log('   $("div").html(userInput);      // ❌');
+            log('   $("div").append(userInput);    // ❌');
+            log('   $("<div>" + userInput + "</div>"); // ❌');
+            log('   $("div").text(userInput);      // ✅ 安全');
+        }
+
+        function demoDefense() {
+            result.innerHTML = '';
+            log('🛡️ XSS 防御:');
+            log('');
+
+            log('1️⃣ 输出转义 (HTML Entity):');
+            log('   function escapeHTML(str) {');
+            log('     return str');
+            log('       .replace(/&/g, "&amp;")');
+            log('       .replace(/</g, "&lt;")');
+            log('       .replace(/>/g, "&gt;")');
+            log('       .replace(/"/g, "&quot;")');
+            log('       .replace(/\'/g, "&#x27;");');
+            log('   }');
+            log('');
+
+            log('2️⃣ 转义前后对比:');
+            const malicious = '<script>alert("XSS")</script>';
+            const escaped = '&lt;script&gt;alert(&quot;XSS&quot;)&lt;/script&gt;';
+            log(`   原始: ${malicious}`);
+            log(`   转义: ${escaped}`);
+            log('');
+
+            log('3️⃣ 使用安全的 API:');
+            log('   ✅ element.textContent = data;');
+            log('   ✅ element.setAttribute("title", data);');
+            log('   ✅ document.createTextNode(data);');
+            log('   ✅ element.classList.add(data);');
+            log('   ❌ element.innerHTML = data;');
+            log('');
+
+            log('4️⃣ Content Security Policy (CSP):');
+            log('   <!-- HTTP 头或 meta 标签 -->');
+            log('   Content-Security-Policy: default-src \'self\';');
+            log('   script-src \'self\' https://trusted.cdn.com;');
+            log('   style-src \'self\' \'unsafe-inline\';');
+            log('   img-src \'self\' data:;');
+            log('');
+
+            log('5️⃣ 输入验证:');
+            log('   // 白名单验证');
+            log('   if (!/^[\\w\\u4e00-\\u9fa5]{1,20}$/.test(username)) {');
+            log('     reject("用户名包含非法字符");');
+            log('   }');
+            log('');
+
+            log('6️⃣ 其他防御措施:');
+            log('   • HttpOnly Cookie (防止 JS 读取)');
+            log('   • X-XSS-Protection: 1; mode=block');
+            log('   • 使用模板引擎 (自动转义)');
+            log('   • 富文本过滤 (DOMPurify 库)');
+            log('');
+
+            log('7️⃣ XSS 检测工具:');
+            log('   • OWASP ZAP (自动化扫描)');
+            log('   • Burp Suite (专业渗透)');
+            log('   • ESLint eslint-plugin-xss');
+            log('   • DOMPurify (HTML 净化库)');
+        }
+
+        console.log('=== XSS 跨站脚本 ===');
+        document.getElementById('output').textContent =
+            `XSS 跨站脚本: 反射型 / 存储型 / DOM型 / 输出转义 / CSP / 防御策略\n` +
+            `✅ XSS 演示完成！`;
+    </script>
+</body>
+</html>

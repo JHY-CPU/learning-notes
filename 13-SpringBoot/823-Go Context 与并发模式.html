@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go Context 与并发模式</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔗 Go Context 与并发模式</h2><p>context 包 (WithCancel/WithTimeout/WithDeadline/WithValue)、pipeline 模式、fan-in/fan-out、worker pool、并发编排、errgroup。</p></div>
+    <div class="card">
+        <h2>Context 基础</h2>
+        <div class="code">// ========== context ==========
+// 跨 API 边界传递: 取消信号/超时/请求级数据
+// 第一个参数通常为 ctx context.Context
+
+package main
+
+import (
+    "context"
+    "fmt"
+    "time"
+)
+
+// ========== context.Background & TODO ==========
+func main() {
+    ctx := context.Background()     // 根 context (最顶层)
+    // ctx := context.TODO()        // 不确定用哪个时
+
+    doSomething(ctx)
+}
+
+// ========== WithCancel ==========
+// 手动取消 goroutine
+
+func withCancel() {
+    ctx, cancel := context.WithCancel(context.Background())
+    defer cancel()                  // 防止资源泄漏
+
+    go func() {
+        for {
+            select {
+            case <-ctx.Done():
+                fmt.Println("goroutine 已取消")
+                return
+            default:
+                fmt.Println("工作中...")
+                time.Sleep(500 * time.Millisecond)
+            }
+        }
+    }()
+
+    time.Sleep(2 * time.Second)
+    cancel()                        // 通知 goroutine 取消
+    time.Sleep(200 * time.Millisecond)
+}
+
+// ========== WithTimeout ==========
+// 自动超时取消
+
+func withTimeout() {
+    ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+    defer cancel()
+
+    result := make(chan string, 1)
+    go func() {
+        // 模拟慢操作
+        time.Sleep(5 * time.Second)
+        result <- "完成"
+    }()
+
+    select {
+    case res := <-result:
+        fmt.Println(res)
+    case <-ctx.Done():
+        fmt.Println("超时:", ctx.Err())  // context deadline exceeded
+    }
+}
+
+// ========== WithDeadline ==========
+// 指定截止时间
+
+func withDeadline() {
+    deadline := time.Now().Add(2 * time.Second)
+    ctx, cancel := context.WithDeadline(context.Background(), deadline)
+    defer cancel()
+
+    <-ctx.Done()
+    fmt.Println(ctx.Err())  // context deadline exceeded
+}
+
+// ========== WithValue ==========
+// 传递请求级数据 (用户ID/TraceID)
+
+type contextKey string
+
+const (
+    UserIDKey contextKey = "userID"
+    TraceIDKey           = "traceID"
+)
+
+func withValue() {
+    ctx := context.WithValue(context.Background(), UserIDKey, "12345")
+    ctx = context.WithValue(ctx, TraceIDKey, "abc-def")
+
+    processRequest(ctx)
+}
+
+func processRequest(ctx context.Context) {
+    userID := ctx.Value(UserIDKey).(string)
+    traceID := ctx.Value(TraceIDKey).(string)
+    fmt.Printf("处理请求: 用户=%s, trace=%s\n", userID, traceID)
+}
+
+// ========== context 规则 ==========
+// 1. context 作为函数第一个参数
+// 2. 不把 context 存 struct (除非标准库)
+// 3. 及时取消: defer cancel()
+// 4. 用 WithValue 传递少量请求数据
+// 5. 不要传递可选参数</div>
+    </div>
+    <div class="card">
+        <h2>并发模式</h2>
+        <div class="code">// ========== 并发模式 ==========
+// Go 提倡: "Don't communicate by sharing memory; share memory by communicating."
+
+// ========== 1. Pipeline (流水线) ==========
+// 每个 stage 通过 channel 连接
+
+func pipeline() {
+    // Stage 1: 生成数字
+    gen := func(nums ...int) <-chan int {
+        out := make(chan int)
+        go func() {
+            for _, n := range nums {
+                out <- n
+            }
+            close(out)
+        }()
+        return out
+    }
+
+    // Stage 2: 平方
+    sq := func(in <-chan int) <-chan int {
+        out := make(chan int)
+        go func() {
+            for n := range in {
+                out <- n * n
+            }
+            close(out)
+        }()
+        return out
+    }
+
+    // 使用 pipeline
+    numbers := gen(1, 2, 3, 4)
+    squares := sq(numbers)
+
+    for result := range squares {
+        fmt.Println(result)  // 1, 4, 9, 16
+    }
+}
+
+// ========== 2. Fan-Out / Fan-In ==========
+// Fan-Out: 多个 goroutine 读同一个 channel
+// Fan-In:  合并多个 channel 到一个
+
+// Fan-Out: 多个 Worker 处理任务
+func fanOut() {
+    jobs := make(chan int, 10)
+    var wg sync.WaitGroup
+
+    // 启动 3 个 worker (fan-out)
+    for w := 1; w <= 3; w++ {
+        wg.Add(1)
+        go func(id int) {
+            defer wg.Done()
+            for job := range jobs {
+                fmt.Printf("Worker %d 处理: %d\n", id, job)
+            }
+        }(w)
+    }
+
+    // 发送任务
+    for j := 1; j <= 9; j++ {
+        jobs <- j
+    }
+    close(jobs)
+    wg.Wait()
+}
+
+// Fan-In: 合并多个 channel
+func fanIn(chs ...<-chan int) <-chan int {
+    out := make(chan int)
+    var wg sync.WaitGroup
+
+    output := func(c <-chan int) {
+        defer wg.Done()
+        for v := range c {
+            out <- v
+        }
+    }
+
+    wg.Add(len(chs))
+    for _, c := range chs {
+        go output(c)
+    }
+
+    go func() {
+        wg.Wait()
+        close(out)
+    }()
+
+    return out
+}
+
+// ========== 3. Worker Pool ==========
+type Job struct {
+    ID   int
+    Data string
+}
+
+type Result struct {
+    JobID int
+    Output string
+}
+
+func workerPool() {
+    numWorkers := 5
+    jobs := make(chan Job, 100)
+    results := make(chan Result, 100)
+
+    // 启动 workers
+    for w := 1; w <= numWorkers; w++ {
+        go func(id int) {
+            for job := range jobs {
+                // 处理任务
+                result := Result{
+                    JobID:  job.ID,
+                    Output: fmt.Sprintf("Worker %d 处理: %s", id, job.Data),
+                }
+                results <- result
+            }
+        }(w)
+    }
+
+    // 发送任务
+    for i := 1; i <= 10; i++ {
+        jobs <- Job{ID: i, Data: fmt.Sprintf("任务-%d", i)}
+    }
+    close(jobs)
+
+    // 收集结果
+    for r := 0; r < 10; r++ {
+        result := <-results
+        fmt.Println(result.Output)
+    }
+}
+
+// ========== 4. 超时 + 重试 ==========
+func fetchWithRetry(ctx context.Context, url string, maxRetries int) (*http.Response, error) {
+    for i := 0; i < maxRetries; i++ {
+        req, _ := http.NewRequestWithContext(ctx, "GET", url, nil)
+        resp, err := http.DefaultClient.Do(req)
+        if err == nil {
+            return resp, nil
+        }
+
+        // 检查是否超时/取消 (不再重试)
+        if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+            return nil, err
+        }
+
+        // 指数退避
+        select {
+        case <-ctx.Done():
+            return nil, ctx.Err()
+        case <-time.After(time.Duration(1<<i) * time.Second):
+        }
+    }
+    return nil, fmt.Errorf("重试 %d 次后失败", maxRetries)
+}</div>
+    </div>
+    <div class="card">
+        <h2>errgroup 并发编排</h2>
+        <div class="code">// ========== errgroup ==========
+// goroutine 并发编排 + 错误传播
+// 标准库: golang.org/x/sync/errgroup
+
+import "golang.org/x/sync/errgroup"
+
+func main() {
+    g, ctx := errgroup.WithContext(context.Background())
+
+    // 并发执行多个任务
+    for i := 0; i < 3; i++ {
+        id := i
+        g.Go(func() error {
+            // 模拟工作, 检查 ctx 是否已取消
+            select {
+            case <-ctx.Done():
+                return ctx.Err()
+            case <-time.After(time.Second):
+                if id == 1 {
+                    return fmt.Errorf("任务 %d 失败", id)
+                }
+                fmt.Printf("任务 %d 完成\n", id)
+                return nil
+            }
+        })
+    }
+
+    // 等待所有完成, 返回第一个错误
+    if err := g.Wait(); err != nil {
+        fmt.Printf("出错: %v\n", err)  // 任务 1 失败
+    }
+}
+
+// ========== errgroup 限制并发 ==========
+func limitedConcurrency() {
+    g, ctx := errgroup.WithContext(context.Background())
+    g.SetLimit(5)  // 最多 5 个并发
+
+    for _, item := range items {
+        item := item  // 复制
+        g.Go(func() error {
+            select {
+            case <-ctx.Done():
+                return ctx.Err()
+            default:
+                return processItem(ctx, item)
+            }
+        })
+    }
+
+    if err := g.Wait(); err != nil {
+        log.Printf("处理出错: %v", err)
+    }
+}
+
+// ========== 并发模式: 完整 HTTP 请求 ==========
+func fetchConcurrent(ctx context.Context, urls []string) map[string]string {
+    results := make(map[string]string)
+    var mu sync.Mutex
+    var wg sync.WaitGroup
+
+    for _, url := range urls {
+        wg.Add(1)
+        go func(u string) {
+            defer wg.Done()
+
+            req, _ := http.NewRequestWithContext(ctx, "GET", u, nil)
+            resp, err := http.DefaultClient.Do(req)
+            if err != nil {
+                return
+            }
+            defer resp.Body.Close()
+
+            body, _ := io.ReadAll(resp.Body)
+
+            mu.Lock()
+            results[u] = string(body[:100])
+            mu.Unlock()
+        }(url)
+    }
+
+    wg.Wait()
+    return results
+}
+
+// ========== context 值传递: Trace 追踪 ==========
+type TraceContext struct {
+    TraceID string
+    SpanID  string
+}
+
+func WithTrace(ctx context.Context, trace TraceContext) context.Context {
+    return context.WithValue(ctx, traceKey{}, trace)
+}
+
+func FromContext(ctx context.Context) (TraceContext, bool) {
+    v, ok := ctx.Value(traceKey{}).(TraceContext)
+    return v, ok
+}
+
+// HTTP 中间件自动传递 trace
+func TraceMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        traceID := r.Header.Get("X-Trace-ID")
+        if traceID == "" {
+            traceID = uuid.New().String()
+        }
+        trace := TraceContext{TraceID: traceID, SpanID: uuid.New().String()}
+        ctx := WithTrace(r.Context(), trace)
+        next.ServeHTTP(w, r.WithContext(ctx))
+    })
+}</div>
+        <div class="note">💡 Context 与并发模式: context.Background 根节点; WithCancel 手动取消; WithTimeout 超时控制; WithValue 传递 traceID/userID; pipeline 流水线; fan-in/fan-out 拆分合并; worker pool 任务池; errgroup 并发编排+错误; 指数退避重试; defer cancel() 防泄漏。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoContext()">Context</button>
+        <button onclick="demoPattern()">并发模式</button>
+        <button onclick="demoErrgroup()">errgroup</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoContext() {
+            result.innerHTML = '';
+            log('# context 包');
+            log('');
+            log('四种 context:');
+            log('  context.Background()   — 根');
+            log('  context.WithCancel()    — 手动取消');
+            log('  context.WithTimeout()   — 超时自动取消');
+            log('  context.WithValue()     — 传值');
+            log('');
+            log('ctx.Done() 返回 channel');
+            log('ctx.Err()  获取取消原因');
+            log('defer cancel() 防止泄漏');
+            log('context 永远作第一个参数');
+        }
+
+        function demoPattern() {
+            result.innerHTML = '';
+            log('# 并发模式');
+            log('');
+            log('Pipeline 流水线:');
+            log(  '  gen → sq → print');
+            log('');
+            log('Fan-Out: 多个 worker 消费');
+            log('Fan-In: 合并多个 channel');
+            log('');
+            log('Worker Pool:');
+            log('  固定数量 worker');
+            log('  处理大量任务');
+            log('  通过 channel 通信');
+        }
+
+        function demoErrgroup() {
+            result.innerHTML = '';
+            log('# errgroup');
+            log('');
+            log('g, ctx := errgroup.WithContext(ctx)');
+            log('g.Go(func() error { ... })');
+            log('err := g.Wait()  // 第一个错误');
+            log('g.SetLimit(5)    // 限制并发');
+            log('');
+            log('特点:');
+            log('  任一任务出错 → cancel ctx');
+            log('  其他 goroutine 收到取消信号');
+            log('  返回第一个非 nil 错误');
+            log('  Wait 等待所有完成');
+        }
+    </script>
+</body>
+</html>

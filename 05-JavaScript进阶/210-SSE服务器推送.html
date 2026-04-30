@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSE服务器推送</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #sse-status { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; }
+        #sse-sim { background: #fef9e7; padding: 15px; border-radius: 8px; margin: 10px 0; }
+        #sse-log { background: #1e1e1e; color: #d4d4d4; padding: 10px; border-radius: 4px; font-size: 12px; max-height: 150px; overflow-y: auto; font-family: monospace; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>SSE 服务器推送</h2><p>Server-Sent Events — 服务器单向推送数据到客户端。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 创建 EventSource（连接到 SSE 端点）
+const source = new EventSource('/api/events');
+
+// 事件
+source.onopen = () => {           // 连接建立
+    console.log('SSE 连接已建立');
+};
+source.onmessage = (e) => {       // 收到消息（未命名事件）
+    console.log(e.data);           // 服务器发送的数据
+    // 服务器格式: "data: 内容\n\n"
+};
+source.onerror = () => {          // 连接错误
+    console.error('SSE 出错');
+};
+
+// 自定义事件（服务器用 event: 指定事件名）
+source.addEventListener('chat', (e) => {
+    console.log('聊天消息:', e.data);
+});
+source.addEventListener('notification', (e) => {
+    console.log('通知:', e.data);
+});
+
+// 关闭连接
+source.close();
+
+// 与 WebSocket 对比：
+// ✅ SSE 更简单（只使用 HTTP）
+// ✅ SSE 自动重连（浏览器内置）
+// ✅ SSE 更适合服务器→客户端的单向推送
+// ❌ SSE 只支持文本（不支持二进制）
+// ❌ SSE 只能服务器→客户端（不能双向）
+// ❌ SSE 连接数限制（浏览器最多 6 个）
+
+// 服务器格式示例 (Node.js):
+// res.writeHead(200, {
+//   'Content-Type': 'text/event-stream',
+//   'Cache-Control': 'no-cache',
+//   'Connection': 'keep-alive',
+// });
+// res.write('data: {"msg":"hello"}\n\n');</div>
+    </div>
+    <div class="card">
+        <h2>演示：模拟 SSE</h2>
+        <p>由于 SSE 需要服务器支持，这里模拟其行为。</p>
+        <button onclick="simulateSSE()">▶ 模拟 SSE 推送</button>
+        <button onclick="stopSimulation()">⏹ 停止</button>
+        <div id="sse-status">就绪</div>
+        <div id="sse-sim">
+            <strong>模拟消息流：</strong>
+            <div id="sse-log">等待开始...</div>
+        </div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const sseStatus = document.getElementById('sse-status');
+        const sseLog = document.getElementById('sse-log');
+        let simTimer = null;
+        let simCount = 0;
+
+        function log(msg, type = 'info') {
+            const div = document.createElement('div');
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            sseLog.appendChild(div);
+            sseLog.scrollTop = sseLog.scrollHeight;
+            if (sseLog.children.length > 20) sseLog.removeChild(sseLog.firstChild);
+            console.log(`[SSE] ${msg}`);
+        }
+
+        // 模拟服务器推送
+        function simulateSSE() {
+            stopSimulation();
+            simCount = 0;
+            sseLog.innerHTML = '';
+            log('🟢 SSE 连接已建立');
+            sseStatus.textContent = '🟢 已连接';
+
+            // 模拟 EventSource
+            class MockEventSource {
+                constructor() {
+                    this._listeners = {};
+                    this.onmessage = null;
+                }
+                addEventListener(name, handler) {
+                    if (!this._listeners[name]) this._listeners[name] = [];
+                    this._listeners[name].push(handler);
+                }
+                dispatch(name, data) {
+                    const event = { data: JSON.stringify(data) };
+                    if (name === 'message' && this.onmessage) this.onmessage(event);
+                    (this._listeners[name] || []).forEach(h => h(event));
+                }
+                close() { log('🔴 连接关闭'); }
+            }
+
+            const source = new MockEventSource();
+
+            // 注册自定义事件
+            source.addEventListener('chat', (e) => log(`💬 chat: ${e.data}`, 'chat'));
+            source.addEventListener('notification', (e) => log(`🔔 notification: ${e.data}`, 'notif'));
+
+            source.onmessage = (e) => log(`📩 message: ${e.data}`);
+
+            // 模拟推送
+            const messages = [
+                { event: 'message', data: { type: 'connected', msg: '欢迎连接' } },
+                { event: 'notification', data: { level: 'info', text: '你有新的消息' } },
+                { event: 'message', data: { type: 'update', version: '2.0' } },
+                { event: 'chat', data: { from: 'Admin', text: '你好！' } },
+                { event: 'message', data: { type: 'heartbeat', ts: Date.now() } },
+                { event: 'notification', data: { level: 'warn', text: '系统即将维护' } },
+            ];
+
+            simTimer = setInterval(() => {
+                if (simCount < messages.length) {
+                    const msg = messages[simCount];
+                    source.dispatch(msg.event, msg.data);
+                    simCount++;
+                } else {
+                    log('✅ 所有消息推送完毕');
+                    source.close();
+                    sseStatus.textContent = '✅ 已完成';
+                    stopSimulation();
+                }
+            }, 1200);
+        }
+
+        function stopSimulation() {
+            if (simTimer) {
+                clearInterval(simTimer);
+                simTimer = null;
+            }
+            sseStatus.textContent = '⏹ 已停止';
+        }
+
+        console.log('=== SSE 服务器推送 ===');
+        console.log('EventSource 支持:', typeof EventSource === 'function');
+        console.log('SSE vs WebSocket: 单向 vs 双向, 文本 vs 文本+二进制');
+
+        document.getElementById('output').textContent =
+            `SSE: 服务器单向推送\n` +
+            `EventSource: onmessage/onopen/onerror/close\n` +
+            `自定义事件: source.addEventListener(name, handler)\n` +
+            `vs WebSocket: SSE 自动重连，但只支持文本\n` +
+            `✅ SSE 演示完成！`;
+    </script>
+</body>
+</html>

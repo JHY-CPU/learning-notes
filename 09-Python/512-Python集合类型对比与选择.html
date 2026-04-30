@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python集合类型对比与选择</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📊 Python 集合类型对比与选择</h2><p>list vs tuple vs dict vs set 全面对比、性能测试、选型指南、实用案例。</p></div>
+    <div class="card">
+        <h2>四大集合类型总览</h2>
+        <div class="code">// ========== 对比总表 ==========
+// 特性         列表 list    元组 tuple   字典 dict     集合 set
+// 可变        ✅ 可变      ❌ 不可变   ✅ 可变       ✅ 可变
+// 有序        ✅ 有序      ✅ 有序     ✅ 有序(3.7+) ❌ 无序
+// 可重复      ✅ 可重复    ✅ 可重复   ❌ 键唯一     ❌ 元素唯一
+// 索引        ✅ 整数索引  ✅ 整数索引  ✅ 键索引     ❌ 不支持
+// 可哈希       ❌ 不可哈希  ✅ 可哈希    ❌ 不可哈希   ❌ 普通set不可哈希
+// 查找速度     O(n)        O(n)        O(1)          O(1)
+// 适用场景     动态序列    固定记录    键值映射      去重/集合运算
+
+// ========== 创建语法 ==========
+list_example = [1, 2, 3]             # 方括号
+tuple_example = (1, 2, 3)            # 圆括号
+dict_example = {"a": 1, "b": 2}      # 花括号 + 冒号
+set_example = {1, 2, 3}              # 花括号 (无冒号)
+frozenset_example = frozenset([1, 2]) # frozenset() 函数
+
+// 注意: {} 是空字典,不是空集合!
+empty_dict = {}
+empty_set = set()
+
+// ========== 类型转换 ==========
+list("hello")              # ["h", "e", "l", "l", "o"]
+tuple([1, 2, 3])           # (1, 2, 3)
+set([1, 2, 2, 3])          # {1, 2, 3}
+dict([("a", 1), ("b", 2)]) # {"a": 1, "b": 2}</div>
+    </div>
+    <div class="card">
+        <h2>性能对比</h2>
+        <div class="code">// ========== 查找速度对比 ==========
+import time
+
+n = 1_000_000
+data_list = list(range(n))
+data_set = set(range(n))
+data_dict = {i: i for i in range(n)}
+data_tuple = tuple(range(n))
+
+// 查找中间元素:
+x = n // 2
+
+// 列表/元组: O(n) — 线性扫描
+// 集合/字典: O(1) — 哈希表
+
+start = time.time()
+x in data_list             # 慢! 线性扫描
+print(f"列表 in: {time.time() - start:.4f}s")
+
+start = time.time()
+x in data_set              # 快! 哈希查找
+print(f"集合 in: {time.time() - start:.6f}s")
+
+// ~1000x 差距! 大量查找时集合/字典远快于列表
+
+// ========== 内存对比 ==========
+// 列表/元组: 每个元素存储值本身,开销小
+// 字典:     存储键/值/哈希,开销较大
+// 集合:     类似字典但只有键,比字典小但比列表大
+
+// 内存从小到大:
+// 元组 < 列表 < 集合 < 字典
+
+// ========== 增删对比 ==========
+// 列表末尾添加: O(1) ✅
+// 列表中间插入: O(n) ❌
+// 集合添加:     O(1) ✅
+// 字典添加:     O(1) ✅</div>
+    </div>
+    <div class="card">
+        <h2>选型指南</h2>
+        <div class="code">// ========== 选型决策树 ==========
+// 需要存储键值对?          → dict
+// 需要元素唯一?            → set
+// 需要固定不变的数据?       → tuple
+// 需要有序、可变序列?       → list
+// 需要作为字典键?           → tuple 或 frozenset
+
+// ========== 什么时候用列表 ==========
+// ✅ 同类型数据集合
+users = ["Alice", "Bob", "Charlie"]
+
+// ✅ 需要频繁增删改
+cart = []
+cart.append("apple")
+cart.append("banana")
+
+// ✅ 需要排序
+scores = [95, 82, 91, 78]
+scores.sort()
+
+// ✅ 需要顺序访问
+for item in items:
+    process(item)
+
+// ❌ 需要快速查找 → 用集合
+// ❌ 需要键值映射 → 用字典
+
+// ========== 什么时候用元组 ==========
+// ✅ 函数多返回值
+def get_user():
+    return "Alice", 25    # 元组
+
+// ✅ 字典键
+location = {(10, 20): "point A"}  # 坐标作为键
+
+// ✅ 不需要修改的数据
+DAYS_OF_WEEK = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+
+// ✅ namedtuple 数据记录
+from collections import namedtuple
+Point = namedtuple("Point", ["x", "y"])
+
+// ❌ 需要增删改 → 用列表</div>
+    </div>
+    <div class="card">
+        <h2>选型指南 (续)</h2>
+        <div class="code">// ========== 什么时候用字典 ==========
+// ✅ 键值映射
+user = {"name": "Alice", "age": 25}
+
+// ✅ 计数/统计 (配合 defaultdict/Counter)
+from collections import Counter
+Counter("hello world")
+
+// ✅ 配置项
+config = {"host": "localhost", "port": 8080}
+
+// ✅ 分组
+from collections import defaultdict
+grouped = defaultdict(list)
+
+// ❌ 需要整数索引 → 用列表
+// ❌ 简单序列     → 用列表
+
+// ========== 什么时候用集合 ==========
+// ✅ 去重
+unique = set(["a", "b", "a", "c"])
+
+// ✅ 快速查找
+valid_ids = set(allowed_ids)
+if user_id in valid_ids:  # O(1)!
+
+// ✅ 集合运算
+common = friends_a & friends_b  # 共同好友
+new = current - previous        # 新增
+
+// ✅ 差异比较
+old = set(old_items)
+new = set(new_items)
+added = new - old
+removed = old - new
+
+// ❌ 需要保持顺序 → 列表 (或用 dict.fromkeys)
+// ❌ 需要索引访问 → 列表
+
+// ========== 常见陷阱 ==========
+// 1. 列表做字典键:
+// {[1, 2]: "value"}  # TypeError!
+
+// 2. 集合包含列表:
+// {[1, 2]}            # TypeError!
+
+// 3. 空花括号是字典:
+x = {}  # 是字典,不是集合
+
+// 4. 单元素元组要加逗号:
+t = (1)   # 整数 1
+t = (1,)  # 元组 (1,)</div>
+        <div class="note">💡 选型要点: (1) 序列用列表,固定用元组; (2) 键值映射用字典; (3) 去重+集合运算用集合; (4) 快速查找用集合或字典; (5) 保持顺序去重用 dict.fromkeys()。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCompare()">类型对比演示</button>
+        <button onclick="demoSelection()">选型演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCompare() {
+            result.innerHTML = '';
+            log('# 集合类型对比演示');
+            log('');
+            log('可变性:');
+            log('  列表 ✅ | 元组 ❌ | 字典 ✅ | 集合 ✅');
+            log('');
+            log('有序性:');
+            log('  列表 ✅ | 元组 ✅ | 字典 ✅ | 集合 ❌');
+            log('');
+            log('查找速度:');
+            log('  列表 O(n) | 元组 O(n) | 字典 O(1) | 集合 O(1)');
+            log('');
+            log('使用场景:');
+            log('  列表: 动态序列、购物车、待办事项');
+            log('  元组: 固定数据、函数返回值、字典键');
+            log('  字典: 键值映射、配置、计数');
+            log('  集合: 去重、快速查找、集合运算');
+        }
+
+        function demoSelection() {
+            result.innerHTML = '';
+            log('# 选型场景演示');
+            log('');
+            log('场景 1: 存储用户列表');
+            log('  → 列表 (有序、可变、同类型)');
+            log('');
+            log('场景 2: 坐标点 (x, y)');
+            log('  → 元组 (固定结构,可哈希)');
+            log('');
+            log('场景 3: 用户信息 name→age');
+            log('  → 字典 (键值映射)');
+            log('');
+            log('场景 4: 检查是否重复');
+            log('  → 集合 (去重,快速查找)');
+            log('');
+            log('场景 5: 函数返回多个值');
+            log('  → 元组 (打包解包)');
+        }
+    </script>
+</body>
+</html>

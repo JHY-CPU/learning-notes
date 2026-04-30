@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ES模块-export</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #export-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>ES 模块 — export</h2><p>named export / default export / 重导出 re-export / export * from。</p></div>
+    <div class="card">
+        <h2>export 语法大全</h2>
+        <div class="code">// ========== named export (命名导出) ==========
+export const PI = 3.14159;
+export function sum(a, b) { return a + b; }
+export class Person {}
+
+// 先声明后导出
+const name = 'Alice';
+const age = 25;
+export { name, age };
+
+// 导出时重命名
+export { name as userName, age as userAge };
+
+// ========== default export (默认导出) ==========
+export default function() { console.log('default'); }
+// 或
+export default class {}
+// 或
+const obj = {};
+export default obj;
+
+// 每个模块只能有一个 default export
+
+// ========== 混合导出 ==========
+export const VERSION = '1.0';
+export default function main() {}
+
+// ========== 重导出 (re-export) ==========
+export { foo, bar } from './utils.js';          // 选择性重导出
+export { foo as myFoo } from './utils.js';       // 重命名后重导出
+export * from './math.js';                       // 全部重导出（不含 default）
+export * as math from './math.js';               // 命名空间重导出 (ES2020)
+export { default } from './other.js';            // 重导出 default
+export { default as myDefault } from './other.js';
+
+// ========== 注意事项 ==========
+// export 必须位于模块顶层，不能在块/函数内
+// export 是静态声明，在解析阶段确定
+// 导出的绑定是实时绑定 (live binding)</div>
+    </div>
+    <div class="card">
+        <h2>演示：模拟 export 模式</h2>
+        <p>⚠️ ES module 需要服务器环境（file:// 不支持 module）。<br>下方模拟 export/import 的行为。</p>
+        <button onclick="demoExports()">模拟 export 演示</button>
+        <div id="export-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const exportResult = document.getElementById('export-result');
+
+        function log(msg) {
+            exportResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // 模拟模块命名空间
+        const mathModule = (() => {
+            // named exports
+            const PI = 3.14159;
+            function sum(a, b) { return a + b; }
+            function multiply(a, b) { return a * b; }
+
+            // default export
+            function defaultFn() { return 'default function'; }
+
+            return {
+                PI,
+                sum,
+                multiply,
+                default: defaultFn,
+            };
+        })();
+
+        const utilsModule = (() => {
+            function formatDate(d) {
+                return d.toLocaleDateString();
+            }
+            function formatNumber(n) {
+                return n.toLocaleString();
+            }
+            const VERSION = '2.0';
+            return { formatDate, formatNumber, VERSION };
+        })();
+
+        // re-export 模拟
+        const combinedModule = (() => {
+            // export * from './math.js'
+            const math = mathModule;
+            // export { formatDate, VERSION } from './utils.js'
+            const { formatDate, VERSION } = utilsModule;
+            return {
+                ...math,
+                formatDate,
+                VERSION,
+                // 额外导出
+                description: 'combined module',
+            };
+        })();
+
+        function demoExports() {
+            exportResult.innerHTML = '';
+
+            log('📦 ES Module export 模拟演示：');
+            log('');
+
+            log('1️⃣ named export (命名导出):');
+            log(`   PI = ${mathModule.PI}`);
+            log(`   sum(1, 2) = ${mathModule.sum(1, 2)}`);
+            log(`   multiply(3, 4) = ${mathModule.multiply(3, 4)}`);
+            log('');
+
+            log('2️⃣ default export (默认导出):');
+            log(`   default() = ${mathModule.default()}`);
+            log('');
+
+            log('3️⃣ re-export (重导出):');
+            log(`   combined.PI = ${combinedModule.PI}`);
+            log(`   combined.formatDate = ${combinedModule.formatDate(new Date())}`);
+            log(`   combined.VERSION = ${combinedModule.VERSION}`);
+            log(`   combined.description = ${combinedModule.description}`);
+            log('');
+
+            log('4️⃣ export 语法要点:');
+            log('   • named export: export const/function/class {}');
+            log('   • default export: export default ...');
+            log('   • 重导出: export { a } from "./module.js"');
+            log('   • 整体重导出: export * from "./module.js"');
+            log('   • 导出是 live binding (实时绑定)');
+        }
+
+        console.log('=== ES 模块 export ===');
+
+        document.getElementById('output').textContent =
+            `ES 模块 export: named / default / re-export / live binding\n` +
+            `export { a, b } / export default / export * from / export { default } from\n` +
+            `✅ ES 模块 export 演示完成！\n` +
+            `⚠️ 本文件为语法说明，ES modules 需在 HTTP 服务器下运行`;
+    </script>
+</body>
+</html>

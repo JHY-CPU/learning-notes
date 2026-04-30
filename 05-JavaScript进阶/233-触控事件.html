@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>触控事件</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        #touch-area { width: 100%; height: 250px; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 18px; touch-action: none; user-select: none; -webkit-user-select: none; position: relative; overflow: hidden; }
+        #touch-info { background: #f8f9fa; padding: 15px; border-radius: 4px; font-size: 13px; margin-top: 10px; }
+        #touch-info .row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #eee; }
+        #touch-info .key { color: #7f8c8d; }
+        #touch-info .val { font-weight: bold; color: #2c3e50; font-family: monospace; }
+        #touch-dot { position: absolute; width: 20px; height: 20px; background: rgba(255,255,255,0.8); border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%); display: none; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>触控事件 Touch Events</h2><p>触摸屏设备的触摸事件：touchstart/touchmove/touchend/touchcancel。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 触摸事件类型
+element.addEventListener('touchstart', handler);   // 手指触摸屏幕
+element.addEventListener('touchmove', handler);    // 手指在屏幕上滑动
+element.addEventListener('touchend', handler);     // 手指离开屏幕
+element.addEventListener('touchcancel', handler);  // 触摸被中断（来电/弹窗）
+
+// TouchEvent 对象
+e.touches;         // 所有触摸点（手指）的列表
+e.targetTouches;   // 在同一目标元素上的触摸点
+e.changedTouches;  // 发生变化的触摸点
+
+// Touch 对象
+touch.identifier;  // 唯一标识符（用于多点触控追踪）
+touch.clientX;     // 触摸点在视口的 X 坐标
+touch.clientY;     // 触摸点在视口的 Y 坐标
+touch.pageX;       // 触摸点在页面的 X 坐标
+touch.pageY;       // 触摸点在页面的 Y 坐标
+touch.screenX;     // 触摸点在屏幕的 X 坐标
+touch.screenY;     // 触摸点在屏幕的 Y 坐标
+touch.force;       // 按压力度（iOS 支持）
+touch.radiusX;     // 触摸区域半径 X
+touch.radiusY;     // 触摸区域半径 Y
+touch.rotationAngle; // 旋转角度
+
+// 处理多点触控（缩放手势）
+element.addEventListener('touchstart', (e) => {
+    if (e.touches.length === 2) {
+        const dist = Math.hypot(
+            e.touches[0].pageX - e.touches[1].pageX,
+            e.touches[0].pageY - e.touches[1].pageY,
+        );
+        // 记录初始距离
+    }
+});
+
+// CSS touch-action
+// touch-action: none;      // 禁用浏览器默认触摸行为
+// touch-action: pan-x;     // 允许水平滚动
+// touch-action: pan-y;     // 允许垂直滚动
+// touch-action: manipulation; // 允许滚动 + 缩放（禁止 dblclick zoom）</div>
+        <div class="note">💡 桌面端可以用 DevTools 的"切换设备模拟"来测试触控事件。<br>
+        ⚠️ 记得设置 touch-action: none 防止浏览器干扰自定义手势。<br>
+        💡 用 identifier 追踪每个触摸点（在 touchend 时 changedTouches 的 identifier 与 touchstart 一致）。</div>
+    </div>
+    <div class="card">
+        <h2>演示：触摸区域</h2>
+        <p>在下方区域触摸（支持多点触控）。<br><small>💡 桌面端可用 DevTools 模拟触摸</small></p>
+        <div id="touch-area">
+            <div id="touch-dot"></div>
+            <span id="touch-prompt">👆 触摸此区域</span>
+        </div>
+        <div id="touch-info">
+            <div class="row"><span class="key">事件类型</span><span class="val" id="t-type">-</span></div>
+            <div class="row"><span class="key">触摸点数</span><span class="val" id="t-count">0</span></div>
+            <div class="row"><span class="key">坐标</span><span class="val" id="t-pos">-</span></div>
+            <div class="row"><span class="key">压力</span><span class="val" id="t-force">-</span></div>
+            <div class="row"><span class="key">手势</span><span class="val" id="t-gesture">-</span></div>
+        </div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const touchArea = document.getElementById('touch-area');
+        const touchDot = document.getElementById('touch-dot');
+        const touchType = document.getElementById('t-type');
+        const touchCount = document.getElementById('t-count');
+        const touchPos = document.getElementById('t-pos');
+        const touchForce = document.getElementById('t-force');
+        const touchGesture = document.getElementById('t-gesture');
+        const touchPrompt = document.getElementById('touch-prompt');
+
+        let startDist = 0;
+        let isPinching = false;
+
+        function handleTouch(e) {
+            e.preventDefault();
+            const type = e.type;
+            touchType.textContent = type;
+            touchCount.textContent = e.touches.length;
+
+            if (e.touches.length > 0) {
+                const t = e.touches[0];
+                touchPos.textContent = `${Math.round(t.clientX)}, ${Math.round(t.clientY)}`;
+                touchForce.textContent = t.force ? t.force.toFixed(3) : 'N/A';
+                touchDot.style.display = 'block';
+                touchDot.style.left = t.clientX - touchArea.getBoundingClientRect().left + 'px';
+                touchDot.style.top = t.clientY - touchArea.getBoundingClientRect().top + 'px';
+
+                if (type === 'touchstart') touchPrompt.textContent = '👆 触摸中...';
+                if (type === 'touchmove') touchPrompt.textContent = '👉 滑动中...';
+            }
+
+            // 双指缩放检测
+            if (e.touches.length === 2) {
+                const dist = Math.hypot(
+                    e.touches[0].pageX - e.touches[1].pageX,
+                    e.touches[0].pageY - e.touches[1].pageY,
+                );
+                if (type === 'touchstart') {
+                    startDist = dist;
+                    isPinching = true;
+                    touchGesture.textContent = '🤏 开始缩放';
+                } else if (type === 'touchmove' && isPinching) {
+                    const scale = (dist / startDist).toFixed(2);
+                    touchGesture.textContent = `📐 缩放比例: ${scale}`;
+                }
+            } else if (e.touches.length === 1 && isPinching) {
+                isPinching = false;
+                touchGesture.textContent = '🆗 缩放结束';
+            }
+
+            console.log(type, `touches:${e.touches.length}`, `pos:(${e.touches[0]?.clientX},${e.touches[0]?.clientY})`);
+        }
+
+        touchArea.addEventListener('touchstart', handleTouch, { passive: false });
+        touchArea.addEventListener('touchmove', handleTouch, { passive: false });
+        touchArea.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            touchType.textContent = 'touchend';
+            touchCount.textContent = e.touches.length;
+            if (e.touches.length === 0) {
+                touchDot.style.display = 'none';
+                touchPrompt.textContent = '👆 触摸此区域';
+                touchGesture.textContent = '-';
+            }
+            console.log('touchend, 剩余触摸点:', e.touches.length);
+        });
+        touchArea.addEventListener('touchcancel', (e) => {
+            touchType.textContent = 'touchcancel';
+            touchPrompt.textContent = '⚠️ 触摸已取消';
+            touchDot.style.display = 'none';
+            console.log('touchcancel');
+        });
+
+        console.log('=== 触控事件 ===');
+        console.log('支持 touch:', 'ontouchstart' in window);
+
+        document.getElementById('output').textContent =
+            `触控事件: touchstart/touchmove/touchend/touchcancel\n` +
+            `TouchList: touches/targetTouches/changedTouches\n` +
+            `Touch: clientX/clientY/pageX/pageY/identifier/force\n` +
+            `✅ 触控事件演示完成！`;
+    </script>
+</body>
+</html>

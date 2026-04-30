@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>22-Floyd-Warshall算法 (Floyd-Warshall)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Floyd-Warshall 算法</h2>
+  <p>多源最短路径算法，使用动态规划思想，O(V^3) 计算所有顶点对之间的最短路径。</p>
+  <div class="code">function floydWarshall(graph) {
+  const V = graph.length;
+  const dist = graph.map(row => [...row]);
+  for (let k = 0; k < V; k++)
+    for (let i = 0; i < V; i++)
+      for (let j = 0; j < V; j++)
+        if (dist[i][j] > dist[i][k] + dist[k][j])
+          dist[i][j] = dist[i][k] + dist[k][j];
+  return dist;
+}</div>
+</div>
+<div class="card">
+  <h2>DP 递推式</h2>
+  <p>dist[k][i][j] = min(dist[k-1][i][j], dist[k-1][i][k] + dist[k-1][k][j])</p>
+</div>
+<div class="card">
+  <h2>交互演示</h2>
+  <button onclick="runFloyd()">运行 Floyd-Warshall</button>
+  <div id="result"></div>
+</div>
+<script>
+function runFloyd() {
+  const INF = Infinity;
+  const g = [
+    [0, 5, INF, 10],
+    [INF, 0, 3, INF],
+    [INF, INF, 0, 1],
+    [INF, INF, INF, 0]
+  ];
+  const dist = g.map(r=>[...r]), V=4;
+  for(let k=0;k<V;k++) for(let i=0;i<V;i++) for(let j=0;j<V;j++)
+    if(dist[i][j] > dist[i][k] + dist[k][j]) dist[i][j] = dist[i][k] + dist[k][j];
+  let s='所有点对最短路径:\n';
+  s += '   A  B  C  D\n';
+  'ABCD'.split('').forEach((c,i) => {
+    s += c + '  ' + dist[i].map(x=>x===INF?'INF':x).join('  ') + '\n';
+  });
+  document.getElementById('result').textContent = s;
+}
+</script>
+</body></html>

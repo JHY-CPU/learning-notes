@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>20-排序算法工程选型 (Sorting in Practice)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; white-space: pre-wrap; }
+</style></head>
+<body>
+<div class="card">
+  <h2>排序算法工程选型 (Sorting in Practice)</h2>
+  <p>在实际工程中，选择合适的排序算法不仅要考虑时间复杂度，还需要考虑数据特征、稳定性、内存限制等多方面因素。</p>
+  <div class="note">
+    <strong>黄金法则：</strong>没有完美的排序算法，只有最适合当前场景的排序算法。
+  </div>
+</div>
+
+<div class="card">
+  <h2>各语言内置排序</h2>
+  <table style="border-collapse:collapse;width:100%">
+    <tr><th>语言/平台</th><th>使用算法</th><th>特点</th></tr>
+    <tr><td>JavaScript (V8)</td><td>TimSort</td><td>归并+插入的混合算法</td></tr>
+    <tr><td>Python</td><td>Timsort</td><td>稳定，最坏 O(n log n)</td></tr>
+    <tr><td>Java (对象)</td><td>TimSort</td><td>稳定排序</td></tr>
+    <tr><td>Java (原始类型)</td><td>Dual-Pivot QuickSort</td><td>双轴快排</td></tr>
+    <tr><td>C++ std::sort</td><td>IntroSort</td><td>快排+堆排+插入混合</td></tr>
+    <tr><td>Rust</td><td>迭代归并排序</td><td>O(n log n)，稳定</td></tr>
+    <tr><td>Go</td><td>pdqsort</td><td>模式感知快排</td></tr>
+    <tr><td>.NET</td><td>IntroSort</td><td>内省排序</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>选型决策树</h2>
+  <pre>
+开始选型:
+├─ 数据能否全部加载到内存?
+│  ├─ 否 → 外部排序（多路归并）
+│  └─ 是 →
+│     ├─ 数据范围很小（如整数 0-100）?
+│     │  └─ 是 → 计数排序
+│     ├─ 数据分布均匀?
+│     │  └─ 是 → 桶排序
+│     ├─ 需要稳定排序?
+│     │  ├─ 是 → 归并排序 / TimSort
+│     │  └─ 否 → 快速排序 / 堆排序
+│     ├─ 内存非常有限?
+│     │  └─ 是 → 堆排序（O(1) 空间）
+│     ├─ 数据接近有序?
+│     │  └─ 是 → 插入排序
+│     └─ 大规模随机数据?
+│        └─ 快速排序（通常最快）</pre>
+</div>
+
+<div class="card">
+  <h2>交互：智能选型建议</h2>
+  <p>输入你的场景参数，获取算法建议：</p>
+  <button onclick="suggestSort()">获取建议</button>
+  <div id="result"></div>
+</div>
+
+<script>
+function suggestSort() {
+  const scenarios = [
+    { desc: '需要稳定的排序，数据量较大', stable: true, large: true, memory: 'normal', range: 'wide', feature: 'random' },
+    { desc: '内存非常有限，数据量巨大', stable: false, large: true, memory: 'tight', range: 'wide', feature: 'random' },
+    { desc: '数据基本有序，只有少量元素错位', stable: true, large: false, memory: 'normal', range: 'wide', feature: 'nearly_sorted' },
+    { desc: '整数数组，值范围在 0-1000', stable: true, large: false, memory: 'normal', range: 'narrow', feature: 'random' },
+    { desc: '数据均匀分布，数据量较大', stable: false, large: true, memory: 'normal', range: 'wide', feature: 'uniform' },
+    { desc: '大量重复元素', stable: false, large: true, memory: 'normal', range: 'wide', feature: 'duplicates' },
+  ];
+
+  const suggestions = [
+    { name: '归并排序 / TimSort', reason: '稳定、O(n log n)，适合大规模数据，但需要 O(n) 额外空间' },
+    { name: '堆排序', reason: 'O(n log n)、O(1) 空间，适合内存受限的场景' },
+    { name: '插入排序', reason: '接近有序时性能为 O(n)，简单高效' },
+    { name: '计数排序', reason: 'O(n+k)，整数且范围有限时极快' },
+    { name: '桶排序', reason: '数据均匀分布时接近 O(n)' },
+    { name: '三路快速排序', reason: '处理重复元素高效，避免 O(n^2) 退化' },
+  ];
+
+  // 随机选择一种场景演示
+  const idx = Math.floor(Math.random() * scenarios.length);
+  const s = scenarios[idx];
+  const sug = suggestions[idx];
+
+  document.getElementById('result').innerHTML =
+    '<strong>场景描述：</strong>' + s.desc + '<br><br>' +
+    '<strong>特征分析：</strong><br>' +
+    '  - 稳定需求: ' + (s.stable ? '是' : '否') + '<br>' +
+    '  - 数据规模: ' + (s.large ? '大' : '小/中') + '<br>' +
+    '  - 内存限制: ' + (s.memory === 'tight' ? '严格' : '正常') + '<br>' +
+    '  - 数据范围: ' + (s.range === 'narrow' ? '有限' : '较广') + '<br>' +
+    '  - 数据特征: ' + (s.feature === 'nearly_sorted' ? '接近有序' : s.feature === 'uniform' ? '均匀分布' : s.feature === 'duplicates' ? '大量重复' : '随机') + '<br><br>' +
+    '<strong>推荐算法：</strong>' + sug.name + '<br>' +
+    '<strong>理由：</strong>' + sug.reason;
+}
+</script>
+</body></html>

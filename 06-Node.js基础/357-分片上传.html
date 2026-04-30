@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分片上传</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        .chunk-grid { display: flex; flex-wrap: wrap; gap: 4px; margin: 10px 0; }
+        .chunk { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; font-size: 10px; border-radius: 4px; border: 1px solid #ddd; color: #333; }
+        .chunk.pending { background: #f8f9fa; }
+        .chunk.uploading { background: #3498db; color: white; }
+        .chunk.done { background: #2ecc71; color: white; }
+        .chunk.error { background: #e74c3c; color: white; }
+        .progress-overall { width: 100%; height: 12px; background: #ecf0f1; border-radius: 6px; overflow: hidden; margin: 8px 0; }
+        .progress-overall .fill { height: 100%; background: linear-gradient(90deg, #3498db, #2ecc71); border-radius: 6px; width: 0; transition: width 0.3s; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>分片上传</h2><p>文件分片(slice)、并发上传、进度合并、秒传(hash预检)。</p></div>
+    <div class="card">
+        <h2>分片上传 API</h2>
+        <div class="code">// ========== 文件分片 ==========
+const CHUNK_SIZE = 5 * 1024 * 1024;  // 5MB
+const chunks = [];
+let start = 0;
+while (start < file.size) {
+    const end = Math.min(start + CHUNK_SIZE, file.size);
+    chunks.push(file.slice(start, end));
+    start = end;
+}
+
+// ========== 并发上传 ==========
+const tasks = chunks.map((chunk, index) => {
+    const formData = new FormData();
+    formData.append('chunk', chunk);
+    formData.append('index', index);
+    formData.append('total', chunks.length);
+    formData.append('hash', fileHash);
+    return fetch('/upload/chunk', { method: 'POST', body: formData });
+});
+await Promise.all(tasks);
+
+// ========== 合并请求 ==========
+fetch('/upload/merge', {
+    method: 'POST',
+    body: JSON.stringify({ hash: fileHash, name: file.name, chunks: chunks.length })
+});
+
+// ========== 秒传 ==========
+// 先计算文件 hash，查询服务器是否已存在
+const hash = await calculateHash(file);
+const res = await fetch('/upload/check', { body: JSON.stringify({ hash }) });
+if (res.exist) { /* 秒传 */ }</div>
+    </div>
+    <div class="card">
+        <h2>演示：分片上传</h2>
+        <button onclick="demoChunk()">分片原理</button>
+        <button onclick="demoUpload()">并发上传</button>
+        <button onclick="demoHash()">秒传与Hash</button>
+        <button onclick="demoResume()">断点续传</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <div id="chunk-demo"></div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        const chunkDemo = document.getElementById('chunk-demo');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+        function clearChunk() { chunkDemo.innerHTML = ''; }
+
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function demoChunk() {
+            clearChunk();
+            result.innerHTML = '';
+            log('🧩 文件分片原理:');
+            log('');
+
+            const fileSize = 50 * 1024 * 1024; // 50MB
+            const chunkSize = 5 * 1024 * 1024; // 5MB
+            const totalChunks = Math.ceil(fileSize / chunkSize);
+
+            log(`1️⃣ 分片参数:`);
+            log(`   文件大小: ${formatSize(fileSize)}`);
+            log(`   分片大小: ${formatSize(chunkSize)}`);
+            log(`   分片数量: ${totalChunks}`);
+            log('');
+
+            log('2️⃣ Blob.slice() 分片:');
+            log('   function createChunks(file, chunkSize) {');
+            log('     const chunks = [];');
+            log('     let offset = 0;');
+            log('     while (offset < file.size) {');
+            log('       const end = Math.min(offset + chunkSize, file.size);');
+            log('       chunks.push(file.slice(offset, end));');
+            log('       offset = end;');
+            log('     }');
+            log('     return chunks;');
+            log('   }');
+            log('');
+
+            // Visual chunk grid
+            log('3️⃣ 分片可视化 (${totalChunks} 片):');
+            const grid = document.createElement('div');
+            grid.className = 'chunk-grid';
+            for (let i = 0; i < totalChunks; i++) {
+                const div = document.createElement('div');
+                div.className = 'chunk pending';
+                div.textContent = i + 1;
+                div.title = `分片 ${i + 1}: ${formatSize(chunkSize)}`;
+                grid.appendChild(div);
+            }
+            chunkDemo.appendChild(grid);
+
+            log('');
+            log('4️⃣ 分片数据结构:');
+            log('   // 每片上传说携带:');
+            log('   {');
+            log('     chunk: Blob,        // 分片二进制数据');
+            log('     index: number,      // 分片索引 (0-based)');
+            log('     total: number,      // 总分片数');
+            log('     hash: string,       // 文件整体 hash');
+            log('     chunkHash: string,  // 分片 hash (校验)');
+            log('     name: string,       // 原始文件名');
+            log('   }');
+        }
+
+        function demoUpload() {
+            clearChunk();
+            result.innerHTML = '';
+            log('🚀 并发上传:');
+            log('');
+
+            const totalChunks = 20;
+            const concurrency = 5;
+
+            log(`1️⃣ 并发控制: 总分片=${totalChunks}, 并发数=${concurrency}`);
+            log('');
+
+            log('2️⃣ 上传流程:');
+            log('   async function uploadChunks(chunks, concurrency) {');
+            log('     const results = [];');
+            log('     const pool = new Set();');
+            log('     for (const chunk of chunks) {');
+            log('       const task = uploadSingle(chunk);');
+            log('       pool.add(task);');
+            log('       task.finally(() => pool.delete(task));');
+            log('       if (pool.size >= concurrency) {');
+            log('         await Promise.race(pool);');
+            log('       }');
+            log('     }');
+            log('     await Promise.all(pool);');
+            log('   }');
+            log('');
+
+            // Simulate concurrent upload with visual
+            const grid = document.createElement('div');
+            grid.className = 'chunk-grid';
+            const chunks = [];
+            for (let i = 0; i < totalChunks; i++) {
+                const div = document.createElement('div');
+                div.className = 'chunk pending';
+                div.textContent = i + 1;
+                grid.appendChild(div);
+                chunks.push(div);
+            }
+            chunkDemo.appendChild(grid);
+
+            const pbar = document.createElement('div');
+            pbar.className = 'progress-overall';
+            pbar.innerHTML = '<div class="fill" id="overallFill"></div>';
+            chunkDemo.appendChild(pbar);
+
+            const ptext = document.createElement('div');
+            ptext.style.cssText = 'font-size:12px;color:#7f8c8d;text-align:center;';
+            chunkDemo.appendChild(ptext);
+
+            log('3️⃣ 并行上传模拟:');
+            let done = 0;
+            function uploadNext() {
+                const idx = done;
+                if (idx >= totalChunks) return;
+                chunks[idx].className = 'chunk uploading';
+                chunks[idx].textContent = '↑';
+                const delay = 300 + Math.random() * 800;
+                setTimeout(() => {
+                    chunks[idx].className = 'chunk done';
+                    chunks[idx].textContent = '✓';
+                    done++;
+                    const pct = Math.round((done / totalChunks) * 100);
+                    document.getElementById('overallFill').style.width = pct + '%';
+                    ptext.textContent = `进度: ${done}/${totalChunks} (${pct}%)`;
+                    log(`   分片 ${idx + 1} 上传完成 (${delay.toFixed(0)}ms)`);
+                    uploadNext();
+                }, delay);
+            }
+
+            // Start initial batch
+            for (let i = 0; i < concurrency; i++) uploadNext();
+
+            log('');
+            log('4️⃣ 合并请求:');
+            log('   fetch("/upload/merge", {');
+            log('     method: "POST",');
+            log('     headers: { "Content-Type": "application/json" },');
+            log('     body: JSON.stringify({');
+            log('       hash: fileHash,');
+            log('       name: fileName,');
+            log('       chunks: totalChunks,');
+            log('       size: fileSize');
+            log('     })');
+            log('   });');
+            log('');
+
+            log('5️⃣ 错误处理:');
+            log('   • 某分片失败 → 重试该分片');
+            log('   • 重试 N 次后放弃 → 通知服务器清理');
+            log('   • 使用指数退避避免拥塞');
+        }
+
+        function demoHash() {
+            clearChunk();
+            result.innerHTML = '';
+            log('🔑 秒传与 Hash:');
+            log('');
+
+            log('1️⃣ 秒传流程:');
+            log('   ① 计算文件 hash (MD5/SHA1/SHA256)');
+            log('   ② 请求服务器检查 hash 是否存在');
+            log('   ③ 存在 → 秒传成功 (无需上传)');
+            log('   ④ 不存在 → 执行分片上传');
+            log('');
+
+            log('2️⃣ 文件 Hash 计算:');
+            log('   async function calculateHash(file) {');
+            log('     const buffer = await file.arrayBuffer();');
+            log('     const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);');
+            log('     const hashArray = Array.from(new Uint8Array(hashBuffer));');
+            log('     return hashArray.map(b => b.toString(16).padStart(2, "0")).join("");');
+            log('   }');
+            log('');
+
+            log('3️⃣ Hash 方案对比:');
+            log('   • MD5      — 快但冲突多 (不适合安全场景)');
+            log('   • SHA-1    — 有安全漏洞，不推荐');
+            log('   • SHA-256  — 安全且常用 (推荐)');
+            log('');
+
+            log('4️⃣ 大文件 Hash 优化:');
+            log('   // 抽样 hash: 只取首/中/尾部分数据');
+            log('   // 增量 hash: 分片读取，逐步更新');
+            log('   // Web Worker: 后台计算不阻塞 UI');
+            log('');
+
+            log('5️⃣ 秒传检查 API:');
+            log('   const res = await fetch("/api/upload/check", {');
+            log('     method: "POST",');
+            log('     body: JSON.stringify({ hash: fileHash })');
+            log('   });');
+            log('   const data = await res.json();');
+            log('   if (data.exists) {');
+            log('     alert("✨ 秒传成功!");');
+            log('   } else {');
+            log('     await uploadChunks(file, fileHash);');
+            log('   }');
+            log('');
+
+            // Simulate hash + sec upload
+            log('6️⃣ 模拟秒传:');
+            const mockHash = 'a3f2b8c9d1e4f7a0b3c6d9e2f5a8b1c4d7e0f3a6b9c2d5e8f1b4c7d0e3f6a9';
+            log(`   文件 Hash: ${mockHash.substring(0, 20)}...`);
+            log(`   服务器查询: 文件已存在 ✨`);
+            log(`   结果: 秒传成功! (0 字节上传)`);
+        }
+
+        function demoResume() {
+            clearChunk();
+            result.innerHTML = '';
+            log('🔄 断点续传:');
+            log('');
+
+            log('1️⃣ 断点续传流程:');
+            log('   ① 开始上传前记录已成功上传的分片');
+            log('   ② 上传中断后，查询已上传的分片列表');
+            log('   ③ 只上传未完成的分片');
+            log('   ④ 所有分片完成后发起合并');
+            log('');
+
+            log('2️⃣ 记录上传状态:');
+            log('   // 方式一: 服务器返回已上传分片');
+            log('   const res = await fetch("/upload/status?hash=" + hash);');
+            log('   const uploaded = await res.json(); // [0, 1, 3, 5...]');
+            log('');
+            log('   // 方式二: 本地存储 (localStorage)');
+            log('   localStorage.setItem(`upload_${hash}`, JSON.stringify(doneChunks));');
+            log('');
+
+            log('3️⃣ 断点续传实现:');
+            log('   async function uploadWithResume(file, hash) {');
+            log('     const chunks = createChunks(file, CHUNK_SIZE);');
+            log('     const doneChunks = await getUploadedChunks(hash);');
+            log('     const remaining = chunks.filter((_, i) => !doneChunks.includes(i));');
+            log('');
+            log('     // 只上传未完成的分片');
+            log('     await uploadChunks(remaining, doneChunks);');
+            log('     await mergeRequest(hash);');
+            log('   }');
+            log('');
+
+            // Resume visualization
+            const totalChunks = 16;
+            const doneSet = new Set([0, 1, 2, 3, 4, 5, 7, 8, 10]);
+
+            const grid = document.createElement('div');
+            grid.className = 'chunk-grid';
+            for (let i = 0; i < totalChunks; i++) {
+                const div = document.createElement('div');
+                div.className = doneSet.has(i) ? 'chunk done' : 'chunk pending';
+                div.textContent = doneSet.has(i) ? '✓' : (i + 1);
+                grid.appendChild(div);
+            }
+            chunkDemo.appendChild(grid);
+
+            const info = document.createElement('div');
+            info.style.cssText = 'font-size:13px;color:#7f8c8d;';
+            const remaining = totalChunks - doneSet.size;
+            info.textContent = `已上传 ${doneSet.size}/${totalChunks} 分片, 还需上传 ${remaining} 分片`;
+            chunkDemo.appendChild(info);
+
+            log('');
+
+            log('4️⃣ 本地状态恢复:');
+            log('   // 页面刷新后恢复上传进度');
+            log('   const saved = localStorage.getItem(`upload_${hash}`);');
+            log('   if (saved) {');
+            log('     const doneList = JSON.parse(saved);');
+            log('     resumeFrom(doneList);');
+            log('   }');
+            log('');
+
+            log('5️⃣ 服务器接口设计:');
+            log('   POST /api/upload/init     — 初始化上传 (获取 uploadId)');
+            log('   POST /api/upload/chunk    — 上传分片');
+            log('   GET  /api/upload/status   — 查询已上传分片');
+            log('   POST /api/upload/merge    — 合并分片');
+            log('   DELETE /api/upload/abort  — 取消上传');
+        }
+
+        console.log('=== 分片上传 ===');
+        document.getElementById('output').textContent =
+            `分片上传: file.slice / 并发上传 / Hash秒传 / 断点续传 / 合并请求\n` +
+            `✅ 分片上传演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CI/CD 与 DevOps 实践</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔄 CI/CD 与 DevOps 实践</h2><p>CI/CD 概念与流水线、GitHub Actions、GitLab CI、Jenkins、Prometheus + Grafana 监控、Terraform IaC、蓝绿/金丝雀部署。</p></div>
+    <div class="card">
+        <h2>CI/CD 核心概念</h2>
+        <div class="code">// ========== CI/CD 定义 ==========
+// CI (Continuous Integration) — 持续集成
+//   频繁合并代码 → 自动构建 + 测试
+// CD (Continuous Delivery) — 持续交付
+//   自动部署到预发布环境
+// CD (Continuous Deployment) — 持续部署
+//   自动部署到生产环境
+
+// ========== 标准流水线 ==========
+// 代码提交 → 代码检查 → 单元测试 →
+// 构建 → 集成测试 → 安全扫描 →
+// 构建镜像 → 部署 staging → E2E 测试 →
+// 部署生产 → 健康检查
+
+// ========== GitOps ==========
+// Git 仓库作为唯一真相源
+// 提交配置 → 自动同步到集群
+// 工具: ArgoCD, Flux
+
+// ========== GitHub Actions ==========
+// .github/workflows/ci.yml
+
+// name: CI Pipeline
+// on:
+//   push:
+//     branches: [main]
+//   pull_request:
+//     branches: [main]
+//
+// jobs:
+//   test:
+//     runs-on: ubuntu-latest
+//     services:
+//       postgres:
+//         image: postgres:16-alpine
+//         env:
+//           POSTGRES_PASSWORD: test
+//         options: >-
+//           --health-cmd pg_isready
+//           --health-interval 10s
+//       redis:
+//         image: redis:7-alpine
+//         options: >-
+//           --health-cmd "redis-cli ping"
+//
+//     steps:
+//       - uses: actions/checkout@v4
+//       - uses: actions/setup-go@v5
+//         with:
+//           go-version: '1.22'
+//       - run: go mod download
+//       - run: go vet ./...
+//       - run: go test -race -coverprofile=coverage.out ./...
+//       - uses: codecov/codecov-action@v3
+//
+//   build-and-push:
+//     needs: test
+//     if: github.ref == 'refs/heads/main'
+//     runs-on: ubuntu-latest
+//     steps:
+//       - uses: actions/checkout@v4
+//       - name: Login to Docker Hub
+//         uses: docker/login-action@v3
+//         with:
+//           username: ${{ secrets.DOCKER_USERNAME }}
+//           password: ${{ secrets.DOCKER_PASSWORD }}
+//       - name: Build and push
+//         uses: docker/build-push-action@v5
+//         with:
+//           push: true
+//           tags: myapp:latest,myapp:${{ github.sha }}</div>
+    </div>
+    <div class="card">
+        <h2>监控与可观测性</h2>
+        <div class="code">// ========== 三大支柱 ==========
+// 1. Metrics (指标)     — Prometheus
+// 2. Logging (日志)     — ELK / Loki
+// 3. Tracing (追踪)    — Jaeger / OpenTelemetry
+
+// ========== Prometheus ==========
+// 拉模式采集 metrics
+
+// Go Metrics 暴露:
+// import "github.com/prometheus/client_golang/prometheus/promhttp"
+
+// func metricsHandler() {
+//     http.Handle("/metrics", promhttp.Handler())
+// }
+
+// 自定义指标:
+// var (
+//     httpRequestsTotal = prometheus.NewCounterVec(
+//         prometheus.CounterOpts{
+//             Name: "http_requests_total",
+//             Help: "Total HTTP requests",
+//         },
+//         []string{"method", "path", "status"},
+//     )
+//     httpRequestDuration = prometheus.NewHistogramVec(
+//         prometheus.HistogramOpts{
+//             Name:    "http_request_duration_seconds",
+//             Help:    "HTTP request latency",
+//             Buckets: prometheus.DefBuckets,
+//         },
+//         []string{"method", "path"},
+//     )
+// )
+
+// PromQL 查询:
+// rate(http_requests_total[5m])
+// histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))
+// up == 0  // 服务宕机告警
+
+// ========== Grafana ==========
+// 可视化仪表盘
+// Prometheus → Grafana Dashboard
+// 常用面板:
+// - 请求率 / 错误率 / 延迟 (RED)
+// - CPU / 内存 / 磁盘 (USE)
+// - 业务指标 (活跃用户/订单)
+
+// ========== ELK Stack ==========
+// Elasticsearch: 存储 + 搜索
+// Logstash:      日志采集 + 处理
+// Kibana:        可视化
+
+// 轻量替代: Loki + Grafana + Promtail
+
+// ========== OpenTelemetry ==========
+// 统一: Metrics + Logs + Traces
+// 供应商中立
+
+// // Go OTel:
+// import "go.opentelemetry.io/otel"
+//
+// tracer := otel.Tracer("my-service")
+// ctx, span := tracer.Start(ctx, "process_order")
+// defer span.End()
+//
+// span.SetAttributes(attribute.String("order.id", orderID))
+// span.AddEvent("payment_processed")</div>
+    </div>
+    <div class="card">
+        <h2>IaC 与部署策略</h2>
+        <div class="code">// ========== Terraform ==========
+// 基础设施即代码 (IaC)
+
+// main.tf:
+// provider "aws" {
+//   region = "ap-northeast-1"
+// }
+//
+// resource "aws_instance" "app" {
+//   ami           = "ami-0c55b159cbfafe1f0"
+//   instance_type = "t3.medium"
+//
+//   tags = {
+//     Name = "myapp-server"
+//   }
+// }
+//
+// resource "aws_db_instance" "db" {
+//   engine         = "postgres"
+//   engine_version = "16"
+//   instance_class = "db.t3.medium"
+//   db_name        = "myapp"
+//   username       = "app"
+//   password       = var.db_password
+// }
+
+// Terraform 命令:
+// terraform init       // 初始化
+// terraform plan       // 预览变更
+// terraform apply      // 应用变更
+// terraform destroy    // 销毁资源
+
+// ========== 部署策略 ==========
+// 1. 滚动更新 (Rolling)
+//    逐个替换实例
+//    无 downtime, 但新旧共存
+
+// 2. 蓝绿部署 (Blue-Green)
+//    两套环境, 切换流量
+//    绿: 旧版本, 蓝: 新版本
+//    切换 → 验证 → 删除旧环境
+
+// 3. 金丝雀发布 (Canary)
+//    小比例流量到新版本
+//    5% → 25% → 50% → 100%
+//    监控错误率, 有问题立即回滚
+
+// 4. 功能开关 (Feature Flag)
+//    代码部署但功能默认关闭
+//    按用户/组逐步开放
+//    工具: LaunchDarkly / 自建
+
+// ========== 回滚策略 ==========
+// 1. 代码回滚: git revert
+// 2. 镜像回滚: docker pull previous_tag
+// 3. 数据库回滚: 迁移反向
+// 4. 流量回滚: 切回蓝环境
+// 5. 配置回滚: 恢复旧配置
+
+// ========== SLI / SLO / SLA ==========
+// SLI (Service Level Indicator): 指标
+//   延迟: P99 < 200ms
+//   可用性: 99.9%
+//   错误率: < 0.1%
+
+// SLO (Service Level Objective): 目标
+//   P99 延迟 < 200ms (99.9% 的时间)
+
+// SLA (Service Level Agreement): 承诺
+//   99.9% 可用性, 否则赔偿</div>
+        <div class="note">💡 DevOps 要点: CI/CD 流水线 (lint→test→build→deploy); GitHub Actions (workflow/jobs/steps/services); Prometheus 指标 + Grafana 仪表盘; ELK/Loki 日志; OpenTelemetry 分布式追踪; Terraform IaC (plan/apply); 部署: 滚动/蓝绿/金丝雀/功能开关; SLI/SLO/SLA 体系; RED 指标 (Rate/Error/Duration); USE 指标 (Utilization/Saturation/Errors)。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCICD()">CI/CD</button>
+        <button onclick="demoMonitor()">监控</button>
+        <button onclick="demoDeploy()">部署策略</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCICD() {
+            result.innerHTML = '';
+            log('# CI/CD 流水线');
+            log('');
+            log('流程:');
+            log('  push → lint → test → build');
+            log('  → image → staging → e2e');
+            log('  → deploy → health check');
+            log('');
+            log('GitHub Actions:');
+            log('  jobs: test, build, deploy');
+            log('  services: postgres, redis');
+            log('  matrix: 多版本/多平台');
+        }
+
+        function demoMonitor() {
+            result.innerHTML = '';
+            log('# 可观测性');
+            log('');
+            log('Metrics → Prometheus + Grafana');
+            log('Logs    → ELK / Loki');
+            log('Traces  → Jaeger / OpenTelemetry');
+            log('');
+            log('RED 指标:');
+            log('  Rate: 请求率');
+            log('  Error: 错误率');
+            log('  Duration: 延迟');
+        }
+
+        function demoDeploy() {
+            result.innerHTML = '';
+            log('# 部署策略');
+            log('');
+            log('滚动更新: 逐步替换');
+            log('蓝绿部署: 切换环境');
+            log('金丝雀: 小比例放量');
+            log('功能开关: 渐进开放');
+            log('');
+            log('Terraform:');
+            log('  init → plan → apply');
+            log('  AWS/GCP/Azure 资源管理');
+        }
+    </script>
+</body>
+</html>

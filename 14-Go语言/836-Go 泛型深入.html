@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 泛型深入</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚙️ Go 泛型深入</h2><p>泛型类型参数、类型约束与类型集、泛型函数与方法、泛型类型与数据结构、泛型性能与限制、常用泛型模式。</p></div>
+    <div class="card">
+        <h2>泛型基础</h2>
+        <div class="code">// ========== Go 1.18+ 泛型 ==========
+// 类型参数写在函数名后的 [] 中
+
+// 泛型函数
+func Print[T any](v T) {
+    fmt.Println(v)
+}
+
+func main() {
+    Print[int](42)     // 显式指定类型参数
+    Print("hello")     // 类型推断
+    Print(3.14)        // 类型推断
+}
+
+// ========== 类型参数与推断 ==========
+func typeInference() {
+    // 显式指定
+    Min[int](3, 5)
+
+    // 类型推断 (编译器从参数推导类型参数)
+    Min(3, 5)          // T = int
+    Min(3.14, 2.71)    // T = float64
+
+    // 不能推断时: 显式指定
+    result := Min[int](3, 5)
+    _ = result
+}
+
+func Min[T ~int | ~float64](a, b T) T {
+    if a < b { return a }
+    return b
+}
+
+// ========== 泛型类型 ==========
+// 泛型栈
+type Stack[T any] struct {
+    items []T
+}
+
+func (s *Stack[T]) Push(item T) {
+    s.items = append(s.items, item)
+}
+
+func (s *Stack[T]) Pop() (T, bool) {
+    if len(s.items) == 0 {
+        var zero T  // 零值
+        return zero, false
+    }
+    item := s.items[len(s.items)-1]
+    s.items = s.items[:len(s.items)-1]
+    return item, true
+}
+
+func (s *Stack[T]) Peek() (T, bool) {
+    if len(s.items) == 0 {
+        var zero T
+        return zero, false
+    }
+    return s.items[len(s.items)-1], true
+}
+
+func (s *Stack[T]) Len() int {
+    return len(s.items)
+}
+
+func stackDemo() {
+    intStack := Stack[int]{}
+    intStack.Push(1)
+    intStack.Push(2)
+    v, _ := intStack.Pop()
+    fmt.Println(v)  // 2
+
+    strStack := Stack[string]{}
+    strStack.Push("hello")
+    fmt.Println(strStack.Len())  // 1
+}
+
+// ========== 泛型 Map/Set ==========
+type Map[K comparable, V any] map[K]V
+
+func (m Map[K, V]) Keys() []K {
+    keys := make([]K, 0, len(m))
+    for k := range m {
+        keys = append(keys, k)
+    }
+    return keys
+}
+
+type Set[T comparable] map[T]struct{}
+
+func (s Set[T]) Add(v T)     { s[v] = struct{}{} }
+func (s Set[T]) Remove(v T)  { delete(s, v) }
+func (s Set[T]) Has(v T) bool {
+    _, ok := s[v]
+    return ok
+}
+func (s Set[T]) Slice() []T {
+    out := make([]T, 0, len(s))
+    for v := range s { out = append(out, v) }
+    return out
+}</div>
+    </div>
+    <div class="card">
+        <h2>类型约束进阶</h2>
+        <div class="code">// ========== 类型集 (Type Set) ==========
+// Go 1.18 引入类型集概念
+
+// 联合类型 (Union)
+type Integer interface {
+    ~int | ~int8 | ~int16 | ~int32 | ~int64 |
+    ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64
+}
+
+type Float interface {
+    ~float32 | ~float64
+}
+
+type Numeric interface {
+    Integer | Float  // 联合
+}
+
+// 方法约束 + 类型约束
+type StringerNumeric interface {
+    ~int | ~float64
+    String() string  // 必须实现了 String() 方法的类型
+}
+
+// 交集 (即多行限制)
+type ReadWriter interface {
+    ~[]byte | ~string
+    Read(p []byte) (n int, err error)
+    // 必须同时满足类型和方法约束
+}
+
+// ========== comparable 的局限 ==========
+func comparableLimit() {
+    // comparable 只保证 == != 可用
+    // 不支持 < > <= >=
+
+    // ❌ 编译错误
+    // func Min[T comparable](a, b T) T {
+    //     if a < b { ... }  // comparable 不支持 <
+    // }
+
+    // ✅ 需要自定义 Order 约束
+}
+
+// 自定义有序约束代替 comparable
+type Ordered interface {
+    ~int | ~int8 | ~int16 | ~int32 | ~int64 |
+    ~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64 |
+    ~float32 | ~float64 | ~string
+}
+
+func SortSlice[T Ordered](s []T) {
+    sort.Slice(s, func(i, j int) bool {
+        return s[i] < s[j]
+    })
+}
+
+// ========== 泛型方法限制 ==========
+// Go 泛型方法有限制: 方法不能有额外的类型参数
+
+type Container[T any] struct {
+    value T
+}
+
+// ✅ 方法使用已有类型参数
+func (c Container[T]) Get() T { return c.value }
+
+// ❌ 方法不能额外声明类型参数
+// func (c Container[T]) Convert[U any]() U {
+//     // 编译错误: 方法不能有类型参数
+// }
+
+// ✅ 替代: 用函数
+func Convert[T, U any](c Container[T], fn func(T) U) U {
+    return fn(c.value)
+}
+
+// ========== 泛型接口 ==========
+// 泛型可用于接口定义
+type Comparator[T any] interface {
+    Compare(a, b T) int
+}
+
+type IntComparator struct{}
+func (IntComparator) Compare(a, b int) int {
+    if a < b { return -1 }
+    if a > b { return 1 }
+    return 0
+}
+
+// 泛型接口作为约束
+func Max[T any](a, b T, cmp Comparator[T]) T {
+    if cmp.Compare(a, b) > 0 { return a }
+    return b
+}</div>
+    </div>
+    <div class="card">
+        <h2>常用泛型模式</h2>
+        <div class="code">// ========== 1. 容器类型 ==========
+// 数据结构用泛型实现
+
+type List[T any] struct {
+    head, tail *node[T]
+}
+
+type node[T any] struct {
+    val  T
+    next *node[T]
+}
+
+func (l *List[T]) Push(v T) {
+    n := &node[T]{val: v}
+    if l.tail == nil {
+        l.head = n
+        l.tail = n
+        return
+    }
+    l.tail.next = n
+    l.tail = n
+}
+
+func (l *List[T]) All() []T {
+    var result []T
+    for n := l.head; n != nil; n = n.next {
+        result = append(result, n.val)
+    }
+    return result
+}
+
+// ========== 2. 函数式操作 ==========
+// Map/Filter/Reduce
+
+func Map[T, U any](slice []T, fn func(T) U) []U {
+    result := make([]U, len(slice))
+    for i, v := range slice {
+        result[i] = fn(v)
+    }
+    return result
+}
+
+func Filter[T any](slice []T, fn func(T) bool) []T {
+    var result []T
+    for _, v := range slice {
+        if fn(v) {
+            result = append(result, v)
+        }
+    }
+    return result
+}
+
+func Reduce[T, U any](slice []T, init U, fn func(U, T) U) U {
+    result := init
+    for _, v := range slice {
+        result = fn(result, v)
+    }
+    return result
+}
+
+// 使用:
+// names := Map(users, func(u User) string { return u.Name })
+// adults := Filter(users, func(u User) bool { return u.Age >= 18 })
+// total := Reduce(ages, 0, func(sum, age int) int { return sum + age })
+
+// ========== 3. 函数选项泛型 ==========
+type Option[T any] func(*T)
+
+func WithValue[T any](val T) Option[Container[T]] {
+    return func(c *Container[T]) {
+        c.value = val
+    }
+}
+
+func NewWithOptions[T any](opts ...Option[T]) *Container[T] {
+    c := &Container[T]{}
+    for _, opt := range opts {
+        opt(c)
+    }
+    return c
+}
+
+// ========== 4. 泛型缓存 ==========
+type Cache[K comparable, V any] struct {
+    mu    sync.RWMutex
+    items map[K]V
+}
+
+func NewCache[K comparable, V any]() *Cache[K, V] {
+    return &Cache[K, V]{items: make(map[K]V)}
+}
+
+func (c *Cache[K, V]) Get(key K) (V, bool) {
+    c.mu.RLock()
+    defer c.mu.RUnlock()
+    v, ok := c.items[key]
+    return v, ok
+}
+
+func (c *Cache[K, V]) Set(key K, val V) {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    c.items[key] = val
+}
+
+func (c *Cache[K, V]) GetOrSet(key K, fn func() V) V {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    if v, ok := c.items[key]; ok {
+        return v
+    }
+    v := fn()
+    c.items[key] = v
+    return v
+}</div>
+    </div>
+    <div class="card">
+        <h2>泛型性能与限制</h2>
+        <div class="code">// ========== 泛型实现 ==========
+// Go 泛型使用 GCShape 模板 + 字典 (Dictionary) 实现
+// 不会为每个具体类型生成代码 (不完全是 C++ 模板)
+
+func genericsImpl() {
+    // 1. 对于指针类型, 共享同一份代码
+    //    *int, *string, *User 使用同一份泛型代码
+
+    // 2. 对于值类型, 根据内存布局分组
+    //    int, float64 可能会有不同的实现
+}
+
+// ========== 泛型性能特征 ==========
+// 1. 无装箱: 对比 interface{}, 泛型不装箱
+//    值类型直接存储, 不逃逸到堆
+
+// interface{} 方式 (装箱)
+func printInterface(v interface{}) {
+    fmt.Println(v)  // v 逃逸到堆
+}
+
+// 泛型方式 (无装箱)
+func printGeneric[T any](v T) {
+    fmt.Println(v)  // 可栈分配
+}
+
+// Benchmark:
+// BenchmarkInterface-8  50M  30 ns/op  8 B/op  1 allocs/op
+// BenchmarkGeneric-8   100M  15 ns/op  0 B/op  0 allocs/op
+
+// 2. 内联: 泛型函数可被内联 (同普通函数)
+
+// 3. 代码大小: 不膨胀 (对比 C++ 模板)
+
+// ========== 泛型限制 ==========
+// 1. 方法不能有额外的类型参数 (前面已述)
+
+// 2. 泛型类型不能用于反射
+//    reflect.TypeOf 返回的是实例化的具体类型
+
+// 3. 不能有泛型闭包
+//    fn := func[T any](v T) T { return v }  // 编译错误!
+
+// 4. 类型 switch 有限支持
+//    func what[T any](v T) {
+//        switch v.(type) {  // 不能对 T 做 type switch
+//        case int: ...
+//        }
+//    }
+
+// 5. 泛型函数不能是 defer 的参数
+//    defer cleanup[T](x)  // 编译错误
+
+// 6. 不能有虚方法 (no virtual methods for generics)
+
+// ========== 泛型 vs interface{} 选择 ==========
+// 用泛型: 类型安全, 性能好, 需要参数化的数据结构
+// 用 interface{}: 不确定类型 (JSON), 类型数量有限
+
+// 经验法则:
+// - 容器数据结构 (Stack/Set/Cache) → 泛型
+// - 算法函数 (Sort/Map/Filter) → 泛型
+// - JSON 反序列化 → interface{}
+// - 错误类型 → interface
+// - io.Reader/Writer → 接口 (非泛型)</div>
+        <div class="note">💡 泛型要点: Go 1.18+ 引入; 类型参数 [T any] 写在 [] 中; 类型约束支持联合 (~int|~float64)、方法约束、comparable; 类型集: 多个约束的并/交集; 泛型类型如 Stack[T] 和方法; 方法不能有额外的类型参数; 泛型优于 interface{} (无装箱, 类型安全, 更好性能); 常用模式: Map/Filter/Reduce 函数式操作, Cache[K,V], Set[T]; 限制: 泛型闭包、type switch、defer 不支持。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoBasic()">泛型基础</button>
+        <button onclick="demoStruct()">泛型数据结构</button>
+        <button onclick="demoFunc()">函数式泛型</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoBasic() {
+            result.innerHTML = '';
+            log('# 泛型基础');
+            log('');
+            log('泛型函数:');
+            log('  func Print[T any](v T)');
+            log('  func Min[T ~int | ~float64](a, b T) T');
+            log('');
+            log('类型推断:');
+            log('  Min(3, 5)        // T = int');
+            log('  Min(3.14, 2.71)  // T = float64');
+            log('');
+            log('约束类型:');
+            log('  any          — 无限制');
+            log('  comparable   — == 和 !=');
+            log('  Ordered      — < > <= >=');
+            log('  ~int         — 包含底层类型');
+        }
+
+        function demoStruct() {
+            result.innerHTML = '';
+            log('# 泛型数据结构');
+            log('');
+            log('type Stack[T any] struct {');
+            log('  items []T');
+            log('}');
+            log('');
+            log('func (s *Stack[T]) Push(item T)');
+            log('func (s *Stack[T]) Pop() (T, bool)');
+            log('');
+            log('使用:');
+            log('  s := Stack[int]{}');
+            log('  s.Push(1)');
+            log('  v, _ := s.Pop()');
+            log('');
+            log('其他泛型类型:');
+            log('  Map[K comparable, V any]');
+            log('  Set[T comparable]');
+            log('  Cache[K comparable, V any]');
+        }
+
+        function demoFunc() {
+            result.innerHTML = '';
+            log('# 函数式泛型');
+            log('');
+            log('Map[T, U any]:');
+            log('  func Map(s []T, fn func(T) U) []U');
+            log('  names := Map(users, func(u User) string {');
+            log('    return u.Name');
+            log('  })');
+            log('');
+            log('Filter[T any]:');
+            log('  func Filter(s []T, fn func(T) bool) []T');
+            log('  adults := Filter(users, func(u User) bool {');
+            log('    return u.Age >= 18');
+            log('  })');
+            log('');
+            log('Reduce[T, U any]:');
+            log('  func Reduce(s []T, init U, fn func(U, T) U) U');
+        }
+    </script>
+</body>
+</html>

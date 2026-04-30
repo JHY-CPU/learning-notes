@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redis 持久化 RDB 与 AOF</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>💾 Redis 持久化 RDB 与 AOF</h2><p>RDB 快照原理与配置、AOF 日志与重写、RDB vs AOF 对比、混合持久化、备份与恢复策略、持久化最佳实践。</p></div>
+    <div class="card">
+        <h2>RDB 持久化</h2>
+        <div class="code">// ========== RDB (Redis Database) ==========
+// 生成数据快照 (Snapshot) 到磁盘文件
+
+// ========== 触发方式 ==========
+
+// 1. SAVE (同步阻塞)
+SAVE
+// 主进程直接写 RDB 文件, 期间阻塞所有请求
+// 生产不要用!
+
+// 2. BGSAVE (异步, 推荐)
+BGSAVE
+// fork 子进程, 子进程写 RDB 文件
+// 主进程继续处理请求
+
+// 3. 自动触发 (配置 save 规则)
+save 900 1        // 900 秒内至少 1 次修改
+save 300 10       // 300 秒内至少 10 次修改
+save 60 10000     // 60 秒内至少 10000 次修改
+// 任一满足即触发 BGSAVE
+
+// ========== RDB 配置 ==========
+# redis.conf
+save 900 1
+save 300 10
+save 60 10000
+
+# RDB 文件名
+dbfilename dump.rdb
+
+# RDB 文件目录
+dir /var/lib/redis
+
+# 压缩 (默认 yes)
+rdbcompression yes
+
+# 校验和 (默认 yes)
+rdbchecksum yes
+
+# 停止写入如果 BGSAVE 失败
+stop-writes-on-bgsave-error yes
+
+// ========== RDB 原理 ==========
+// 1. 主进程 fork 子进程 (复制页表)
+// 2. 子进程将内存数据写入临时 RDB 文件
+// 3. 子进程写完, 用临时文件替换旧 RDB 文件
+//    (原子操作: rename temp.rdb dump.rdb)
+
+// ========== RDB 优缺点 ==========
+// 优点:
+// ✅ 文件紧凑, 适合备份和传输
+// ✅ 恢复快 (直接加载到内存)
+// ✅ fork 子进程不影响主进程
+//
+// 缺点:
+// ❌ 可能丢数据 (两次快照间的数据)
+// ❌ fork 大内存实例耗时较久
+// ❌ BGSAVE 期间内存翻倍 (Copy on Write)</div>
+    </div>
+    <div class="card">
+        <h2>AOF 持久化</h2>
+        <div class="code">// ========== AOF (Append Only File) ==========
+// 记录所有写操作命令的日志
+// 类似 MySQL binlog / PostgreSQL WAL
+
+// ========== 配置 ==========
+appendonly yes             # 启用 AOF
+appendfilename "appendonly.aof"
+appendfsync everysec       # fsync 策略
+
+// ========== fsync 策略 ==========
+// appendfsync always
+//   每次写入都 fsync (最安全, 最慢)
+//   最多丢 1 次写操作
+//   吞吐: ~几百 QPS
+
+// appendfsync everysec (推荐)
+//   每秒 fsync 一次
+//   最多丢 1 秒数据
+//   吞吐: ~10万 QPS
+
+// appendfsync no
+//   由操作系统决定何时 fsync
+//   可能丢较多数据
+//   吞吐: 最高
+
+// ========== AOF 重写 ==========
+// AOF 文件会越来越大, 需要重写压缩
+
+// 手动触发:
+BGREWRITEAOF
+
+// 自动触发:
+auto-aof-rewrite-percentage 100   # 上次重写后增长 100%
+auto-aof-rewrite-min-size 64mb    # 最小 64MB
+
+// 重写原理:
+// 1. fork 子进程
+// 2. 将当前内存数据转为最小命令集
+//    (如: 多次 INCR → SET final_value)
+// 3. 写入临时 AOF 文件
+// 4. 替换旧 AOF 文件
+
+// ========== AOF 恢复 ==========
+// 启动时自动加载 appendonly.aof
+// 如果 AOF 文件损坏:
+redis-check-aof --fix appendonly.aof
+
+// ========== AOF 优缺点 ==========
+// 优点:
+// ✅ 数据更安全 (最多丢 1 秒)
+// ✅ AOF 文件可读可修改
+// ✅ 可修复损坏的 AOF 文件
+//
+// 缺点:
+// ❌ 文件比 RDB 大
+// ❌ 恢复比 RDB 慢 (逐条执行命令)
+// ❌ AOF 重写消耗资源</div>
+    </div>
+    <div class="card">
+        <h2>RDB vs AOF 对比</h2>
+        <div class="code">// ========== RDB vs AOF ==========
+// ┌──────────────┬─────────────────┬──────────────────┐
+// │ 特性          │ RDB             │ AOF              │
+// ├──────────────┼─────────────────┼──────────────────┤
+// │ 文件大小      │ 小 (压缩)       │ 大 (命令文本)    │
+// │ 恢复速度      │ 快 (直接加载)   │ 慢 (逐条执行)    │
+// │ 数据安全      │ 可能丢较多数据   │ 最多丢 1 秒     │
+// │ 影响写入性能  │ 低 (fork 子进程) │ 中 (fsync 开销)  │
+// │ 可读性        │ 二进制          │ 明文命令          │
+// │ 适用场景      │ 备份/冷备       │ 数据安全优先     │
+// └──────────────┴─────────────────┴──────────────────┘
+
+// ========== 混合持久化 (Redis 4.0+) ==========
+// 结合 RDB 和 AOF 优点
+
+aof-use-rdb-preamble yes
+
+// 混合格式:
+// [RDB 快照] + [AOF 增量命令]
+
+// 优点:
+// - 加载快: 直接加载 RDB 部分
+// - 数据安全: AOF 部分记录后续增量
+// - 文件比纯 AOF 小
+
+// 推荐: 启用 AOF + 混合持久化
+// appendonly yes
+// aof-use-rdb-preamble yes
+
+// ========== 备份策略推荐 ==========
+// 1. 启用 AOF (everysec) + 混合持久化
+// 2. 定时 RDB 快照备份 (cron)
+// 3. 复制 RDB/AOF 文件到异地
+// 4. 定期演练恢复流程
+
+// 示例备份脚本:
+// 0 */6 * * * cp /var/lib/redis/dump.rdb /backup/redis/dump-$(date +\%Y\%m\%d\%H).rdb
+// 保留 7 天
+
+// ========== 持久化建议 ==========
+// 1. 如果只做缓存: 关掉所有持久化
+// 2. 数据重要: AOF + RDB 混合
+// 3. 同时开 RDB 和 AOF:
+//    - Redis 优先用 AOF 恢复
+//    - 因为 AOF 数据更完整
+// 4. 大实例 fork 可能耗时:
+//    - 设置合理的 save 规则
+//    - 监控 latency</div>
+    </div>
+    <div class="card">
+        <h2>数据恢复流程</h2>
+        <div class="code">// ========== 数据恢复 ==========
+
+// ========== Redis 启动加载流程 ==========
+// 1. 检查是否启用 AOF (appendonly yes)
+//    是 → 加载 AOF 文件
+//    否 → 检查 RDB 文件
+// 2. 加载 RDB 文件 (dump.rdb)
+// 3. 完成加载, 开始服务
+
+// ========== 从 AOF 恢复 ==========
+// 如果 AOF 文件损坏:
+redis-check-aof --fix appendonly.aof
+redis-server /path/to/redis.conf
+
+// ========== 从 RDB 恢复 ==========
+// 1. 停止 Redis
+// 2. 将备份的 dump.rdb 复制到 dir 目录
+// 3. 启动 Redis
+
+// ========== 主从复制中的持久化 ==========
+// 主节点:
+// - 建议开启 AOF (数据安全)
+// - BGSAVE 影响主节点性能
+
+// 从节点:
+// - 可在从节点做 BGSAVE (不影响主)
+// - 备份在从节点做
+
+// ========== 灾难恢复 ==========
+// 1. 异地备份 RDB/AOF 文件
+// 2. 在新服务器安装 Redis
+// 3. 复制备份文件到数据目录
+// 4. 启动 Redis, 验证数据
+// 5. 切换 DNS/负载均衡
+
+// ========== fork 耗时监控 ==========
+// 大实例 (10GB+) fork 可能耗时数秒
+// 监控:
+INFO latest_fork_usec
+// 如果 fork 耗时 > 1 秒, 考虑:
+// 1. 增大 overcommit_memory
+// 2. 减小 RDB 频率
+// 3. 用副本做备份</div>
+        <div class="note">💡 持久化要点: RDB 适合备份 (文件小/恢复快); AOF 适合数据安全 (最多丢 1 秒); 推荐 AOF + RDB 混合模式; 从节点做备份; fork 大实例注意耗时; 生产备份要异地; 定期演练恢复; 纯缓存可关持久化。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoRDB()">RDB 持久化</button>
+        <button onclick="demoAOF()">AOF 持久化</button>
+        <button onclick="demoCompare()">对比与选择</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoRDB() {
+            result.innerHTML = '';
+            log('# RDB 快照');
+            log('');
+            log('SAVE — 同步阻塞 (生产不用)');
+            log('BGSAVE — fork 子进程异步');
+            log('自动: save 900 1 / 300 10 / 60 10000');
+            log('');
+            log('优点: 文件小, 恢复快');
+            log('缺点: 可能丢数据');
+        }
+
+        function demoAOF() {
+            result.innerHTML = '';
+            log('# AOF 日志');
+            log('');
+            log('appendonly yes — 启用');
+            log('appendfsync everysec — 推荐');
+            log('BGREWRITEAOF — 重写压缩');
+            log('');
+            log('优点: 最多丢 1 秒数据');
+            log('缺点: 文件大, 恢复慢');
+        }
+
+        function demoCompare() {
+            result.innerHTML = '';
+            log('# 持久化选择');
+            log('');
+            log('纯缓存: 关闭持久化');
+            log('数据重要: AOF + 混合');
+            log('备份: RDB 快照');
+            log('最佳: appendonly yes');
+            log('     + aof-use-rdb-preamble yes');
+            log('');
+            log('从节点做备份, 不影响主');
+        }
+    </script>
+</body>
+</html>

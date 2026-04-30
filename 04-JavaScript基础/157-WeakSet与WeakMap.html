@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WeakSet与WeakMap</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #8e44ad; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>WeakSet & WeakMap — 弱引用集合</h2><p>键必须是对象，不阻止垃圾回收，没有 size/clear/遍历方法。</p></div>
+    <div class="card">
+        <h2>WeakMap</h2>
+        <div class="code">// 创建
+const wm = new WeakMap();
+
+// 键必须是对象！
+const obj1 = { id: 1 };
+const obj2 = { id: 2 };
+
+// set / get / has / delete
+wm.set(obj1, '数据1');
+wm.set(obj2, '数据2');
+
+wm.get(obj1);      // '数据1'
+wm.has(obj2);      // true
+wm.delete(obj1);   // true
+
+// ⚠️ 不能用的：
+// wm.size          // undefined（没有 size）
+// wm.clear()       // 没有 clear
+// for (let k of wm) {}  // 不可遍历
+// wm.set('str', 1) // ❌ 键必须是对象（TypeError）
+
+// 核心：弱引用
+// 当 obj1 被其他代码释放（= null），
+// WeakMap 中对应的条目自动被 GC 回收</div>
+    </div>
+    <div class="card">
+        <h2>WeakSet</h2>
+        <div class="code">// 创建
+const ws = new WeakSet();
+
+const obj1 = { id: 1 };
+const obj2 = { id: 2 };
+
+// add / has / delete
+ws.add(obj1);
+ws.add(obj2);
+
+ws.has(obj1);      // true
+ws.delete(obj2);   // true
+
+// ⚠️ 不能用的：
+// ws.size          // undefined
+// ws.clear()       // 没有
+// for...of         // 不可遍历
+// ws.add(123)      // ❌ 必须是对象（TypeError）
+
+// 核心用途：标记对象</div>
+    </div>
+    <div class="card">
+        <h2>实际应用场景</h2>
+        <div class="code">// 1. WeakMap — 私有数据存储
+const privateData = new WeakMap();
+
+class User {
+    constructor(name, age) {
+        privateData.set(this, { name, age });
+    }
+
+    getName() {
+        return privateData.get(this).name;
+    }
+
+    getAge() {
+        return privateData.get(this).age;
+    }
+}
+
+const u = new User('Alice', 25);
+u.getName();  // 'Alice'
+// 外部无法直接访问 privateData 里的内容
+
+// 2. WeakMap — DOM 元素关联数据
+// const wm = new WeakMap();
+// const btn = document.getElementById('btn');
+// wm.set(btn, { clicks: 0 });
+// btn.addEventListener('click', () => {
+//     const data = wm.get(btn);
+//     data.clicks++;
+// });
+// 当 btn 被移除时，相关数据自动 GC
+
+// 3. WeakSet — 标记/白名单
+const visited = new WeakSet();
+// visited.add(currentNode);
+// if (visited.has(node)) { /* 已访问 */ }
+
+// 4. 缓存计算结果
+const cache = new WeakMap();
+function processObj(obj) {
+    if (cache.has(obj)) return cache.get(obj);
+    const result = { /* 复杂计算 */ };
+    cache.set(obj, result);
+    return result;
+}</div>
+        <div class="note">💡 弱引用不一定立即回收，但保证了不会因 WeakMap/WeakSet 而阻止内存释放。</div>
+    </div>
+    <div class="card">
+        <h2>WeakMap vs Map / WeakSet vs Set</h2>
+        <div class="code">// Map — 强引用
+let obj = { key: 'value' };
+const map = new Map();
+map.set(obj, 'data');
+obj = null;  // 对象仍存在（Map 持有强引用）无法 GC
+
+// WeakMap — 弱引用
+let obj2 = { key: 'value' };
+const wm = new WeakMap();
+wm.set(obj2, 'data');
+obj2 = null;  // 对象被 GC 回收，WeakMap 条目自动移除
+
+// Set vs WeakSet 同理
+
+// | 特性         | Map/Set       | WeakMap/WeakSet |
+// |--------------|---------------|-----------------|
+// | 键类型       | 任意          | 仅对象          |
+// | 弱引用       | ❌            | ✅              |
+// | 可遍历       | ✅            | ❌              |
+// | size         | ✅            | ❌              |
+// | clear        | ✅            | ❌              |
+// | GC 不阻塞    | ❌            | ✅              |</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== WeakMap 基本使用 ===');
+        const wm = new WeakMap();
+        let obj1 = { id: 1 };
+        let obj2 = { id: 2 };
+
+        wm.set(obj1, 'Hello');
+        wm.set(obj2, 'World');
+        console.log('wm.has(obj1):', wm.has(obj1));
+        console.log('wm.get(obj1):', wm.get(obj1));
+
+        console.log('=== WeakSet 基本使用 ===');
+        const ws = new WeakSet();
+        const a = { name: 'A' };
+        const b = { name: 'B' };
+        ws.add(a);
+        ws.add(b);
+        console.log('ws.has(a):', ws.has(a));
+        ws.delete(b);
+        console.log('ws.has(b):', ws.has(b));
+
+        console.log('=== 私有数据示例 ===');
+        const priv = new WeakMap();
+        function createUser(name) {
+            const data = { name };
+            priv.set(data, { secret: '这是私有数据' });
+            return data;
+        }
+        const user = createUser('Alice');
+        console.log('私有数据:', priv.get(user));
+
+        console.log('=== 弱引用演示 ===');
+        let temp = { temp: true };
+        wm.set(temp, '临时数据');
+        console.log('释放前:', wm.has(temp));
+        temp = null;  // 可以 GC
+        // 此时 wm 中对应的条目可能会被回收（但不一定立即）
+
+        document.getElementById('output').textContent =
+            `WeakMap has obj1: ${wm.has(obj1)}\n` +
+            `WeakSet has a: ${ws.has(a)}\n` +
+            `私有数据: ${priv.get(user)?.secret}\n` +
+            `✅ WeakSet & WeakMap 演示完成！`;
+    </script>
+</body>
+</html>

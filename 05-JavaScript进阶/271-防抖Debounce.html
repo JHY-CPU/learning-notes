@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>防抖Debounce</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; max-height: 200px; overflow-y: auto; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        .demo-panel { background: #f8f9fa; border-radius: 8px; padding: 15px; margin: 10px 0; }
+        .counter { font-size: 24px; font-weight: bold; color: #e74c3c; margin: 10px 0; }
+        .timeline { display: flex; gap: 2px; flex-wrap: wrap; margin: 10px 0; min-height: 20px; }
+        .timeline .event { width: 8px; height: 8px; border-radius: 50%; background: #3498db; }
+        .timeline .executed { background: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>防抖 Debounce</h2><p>将多次高频触发合并为一次执行。在事件被触发 n 毫秒后执行回调，如果在此期间再次被触发，则重新计时。</p></div>
+    <div class="card"><h2>leading vs trailing</h2><p><b>leading（前置）：</b> 触发时立即执行，然后等待冷却。<b>trailing（后置）：</b> 等待触发停止后执行。可组合使用。<b>immediate：</b> 类似 leading 的简化版本。</p></div>
+    <div class="card"><h2>cancel 和 flush 方法</h2><p>返回的 debounced 函数附加 <b>cancel()</b> 取消待执行任务和 <b>flush()</b> 立即执行待处理任务的接口。</p></div>
+    <div class="demo-panel">
+        <h3>交互演示</h3>
+        <button onclick="demoDebounceTrailing()">后置防抖 (trailing)</button>
+        <button onclick="demoDebounceLeading()">前置防抖 (leading)</button>
+        <button onclick="demoDebounceCancel()">取消/立即执行</button>
+        <button onclick="clearOutput()">清空日志</button>
+        <div class="counter" id="click-count">点击次数: 0 | 执行次数: 0</div>
+        <div class="timeline" id="timeline"></div>
+        <p><button id="trigger-btn" style="background:#e74c3c; font-size:16px; padding:12px 30px;" onclick="demoFire()">快速点击我</button></p>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const output = document.getElementById('output');
+        const timeline = document.getElementById('timeline');
+        const clickCountEl = document.getElementById('click-count');
+
+        let clickCount = 0;
+        let execCount = 0;
+
+        function log(msg) {
+            const line = document.createElement('div');
+            line.style.cssText = 'padding:2px 0;font-size:13px;border-bottom:1px solid #333;';
+            line.textContent = msg;
+            output.appendChild(line);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearOutput() {
+            output.innerHTML = '';
+        }
+
+        function updateCounts() {
+            clickCountEl.textContent = `点击次数: ${clickCount} | 执行次数: ${execCount}`;
+        }
+
+        // ========== 完整 debounce 实现 ==========
+        function debounce(fn, ms = 300, options = {}) {
+            const { leading = false, trailing = true } = options;
+            let timer = null;
+            let lastArgs = null;
+            let isLeadingCalled = false;
+
+            const debounced = function(...args) {
+                lastArgs = args;
+                if (timer) clearTimeout(timer);
+
+                if (leading && !isLeadingCalled) {
+                    isLeadingCalled = true;
+                    fn.apply(this, args);
+                    execCount++;
+                    updateCounts();
+                    addTimeline(true);
+                }
+
+                if (trailing) {
+                    timer = setTimeout(() => {
+                        if (!leading || lastArgs) {
+                            fn.apply(this, lastArgs);
+                            execCount++;
+                            updateCounts();
+                            addTimeline(true);
+                        }
+                        isLeadingCalled = false;
+                        timer = null;
+                        lastArgs = null;
+                    }, ms);
+                }
+            };
+
+            debounced.cancel = function() {
+                if (timer) {
+                    clearTimeout(timer);
+                    timer = null;
+                    isLeadingCalled = false;
+                    lastArgs = null;
+                    log('[防抖] 已取消待执行任务');
+                }
+            };
+
+            debounced.flush = function() {
+                if (timer && lastArgs) {
+                    clearTimeout(timer);
+                    timer = null;
+                    fn.apply(this, lastArgs);
+                    execCount++;
+                    updateCounts();
+                    addTimeline(true);
+                    log('[防抖] flush 立即执行');
+                    isLeadingCalled = false;
+                    lastArgs = null;
+                }
+            };
+
+            return debounced;
+        }
+
+        // ========== 创建防抖函数 ==========
+        let currentDebounce = null;
+
+        function onDebounceAction(msg) {
+            log(`[执行] ${msg}`);
+        }
+
+        function addTimeline(executed = false) {
+            const dot = document.createElement('div');
+            dot.className = `event ${executed ? 'executed' : ''}`;
+            timeline.appendChild(dot);
+            if (timeline.children.length > 100) {
+                timeline.removeChild(timeline.firstChild);
+            }
+        }
+
+        function fireClick() {
+            clickCount++;
+            addTimeline(false);
+            updateCounts();
+        }
+
+        // ========== 演示: 后置防抖 ==========
+        function demoDebounceTrailing() {
+            clearLog();
+            log('=== 后置防抖 (trailing, 默认) ===');
+            log('快速点击按钮，在停止点击 500ms 后执行一次');
+
+            if (currentDebounce && currentDebounce.cancel) currentDebounce.cancel();
+            currentDebounce = debounce(() => onDebounceAction('后置防抖触发'), 500, { leading: false, trailing: true });
+
+            window.demoFire = function() {
+                fireClick();
+                currentDebounce();
+            };
+
+            clickCount = 0;
+            execCount = 0;
+            timeline.innerHTML = '';
+            updateCounts();
+        }
+
+        // ========== 演示: 前置防抖 ==========
+        function demoDebounceLeading() {
+            clearLog();
+            log('=== 前置防抖 (leading) ===');
+            log('快速点击按钮，第一次点击立即执行，然后 500ms 内不再触发');
+
+            if (currentDebounce && currentDebounce.cancel) currentDebounce.cancel();
+            currentDebounce = debounce(() => onDebounceAction('前置防抖触发'), 500, { leading: true, trailing: false });
+
+            window.demoFire = function() {
+                fireClick();
+                currentDebounce();
+            };
+
+            clickCount = 0;
+            execCount = 0;
+            timeline.innerHTML = '';
+            updateCounts();
+        }
+
+        // ========== 演示: 取消/立即执行 ==========
+        let demoCancelTimer = null;
+
+        function demoDebounceCancel() {
+            clearLog();
+            log('=== cancel() 和 flush() 演示 ===');
+            log('防抖定时器 2 秒后自动取消，你也可以手动操作');
+
+            if (currentDebounce && currentDebounce.cancel) currentDebounce.cancel();
+            currentDebounce = debounce(() => onDebounceAction('可取消的防抖'), 1000, { trailing: true });
+
+            if (!demoCancelTimer) {
+                demoCancelTimer = setTimeout(() => {
+                    log('[自动] 2 秒后自动取消防抖');
+                    if (currentDebounce && currentDebounce.cancel) currentDebounce.cancel();
+                }, 2000);
+            }
+
+            window.demoFire = function() {
+                fireClick();
+                currentDebounce();
+            };
+
+            // 添加手动控制按钮
+            const panel = document.querySelector('.demo-panel');
+            let extraBtns = document.getElementById('extra-btns');
+            if (!extraBtns) {
+                extraBtns = document.createElement('div');
+                extraBtns.id = 'extra-btns';
+                extraBtns.innerHTML = `
+                    <button onclick="if(currentDebounce) currentDebounce.cancel(); log('[手动] 已取消')">取消 cancel()</button>
+                    <button onclick="if(currentDebounce) currentDebounce.flush(); log('[手动] 已立即执行')">立即执行 flush()</button>
+                `;
+                panel.appendChild(extraBtns);
+            }
+
+            clickCount = 0;
+            execCount = 0;
+            timeline.innerHTML = '';
+            updateCounts();
+        }
+
+        // ========== 搜索输入框示例 ==========
+        const searchInput = document.createElement('div');
+        searchInput.className = 'card';
+        searchInput.innerHTML = `
+            <h2>搜索输入框应用</h2>
+            <p>防抖常用于搜索输入，避免每次按键都发起 API 请求。</p>
+            <input type="text" id="search-input" placeholder="输入搜索内容..." style="padding:8px 12px;font-size:16px;width:300px;border:2px solid #ddd;border-radius:4px;">
+            <div style="margin-top:10px;padding:10px;background:#fef9e7;border-radius:4px;font-size:14px;" id="search-result">等待输入...</div>
+        `;
+        document.body.insertBefore(searchInput, document.querySelector('pre#output'));
+
+        // 搜索防抖
+        (function() {
+            const input = document.getElementById('search-input');
+            const result = document.getElementById('search-result');
+
+            const doSearch = debounce(function(value) {
+                result.textContent = `搜索结果: "${value}" (模拟 API 请求耗时 300ms)`;
+                log(`[搜索 API] query="${value}"`);
+            }, 300);
+
+            input.addEventListener('input', function(e) {
+                result.textContent = `正在输入: "${e.target.value}" (等待输入完成后搜索)`;
+                doSearch(e.target.value);
+            });
+        })();
+
+        // 初始状态
+        clickCount = 0;
+        execCount = 0;
+        updateCounts();
+        window.demoFire = function() {};
+
+        log('=== 防抖 Debounce 演示 ===\n防抖将多次高频触发合并为一次，适用于搜索输入、窗口 resize、自动保存等场景。\n\n点击上方按钮切换防抖模式，然后点击"快速点击我"测试。');
+    </script>
+</body>
+</html>

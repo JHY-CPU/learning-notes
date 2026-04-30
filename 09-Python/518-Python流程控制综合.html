@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python流程控制综合</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📊 Python 流程控制综合</h2><p>流程控制总结、for vs while 选择、嵌套控制、综合案例、代码风格。</p></div>
+    <div class="card">
+        <h2>流程控制总览</h2>
+        <div class="code">// ========== Python 流程控制总结 ==========
+// 条件分支:
+//   if / elif / else         — 条件判断
+//   match / case             — 模式匹配 (3.10+)
+//   三元表达式                — 简单条件赋值
+
+// 循环:
+//   for ... in ...           — 遍历可迭代对象
+//   while ...                — 条件循环
+//   for-else / while-else    — 循环正常结束
+
+// 循环控制:
+//   break                    — 退出循环
+//   continue                 — 跳过本次
+//   pass                     — 占位符
+
+// 其他控制:
+//   return                   — 函数返回
+//   raise                    — 抛出异常
+//   yield                    — 生成器
+//   async / await            — 异步
+
+// ========== 选择指南 ==========
+// 遍历序列 (列表/字符串/文件)   → for
+// 遍历 range()               → for
+// 需要索引                   → enumerate()
+// 不确定循环次数             → while
+// 输入验证                   → while True + break
+// 无限循环                   → while True + 退出条件</div>
+    </div>
+    <div class="card">
+        <h2>for vs while 对比</h2>
+        <div class="code">// ========== for ==========
+// 适用: 遍历已知可迭代对象
+
+// ✅ 遍历列表:
+for fruit in ["apple", "banana"]:
+    print(fruit)
+
+// ✅ 固定次数:
+for i in range(100):
+    process(i)
+
+// ✅ 遍历文件:
+for line in open("file.txt"):
+    print(line.strip())
+
+// ✅ 并行遍历:
+for name, age in zip(names, ages):
+    print(name, age)
+
+// ========== while ==========
+// 适用: 条件驱动,未知次数
+
+// ✅ 输入验证:
+while (text := input("> ")) != "quit":
+    process(text)
+
+// ✅ 轮询:
+while not server.ready():
+    time.sleep(1)
+
+// ✅ 重试:
+while retries < max_retries:
+    try:
+        return fetch_data()
+    except:
+        retries += 1
+
+// ✅ 游戏循环:
+while player.health > 0:
+    player.update()
+    game.render()
+
+// ========== 经验法则 ==========
+// 如果能用 for 解决,就不用 while
+// for 更安全 (不会忘记更新循环变量)
+// while 更灵活 (条件可以是任何表达式)</div>
+    </div>
+    <div class="card">
+        <h2>综合案例</h2>
+        <div class="code">// ========== 案例: 简易计算器 ==========
+def calculator():
+    """命令行计算器,直到输入 quit 退出"""
+    print("简易计算器 (输入 quit 退出)")
+
+    while True:
+        expr = input("\n表达式 (如: 2 + 3): ").strip()
+        if expr.lower() == "quit":
+            print("再见!")
+            break
+
+        parts = expr.split()
+        if len(parts) != 3:
+            print("格式: 数字 运算符 数字")
+            continue
+
+        a, op, b = parts
+        try:
+            a, b = float(a), float(b)
+        except ValueError:
+            print("无效数字")
+            continue
+
+        if op == "+":
+            print(f"= {a + b}")
+        elif op == "-":
+            print(f"= {a - b}")
+        elif op == "*":
+            print(f"= {a * b}")
+        elif op == "/":
+            if b == 0:
+                print("除数不能为零")
+                continue
+            print(f"= {a / b}")
+        else:
+            print(f"无效运算符: {op}")
+
+// ========== 案例: 学生成绩统计 ==========
+def analyze_scores(scores):
+    """分析学生成绩"""
+    if not scores:
+        return "没有成绩数据"
+
+    # 计算统计值
+    total = sum(scores)
+    count = len(scores)
+    average = total / count
+    highest = max(scores)
+    lowest = min(scores)
+
+    # 等级分布
+    distribution = {"优秀(≥90)": 0, "良好(80-89)": 0,
+                    "及格(60-79)": 0, "不及格(<60)": 0}
+
+    for score in scores:
+        if score >= 90:
+            distribution["优秀(≥90)"] += 1
+        elif score >= 80:
+            distribution["良好(80-89)"] += 1
+        elif score >= 60:
+            distribution["及格(60-79)"] += 1
+        else:
+            distribution["不及格(<60)"] += 1
+
+    # 找出最高分对应的学生 (假设有名字列表)
+    return {
+        "总数": count,
+        "总分": total,
+        "平均分": round(average, 2),
+        "最高分": highest,
+        "最低分": lowest,
+        "分布": distribution,
+    }
+
+scores = [85, 92, 67, 78, 55, 90, 88, 73]
+result = analyze_scores(scores)
+for k, v in result.items():
+    print(f"{k}: {v}")</div>
+    </div>
+    <div class="card">
+        <h2>Pythonic 控制流风格</h2>
+        <div class="code">// ========== Pythonic 控制流原则 ==========
+// 1. 避免深层嵌套 (提前返回)
+// 2. 用 in 简化多条件
+// 3. 用 any/all 简化循环
+// 4. 用推导式替代简单循环
+// 5. 用 for 替代 while (能用则用)
+
+// ========== 提前返回 ==========
+// ❌ 嵌套过深:
+def validate_user(user):
+    if user:
+        if user.is_active:
+            if user.has_permission:
+                return True
+    return False
+
+// ✅ 提前返回:
+def validate_user(user):
+    if not user:
+        return False
+    if not user.is_active:
+        return False
+    if not user.has_permission:
+        return False
+    return True
+
+// ========== any/all 替代循环 ==========
+// 检查是否所有元素都满足条件:
+all(x > 0 for x in numbers)      # 全部正数?
+any(x < 0 for x in numbers)      # 有负数?
+
+// 比显式循环简洁:
+// ❌
+all_positive = True
+for x in numbers:
+    if x <= 0:
+        all_positive = False
+        break
+
+// ✅
+all_positive = all(x > 0 for x in numbers)
+
+// ========== 推导式替代 ==========
+// ❌
+result = []
+for x in items:
+    if condition(x):
+        result.append(transform(x))
+
+// ✅
+result = [transform(x) for x in items if condition(x)]
+
+// ========== 最终建议 ==========
+// 清晰 > 简洁 > 性能
+// 如果一行代码需要 3 秒才能看懂,拆开写</div>
+        <div class="note">💡 流程控制最佳实践: (1) 能用 for 不用 while; (2) 用 enumerate 避免 range(len()); (3) 用 any/all 简化条件循环; (4) 提前返回避免深层嵌套; (5) 推导式替代简单 for+append; (6) 代码清晰永远是第一位的。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoFlow()">流程控制总结</button>
+        <button onclick="demoPythonic()">Pythonic 风格</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoFlow() {
+            result.innerHTML = '';
+            log('# 流程控制总结');
+            log('');
+            log('条件分支:');
+            log('  if/elif/else     — 基本条件');
+            return;
+            log('  match/case       — 模式匹配 (3.10+)');
+            log('  x if C else y    — 三元表达式');
+            log('');
+            log('循环:');
+            log('  for x in iter    — 遍历迭代');
+            log('  while cond       — 条件循环');
+            log('  for-else         — 无 break 时执行');
+            log('');
+            log('控制:');
+            log('  break     — 退出循环');
+            log('  continue  — 跳过本次');
+            log('  pass      — 占位符');
+        }
+
+        function demoPythonic() {
+            result.innerHTML = '';
+            log('# Pythonic 控制流风格');
+            log('');
+            log('提前返回:');
+            log('  def check(x):');
+            log('      if not x: return False');
+            log('      if x < 0: return False');
+            log('      return True');
+            log('');
+            log('any/all:');
+            log('  all(x>0 for x in nums)  全部正数?');
+            log('  any(x<0 for x in nums)  有负数?');
+            log('');
+            log('in 简化:');
+            log("  if x in (1, 2, 3): ✅");
+            log("  if x == 1 or x == 2: ❌");
+            log('');
+            log('推导式:');
+            log('  [f(x) for x in items if cond]');
+        }
+    </script>
+</body>
+</html>

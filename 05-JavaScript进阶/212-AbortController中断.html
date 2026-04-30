@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AbortController中断</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #abort-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        #abort-progress { height: 4px; background: #ecf0f1; border-radius: 2px; margin: 5px 0; }
+        #abort-progress .bar { height: 100%; background: #3498db; border-radius: 2px; width: 0%; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>AbortController</h2><p>中断 fetch 请求和异步操作。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 创建控制器
+const controller = new AbortController();
+const signal = controller.signal;
+
+// 绑定到 fetch
+fetch(url, { signal })
+    .then(res => res.json())
+    .then(data => console.log(data))
+    .catch(err => {
+        if (err.name === 'AbortError') {
+            console.log('请求被中断');
+        } else {
+            console.error('其他错误:', err);
+        }
+    });
+
+// 中断
+controller.abort();              // 立即中断
+controller.abort('超时');         // 带原因
+
+// signal 的属性
+signal.aborted;    // 是否已中断 (boolean)
+signal.reason;     // 中断原因 ('超时')
+
+// 监听中断事件
+signal.addEventListener('abort', () => {
+    console.log('已中断, 原因:', signal.reason);
+});
+
+// 超时中断（Chrome 103+）
+const signal2 = AbortSignal.timeout(5000);
+fetch(url, { signal: signal2 });
+// 5 秒后自动中断
+
+// 合并多个 signal
+const combined = AbortSignal.any([signal1, signal2]);
+fetch(url, { signal: combined });</div>
+        <div class="note">💡 一个 AbortController 可以控制多个请求（同时中断所有）。<br>
+        💡 中断是不可逆的：abort() 后 signal.aborted 永远为 true。<br>
+        ⚠️ 中断后必须创建新的 AbortController 才能发起新请求。</div>
+    </div>
+    <div class="card">
+        <h2>可中断的 Promise</h2>
+        <div class="code">// 任何异步操作都可以支持 AbortSignal
+function wait(duration, signal) {
+    return new Promise((resolve, reject) => {
+        if (signal?.aborted) {
+            return reject(new DOMException(signal.reason, 'AbortError'));
+        }
+        const timer = setTimeout(() => resolve('完成'), duration);
+        signal?.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(new DOMException(signal.reason, 'AbortError'));
+        }, { once: true });
+    });
+}
+
+// 使用
+const ac = new AbortController();
+wait(5000, ac.signal).then(console.log).catch(console.error);
+setTimeout(() => ac.abort('等太久了'), 2000);</div>
+    </div>
+    <div class="card">
+        <h2>演示：中断请求</h2>
+        <button onclick="startRequest()">开始请求</button>
+        <button onclick="abortRequest()" style="background:#e74c3c;">中断请求</button>
+        <div id="abort-progress"><div class="bar" id="abort-bar"></div></div>
+        <div id="abort-result">点击"开始请求"</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const abortResult = document.getElementById('abort-result');
+        const abortBar = document.getElementById('abort-bar');
+        let controller = null;
+
+        function log(msg) {
+            abortResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function startRequest() {
+            abortResult.innerHTML = '';
+            controller = new AbortController();
+            const signal = controller.signal;
+
+            log('🔄 开始请求 (模拟 3 秒加载)...');
+            abortBar.style.width = '0%';
+
+            // 模拟进度
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += 10;
+                abortBar.style.width = Math.min(progress, 90) + '%';
+                if (progress >= 90) clearInterval(progressInterval);
+            }, 300);
+
+            // 使用 AbortSignal.timeout 演示
+            fetch('https://jsonplaceholder.typicode.com/posts?_delay=3000', { signal })
+                .then(res => res.json())
+                .then(data => {
+                    clearInterval(progressInterval);
+                    abortBar.style.width = '100%';
+                    log(`✅ 请求成功! 收到 ${data.length} 条数据`);
+                })
+                .catch(err => {
+                    clearInterval(progressInterval);
+                    if (err.name === 'AbortError') {
+                        abortBar.style.width = '0%';
+                        log(`⏹ 请求被中断 (reason: ${signal.reason})`);
+                    } else {
+                        log(`❌ 请求失败: ${err.message}`);
+                    }
+                });
+
+            // 监听 abort
+            signal.addEventListener('abort', () => {
+                log(`📢 abort 事件触发, aborted=${signal.aborted}`);
+            });
+        }
+
+        function abortRequest() {
+            if (controller && !controller.signal.aborted) {
+                controller.abort('用户手动中断');
+                log('👉 已调用 controller.abort()');
+            } else {
+                log('⏸ 没有正在进行的请求');
+            }
+        }
+
+        console.log('=== AbortController ===');
+        console.log('AbortController 支持:', typeof AbortController === 'function');
+        console.log('AbortSignal.timeout 支持:', typeof AbortSignal?.timeout === 'function');
+
+        document.getElementById('output').textContent =
+            `AbortController: 中断异步操作\n` +
+            `new AbortController() → signal → fetch(url, {signal})\n` +
+            `controller.abort(reason) / signal.aborted / signal.reason\n` +
+            `AbortSignal.timeout(ms) / AbortSignal.any([...])\n` +
+            `✅ AbortController 演示完成！`;
+    </script>
+</body>
+</html>

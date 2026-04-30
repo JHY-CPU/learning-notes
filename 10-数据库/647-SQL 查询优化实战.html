@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 查询优化实战</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🚀 SQL 查询优化实战</h2><p>慢查询日志分析、索引优化案例、JOIN 优化策略、分页优化、COUNT 优化、子查询优化、OR 优化、排序优化、实际调优案例分析。</p></div>
+    <div class="card">
+        <h2>慢查询日志</h2>
+        <div class="code">// ========== 慢查询日志 ==========
+-- 优化第一步: 找到慢查询!
+
+-- MySQL 慢查询配置
+SET GLOBAL slow_query_log = ON;          -- 开启慢查询日志
+SET GLOBAL long_query_time = 1;           -- 超过 1 秒
+SET GLOBAL log_queries_not_using_indexes = ON;  -- 记录未用索引的查询
+SET GLOBAL slow_query_log_file = '/var/log/mysql/slow.log';
+
+-- 查看慢查询配置
+SHOW VARIABLES LIKE 'slow_query_log%';
+SHOW VARIABLES LIKE 'long_query_time';
+
+-- 分析慢查询日志
+-- mysqldumpslow -s t -t 10 /var/log/mysql/slow.log
+-- -s t: 按时间排序
+-- -t 10: 显示前 10 条
+
+-- pt-query-digest (Percona Toolkit)
+-- pt-query-digest /var/log/mysql/slow.log
+
+-- ========== 常见慢查询模式 ==========
+
+-- 1. 全表扫描 + 文件排序
+EXPLAIN SELECT * FROM orders ORDER BY created_at DESC LIMIT 10;
+-- type: ALL, Extra: Using filesort
+
+-- 2. 大表 JOIN 无索引
+EXPLAIN SELECT * FROM users u
+LEFT JOIN orders o ON u.id = o.user_id;
+-- type: ALL, Extra: Using join buffer
+
+-- 3. 大分页
+EXPLAIN SELECT * FROM orders ORDER BY id LIMIT 100000, 20;
+
+-- 4. COUNT 大表
+EXPLAIN SELECT COUNT(*) FROM orders;  -- 不走索引可能很慢</div>
+    </div>
+    <div class="card">
+        <h2>案例 1: 索引优化</h2>
+        <div class="code">// ========== 案例: 电商订单查询 ==========
+
+-- 问题: 查询用户某个月的订单很慢
+SELECT *
+FROM orders
+WHERE user_id = 123
+  AND created_at >= '2024-01-01'
+  AND created_at < '2024-02-01'
+ORDER BY created_at DESC;
+
+-- EXPLAIN 显示: type=ALL (全表扫描!)
+
+-- 解决方案: 创建复合索引
+CREATE INDEX idx_orders_user_date ON orders(user_id, created_at);
+
+-- 再次 EXPLAIN: type=ref, Extra=Using index condition
+-- 行数从 100 万降到 50!
+
+-- ========== 案例 2: 覆盖索引 ==========
+
+-- 问题: 查询经常慢
+SELECT id, user_id, amount, created_at
+FROM orders
+WHERE user_id = 123
+ORDER BY created_at DESC;
+
+-- 如果查询只涉及这几列,创建覆盖索引:
+CREATE INDEX idx_orders_covering ON orders(user_id, created_at, amount);
+
+-- Extra: Using index (完全不需要回表!)
+
+-- ========== 案例 3: 索引选择性 ==========
+
+-- 低选择性索引 (效果差):
+-- gender 列只有'男','女' → 选择性低
+CREATE INDEX idx_users_gender ON users(gender);  -- 几乎没用!
+
+-- 高选择性索引 (效果好):
+CREATE INDEX idx_users_email ON users(email);   -- 选择性近 100%
+
+-- 联合索引: 高选择性列放前面
+-- ❌: INDEX(gender, email)  -- gender 选择性低
+-- ✅: INDEX(email, gender)  -- email 选择性高</div>
+    </div>
+    <div class="card">
+        <h2>案例 2: JOIN 优化</h2>
+        <div class="code">// ========== JOIN 优化核心 ==========
+-- 1. JOIN 列必须建索引!
+-- 2. 小表驱动大表!
+-- 3. 只返回需要的列!
+
+-- ========== 案例: 用户订单统计 ==========
+
+-- 原始查询:
+SELECT u.name, COUNT(o.id) AS order_count, SUM(o.amount) AS total
+FROM users u
+LEFT JOIN orders o ON u.id = o.user_id
+GROUP BY u.id, u.name;
+
+-- EXPLAIN:
+-- orders: type=ALL, Extra=Using join buffer ← 没索引!
+
+-- 优化 1: 在 o.user_id 加索引
+CREATE INDEX idx_orders_user_id ON orders(user_id);
+-- 再次 EXPLAIN: type=ref, 不再 Using join buffer
+
+-- 优化 2: 先聚合再 JOIN
+SELECT u.name, COALESCE(os.order_count, 0) AS order_count,
+       COALESCE(os.total, 0) AS total
+FROM users u
+LEFT JOIN (
+    SELECT user_id, COUNT(*) AS order_count, SUM(amount) AS total
+    FROM orders
+    GROUP BY user_id
+) os ON u.id = os.user_id;
+
+-- ========== 案例: 多表 JOIN ==========
+
+-- 性能关键: 确保 ON 条件上的外键都有索引
+-- 用户 → 订单 → 订单明细 → 商品
+
+SELECT u.name, o.id AS order_id, p.name AS product, oi.quantity
+FROM users u
+JOIN orders o ON u.id = o.user_id          -- o.user_id 有索引?
+JOIN order_items oi ON o.id = oi.order_id   -- oi.order_id 有索引?
+JOIN products p ON oi.product_id = p.id     -- p.id (PK 有索引)
+
+-- 所有 JOIN 列都应建索引!</div>
+    </div>
+    <div class="card">
+        <h2>案例 3: 分页优化</h2>
+        <div class="code">// ========== 大分页优化 ==========
+
+-- 问题: 偏移量越大越慢
+SELECT * FROM orders ORDER BY id LIMIT 100000, 20;
+-- 扫描 100020 行,丢弃前 100000 行!
+
+-- 优化 1: 延迟关联 (先查 ID,再 JOIN)
+SELECT o.*
+FROM orders o
+JOIN (SELECT id FROM orders ORDER BY id LIMIT 100000, 20) tmp
+  ON o.id = tmp.id;
+
+-- 优化 2: 游标分页 (基于上一页最后 ID)
+-- 适用于: 滚动加载,不跳页
+SELECT * FROM orders
+WHERE id > 100000  -- 上一页最后 ID
+ORDER BY id
+LIMIT 20;
+
+-- 优化 3: 复合索引
+-- 如果 ORDER BY user_id, created_at 是覆盖索引
+-- 延迟关联效果更明显
+
+-- ========== COUNT 优化 ==========
+
+-- 问题: COUNT(*) 遍历整个表
+SELECT COUNT(*) FROM orders;  -- 1000 万行 → 慢!
+
+-- 优化 1: 使用近似值
+-- SHOW TABLE STATUS LIKE 'orders';
+-- PostgreSQL: ANALYZE orders; SELECT reltuples FROM pg_class;
+
+-- 优化 2: 使用二级索引 (比主键小)
+SELECT COUNT(id) FROM orders;  -- 如果 id 是主键,用主键索引
+-- 实际上 InnoDB 会自动选最小的索引
+
+-- 优化 3: 条件 COUNT
+-- COUNT(status = 'completed') 用条件索引
+CREATE INDEX idx_orders_completed ON orders(status) WHERE status = 'completed';  -- PG
+
+-- 优化 4: 缓存计数
+-- 用 Redis 维护计数器
+-- INSERT → INCR, DELETE → DECR
+
+-- ========== OR 优化 ==========
+
+-- ❌ OR 可能导致索引失效:
+SELECT * FROM users WHERE city = 'Beijing' OR age = 25;
+
+-- ✅ 用 UNION:
+SELECT * FROM users WHERE city = 'Beijing'
+UNION ALL
+SELECT * FROM users WHERE age = 25 AND city <> 'Beijing';
+
+-- ✅ 或改用 IN:
+SELECT * FROM users WHERE city IN ('Beijing', 'Shanghai');  -- 走索引</div>
+    </div>
+    <div class="card">
+        <h2>优化综合案例</h2>
+        <div class="code">// ========== 综合案例: 电商仪表板 ==========
+
+-- 需求: 查询今年每个月的销售额,以及同比去年增长
+
+-- ❌ 原始 (慢):
+SELECT
+    MONTH(created_at) AS month,
+    SUM(amount) AS revenue_this_year,
+    (SELECT SUM(amount) FROM orders
+     WHERE YEAR(created_at) = YEAR(CURDATE()) - 1
+       AND MONTH(created_at) = MONTH(o.created_at)
+    ) AS revenue_last_year
+FROM orders o
+WHERE YEAR(created_at) = YEAR(CURDATE())
+GROUP BY MONTH(created_at)
+ORDER BY month;
+
+-- 问题: 关联子查询每行执行一次! WHERE YEAR(col) 不走索引!
+
+-- ✅ 优化:
+SELECT
+    this.month,
+    this.revenue AS revenue_this_year,
+    COALESCE(last.revenue, 0) AS revenue_last_year,
+    ROUND((this.revenue - COALESCE(last.revenue, 0)) / COALESCE(last.revenue, 1) * 100, 1) AS growth_pct
+FROM (
+    SELECT MONTH(created_at) AS month, SUM(amount) AS revenue
+    FROM orders
+    WHERE created_at >= '2024-01-01' AND created_at < '2025-01-01'
+    GROUP BY MONTH(created_at)
+) this
+LEFT JOIN (
+    SELECT MONTH(created_at) AS month, SUM(amount) AS revenue
+    FROM orders
+    WHERE created_at >= '2023-01-01' AND created_at < '2024-01-01'
+    GROUP BY MONTH(created_at)
+) last ON this.month = last.month
+ORDER BY this.month;
+
+-- 优化点:
+-- 1. 范围查询代替 YEAR() 函数 (可以走索引)
+-- 2. 提前聚合,避免关联子查询
+-- 3. 只需要扫描两遍数据 (不是 12 遍)</div>
+        <div class="note">💡 优化要点: 慢查询日志找问题; 索引最左前缀; 覆盖索引避免回表; JOIN 列必须索引; 大分页用延迟关联; 范围查询代替函数; 子查询尽量改 JOIN; OR 改 UNION; 监控索引使用情况。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSlow()">慢查询诊断</button>
+        <button onclick="demoJoin()">JOIN 优化</button>
+        <button onclick="demoPaging()">分页优化</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSlow() {
+            result.innerHTML = '';
+            log('# 慢查询诊断');
+            log('');
+            log('1. 开启日志:');
+            log('  SET GLOBAL slow_query_log = ON;');
+            log('  SET GLOBAL long_query_time = 1;');
+            log('');
+            log('2. 分析:');
+            log('  mysqldumpslow -s t -t 10 slow.log');
+            log('');
+            log('3. EXPLAIN 检查:');
+            log('  type=ALL, rows 很大');
+            log('  Extra: filesort/temporary/join buffer');
+        }
+
+        function demoJoin() {
+            result.innerHTML = '';
+            log('# JOIN 优化');
+            log('');
+            log('✅ JOIN 列建索引:');
+            log('  orders.user_id 建索引');
+            log('  order_items.order_id 建索引');
+            log('');
+            log('✅ 小表驱动大表:');
+            log('  JOIN 顺序: 小表 → 大表');
+            log('');
+            log('✅ 先聚合再 JOIN:');
+            log('  (先 GROUP BY 再 JOIN)');
+            log('  减少 JOIN 数据量');
+        }
+
+        function demoPaging() {
+            result.innerHTML = '';
+            log('# 分页优化');
+            log('');
+            log('❌ 传统分页 (慢):');
+            log('  SELECT * FROM t ORDER BY id LIMIT 100000, 20;');
+            log('');
+            log('✅ 延迟关联:');
+            log('  SELECT t.* FROM t');
+            log('  JOIN (SELECT id FROM t ORDER BY id');
+            log('        LIMIT 100000, 20) tmp');
+            log('    ON t.id = tmp.id;');
+            log('');
+            log('✅ 游标分页:');
+            log('  WHERE id > 100000 LIMIT 20;');
+        }
+    </script>
+</body>
+</html>

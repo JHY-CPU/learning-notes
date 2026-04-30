@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>requestIdleCallback</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #ric-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>requestIdleCallback</h2><p>空闲回调、deadline.timeRemaining、合作式调度、后台任务。</p></div>
+    <div class="card">
+        <h2>requestIdleCallback 语法</h2>
+        <div class="code">// ========== requestIdleCallback ==========
+// 在浏览器空闲时执行低优先级任务
+const handle = requestIdleCallback(callback, options);
+
+// 回调接收 IdleDeadline 对象
+requestIdleCallback((deadline) => {
+    // deadline.timeRemaining() — 当前帧剩余时间 (ms)
+    // deadline.didTimeout — 是否因超时而执行
+    while (deadline.timeRemaining() > 0 && tasks.length > 0) {
+        processTask(tasks.shift());
+    }
+    if (tasks.length > 0) {
+        requestIdleCallback(processTasks); // 继续调度
+    }
+});
+
+// options.timeout — 最大延迟时间 (ms)
+// 超时后，即使没有空闲时间也会执行
+requestIdleCallback(callback, { timeout: 3000 });
+
+// ========== cancelIdleCallback ==========
+cancelIdleCallback(handle);
+
+// ========== 与 requestAnimationFrame 对比 ==========
+// rAF: 在下一帧渲染前执行 (高优先级)
+// rIC: 在帧空闲时执行 (低优先级)
+// rAF: 适合动画/布局测量
+// rIC: 适合非关键任务/数据上报/日志
+
+// ========== 应用场景 ==========
+// ✅ 数据上报和分析
+// ✅ 大型数据格式化
+// ✅ 图片延迟解码
+// ✅ 缓存清理/预计算
+// ✅ 非关键 DOM 操作</div>
+        <div class="note">⚠️ requestIdleCallback 不保证一定会执行。<br>
+        💡 使用 timeout 作为保底策略。<br>
+        💡 不要在 rIC 中操作 DOM (可能引起重排)。</div>
+    </div>
+    <div class="card">
+        <h2>演示：空闲任务调度</h2>
+        <button onclick="demoRIC()">空闲任务调度</button>
+        <button onclick="demoTaskSplit()">大任务分片</button>
+        <div id="ric-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const ricResult = document.getElementById('ric-result');
+
+        function log(msg) {
+            ricResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoRIC() {
+            ricResult.innerHTML = '';
+            log('🧠 requestIdleCallback 演示:');
+            log('');
+
+            // 模拟空闲任务
+            function createIdleTask(name, duration) {
+                return () => {
+                    const start = performance.now();
+                    while (performance.now() - start < duration) {
+                        // 模拟工作
+                    }
+                    log(`   ✅ 任务 "${name}" 完成 (耗时 ${duration}ms)`);
+                };
+            }
+
+            const tasks = [
+                createIdleTask('数据上报', 5),
+                createIdleTask('日志压缩', 8),
+                createIdleTask('缓存清理', 3),
+                createIdleTask('预渲染', 6),
+                createIdleTask('分析统计', 4),
+            ];
+
+            log('📋 注册 5 个空闲任务:');
+            tasks.forEach(t => log(`   📌 等待调度...`));
+            log('');
+
+            let idx = 0;
+
+            function processIdleTasks(deadline) {
+                while (deadline.timeRemaining() > 0 && idx < tasks.length) {
+                    tasks[idx]();
+                    idx++;
+                }
+                if (idx < tasks.length) {
+                    log(`   ⏳ 还有 ${tasks.length - idx} 个任务等待下次空闲`);
+                    requestIdleCallback(processIdleTasks);
+                } else {
+                    log('');
+                    log('✅ 所有空闲任务已完成');
+                    log(`📊 共处理 ${tasks.length} 个低优先级任务`);
+                }
+            }
+
+            requestIdleCallback(processIdleTasks);
+            log('⏳ 等待浏览器空闲...');
+        }
+
+        function demoTaskSplit() {
+            ricResult.innerHTML = '';
+
+            // 模拟大数组处理
+            const largeArray = Array.from({ length: 100 }, (_, i) => i + 1);
+            let result = [];
+
+            log('🔢 大任务分片处理 (100 个数字):');
+            log('');
+
+            let processed = 0;
+
+            function processChunk(deadline) {
+                const chunkSize = 10;
+                while (deadline.timeRemaining() > 0.5 && processed < largeArray.length) {
+                    const end = Math.min(processed + chunkSize, largeArray.length);
+                    for (let i = processed; i < end; i++) {
+                        result.push(largeArray[i] * 2);
+                    }
+                    processed = end;
+                    log(`   已处理 ${processed}/${largeArray.length} 项`);
+                }
+
+                if (processed < largeArray.length) {
+                    requestIdleCallback(processChunk);
+                } else {
+                    log('');
+                    log('✅ 全部处理完成!');
+                    log(`📊 结果前 10 项: [${result.slice(0, 10).join(', ')}]`);
+                    log('');
+                    log('📌 requestIdleCallback 优势:');
+                    log('   • 不阻塞用户交互');
+                    log('   • 利用空闲时间');
+                    log('   • 可配合 timeout 保底');
+                }
+            }
+
+            requestIdleCallback(processChunk, { timeout: 5000 });
+            log('⏳ 在浏览器空闲时逐步处理...');
+        }
+
+        console.log('=== requestIdleCallback ===');
+
+        document.getElementById('output').textContent =
+            `requestIdleCallback: 空闲调度 / deadline.timeRemaining / 任务分片\n` +
+            `低优先级任务: 数据上报 / 日志 / 缓存清理 / 预计算\n` +
+            `✅ requestIdleCallback 演示完成！`;
+    </script>
+</body>
+</html>

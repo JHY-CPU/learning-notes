@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 事务与隔离级别</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔒 SQL 事务与隔离级别</h2><p>ACID 特性、BEGIN/COMMIT/ROLLBACK、SAVEPOINT、四种隔离级别、脏读/不可重复读/幻读、MVCC 多版本并发控制。</p></div>
+    <div class="card">
+        <h2>事务基础</h2>
+        <div class="code">// ========== 事务概念 ==========
+-- 事务: 一组 SQL 操作,要么全部成功,要么全部失败
+-- 经典例子: A 转 100 给 B
+--   UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+--   UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+--   如果第一步成功第二步失败 → 钱就丢了!
+--   事务保证这两步一起成功或一起失败
+
+-- ========== 事务操作 ==========
+-- 开始事务:
+BEGIN;           -- PostgreSQL, MySQL
+-- 或:
+START TRANSACTION; -- MySQL
+-- 或:
+BEGIN TRANSACTION; -- SQLite
+
+-- 提交事务:
+COMMIT;
+
+-- 回滚事务:
+ROLLBACK;
+
+-- 设置保存点:
+SAVEPOINT savepoint_name;
+
+-- 回滚到保存点:
+ROLLBACK TO SAVEPOINT savepoint_name;
+
+-- ========== 转账示例 ==========
+BEGIN;
+
+UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+-- 检查余额是否足够 (应用程序检查)
+
+UPDATE accounts SET balance = balance + 100 WHERE id = 2;
+
+-- 如果一切正常:
+COMMIT;
+-- 如果出错:
+ROLLBACK;
+
+-- ========== 保存点示例 ==========
+BEGIN;
+
+INSERT INTO logs(action) VALUES('start_processing');
+SAVEPOINT log_inserted;
+
+-- 尝试操作1
+UPDATE accounts SET balance = balance - 100 WHERE id = 1;
+-- 如果失败,只回滚到保存点
+ROLLBACK TO SAVEPOINT log_inserted;
+
+-- 尝试操作2
+UPDATE accounts SET balance = balance - 100 WHERE id = 2;
+
+-- 最终提交
+COMMIT;</div>
+    </div>
+    <div class="card">
+        <h2>ACID 特性</h2>
+        <div class="code">// ========== ACID ==========
+-- 事务的四个核心特性
+
+-- 1. A - Atomicity (原子性)
+-- 事务不可分割,要么全做,要么全不做
+-- 系统崩溃后自动回滚未提交的事务
+
+-- 2. C - Consistency (一致性)
+-- 事务前后数据满足所有约束
+-- 从一种一致状态到另一种一致状态
+-- 应用负责维护业务一致性 (如余额>=0)
+
+-- 3. I - Isolation (隔离性)
+-- 并发事务互不干扰
+-- 看起来像串行执行 (取决于隔离级别)
+
+-- 4. D - Durability (持久性)
+-- 提交的事务永久生效
+-- 系统崩溃后可通过日志恢复
+-- 数据已写入磁盘
+
+-- ========== 数据库实现 ==========
+-- MySQL (InnoDB):
+--   Redo Log:   保证持久性 (D)
+--   Undo Log:   保证原子性 (A) + MVCC
+--   Lock:       保证隔离性 (I)
+--   约束:       保证一致性 (C)
+
+-- PostgreSQL:
+--   WAL (Write-Ahead Log): 保证持久性
+--   MVCC:                  保证隔离性
+--   FSM (Free Space Map):  空间管理</div>
+    </div>
+    <div class="card">
+        <h2>并发问题</h2>
+        <div class="code">// ========== 并发事务的三大问题 ==========
+
+-- 1. 脏读 (Dirty Read)
+-- 读到其他事务未提交的数据
+-- 如果那个事务回滚 → 读到的是脏数据!
+
+-- 时间线:
+-- 事务A: BEGIN
+-- 事务A: UPDATE accounts SET balance = 200 WHERE id = 1
+-- 事务B: SELECT balance FROM accounts WHERE id = 1  → 200 (脏数据!)
+-- 事务A: ROLLBACK  (余额回到 100)
+-- 事务B 读了 200,但实际数据是 100
+
+-- 2. 不可重复读 (Non-Repeatable Read)
+-- 同一事务内,两次读取同一数据,结果不同
+-- 原因: 其他事务修改并提交了
+
+-- 时间线:
+-- 事务A: SELECT balance FROM accounts WHERE id = 1  → 100
+-- 事务B: UPDATE accounts SET balance = 200 WHERE id = 1; COMMIT;
+-- 事务A: SELECT balance FROM accounts WHERE id = 1  → 200 (变了!)
+-- 问题: 事务A 中两次读取结果不一致
+
+-- 3. 幻读 (Phantom Read)
+-- 同一事务内,两次查询返回不同行数
+-- 原因: 其他事务插入/删除了行
+
+-- 时间线:
+-- 事务A: SELECT * FROM accounts WHERE balance > 100  → 5 行
+-- 事务B: INSERT INTO accounts (...) VALUES (150); COMMIT;
+-- 事务A: SELECT * FROM accounts WHERE balance > 100  → 6 行 (出现了幻影行!)
+-- 问题: 事务A 中两次查询行数不一致
+
+-- ========== 问题严重程度 ==========
+-- 脏读        > 不可重复读 > 幻读
+-- (最严重)                    (最轻微)</div>
+    </div>
+    <div class="card">
+        <h2>四种隔离级别</h2>
+        <div class="code">// ========== SQL 标准隔离级别 ==========
+-- 低 → 高 (性能递减,正确性递增)
+
+-- 1. READ UNCOMMITTED (读未提交)
+--    - 允许脏读 ✓
+--    - 允许不可重复读 ✓
+--    - 允许幻读 ✓
+--    "什么都不做,直接读"
+--    MySQL InnoDB 实际上禁止脏读
+
+-- 2. READ COMMITTED (读已提交) ← PostgreSQL 默认
+--    - 禁止脏读 ✗
+--    - 允许不可重复读 ✓
+--    - 允许幻读 ✓
+--    "只读已经提交的数据"
+--    每条语句看到最新的快照
+
+-- 3. REPEATABLE READ (可重复读) ← MySQL InnoDB 默认
+--    - 禁止脏读 ✗
+--    - 禁止不可重复读 ✗
+--    - 允许幻读 ✓ (MySQL InnoDB 通过 Gap Lock 解决了!)
+--    "事务开始后看到一致的数据快照"
+--    同一事务内多次读取结果一致
+
+-- 4. SERIALIZABLE (可串行化)
+--    - 禁止脏读 ✗
+--    - 禁止不可重复读 ✗
+--    - 禁止幻读 ✗
+--    "事务完全串行执行"
+--    性能最差,几乎不用
+
+-- ========== 设置隔离级别 ==========
+-- MySQL:
+SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+-- 或:
+SET SESSION TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+
+-- PostgreSQL:
+BEGIN;
+SET TRANSACTION ISOLATION LEVEL SERIALIZABLE;
+-- ...
+
+-- 查看当前隔离级别:
+-- MySQL: SELECT @@transaction_isolation;
+-- PostgreSQL: SHOW transaction_isolation;</div>
+    </div>
+    <div class="card">
+        <h2>MVCC 多版本并发控制</h2>
+        <div class="code">// ========== MVCC 原理 ==========
+-- MVCC: Multi-Version Concurrency Control
+-- 每个修改创建新版本,读操作读旧版本快照
+-- 读不阻塞写,写不阻塞读!
+
+-- ========== 行结构 (InnoDB) ==========
+-- 每行数据有隐藏列:
+-- DB_TRX_ID:  最后修改该行的事务ID
+-- DB_ROLL_PTR: 回滚指针 (指向 Undo Log)
+-- DB_ROW_ID:  行ID (无主键时使用)
+
+-- ========== 工作原理 ==========
+-- 1. 事务开始: 记录当前活跃事务列表 (Read View)
+-- 2. 读取时: 检查行的 DB_TRX_ID
+--    - 如果事务 ID < Read View 中最小值 → 可见
+--    - 如果事务 ID 在 active 列表中 → 不可见 (找旧版本)
+--    - 如果事务 ID > Read View 中最大值 → 不可见
+-- 3. 修改时: 创建新版本,旧版本保留在 Undo Log
+-- 4. COMMIT 后: 清理 Undo Log (不再需要)
+
+-- ========== 图示 ==========
+-- 事务 10 读取:
+--   行版本: (trx_id=5, balance=100)  ← 可见 (5 < 10)
+--   行版本: (trx_id=8, balance=200)  ← 可见 (8 已提交)
+--   行版本: (trx_id=12, balance=300) ← 不可见 (12 > 10)
+
+-- ========== 不同隔离级别下的 MVCC ==========
+-- READ COMMITTED:
+--   每条语句都创建新的 Read View
+--   看到的是语句开始时的快照
+
+-- REPEATABLE READ:
+--   事务开始创建 Read View,整个事务用同一个
+--   看到的是事务开始时的快照
+
+-- ========== MVCC 的好处 ==========
+-- 1. 读不阻塞写: SELECT 时别人可以 UPDATE
+-- 2. 写不阻塞读: UPDATE 时别人可以 SELECT (读旧快照)
+-- 3. 大大提升并发性能</div>
+    </div>
+    <div class="card">
+        <h2>锁机制</h2>
+        <div class="code">// ========== InnoDB 锁类型 ==========
+
+-- 1. 共享锁 (S Lock): SELECT ... LOCK IN SHARE MODE
+--    允许多个事务同时读
+--    不允许任何事务修改
+
+-- 2. 排他锁 (X Lock): SELECT ... FOR UPDATE
+--    不允许其他事务读写该行
+--    UPDATE/DELETE/INSERT 自动加 X 锁
+
+-- 3. 意向锁 (IS/IX): 表级锁,表示事务要加行锁
+
+-- 4. 间隙锁 (Gap Lock): 锁定范围,防止幻读
+--    只在 REPEATABLE READ 级别存在
+--    锁定两个索引之间的间隙
+
+-- 5. Next-Key Lock: 行锁 + 间隙锁的组合
+--    InnoDB REPEATABLE READ 级别的默认锁
+--    防止幻读的关键
+
+-- ========== 死锁 ==========
+-- 事务A: UPDATE accounts SET balance = ... WHERE id = 1;
+-- 事务B: UPDATE accounts SET balance = ... WHERE id = 2;
+-- 事务A: UPDATE accounts SET balance = ... WHERE id = 2;  -- 等待B
+-- 事务B: UPDATE accounts SET balance = ... WHERE id = 1;  -- 等待A
+-- 结果: 死锁! (MySQL 自动检测并回滚一个)
+
+-- 预防:
+-- 1. 事务按相同顺序访问资源
+-- 2. 尽量缩短事务时间
+-- 3. 合理设置隔离级别</div>
+        <div class="note">💡 事务要点: ACID 保证数据完整性; 隔离级别从低到高: RU→RC→RR→S; MVCC 实现读不阻塞写; 间隙锁防止幻读; 死锁通过资源有序访问预防; 事务尽量短小精悍。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoAcid()">ACID 演示</button>
+        <button onclick="demoIsolation()">隔离级别对比</button>
+        <button onclick="demoDeadlock()">死锁演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoAcid() {
+            result.innerHTML = '';
+            log('# ACID 特性');
+            log('');
+            log('A (原子性): 全做或全不做');
+            log('C (一致性): 约束保持正确');
+            log('I (隔离性): 并发互不干扰');
+            log('D (持久性): 提交后永久保存');
+            log('');
+            log('转账示例:');
+            log('  BEGIN;');
+            log("  UPDATE accounts SET balance = balance - 100 WHERE id = 1;");
+            log("  UPDATE accounts SET balance = balance + 100 WHERE id = 2;");
+            log('  COMMIT;  -- 或 ROLLBACK');
+        }
+
+        function demoIsolation() {
+            result.innerHTML = '';
+            log('# 隔离级别对比');
+            log('');
+            log('级别            脏读  不可重复读  幻读');
+            log('READ UNCOMMITTED  ✓    ✓         ✓');
+            log('READ COMMITTED    ✗    ✓         ✓');
+            log('REPEATABLE READ   ✗    ✗         ✓(*)');
+            log('SERIALIZABLE      ✗    ✗         ✗');
+            log('');
+            log('(*) MySQL InnoDB 通过 Gap Lock 解决');
+            log('');
+            log('性能: RC > RR > SERIALIZABLE');
+            log('默认: MySQL=RR, PostgreSQL=RC');
+        }
+
+        function demoDeadlock() {
+            result.innerHTML = '';
+            log('# 死锁演示');
+            log('');
+            log('事务A: UPDATE t SET x=1 WHERE id=1');
+            log('事务B: UPDATE t SET x=2 WHERE id=2');
+            log('事务A: UPDATE t SET x=3 WHERE id=2  ← 等B');
+            log('事务B: UPDATE t SET x=4 WHERE id=1  ← 等A');
+            log('--- DEADLOCK ---');
+            log('');
+            log('预防: 按相同顺序访问!');
+            log('      A: id=1 → id=2');
+            log('      B: id=1 → id=2  (同顺序)');
+        }
+    </script>
+</body>
+</html>

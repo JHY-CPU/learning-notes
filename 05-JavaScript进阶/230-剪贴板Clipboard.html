@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>剪贴板Clipboard</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        textarea { width: 100%; height: 60px; padding: 8px; border: 2px solid #ddd; border-radius: 4px; font-size: 14px; margin: 5px 0; box-sizing: border-box; }
+        #clip-status { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 30px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>剪贴板 Clipboard API</h2><p>异步读写系统剪贴板。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 异步剪贴板 API（推荐，需要 HTTPS）
+// 写入文本
+await navigator.clipboard.writeText('要复制的文本');
+
+// 读取文本
+const text = await navigator.clipboard.readText();
+
+// 写入任意数据（图片等）
+await navigator.clipboard.write([
+    new ClipboardItem({
+        'text/plain': new Blob(['文本'], { type: 'text/plain' }),
+        'text/html': new Blob(['<b>HTML</b>'], { type: 'text/html' }),
+        'image/png': imageBlob,
+    })
+]);
+
+// 读取任意数据
+const items = await navigator.clipboard.read();
+for (const item of items) {
+    for (const type of item.types) {
+        const blob = await item.getType(type);
+    }
+}
+
+// 粘贴事件（不依赖 API 可用性）
+document.addEventListener('paste', (e) => {
+    const text = e.clipboardData.getData('text/plain');
+    const html = e.clipboardData.getData('text/html');
+    const files = e.clipboardData.files;  // 粘贴的文件
+});
+
+// 复制/剪切事件
+document.addEventListener('copy', (e) => {
+    e.clipboardData.setData('text/plain', '自定义复制内容');
+    e.preventDefault(); // 覆盖默认复制
+});
+document.addEventListener('cut', (e) => { });
+
+// 权限检查
+// navigator.permissions.query({ name: 'clipboard-read' })
+// navigator.permissions.query({ name: 'clipboard-write' })</div>
+        <div class="note">⚠️ Clipboard API 需要 HTTPS（localhost 除外）。<br>
+        ⚠️ read()/write() 在部分浏览器需要用户授权。<br>
+        💡 旧方案: document.execCommand('copy') 已弃用但仍广泛兼容。<br>
+        💡 copy/paste 事件始终可用，不需要权限。</div>
+    </div>
+    <div class="card">
+        <h2>演示：读写剪贴板</h2>
+        <button onclick="copyText()">复制文本</button>
+        <button onclick="pasteText()">粘贴文本</button>
+        <textarea id="clip-text" placeholder="在这里输入要复制的内容，或查看粘贴的内容...">你好，Clipboard API！</textarea>
+        <div id="clip-status">点击按钮操作剪贴板</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const clipStatus = document.getElementById('clip-status');
+        const clipText = document.getElementById('clip-text');
+
+        async function copyText() {
+            try {
+                await navigator.clipboard.writeText(clipText.value);
+                clipStatus.textContent = '✅ 已复制到剪贴板';
+                console.log('已复制:', clipText.value);
+            } catch (err) {
+                // fallback
+                try {
+                    const textarea = document.createElement('textarea');
+                    textarea.value = clipText.value;
+                    document.body.appendChild(textarea);
+                    textarea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textarea);
+                    clipStatus.textContent = '✅ 已复制（execCommand fallback）';
+                    console.log('复制 fallback 成功');
+                } catch (err2) {
+                    clipStatus.textContent = '❌ 复制失败: ' + err.message;
+                    console.error('复制失败:', err);
+                }
+            }
+        }
+
+        async function pasteText() {
+            try {
+                const text = await navigator.clipboard.readText();
+                clipText.value = text;
+                clipStatus.textContent = '✅ 已粘贴: ' + text.substring(0, 50);
+                console.log('已粘贴:', text);
+            } catch (err) {
+                clipStatus.textContent = '❌ 读取剪贴板失败（可能需要授权或 HTTPS）';
+                console.error('粘贴失败:', err);
+                // 提示用户手动粘贴
+                clipText.focus();
+            }
+        }
+
+        // 粘贴事件监听
+        clipText.addEventListener('paste', (e) => {
+            const text = e.clipboardData.getData('text/plain');
+            clipStatus.textContent = '📋 粘贴事件: ' + text.substring(0, 50);
+            console.log('paste event:', text);
+        });
+
+        // 复制事件监听
+        document.addEventListener('copy', () => {
+            clipStatus.textContent = '📋 复制事件触发';
+            console.log('copy event');
+        });
+
+        console.log('=== Clipboard API ===');
+        console.log('支持 clipboard:', !!navigator.clipboard);
+        console.log('支持 execCommand:', !!document.queryCommandSupported('copy'));
+
+        document.getElementById('output').textContent =
+            `Clipboard API: 异步剪贴板操作\n` +
+            `writeText/readText (文本) / write/read (任意数据)\n` +
+            `copy/paste/cut 事件 + clipboardData\n` +
+            `✅ Clipboard 演示完成！`;
+    </script>
+</body>
+</html>

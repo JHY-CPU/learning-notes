@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redis List 与 Set</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📋 Redis List 与 Set</h2><p>List 操作 (LPUSH/RPUSH/LPOP/RPOP/LLEN/LRANGE)、消息队列模式、Set 操作 (SADD/SREM/SMEMBERS/SISMEMBER)、集合运算 (SINTER/SUNION/SDIFF)。</p></div>
+    <div class="card">
+        <h2>List 类型</h2>
+        <div class="code">// ========== List (列表) ==========
+// 有序字符串列表, 基于链表
+// 适合: 消息队列, 时间线, 最新列表
+
+// ========== 添加元素 ==========
+
+// 从左侧推入
+LPUSH tasks "task1"          // ["task1"]
+LPUSH tasks "task2"          // ["task2", "task1"]
+
+// 从右侧推入
+RPUSH tasks "task0"          // ["task2", "task1", "task0"]
+
+// 一次多个
+LPUSH queue "a" "b" "c"     // ["c", "b", "a"] (注意顺序!)
+RPUSH queue "x" "y" "z"     // ["c", "b", "a", "x", "y", "z"]
+
+// ========== 弹出元素 ==========
+
+// 从左侧弹出
+LPOP queue                   // "c"
+// 从右侧弹出
+RPOP queue                   // "z"
+
+// 阻塞弹出 (消息队列核心!)
+BLPOP queue 5                // 从左侧弹出, 无数据等待 5 秒
+BRPOP queue 5                // 从右侧弹出, 无数据等待 5 秒
+// 返回: ["queue", "value"] 或 nil (超时)
+
+// 超时 0 = 一直等
+BRPOP queue 0
+
+// ========== 查看元素 ==========
+
+// 范围查询 (0 开始, -1 结束)
+LRANGE list 0 -1             // 所有元素
+LRANGE list 0 2              // 前 3 个
+LRANGE list -3 -1            // 后 3 个
+
+LLEN list                    // 列表长度: 6
+LINDEX list 0                // 索引 0 的元素
+LINDEX list -1               // 最后一个
+
+// ========== 其他操作 ==========
+
+// 修剪 (保留指定范围)
+LTRIM list 0 99              // 只保留前 100 个
+
+// 插入
+LINSERT list BEFORE "a" "before_a"  // 在 a 前插入
+LINSERT list AFTER "a" "after_a"    // 在 a 后插入
+
+// 修改
+LSET list 0 "new_first"     // 设置索引 0 的值
+
+// 删除
+LREM list 2 "value"         // 删除 2 个 "value" (count>0 从左边删)
+LREM list -2 "value"        // count<0 从右边删
+LREM list 0 "value"         // count=0 删所有</div>
+    </div>
+    <div class="card">
+        <h2>List 消息队列模式</h2>
+        <div class="code">// ========== List 实现消息队列 ==========
+
+// ========== 简单队列 ==========
+// 生产者:
+RPUSH queue:email "user1@test.com"
+RPUSH queue:email "user2@test.com"
+
+// 消费者:
+BRPOP queue:email 0
+
+// ========== 可靠队列 (确认机制) ==========
+// 使用 RPOPLPUSH 或 BRPOPLPUSH
+
+// 生产者:
+RPUSH queue:orders '{"id":1,"user":"Alice"}'
+
+// 消费者: 原子弹出+备份到处理中队列
+BRPOPLPUSH queue:orders queue:orders:processing 0
+
+// 处理成功: DEL queue:orders:processing (确认删除)
+// 处理失败: 重新 RPUSH 回 queue:orders (重试)
+// 崩溃恢复: 扫描 queue:orders:processing 中的未处理项
+
+// ========== 限流队列 ==========
+// 用 LLEN 限制积压
+LLEN queue:orders           // 检查积压
+// 如果 > 10000, 拒绝新请求 (防止内存溢出)
+
+// ========== 最新列表 ==========
+// 存储用户最新动态 (保留 100 条)
+LPUSH user:100:feed "post:42"
+LTRIM user:100:feed 0 99
+
+// 获取时间线:
+LRANGE user:100:feed 0 -1
+
+// ========== List 与消息队列注意事项 ==========
+// 1. List 做队列: 简单, 但不支持多消费者广播
+// 2. 需要广播 → 用 Pub/Sub 或 Redis Stream
+// 3. List 无 ACK 机制 → 用 BRPOPLPUSH 手工 ACK
+// 4. 生产大型队列 → 用 Redis Stream 或 Kafka</div>
+    </div>
+    <div class="card">
+        <h2>Set 类型</h2>
+        <div class="code">// ========== Set (集合) ==========
+// 无序唯一字符串集合
+// 适合: 标签, 去重, 共同关注
+
+// ========== 添加/删除 ==========
+
+SADD user:100:tags "tech"     // 1 (新增)
+SADD user:100:tags "music"    // 1
+SADD user:100:tags "tech"     // 0 (已存在, 不重复)
+
+SREM user:100:tags "music"    // 1 (删除)
+
+// ========== 查询 ==========
+
+SMEMBERS user:100:tags        // 所有元素: ["tech"]
+SISMEMBER user:100:tags "tech"  // 是否成员: 1
+SCARD user:100:tags           // 元素数量: 1
+SRANDMEMBER user:100:tags 2   // 随机获取 2 个 (不删除)
+SPOP user:100:tags 1          // 随机弹出 1 个 (删除)
+
+// ========== 集合运算 ==========
+
+// 准备数据
+SADD set_a "a" "b" "c" "d"
+SADD set_b "c" "d" "e" "f"
+
+// 交集 (共同)
+SINTER set_a set_b            // ["c", "d"]
+SINTERCARD 2 set_a set_b      // 交集计数: 2 (7.0+ 高效)
+
+// 并集 (合并)
+SUNION set_a set_b            // ["a","b","c","d","e","f"]
+
+// 差集 (在 A 不在 B)
+SDIFF set_a set_b             // ["a", "b"]
+
+// 存储结果
+SINTERSTORE dest set_a set_b  // 交集存入 dest
+SUNIONSTORE dest set_a set_b  // 并集存入 dest
+SDIFFSTORE dest set_a set_b   // 差集存入 dest</div>
+    </div>
+    <div class="card">
+        <h2>Set 实际应用</h2>
+        <div class="code">// ========== Set 实战应用 ==========
+
+// ========== 1. 标签系统 ==========
+SADD article:42:tags "database" "nosql" "redis"
+SADD tag:redis:articles 42 43 45
+
+// 查找标签为 database 和 redis 的文章:
+SINTER article:42:tags tag:redis:articles
+
+// ========== 2. 共同好友 ==========
+SADD user:alice:friends "bob" "carol" "dave"
+SADD user:bob:friends "alice" "carol" "eve"
+
+// 共同好友:
+SINTER user:alice:friends user:bob:friends
+// ["carol"]
+
+// 推荐好友 (A 的好友 - B 的好友):
+SDIFF user:alice:friends user:bob:friends
+// ["dave"]
+
+// ========== 3. 去重 ==========
+// 今天访问的用户 (自动去重)
+SADD visitors:2024-10-01 "user:100" "user:200" "user:100"
+
+SCARD visitors:2024-10-01     // 唯一用户数: 2
+
+// ========== 4. 抽奖 ==========
+SADD lottery:2024 "user:1" "user:2" "user:3" "user:4"
+
+// 随机中奖 (不删除):
+SRANDMEMBER lottery:2024 2     // 抽 2 人
+
+// 随机中奖并删除 (一次抽完):
+SPOP lottery:2024 2
+
+// ========== 5. 关注模型 ==========
+// A 关注的人:
+SADD follow:alice "bob" "carol"
+// A 的粉丝:
+SADD follower:bob "alice"
+
+// 你可能认识 (好友的好友):
+SINTER follow:alice follow:bob
+
+// ========== Set 与 List 选择 ==========
+// 需要排序/重复? → List
+// 需要唯一/集合运算? → Set
+// 需要消息队列? → List (或 Stream)
+// 需要排行榜? → ZSet</div>
+        <div class="note">💡 List 要点: LPUSH/RPOP 做队列; BLPOP/BRPOP 阻塞等待; BRPOPLPUSH 可靠消费; LTRIM 固定长度; LRANGE 范围查询。Set 要点: 自动去重; SINTER/SUNION/SDIFF 集合运算; SRANDMEMBER/SPOP 随机抽取; 适合标签/好友/去重场景。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoList()">List 操作</button>
+        <button onclick="demoSet()">Set 操作</button>
+        <button onclick="demoApply()">实战应用</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoList() {
+            result.innerHTML = '';
+            log('# List 操作');
+            log('');
+            log('RPUSH queue "a" "b" "c"');
+            log('LPUSH queue "x"');     // ["x","a","b","c"]
+            log('LPOP queue → "x"');
+            log('BRPOP queue 0 → 阻塞等待');
+            log('LRANGE queue 0 -1 → 全部');
+            log('LLEN queue → 长度');
+        }
+
+        function demoSet() {
+            result.innerHTML = '';
+            log('# Set 操作');
+            log('');
+            log('SADD set "a" "b" "c"');
+            log('SREM set "a"');
+            log('SMEMBERS set → 全部元素');
+            log('SISMEMBER set "a" → 0/1');
+            log('SCARD set → 元素数量');
+            log('');
+            log('SINTER set1 set2 → 交集');
+            log('SUNION set1 set2 → 并集');
+            log('SDIFF set1 set2 → 差集');
+        }
+
+        function demoApply() {
+            result.innerHTML = '';
+            log('# 实战应用');
+            log('');
+            log('List: 消息队列, 最新列表');
+            log('  生产者: RPUSH, 消费者: BRPOP');
+            log('');
+            log('Set: 标签系统');
+            log('  SADD article:id:tags ...');
+            log('  交集查找共同标签');
+            log('');
+            log('Set: 共同好友');
+            log('  SINTER user:A:friends user:B:friends');
+        }
+    </script>
+</body>
+</html>

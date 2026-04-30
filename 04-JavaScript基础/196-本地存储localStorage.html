@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>本地存储localStorage</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        input, textarea { padding: 8px 12px; border: 2px solid #ddd; border-radius: 4px; font-size: 14px; margin: 5px; width: 250px; }
+        input:focus, textarea:focus { outline: none; border-color: #3498db; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        button.danger { background: #e74c3c; }
+        button.secondary { background: #95a5a6; }
+        #storage-list { background: #f8f9fa; padding: 15px; border-radius: 4px; min-height: 60px; font-size: 14px; }
+        #storage-list .entry { padding: 4px 0; border-bottom: 1px solid #eee; word-break: break-all; }
+        .storage-demo { display: flex; gap: 20px; flex-wrap: wrap; }
+        .storage-demo > div { flex: 1; min-width: 200px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>本地存储 localStorage</h2><p>持久化存储，数据保存在浏览器中，不会过期。</p></div>
+    <div class="card">
+        <h2>localStorage 基本操作</h2>
+        <div class="code">// localStorage — 持久存储（除非手动清除，否则永不过期）
+
+// 存储键值对（值必须是字符串）
+localStorage.setItem('key', 'value');
+
+// 获取值
+const value = localStorage.getItem('key');  // 'value' 或 null
+
+// 删除某个键
+localStorage.removeItem('key');
+
+// 清空所有
+localStorage.clear();
+
+// 获取键名
+localStorage.key(0);         // 第0个键名
+
+// 获取数量
+localStorage.length;          // 存储项数量
+
+// ⚠️ 存储的值会被自动转为字符串
+localStorage.setItem('num', 42);
+typeof localStorage.getItem('num');  // 'string'（不是 number）
+
+// ⚠️ 存储对象/数组需要 JSON 序列化
+const user = { name: 'Alice', age: 25 };
+localStorage.setItem('user', JSON.stringify(user));
+
+const saved = JSON.parse(localStorage.getItem('user'));
+console.log(saved.name);  // 'Alice'
+
+// ⚠️ 存储大小限制约 5MB（不同浏览器略有差异）
+// ⚠️ 同源策略（协议 + 域名 + 端口）共享</div>
+    </div>
+    <div class="card">
+        <h2>storage 事件（跨标签通信）</h2>
+        <div class="code">// 当 localStorage 发生变化时，其他标签页会收到 storage 事件
+// （⚠️ 只有其他标签页才会触发，当前页面不会）
+
+window.addEventListener('storage', (event) => {
+    console.log('键:', event.key);          // 修改的键名
+    console.log('旧值:', event.oldValue);    // 旧值
+    console.log('新值:', event.newValue);    // 新值
+    console.log('URL:', event.url);          // 修改的页面 URL
+    console.log('存储区:', event.storageArea); // localStorage 对象
+});
+
+// 用途：跨标签页同步数据
+// 标签A 修改了数据 → 标签B 收到 storage 事件 → 标签B 更新界面</div>
+    </div>
+    <div class="card">
+        <h2>实际应用：笔记存储</h2>
+        <div class="storage-demo">
+            <div>
+                <h3 style="font-size:16px;margin-bottom:5px;">添加数据</h3>
+                <input type="text" id="storage-key" placeholder="键名"><br>
+                <input type="text" id="storage-value" placeholder="值"><br>
+                <button onclick="saveItem()">保存 setItem</button>
+                <button onclick="loadItem()">读取 getItem</button>
+                <button onclick="removeItem()" class="secondary">删除 removeItem</button>
+            </div>
+            <div>
+                <h3 style="font-size:16px;margin-bottom:5px;">存储的笔记</h3>
+                <textarea id="note-input" placeholder="输入笔记内容..." style="width:100%;height:60px;"></textarea><br>
+                <button onclick="saveNote()">保存笔记</button>
+                <button onclick="clearAll()" class="danger">清空所有</button>
+                <button onclick="refreshList()" class="secondary">刷新列表</button>
+            </div>
+        </div>
+        <div id="storage-list">当前存储内容：</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const output = document.getElementById('output');
+        const storageList = document.getElementById('storage-list');
+
+        console.log('=== localStorage 基础 ===');
+
+        // 保存
+        localStorage.setItem('test', 'hello');
+        console.log('setItem: test=hello');
+
+        // 读取
+        const val = localStorage.getItem('test');
+        console.log('getItem:', val);
+
+        // 删除
+        localStorage.removeItem('test');
+        console.log('removeItem: test 已删除');
+
+        // 大小
+        console.log('length:', localStorage.length);
+
+        console.log('=== JSON 序列化 ===');
+        const obj = { name: 'Alice', scores: [90, 85, 92] };
+        localStorage.setItem('userData', JSON.stringify(obj));
+        const restored = JSON.parse(localStorage.getItem('userData'));
+        console.log('恢复的对象:', restored);
+        console.log('对象相等:', restored.name === obj.name);
+
+        function saveItem() {
+            const key = document.getElementById('storage-key').value.trim();
+            const value = document.getElementById('storage-value').value.trim();
+            if (!key) { output.textContent = '请输入键名'; return; }
+
+            localStorage.setItem(key, value);
+            output.textContent = `已保存: ${key} = ${value}`;
+            refreshList();
+            console.log(`save: ${key}=${value}`);
+        }
+
+        function loadItem() {
+            const key = document.getElementById('storage-key').value.trim();
+            if (!key) { output.textContent = '请输入键名'; return; }
+
+            const value = localStorage.getItem(key);
+            output.textContent = value !== null
+                ? `读取: ${key} = ${value}`
+                : `未找到键: ${key}`;
+            console.log(`load: ${key}=${value}`);
+        }
+
+        function removeItem() {
+            const key = document.getElementById('storage-key').value.trim();
+            if (!key) { output.textContent = '请输入键名'; return; }
+
+            localStorage.removeItem(key);
+            output.textContent = `已删除: ${key}`;
+            refreshList();
+        }
+
+        function saveNote() {
+            const note = document.getElementById('note-input').value.trim();
+            if (!note) { output.textContent = '请输入笔记'; return; }
+
+            const key = 'note_' + Date.now();
+            localStorage.setItem(key, note);
+            document.getElementById('note-input').value = '';
+            output.textContent = `笔记已保存: ${key}`;
+            refreshList();
+            console.log(`保存笔记: ${key}`);
+        }
+
+        function clearAll() {
+            if (confirm('确定清空所有 localStorage 数据？')) {
+                localStorage.clear();
+                output.textContent = '已清空所有数据';
+                refreshList();
+                console.log('localStorage 已清空');
+            }
+        }
+
+        function refreshList() {
+            const list = document.getElementById('storage-list');
+            const len = localStorage.length;
+            if (len === 0) {
+                list.innerHTML = '<div style="color:#95a5a6;">（空）</div>';
+                return;
+            }
+
+            let html = `当前存储 (${len} 项)：`;
+            for (let i = 0; i < len; i++) {
+                const key = localStorage.key(i);
+                let value = localStorage.getItem(key);
+                if (value.length > 40) value = value.substring(0, 40) + '...';
+                html += `<div class="entry">${i+1}. <strong>${key}</strong> = ${value}</div>`;
+            }
+            list.innerHTML = html;
+        }
+
+        refreshList();
+
+        // storage 事件演示
+        window.addEventListener('storage', function(e) {
+            console.log('storage 事件:', e.key, e.oldValue, '→', e.newValue);
+            refreshList();
+        });
+
+        // 已保存的项目示例
+        if (!localStorage.getItem('示例数据')) {
+            localStorage.setItem('示例数据', '这是一个示例');
+            localStorage.setItem('设置_主题', 'dark');
+            localStorage.setItem('设置_字号', '16px');
+        }
+        refreshList();
+
+        console.log('=== localStorage 限制 ===');
+        console.log('大小限制: 约 5MB');
+        console.log('只能存储字符串');
+        console.log('同源共享');
+        console.log('永不过期');
+
+        document.getElementById('output').textContent += '\n✅ localStorage 演示完成！';
+    </script>
+</body>
+</html>

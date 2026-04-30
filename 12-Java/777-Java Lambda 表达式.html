@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java Lambda 表达式</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>λ Java Lambda 表达式</h2><p>Lambda 语法、函数式接口、方法引用 (::)、构造器引用、变量捕获 (effectively final)、Lambda 与匿名类对比、常见 Lambda 模式。</p></div>
+    <div class="card">
+        <h2>Lambda 语法</h2>
+        <div class="code">// ========== Lambda 表达式 (Java 8+) ==========
+// 简洁地实现函数式接口 (只有一个抽象方法的接口)
+// 语法: (参数) -> { 方法体 }
+
+import java.util.*;
+import java.util.function.*;
+
+public class LambdaSyntax {
+    public static void main(String[] args) {
+        // ========== 基本语法 ==========
+        // (参数列表) -> { 方法体 }
+        // (参数列表) -> 表达式          (单行)
+        // () -> { 方法体 }              (无参)
+        // x -> 表达式                   (单参数可省略括号)
+
+        // ---------- 无参 ----------
+        Runnable r1 = () -> System.out.println("Hello");
+
+        // ---------- 单参 (省略括号) ----------
+        Consumer<String> c1 = s -> System.out.println(s);
+        Consumer<String> c2 = (s) -> { System.out.println(s); };
+
+        // ---------- 多参 ----------
+        Comparator<Integer> cmp = (a, b) -> a - b;
+        BinaryOperator<Integer> sum = (a, b) -> a + b;
+
+        // ---------- 多行 (需要 { }) ----------
+        Comparator<String> byLength = (a, b) -> {
+            int lenCmp = Integer.compare(a.length(), b.length());
+            if (lenCmp != 0) return lenCmp;
+            return a.compareTo(b);
+        };
+
+        // ========== 类型推断 ==========
+        // 编译器从上下文推断参数类型
+        Comparator<String> comp = (a, b) -> a.compareTo(b);
+        // 等价于:
+        Comparator<String> comp2 = (String a, String b) -> a.compareTo(b);
+
+        // ========== 简化规则 ==========
+        // 1. 参数类型可省略 (编译器推断)
+        // 2. 单参数可省略括号: x -> x * 2
+        // 3. 单行方法体可省略 {} 和 return:
+        //    (a, b) -> a + b  等价于  (a, b) -> { return a + b; }
+        // 4. 无参必须有括号: () -> 42
+    }
+}
+
+// ========== Lambda 使用场景 ==========
+class LambdaUseCases {
+    public static void main(String[] args) {
+        List<String> list = new ArrayList<>(List.of("Charlie", "Alice", "Bob"));
+
+        // 1. 排序
+        list.sort((a, b) -> a.compareTo(b));
+        list.sort(Comparator.naturalOrder());
+
+        // 2. 遍历
+        list.forEach(s -> System.out.println(s));
+
+        // 3. 过滤 (Stream)
+        list.stream()
+            .filter(s -> s.startsWith("A"))
+            .forEach(System.out::println);
+
+        // 4. 映射
+        list.stream()
+            .map(s -> s.length())
+            .forEach(System.out::println);
+
+        // 5. 事件处理 (Swing/JavaFX)
+        // button.addActionListener(e -> System.out.println("Clicked"));
+
+        // 6. 线程
+        Thread thread = new Thread(() -> {
+            System.out.println("Running in thread");
+        });
+
+        // 7. 自定义函数式接口
+        Calculator add = (x, y) -> x + y;
+        Calculator multiply = (x, y) -> x * y;
+        System.out.println(add.calc(3, 4));   // 7
+        System.out.println(multiply.calc(3, 4)); // 12
+    }
+
+    @FunctionalInterface
+    interface Calculator {
+        int calc(int a, int b);
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>方法引用</h2>
+        <div class="code">// ========== 方法引用 (::) ==========
+// Lambda 的简化写法: 直接引用已有方法
+// 4 种类型:
+
+import java.util.*;
+import java.util.function.*;
+
+public class MethodRefDemo {
+
+    // ========== 1. 静态方法引用 ==========
+    // Class::staticMethod
+    static void staticMethodRef() {
+        // Lambda:  s -> Integer.parseInt(s)
+        // 引用:    Integer::parseInt
+
+        Function<String, Integer> parser1 = s -> Integer.parseInt(s);
+        Function<String, Integer> parser2 = Integer::parseInt;
+
+        // 另一个例子:
+        // Comparator<Integer> cmp = (a, b) -> Integer.compare(a, b);
+        Comparator<Integer> cmp = Integer::compare;
+    }
+
+    // ========== 2. 实例方法引用 (特定对象) ==========
+    // instance::method
+    static void instanceMethodRef() {
+        String str = "hello";
+
+        // Lambda:  () -> str.length()
+        // 引用:    str::length
+
+        Supplier<Integer> len1 = () -> str.length();
+        Supplier<Integer> len2 = str::length;
+
+        // 实际例子:
+        List<String> list = List.of("a", "b", "c");
+        list.forEach(System.out::println);  // System.out::println
+    }
+
+    // ========== 3. 实例方法引用 (类型, 任意对象) ==========
+    // Class::instanceMethod
+    static void arbitraryObjectMethodRef() {
+        // Lambda:  (s) -> s.length()
+        // 引用:    String::length
+
+        Function<String, Integer> len1 = s -> s.length();
+        Function<String, Integer> len2 = String::length;
+
+        // Lambda:  (a, b) -> a.compareTo(b)
+        // 引用:    String::compareTo
+
+        Comparator<String> comp = String::compareTo;
+
+        // Lambda:  (s) -> s.toUpperCase()
+        // 引用:    String::toUpperCase
+
+        // 原理: 第一个参数作为调用对象, 其余作为方法参数
+    }
+
+    // ========== 4. 构造器引用 ==========
+    // Class::new
+    static void constructorRef() {
+        // Lambda:  () -> new ArrayList<>()
+        // 引用:    ArrayList::new
+
+        Supplier<List<String>> list1 = () -> new ArrayList<>();
+        Supplier<List<String>> list2 = ArrayList::new;
+
+        // 数组构造
+        // Lambda:  len -> new int[len]
+        // 引用:    int[]::new
+
+        Function<Integer, int[]> arrMaker = int[]::new;
+        int[] arr = arrMaker.apply(5);  // new int[5]
+
+        // 带参数的构造器
+        // Lambda:  name -> new Person(name)
+        // 引用:    Person::new
+        // Function<String, Person> personCreator = Person::new;
+    }
+
+    // ========== 方法引用速查 ==========
+    // ┌──────────────┬────────────────┬───────────────────────┐
+    // │ 类型         │ Lambda         │ 方法引用              │
+    // ├──────────────┼────────────────┼───────────────────────┤
+    // │ 静态方法     │ x -> foo(x)    │ Foo::staticMethod     │
+    // │ 特定对象     │ () -> inst.foo │ inst::method          │
+    // │ 任意对象     │ x -> x.foo()   │ Class::method         │
+    // │ 构造器       │ () -> new Foo()│ Foo::new              │
+    // └──────────────┴────────────────┴───────────────────────┘
+}</div>
+    </div>
+    <div class="card">
+        <h2>变量捕获与 effectively final</h2>
+        <div class="code">// ========== 变量捕获 ==========
+// Lambda 可以访问外部变量
+// 被捕获的变量必须是 effectively final (不可修改)
+
+public class VariableCapture {
+
+    public static void main(String[] args) {
+        // ========== effectively final ==========
+        int factor = 10;  // 没有修改 → effectively final
+
+        Function<Integer, Integer> multiplier = n -> n * factor;
+        System.out.println(multiplier.apply(5));  // 50
+
+        // factor = 20;  // ❌ 被 Lambda 捕获后不能修改!
+
+        // ========== 实例变量和静态变量 ==========
+        // 实例变量和静态变量没有此限制 (存在堆中)
+        VariableCapture vc = new VariableCapture();
+        vc.demoInstanceVar();
+    }
+
+    private int instanceVar = 100;
+
+    void demoInstanceVar() {
+        // 实例变量可以被 Lambda 修改!
+        Function<Integer, Integer> func = n -> {
+            instanceVar += n;  // ✅ 可修改实例变量
+            return instanceVar;
+        };
+        System.out.println(func.apply(50));  // 150
+        instanceVar = 999;  // ✅ 也可以直接修改
+        System.out.println(func.apply(1));   // 1000
+    }
+
+    // ========== this 关键字 ==========
+    // Lambda 中的 this 指向外部类 (而非 Lambda 本身)
+    // 匿名类中的 this 指向匿名类实例
+
+    void thisDemo() {
+        Runnable r1 = () -> {
+            System.out.println(this);  // VariableCapture 实例
+        };
+
+        Runnable r2 = new Runnable() {
+            @Override
+            public void run() {
+                System.out.println(this);  // 匿名 Runnable 实例
+            }
+        };
+    }
+}
+
+// ========== Lambda vs 匿名内部类 ==========
+// ┌──────────────┬────────────────────┬──────────────────┐
+// │ 特性         │ Lambda             │ 匿名内部类       │
+// ├──────────────┼────────────────────┼──────────────────┤
+// │ this         │ 外部类             │ 匿名类自身       │
+// │ 编译         │ invokeDynamic      │ 生成 .class 文件 │
+// │ 接口限制     │ 函数式接口(1个方法)│ 任何接口/类     │
+// │ 简洁性       │ 极简               │ 较啰嗦           │
+// │ 变量捕获     │ effectively final  │ effectively final│
+// └──────────────┴────────────────────┴──────────────────┘
+
+// Lambda 编译: invokedynamic + LambdaMetafactory
+// 不产生匿名 .class 文件, 运行时动态生成
+
+// ========== Lambda 的限制 ==========
+// 1. 只能用于函数式接口 (1个抽象方法)
+// 2. this 指向外部类 (不是 Lambda)
+// 3. 不能序列化 (除非转型)
+// 4. 调试时堆栈信息不如匿名类清晰</div>
+        <div class="note">💡 Lambda 要点: (参数) -> { 表达式 }; 单参可省括号, 单行可省 {} 和 return; 方法引用 :: 简化 Lambda (静态/实例/构造器); 变量必须 effectively final; this 指向外部类; 只能用于函数式接口; 编译用 invokedynamic 更高效; 与 Stream/集合结合使用。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSyntax()">Lambda 语法</button>
+        <button onclick="demoRef()">方法引用</button>
+        <button onclick="demoCapture()">变量捕获</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSyntax() {
+            result.innerHTML = '';
+            log('# Lambda 语法');
+            log('');
+            log('(参数) -> 表达式');
+            log('(参数) -> { 语句; }');
+            log('');
+            log('Runnable r = () -> System.out.println("Hi");');
+            log('Consumer<String> c = s -> System.out.println(s);');
+            log('Comparator<Integer> cmp = (a, b) -> a - b;');
+            log('');
+            log('单参: x -> x * 2  (括号可省)');
+            log('多参: (a, b) -> a + b');
+        }
+
+        function demoRef() {
+            result.innerHTML = '';
+            log('# 4 种方法引用');
+            log('');
+            log('静态方法: String::valueOf');
+            log('特定对象: System.out::println');
+            log('任意对象: String::length');
+            log('构造器:   ArrayList::new');
+            log('');
+            log('s -> Integer.parseInt(s)');
+            log('  → Integer::parseInt');
+            log('');
+            log('s -> s.toUpperCase()');
+            log('  → String::toUpperCase');
+        }
+
+        function demoCapture() {
+            result.innerHTML = '';
+            log('# 变量捕获');
+            log('');
+            log('int factor = 10;  // effectively final');
+            log('Function<Integer,Integer> f = n -> n * factor;');
+            log('');
+            log('规则: 被 Lambda 使用的局部变量');
+            log('  不能重新赋值 (effectively final)');
+            log('');
+            log('实例变量: 可以修改 (存于堆)');
+            log('this: 指向外部类 (不是 Lambda)');
+        }
+    </script>
+</body>
+</html>

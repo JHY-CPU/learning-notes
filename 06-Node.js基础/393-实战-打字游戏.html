@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实战-打字游戏</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; max-width: 500px; margin: 0 auto; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        /* 游戏区域 */
+        .game-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .game-stats { display: flex; gap: 16px; font-size: 13px; color: #666; }
+        .game-stats .stat { text-align: center; }
+        .game-stats .stat .num { font-size: 20px; font-weight: bold; color: #2c3e50; display: block; }
+        .game-stats .stat .label { font-size: 11px; color: #95a5a6; }
+        /* 文字展示 */
+        .word-display { font-family: 'Courier New', monospace; font-size: 22px; line-height: 1.8; padding: 16px; background: #f8f9fa; border-radius: 8px; margin-bottom: 12px; min-height: 80px; word-spacing: 8px; letter-spacing: 1px; }
+        .word-display .char { }
+        .word-display .char.done { color: #2ecc71; }
+        .word-display .char.current { color: #3498db; background: #dbeafe; border-radius: 2px; }
+        .word-display .char.wrong { color: #e74c3c; background: #fde8e8; border-radius: 2px; text-decoration: underline; }
+        .word-display .char.pending { color: #95a5a6; }
+        /* 输入框 */
+        .typing-input { width: 100%; padding: 10px 14px; border: 2px solid #ddd; border-radius: 6px; font-size: 16px; font-family: 'Courier New', monospace; box-sizing: border-box; letter-spacing: 1px; }
+        .typing-input:focus { border-color: #3498db; outline: none; }
+        .typing-input.correct { border-color: #2ecc71; }
+        .typing-input.wrong { border-color: #e74c3c; }
+        /* 模式选择 */
+        .mode-select { display: flex; gap: 8px; margin-bottom: 12px; }
+        .mode-select button { padding: 5px 14px; border: 1px solid #ddd; border-radius: 14px; background: white; color: #666; cursor: pointer; font-size: 12px; }
+        .mode-select button.active { background: #3498db; color: white; border-color: #3498db; }
+        .controls { display: flex; gap: 8px; margin: 10px 0; flex-wrap: wrap; }
+        .controls button { padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .controls button.primary { background: #3498db; color: white; }
+        .controls button.primary:hover { opacity: 0.9; }
+        .controls button.danger { background: #e74c3c; color: white; }
+        /* 结果 */
+        .result-panel { display: none; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 16px; margin-top: 12px; }
+        .result-panel.show { display: block; }
+        .result-panel h4 { margin: 0 0 8px 0; color: #166534; }
+        .result-panel .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; color: #166534; }
+        .result-panel .grid .item { display: flex; justify-content: space-between; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>⌨️ 打字游戏</h2>
+        <p style="color:#7f8c8d;font-size:13px;">随机单词/句子、输入比对、计时、WPM 速度、准确率。</p>
+
+        <div class="game-header">
+            <div class="game-stats">
+                <div class="stat"><span class="num" id="wpmDisplay">0</span><span class="label">WPM</span></div>
+                <div class="stat"><span class="num" id="accDisplay">100</span><span class="label">准确率%</span></div>
+                <div class="stat"><span class="num" id="timerDisplay">0</span><span class="label">秒</span></div>
+                <div class="stat"><span class="num" id="progressDisplay">0/0</span><span class="label">进度</span></div>
+            </div>
+        </div>
+
+        <div class="mode-select">
+            <button class="active" onclick="setMode('words')">📝 单词</button>
+            <button onclick="setMode('sentence')">📄 句子</button>
+            <button onclick="setMode('quote')">📜 名言</button>
+        </div>
+
+        <div class="word-display" id="wordDisplay"></div>
+
+        <input type="text" class="typing-input" id="typeInput" placeholder="在此输入..." autocomplete="off" autofocus oninput="onTypeInput()">
+
+        <div class="controls">
+            <button class="primary" onclick="startGame()" id="startBtn">▶ 开始</button>
+            <button class="danger" onclick="resetGame()">↺ 重置</button>
+        </div>
+
+        <div class="result-panel" id="resultPanel">
+            <h4>✅ 完成!</h4>
+            <div class="grid">
+                <div class="item"><span>速度</span><span id="rWpm">0 WPM</span></div>
+                <div class="item"><span>准确率</span><span id="rAcc">0%</span></div>
+                <div class="item"><span>用时</span><span id="rTime">0s</span></div>
+                <div class="item"><span>字符数</span><span id="rChars">0</span></div>
+                <div class="item"><span>错误数</span><span id="rErrors">0</span></div>
+                <div class="item"><span>正确数</span><span id="rCorrect">0</span></div>
+            </div>
+        </div>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('⌨️ 打字游戏演示:');
+        log('');
+
+        // ========== 题库 ==========
+        const wordBank = [
+            'javascript', 'function', 'variable', 'promise', 'async', 'await', 'callback',
+            'array', 'object', 'string', 'number', 'boolean', 'null', 'undefined',
+            'prototype', 'closure', 'module', 'import', 'export', 'class', 'extends',
+            'reduce', 'filter', 'map', 'sort', 'splice', 'slice', 'spread',
+            'performance', 'optimize', 'render', 'component', 'middleware', 'framework',
+            'typescript', 'webpack', 'babel', 'eslint', 'prettier', 'debugger',
+        ];
+        const sentences = [
+            'The quick brown fox jumps over the lazy dog.',
+            'JavaScript is the language of the web.',
+            'Practice makes perfect every single day.',
+            'Code is like humor when you have to explain it it is bad.',
+            'First solve the problem then write the code.',
+            'Simplicity is the soul of efficiency.',
+        ];
+        const quotes = [
+            'Talk is cheap. Show me the code. — Linus Torvalds',
+            'Any fool can write code that a computer can understand. — Martin Fowler',
+            'Code never lies, comments sometimes do. — Ron Jeffries',
+            'Programs must be written for people to read. — Harold Abelson',
+            'The best way to predict the future is to invent it. — Alan Kay',
+        ];
+
+        let mode = 'words';
+        let targetText = '';
+        let typedChars = [];
+        let gameStarted = false;
+        let gameFinished = false;
+        let startTime = 0;
+        let timerInterval = null;
+        let elapsedSeconds = 0;
+        let errors = 0;
+        let correct = 0;
+
+        // ========== 生成文本 ==========
+        function generateText() {
+            if (mode === 'words') {
+                const count = Math.floor(Math.random() * 5) + 8; // 8-12 个单词
+                return Array.from({length: count}, () => wordBank[Math.floor(Math.random() * wordBank.length)]).join(' ');
+            } else if (mode === 'sentence') {
+                return sentences[Math.floor(Math.random() * sentences.length)];
+            } else {
+                return quotes[Math.floor(Math.random() * quotes.length)];
+            }
+        }
+
+        // ========== 显示 ==========
+        function renderText() {
+            const display = document.getElementById('wordDisplay');
+            display.innerHTML = targetText.split('').map((char, i) => {
+                let cls = 'char pending';
+                if (i < typedChars.length) {
+                    cls = typedChars[i] === char ? 'char done' : 'char wrong';
+                } else if (i === typedChars.length && gameStarted && !gameFinished) {
+                    cls = 'char current';
+                }
+                const ch = char === ' ' ? '&nbsp;' : char;
+                return `<span class="${cls}">${ch}</span>`;
+            }).join('');
+        }
+
+        // ========== 输入处理 ==========
+        function onTypeInput() {
+            const input = document.getElementById('typeInput');
+            const val = input.value;
+
+            if (!gameStarted || gameFinished) return;
+
+            // 防止粘贴
+            if (val.length > typedChars.length + 1) {
+                input.value = typedChars.join('');
+                return;
+            }
+
+            typedChars = val.split('');
+            renderText();
+            updateStats();
+
+            // 检查是否完成
+            if (typedChars.length >= targetText.length) {
+                finishGame();
+                return;
+            }
+
+            // 颜色反馈
+            const lastChar = typedChars[typedChars.length - 1];
+            const expected = targetText[typedChars.length - 1];
+            if (lastChar !== undefined) {
+                input.className = lastChar === expected ? 'typing-input correct' : 'typing-input wrong';
+            }
+        }
+
+        // ========== 统计 ==========
+        function updateStats() {
+            errors = 0;
+            correct = 0;
+            for (let i = 0; i < typedChars.length; i++) {
+                if (typedChars[i] === targetText[i]) correct++;
+                else errors++;
+            }
+            const acc = typedChars.length > 0 ? (correct / typedChars.length) * 100 : 100;
+            document.getElementById('accDisplay').textContent = Math.round(acc);
+            document.getElementById('progressDisplay').textContent = `${typedChars.length}/${targetText.length}`;
+
+            // WPM: 每 5 个字符算 1 个词
+            const minutes = elapsedSeconds / 60;
+            const wpm = minutes > 0 ? (correct / 5) / minutes : 0;
+            document.getElementById('wpmDisplay').textContent = Math.round(wpm);
+        }
+
+        // ========== 计时 ==========
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(() => {
+                elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+                document.getElementById('timerDisplay').textContent = elapsedSeconds;
+                updateStats();
+            }, 200);
+        }
+
+        // ========== 游戏控制 ==========
+        function startGame() {
+            targetText = generateText();
+            typedChars = [];
+            gameStarted = true;
+            gameFinished = false;
+            errors = 0;
+            correct = 0;
+            elapsedSeconds = 0;
+
+            document.getElementById('resultPanel').classList.remove('show');
+            document.getElementById('typeInput').value = '';
+            document.getElementById('typeInput').className = 'typing-input';
+            document.getElementById('typeInput').disabled = false;
+            document.getElementById('typeInput').focus();
+            document.getElementById('startBtn').textContent = '⌨️ 打字中...';
+
+            renderText();
+            updateStats();
+            document.getElementById('timerDisplay').textContent = '0';
+            startTimer();
+            log(`⌨️ 游戏开始 (${mode})`);
+        }
+
+        function finishGame() {
+            gameFinished = true;
+            clearInterval(timerInterval);
+            document.getElementById('startBtn').textContent = '▶ 开始';
+            document.getElementById('typeInput').disabled = true;
+
+            const acc = typedChars.length > 0 ? (correct / typedChars.length) * 100 : 100;
+            const minutes = elapsedSeconds / 60;
+            const wpm = minutes > 0 ? (correct / 5) / minutes : 0;
+
+            document.getElementById('rWpm').textContent = Math.round(wpm) + ' WPM';
+            document.getElementById('rAcc').textContent = Math.round(acc) + '%';
+            document.getElementById('rTime').textContent = elapsedSeconds + 's';
+            document.getElementById('rChars').textContent = typedChars.length;
+            document.getElementById('rErrors').textContent = errors;
+            document.getElementById('rCorrect').textContent = correct;
+            document.getElementById('resultPanel').classList.add('show');
+
+            log(`✅ 完成! ${Math.round(wpm)} WPM, 准确率 ${Math.round(acc)}%, 用时 ${elapsedSeconds}s`);
+        }
+
+        function resetGame() {
+            clearInterval(timerInterval);
+            gameStarted = false;
+            gameFinished = false;
+            typedChars = [];
+            errors = 0;
+            correct = 0;
+            elapsedSeconds = 0;
+            targetText = generateText();
+
+            document.getElementById('typeInput').value = '';
+            document.getElementById('typeInput').className = 'typing-input';
+            document.getElementById('typeInput').disabled = true;
+            document.getElementById('startBtn').textContent = '▶ 开始';
+            document.getElementById('timerDisplay').textContent = '0';
+            document.getElementById('wpmDisplay').textContent = '0';
+            document.getElementById('accDisplay').textContent = '100';
+            document.getElementById('progressDisplay').textContent = '0/0';
+            document.getElementById('resultPanel').classList.remove('show');
+
+            renderText();
+            log('↺ 游戏重置');
+        }
+
+        function setMode(newMode) {
+            mode = newMode;
+            document.querySelectorAll('.mode-select button').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.mode-select button').forEach(b => {
+                if (b.textContent.includes(newMode === 'words' ? '单词' : newMode === 'sentence' ? '句子' : '名言')) {
+                    b.classList.add('active');
+                }
+            });
+            resetGame();
+            log(`📝 模式: ${newMode}`);
+        }
+
+        // ========== 键盘快捷键 ==========
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !gameStarted) {
+                startGame();
+            }
+        });
+
+        // ========== 初始化 ==========
+        targetText = generateText();
+        renderText();
+        document.getElementById('typeInput').disabled = true;
+        log('✅ 打字游戏就绪 (按 Enter 或点击开始)');
+    </script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>28-TopK问题 (Top K Problem)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Top K Problem</h2>
+  <div class="code">从数组中找出第 K 大（小）的元素，可用堆或快速选择。</div>
+  <pre>// 堆方法求第K大
+function findKthLargest(nums, k) {
+  // 小顶堆，保持大小为k
+  const minHeap = [];
+  for (const n of nums) {
+    minHeap.push(n);
+    if (minHeap.length > k) {
+      minHeap.sort((a,b) => a-b);
+      minHeap.shift();
+    }
+  }
+  minHeap.sort((a,b) => a-b);
+  return minHeap[0];
+}
+// 快速选择
+function quickSelect(nums, k) {
+  const idx = nums.length - k;
+  function select(l, r) {
+    const p = partition(nums, l, r);
+    if (p === idx) return nums[p];
+    return p < idx ? select(p+1, r) : select(l, p-1);
+  }
+  return select(0, nums.length-1);
+}
+function partition(arr, l, r) {
+  const pivot = arr[r]; let i = l;
+  for (let j = l; j < r; j++)
+    if (arr[j] <= pivot) { [arr[i], arr[j]] = [arr[j], arr[i]]; i++; }
+  [arr[i], arr[r]] = [arr[r], arr[i]];
+  return i;
+}
+console.log(findKthLargest([3,2,1,5,6,4], 2)); // 5
+console.log(quickSelect([3,2,1,5,6,4], 2)); // 5</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  function fkl(nums,k){nums.sort((a,b)=>b-a);return nums[k-1];}
+  document.getElementById('result').textContent =
+    `第${2}大 [3,2,1,5,6,4]: ${fkl([3,2,1,5,6,4],2)}\n第${3}大 [3,2,1,5,6,4]: ${fkl([3,2,1,5,6,4],3)}`;
+}
+</script>
+</body>
+</html>

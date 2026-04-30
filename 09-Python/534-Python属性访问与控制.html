@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python属性访问与控制</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔑 Python 属性访问与控制</h2><p>@property 装饰器、getter/setter/deleter、__getattr__ / __setattr__ / __delattr__ / __getattribute__、属性描述符 protocol、slots 优化。</p></div>
+    <div class="card">
+        <h2>@property 装饰器</h2>
+        <div class="code">// ========== 为什么需要 property ==========
+// 在 Python 中,不应该直接暴露实例变量
+// 但也不想写 Java 那样的 getter/setter 方法
+// @property 提供了"属性访问"的语法糖
+
+// ❌ 直接暴露:
+class Person:
+    def __init__(self, age):
+        self.age = age     # 可以直接设为负数!
+
+p = Person(-5)
+print(p.age)               # -5 🤔 不合理!
+
+// ❌ Java 风格的 getter/setter:
+class Person:
+    def __init__(self, age):
+        self._age = age
+
+    def get_age(self):
+        return self._age
+
+    def set_age(self, value):
+        if value < 0:
+            raise ValueError("年龄不能为负数")
+        self._age = value
+// 不够 Pythonic
+
+// ✅ @property 方式:
+class Person:
+    def __init__(self, age):
+        self._age = age
+
+    @property
+    def age(self):           # getter
+        return self._age
+
+    @age.setter
+    def age(self, value):    # setter
+        if value < 0:
+            raise ValueError("年龄不能为负数")
+        self._age = value
+
+p = Person(25)
+print(p.age)                 # 25 (像属性一样访问)
+p.age = 30                   # ✅ 走 setter
+# p.age = -5                # ❌ ValueError: 年龄不能为负数</div>
+    </div>
+    <div class="card">
+        <h2>property 完整示例</h2>
+        <div class="code">// ========== getter/setter/deleter ==========
+class Temperature:
+    def __init__(self, celsius=0):
+        self._celsius = celsius
+
+    @property
+    def celsius(self):                    # getter
+        """获取摄氏温度"""
+        return self._celsius
+
+    @celsius.setter
+    def celsius(self, value):             # setter
+        """设置摄氏温度"""
+        if value < -273.15:
+            raise ValueError("温度不能低于绝对零度")
+        self._celsius = value
+
+    @celsius.deleter
+    def celsius(self):                    # deleter
+        """删除温度"""
+        print("删除温度属性")
+        del self._celsius
+
+    @property
+    def fahrenheit(self):                 # 只读属性 (没有 setter)
+        """华氏温度 (只读,计算得出)"""
+        return self._celsius * 9/5 + 32
+
+t = Temperature(100)
+print(t.celsius)              # 100 (getter)
+print(t.fahrenheit)           # 212.0 (只读属性)
+t.celsius = 0                 # setter
+print(t.fahrenheit)           # 32.0
+# t.fahrenheit = 100          # AttributeError! (没有 setter)
+del t.celsius                 # deleter
+
+// ========== 计算属性 ==========
+class Rectangle:
+    def __init__(self, width, height):
+        self.width = width
+        self.height = height
+
+    @property
+    def area(self):
+        """面积: 只读,动态计算"""
+        return self.width * self.height
+
+    @property
+    def perimeter(self):
+        """周长"""
+        return 2 * (self.width + self.height)
+
+r = Rectangle(3, 4)
+print(r.area)                 # 12
+r.width = 5
+print(r.area)                 # 20 (自动更新)</div>
+    </div>
+    <div class="card">
+        <h2>属性访问魔术方法</h2>
+        <div class="code">// ========== 属性访问魔术方法 ==========
+// Python 在访问属性时,会调用以下方法:
+
+// __getattribute__(self, name): 每次访问属性时调用 (无条件)
+// __getattr__(self, name):      属性不存在时调用
+// __setattr__(self, name, value): 设置属性时调用
+// __delattr__(self, name):       删除属性时调用
+
+// ========== 访问优先级 ==========
+// obj.attr 的查找顺序:
+// 1. __getattribute__ (数据描述符优先)
+// 2. 实例 __dict__
+// 3. 类 __dict__ (非数据描述符)
+// 4. __getattr__ (如果上面都没找到)
+
+// ========== __getattr__ 和 __getattribute__ ==========
+class ValidatedAttr:
+    def __init__(self):
+        self.data = {}
+
+    def __getattr__(self, name):
+        """属性不存在时调用"""
+        print(f"获取属性 {name} (不存在)")
+        if name in self.data:
+            return self.data[name]
+        raise AttributeError(f"'{type(self).__name__}' 没有 '{name}'")
+
+    def __setattr__(self, name, value):
+        """设置属性时调用"""
+        print(f"设置 {name} = {value}")
+        if name == "data":
+            # 调用父类的 __setattr__ 避免递归
+            super().__setattr__(name, value)
+        else:
+            self.data[name] = value
+
+obj = ValidatedAttr()
+obj.name = "Alice"           # 设置 name = Alice
+print(obj.name)              # Alice (从 data 取)
+print(obj.data)              # {"name": "Alice"}
+
+// ========== __setattr__ 陷阱 ==========
+// 在 __setattr__ 中给 self 赋值会无限递归!
+
+class Trap:
+    def __setattr__(self, name, value):
+        self.name = value     # ❌ 递归调用 __setattr__!
+
+    # ✅ 正确方式:
+    # def __setattr__(self, name, value):
+    #     super().__setattr__(name, value)  # 用父类方法
+
+// ========== 只读属性保护 ==========
+class ReadOnly:
+    def __init__(self):
+        self._initialized = False
+        self.x = 10
+        self._initialized = True
+
+    def __setattr__(self, name, value):
+        if hasattr(self, '_initialized') and self._initialized:
+            raise AttributeError(f"不能修改 {name}")
+        super().__setattr__(name, value)</div>
+    </div>
+    <div class="card">
+        <h2>__slots__ 与描述符</h2>
+        <div class="code">// ========== __slots__ ==========
+// 限制实例能添加的属性,节省内存
+
+class SlottedClass:
+    __slots__ = ("x", "y")    # 只允许 x, y 属性
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+obj = SlottedClass(1, 2)
+print(obj.x)                  # 1
+# obj.z = 3                   # AttributeError! 没有 __slots__
+
+// __slots__ 的好处:
+// 1. 内存更小 (没有 __dict__)
+// 2. 属性访问更快
+// 3. 防止动态添加属性
+
+// 缺点: 不能动态添加属性,不支持多继承
+
+// ========== 性能对比 ==========
+// 普通类: 每个实例有 __dict__
+// slot 类: 没有 __dict__,属性存储在固定数组中
+
+import sys
+
+class Normal:
+    def __init__(self):
+        self.x = 1
+
+class Slotted:
+    __slots__ = ("x",)
+    def __init__(self):
+        self.x = 1
+
+n = Normal()
+s = Slotted()
+print(sys.getsizeof(n))       # ~56 (含 __dict__)
+print(sys.getsizeof(s))       # ~40 (无 __dict__)
+
+// ========== 描述符协议 ==========
+// 描述符: 实现了 __get__/__set__/__delete__ 的对象
+// property 就是描述符的一种
+
+class PositiveNumber:
+    """描述符: 只允许正数"""
+    def __init__(self, default=0):
+        self.default = default
+
+    def __set_name__(self, owner, name):
+        self.name = f"_{name}"  # 存储名
+
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+        return getattr(obj, self.name, self.default)
+
+    def __set__(self, obj, value):
+        if value <= 0:
+            raise ValueError("必须是正数")
+        setattr(obj, self.name, value)
+
+class Order:
+    quantity = PositiveNumber()   # 描述符实例
+    price = PositiveNumber()
+
+    def __init__(self, quantity, price):
+        self.quantity = quantity
+        self.price = price
+
+order = Order(2, 29.9)
+print(order.quantity)         # 2
+# order.quantity = -1         # ValueError: 必须是正数</div>
+        <div class="note">💡 属性控制要点: (1) @property 替代 getter/setter,更 Pythonic; (2) @prop.setter 做验证,@prop.deleter 做清理; (3) __getattr__ 在属性不存在时调用,__setattr__ 设置属性时调用; (4) __slots__ 节省内存但限制动态属性; (5) 描述符协议实现可复用的属性行为。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoProperty()">property 演示</button>
+        <button onclick="demoSlots()">__slots__ 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoProperty() {
+            result.innerHTML = '';
+            log('# @property 演示');
+            log('');
+            log('class Temperature:');
+            log('    @property');
+            log('    def celsius(self): return self._c');
+            log('');
+            log('    @celsius.setter');
+            log('    def celsius(self, v):');
+            log('        if v < -273.15: raise');
+            log('        self._c = v');
+            log('');
+            log('    @property');
+            log('    def fahrenheit(self):');
+            log('        return self._c * 9/5 + 32');
+            log('');
+            log('t = Temperature(100)');
+            log('t.celsius → 100');
+            log('t.fahrenheit → 212.0');
+            log('t.celsius = 0   ✅ setter');
+            log('t.fahrenheit 只读 ✅');
+        }
+
+        function demoSlots() {
+            result.innerHTML = '';
+            log('# __slots__ 演示');
+            log('');
+            log('class Point:');
+            log('    __slots__ = ("x", "y")');
+            log('    def __init__(self, x, y):');
+            log('        self.x = x');
+            log('        self.y = y');
+            log('');
+            log('p = Point(3, 4)');
+            log('p.x → 3');
+            log('p.y → 4');
+            log("p.z = 5  ❌ AttributeError!");
+            log('');
+            log('优势:');
+            log('  ✅ 节省内存 (无 __dict__)');
+            log('  ✅ 访问更快');
+            log('  ✅ 防止拼写错误');
+            log('  ❌ 不能动态添加属性');
+        }
+    </script>
+</body>
+</html>

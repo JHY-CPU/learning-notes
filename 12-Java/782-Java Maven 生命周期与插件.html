@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java Maven 生命周期与插件</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔄 Maven 生命周期与插件</h2><p>3 大生命周期 (default/clean/site)、阶段绑定、插件目标 (goal)、常用插件配置、Profile 多环境构建。</p></div>
+    <div class="card">
+        <h2>Maven 三大生命周期</h2>
+        <div class="code">// ========== Maven 生命周期 ==========
+// Maven 有 3 个独立生命周期, 各有多个阶段 (phase)
+// 阶段按顺序执行, 执行靠后的会自动执行之前所有阶段
+
+// ========== 1. default (项目部署) ==========
+// 最常用, 处理项目构建和部署
+validate          → 验证项目正确性, 必要信息可用
+initialize        → 初始化构建状态 (创建目录)
+generate-sources  → 生成源代码
+process-sources   → 处理源代码 (过滤/替换)
+generate-resources → 生成资源文件
+process-resources → 复制资源到目标目录
+compile           → 编译源代码
+process-classes   → 处理编译后的文件 (增强/字节码)
+generate-test-sources  → 生成测试源代码
+process-test-sources   → 处理测试源代码
+generate-test-resources → 生成测试资源
+process-test-resources  → 复制测试资源到目标目录
+test-compile       → 编译测试代码
+process-test-classes   → 处理测试编译后文件
+test               → 运行测试
+prepare-package    → 打包前准备
+package            → 打包 (jar/war)
+pre-integration-test  → 集成测试前准备
+integration-test   → 集成测试
+post-integration-test → 集成测试后清理
+verify             → 验证包有效
+install            → 安装到本地仓库
+deploy             → 部署到远程仓库
+
+// mvn test → 执行 validate → ... → test
+// mvn package → validate → ... → package
+// mvn install → validate → ... → install
+
+// ========== 2. clean (清理) ==========
+pre-clean    → 清理前
+clean        → 删除 target/ 目录
+post-clean   → 清理后
+
+// ========== 3. site (文档生成) ==========
+pre-site     → 文档生成前
+site         → 生成项目文档
+post-site    → 文档生成后
+site-deploy  → 部署文档到服务器</div>
+    </div>
+    <div class="card">
+        <h2>插件与目标</h2>
+        <div class="code">// ========== 插件 (Plugin) 与目标 (Goal) ==========
+// 生命周期阶段 → 绑定到 → 插件目标
+// 每个插件包含多个目标 (goal)
+
+// ========== 内置插件绑定 ==========
+// ┌──────────────┬──────────────────────────────────────┐
+// │ 生命周期阶段  │ 插件:目标                           │
+// ├──────────────┼──────────────────────────────────────┤
+// │ process-res  │ maven-resources-plugin:resources     │
+// │ compile      │ maven-compiler-plugin:compile        │
+// │ test-compile │ maven-compiler-plugin:testCompile    │
+// │ test         │ maven-surefire-plugin:test           │
+// │ package      │ maven-jar-plugin:jar / war plugin   │
+// │ install      │ maven-install-plugin:install         │
+// │ deploy       │ maven-deploy-plugin:deploy           │
+// │ clean        │ maven-clean-plugin:clean             │
+// │ site         │ maven-site-plugin:site               │
+// └──────────────┴──────────────────────────────────────┘
+
+// ========== 常用插件配置 ==========
+&lt;build&gt;
+    &lt;plugins&gt;
+        &lt;!-- 编译插件 --&gt;
+        &lt;plugin&gt;
+            &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+            &lt;artifactId&gt;maven-compiler-plugin&lt;/artifactId&gt;
+            &lt;version&gt;3.11.0&lt;/version&gt;
+            &lt;configuration&gt;
+                &lt;source&gt;17&lt;/source&gt;
+                &lt;target&gt;17&lt;/target&gt;
+                &lt;encoding&gt;UTF-8&lt;/encoding&gt;
+                &lt;parameters&gt;true&lt;/parameters&gt;  &lt;!-- 保留参数名 --&gt;
+                &lt;!-- --parameters 让反射可获取参数名 --&gt;
+            &lt;/configuration&gt;
+        &lt;/plugin&gt;
+
+        &lt;!-- 测试插件 --&gt;
+        &lt;plugin&gt;
+            &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+            &lt;artifactId&gt;maven-surefire-plugin&lt;/artifactId&gt;
+            &lt;version&gt;3.1.2&lt;/version&gt;
+            &lt;configuration&gt;
+                &lt;includes&gt;
+                    &lt;include&gt;**/*Test.java&lt;/include&gt;
+                    &lt;include&gt;**/*Tests.java&lt;/include&gt;
+                &lt;/includes&gt;
+                &lt;excludes&gt;
+                    &lt;exclude&gt;**/*IntegrationTest.java&lt;/exclude&gt;
+                &lt;/excludes&gt;
+                &lt;forkCount&gt;4&lt;/forkCount&gt;
+                &lt;reuseForks&gt;true&lt;/reuseForks&gt;
+            &lt;/configuration&gt;
+        &lt;/plugin&gt;
+
+        &lt;!-- Jar 包插件 --&gt;
+        &lt;plugin&gt;
+            &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+            &lt;artifactId&gt;maven-jar-plugin&lt;/artifactId&gt;
+            &lt;version&gt;3.3.0&lt;/version&gt;
+            &lt;configuration&gt;
+                &lt;archive&gt;
+                    &lt;manifest&gt;
+                        &lt;mainClass&gt;com.example.Main&lt;/mainClass&gt;
+                        &lt;addClasspath&gt;true&lt;/addClasspath&gt;
+                    &lt;/manifest&gt;
+                &lt;/archive&gt;
+            &lt;/configuration&gt;
+        &lt;/plugin&gt;
+    &lt;/plugins&gt;
+&lt;/build&gt;</div>
+    </div>
+    <div class="card">
+        <h2>Fat Jar 与 Assembly</h2>
+        <div class="code">// ========== 打包可执行 JAR ==========
+
+// ========== maven-shade-plugin (打 fat jar) ==========
+// 将所有依赖合并到一个 jar 中
+&lt;plugin&gt;
+    &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+    &lt;artifactId&gt;maven-shade-plugin&lt;/artifactId&gt;
+    &lt;version&gt;3.5.1&lt;/version&gt;
+    &lt;executions&gt;
+        &lt;execution&gt;
+            &lt;phase&gt;package&lt;/phase&gt;
+            &lt;goals&gt;&lt;goal&gt;shade&lt;/goal&gt;&lt;/goals&gt;
+            &lt;configuration&gt;
+                &lt;transformers&gt;
+                    &lt;transformer implementation=
+                        "org.apache.maven.plugins.shade.resource.ManifestResourceTransformer"&gt;
+                        &lt;mainClass&gt;com.example.Main&lt;/mainClass&gt;
+                    &lt;/transformer&gt;
+                    &lt;!-- 合并 META-INF/services --&gt;
+                    &lt;transformer implementation=
+                        "org.apache.maven.plugins.shade.resource.ServicesResourceTransformer"/&gt;
+                &lt;/transformers&gt;
+                &lt;!-- 排除不需要的文件 --&gt;
+                &lt;filters&gt;
+                    &lt;filter&gt;
+                        &lt;artifact&gt;*:*&lt;/artifact&gt;
+                        &lt;excludes&gt;
+                            &lt;exclude&gt;META-INF/*.SF&lt;/exclude&gt;
+                            &lt;exclude&gt;META-INF/*.DSA&lt;/exclude&gt;
+                            &lt;exclude&gt;META-INF/*.RSA&lt;/exclude&gt;
+                        &lt;/excludes&gt;
+                    &lt;/filter&gt;
+                &lt;/filters&gt;
+            &lt;/configuration&gt;
+        &lt;/execution&gt;
+    &lt;/executions&gt;
+&lt;/plugin&gt;
+
+// ========== maven-assembly-plugin ==========
+// 更灵活的打包, 可自定义格式
+&lt;plugin&gt;
+    &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+    &lt;artifactId&gt;maven-assembly-plugin&lt;/artifactId&gt;
+    &lt;version&gt;3.6.0&lt;/version&gt;
+    &lt;configuration&gt;
+        &lt;descriptorRefs&gt;
+            &lt;descriptorRef&gt;jar-with-dependencies&lt;/descriptorRef&gt;
+        &lt;/descriptorRefs&gt;
+        &lt;archive&gt;
+            &lt;manifest&gt;
+                &lt;mainClass&gt;com.example.Main&lt;/mainClass&gt;
+            &lt;/manifest&gt;
+        &lt;/archive&gt;
+    &lt;/configuration&gt;
+    &lt;executions&gt;
+        &lt;execution&gt;
+            &lt;id&gt;make-assembly&lt;/id&gt;
+            &lt;phase&gt;package&lt;/phase&gt;
+            &lt;goals&gt;&lt;goal&gt;single&lt;/goal&gt;&lt;/goals&gt;
+        &lt;/execution&gt;
+    &lt;/executions&gt;
+&lt;/plugin&gt;
+
+// ========== Spring Boot Maven Plugin ==========
+&lt;plugin&gt;
+    &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+    &lt;artifactId&gt;spring-boot-maven-plugin&lt;/artifactId&gt;
+    &lt;version&gt;3.2.0&lt;/version&gt;
+    &lt;configuration&gt;
+        &lt;excludes&gt;
+            &lt;exclude&gt;
+                &lt;groupId&gt;org.projectlombok&lt;/groupId&gt;
+                &lt;artifactId&gt;lombok&lt;/artifactId&gt;
+            &lt;/exclude&gt;
+        &lt;/excludes&gt;
+    &lt;/configuration&gt;
+&lt;/plugin&gt;</div>
+    </div>
+    <div class="card">
+        <h2>Profile 与环境</h2>
+        <div class="code">// ========== Maven Profile ==========
+// 根据不同环境使用不同配置
+// 常见: dev / test / prod
+
+// ========== 定义 Profile ==========
+&lt;profiles&gt;
+    &lt;!-- 开发环境 --&gt;
+    &lt;profile&gt;
+        &lt;id&gt;dev&lt;/id&gt;
+        &lt;activation&gt;
+            &lt;activeByDefault&gt;true&lt;/activeByDefault&gt;
+        &lt;/activation&gt;
+        &lt;properties&gt;
+            &lt;env&gt;dev&lt;/env&gt;
+            &lt;db.url&gt;jdbc:h2:mem:testdb&lt;/db.url&gt;
+            &lt;logging.level&gt;DEBUG&lt;/logging.level&gt;
+        &lt;/properties&gt;
+    &lt;/profile&gt;
+
+    &lt;!-- 生产环境 --&gt;
+    &lt;profile&gt;
+        &lt;id&gt;prod&lt;/id&gt;
+        &lt;properties&gt;
+            &lt;env&gt;prod&lt;/env&gt;
+            &lt;db.url&gt;jdbc:mysql://prod-server:3306/mydb&lt;/db.url&gt;
+            &lt;logging.level&gt;WARN&lt;/logging.level&gt;
+        &lt;/properties&gt;
+    &lt;/profile&gt;
+
+    &lt;!-- 按条件激活 --&gt;
+    &lt;profile&gt;
+        &lt;id&gt;java17&lt;/id&gt;
+        &lt;activation&gt;
+            &lt;jdk&gt;17&lt;/jdk&gt;                        &lt;!-- JDK 版本 --&gt;
+            &lt;os&gt;
+                &lt;name&gt;Windows 11&lt;/name&gt;            &lt;!-- OS 条件 --&gt;
+            &lt;/os&gt;
+            &lt;property&gt;
+                &lt;name&gt;environment&lt;/name&gt;
+                &lt;value&gt;test&lt;/value&gt;               &lt;!-- -Denvironment=test --&gt;
+            &lt;/property&gt;
+        &lt;/activation&gt;
+        &lt;dependencies&gt;
+            &lt;dependency&gt;
+                &lt;groupId&gt;com.h2database&lt;/groupId&gt;
+                &lt;artifactId&gt;h2&lt;/artifactId&gt;
+                &lt;scope&gt;test&lt;/scope&gt;
+            &lt;/dependency&gt;
+        &lt;/dependencies&gt;
+    &lt;/profile&gt;
+&lt;/profiles&gt;
+
+// ========== Profile 激活方式 ==========
+// 1. 默认激活: &lt;activeByDefault&gt;true&lt;/activeByDefault&gt;
+// 2. 命令行:   mvn package -Pprod
+// 3. 系统属性: mvn package -Denvironment=test
+// 4. 文件存在: &lt;activation&gt;&lt;file&gt;&lt;exists&gt;...
+// 5. JDK/OS:  &lt;jdk&gt;17&lt;/jdk&gt;
+
+// ========== 资源过滤 ==========
+// 让 profile 属性替换资源文件中的 ${...}
+&lt;build&gt;
+    &lt;resources&gt;
+        &lt;resource&gt;
+            &lt;directory&gt;src/main/resources&lt;/directory&gt;
+            &lt;filtering&gt;true&lt;/filtering&gt;  &lt;!-- 启用变量替换 --&gt;
+            &lt;includes&gt;
+                &lt;include&gt;application-*.yml&lt;/include&gt;
+                &lt;include&gt;*.properties&lt;/include&gt;
+            &lt;/includes&gt;
+        &lt;/resource&gt;
+    &lt;/resources&gt;
+&lt;/build&gt;
+
+// application-dev.yml 中使用: ${db.url}
+// mvn package -Pdev → 替换为 jdbc:h2:mem:testdb
+
+// ========== settings.xml 安全配置 ==========
+// 服务器密码加密存储
+&lt;servers&gt;
+    &lt;server&gt;
+        &lt;id&gt;private-repo&lt;/id&gt;
+        &lt;username&gt;deploy-user&lt;/username&gt;
+        &lt;password&gt;{encrypted-password}&lt;/password&gt;
+    &lt;/server&gt;
+&lt;/servers&gt;</div>
+    </div>
+    <div class="card">
+        <h2>实用技巧</h2>
+        <div class="code">// ========== Maven 实用技巧 ==========
+
+// ========== 跳过测试 ==========
+mvn package -DskipTests           // 编译测试但不运行
+mvn package -Dmaven.test.skip=true  // 完全不编译测试
+
+// ========== 多线程构建 ==========
+mvn -T 4 clean install            // 4 线程并行
+mvn -T 1C clean install           // CPU 核心数线程
+
+// ========== 离线模式 ==========
+mvn -o clean install              // 只使用本地仓库
+
+// ========== 调试输出 ==========
+mvn -X clean install              // 调试日志
+mvn -e clean install              // 错误详情
+
+// ========== 检查更新 ==========
+mvn versions:display-dependency-updates   // 检查依赖更新
+mvn versions:display-plugin-updates       // 检查插件更新
+mvn versions:display-property-updates     // 检查属性更新
+
+// ========== 生成项目 ==========
+mvn archetype:generate           // 交互式创建项目
+// Maven 原型 (archetype) 模板:
+// maven-archetype-quickstart      // 简单 Java 项目
+// maven-archetype-webapp          // Web 应用
+
+// ========== 传递依赖解决 ==========
+// 查看为何引入某个依赖:
+mvn dependency:tree -Dincludes=com.google.guava
+// 输出:
+// com.example:my-app:jar:1.0
+// └─ org.springframework.boot:spring-boot-starter-web:jar:3.2.0
+//    └─ com.fasterxml.jackson.core:jackson-databind:jar:2.15.0
+//       └─ com.fasterxml.jackson.core:jackson-core:jar:2.15.0
+
+// ========== 分析依赖 ==========
+mvn dependency:analyze
+// 报告:
+// [WARNING] Unused declared dependencies: ...
+// [WARNING] Used undeclared dependencies: ...
+
+// ========== 生成 Javadoc ==========
+mvn javadoc:javadoc               // 生成 Javadoc
+mvn site                          // 生成项目站点文档
+
+// ========== Maven Wrapper ==========
+// 类似 Gradle Wrapper, 锁定 Maven 版本
+mvn -N wrapper:wrapper -Dmaven=3.9.6
+// 生成 mvnw / mvnw.cmd</div>
+        <div class="note">💡 生命周期与插件要点: 3 大生命周期 default/clean/site; 阶段按顺序执行, 靠后包含之前; 插件目标绑定到生命周期阶段; maven-compiler-plugin 编译配置; maven-surefire-plugin 测试; maven-shade-plugin fat jar; Profile 多环境 (dev/prod/test); -P 激活 profile; -T 多线程构建; -o 离线模式; dependency:tree 分析依赖树。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoLifecycle()">生命周期</button>
+        <button onclick="demoPlugin()">插件配置</button>
+        <button onclick="demoProfile()">Profile</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoLifecycle() {
+            result.innerHTML = '';
+            log('# Maven 生命周期');
+            log('');
+            log('default: validate → compile → test → package → install → deploy');
+            log('clean:   pre-clean → clean → post-clean');
+            log('site:    pre-site → site → post-site → site-deploy');
+            log('');
+            log('mvn test  = validate → ... → test');
+            log('mvn package = ... → compile → test → package');
+            log('mvn clean install = clean + install');
+        }
+
+        function demoPlugin() {
+            result.innerHTML = '';
+            log('# 常用 Maven 插件');
+            log('');
+            log('maven-compiler-plugin  — source/target 版本');
+            log('maven-surefire-plugin  — 运行 JUnit 测试');
+            log('maven-jar-plugin       — jar 打包');
+            log('maven-shade-plugin     — fat jar (含依赖)');
+            log('maven-assembly-plugin  — 自定义打包');
+            log('maven-source-plugin    — 打包源码');
+            log('spring-boot-maven-plugin — Spring Boot');
+            log('');
+            log('插件绑定到生命周期阶段:');
+            log('  compile 阶段 → maven-compiler-plugin:compile');
+            log('  test    阶段 → maven-surefire-plugin:test');
+            log('  package 阶段 → maven-jar-plugin:jar');
+        }
+
+        function demoProfile() {
+            result.innerHTML = '';
+            log('# Maven Profile');
+            log('');
+            log('常见环境: dev / test / prod');
+            log('');
+            log('激活方式:');
+            log('  默认激活: activeByDefault=true');
+            log('  命令行:   mvn package -Pprod');
+            log('  属性:     mvn package -Denv=prod');
+            log('  JDK 版本: &lt;activation&gt;&lt;jdk&gt;17&lt;/jdk&gt;');
+            log('');
+            log('资源过滤:');
+            log('  application.yml 中用 ${db.url}');
+            log('  不同 profile 替换不同值');
+        }
+    </script>
+</body>
+</html>

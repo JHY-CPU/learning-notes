@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>19-排序算法对比 (Sorting Comparison)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; white-space: pre-wrap; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+th { background: #2c3e50; color: white; }
+tr:nth-child(even) { background: #f2f2f2; }
+.best { background: #d5f5e3; }
+.worst { background: #fadbd8; }
+</style></head>
+<body>
+<div class="card">
+  <h2>排序算法对比 (Sorting Comparison)</h2>
+  <p>本页面提供全面的排序算法对比，包含理论分析和实际性能基准测试。</p>
+</div>
+
+<div class="card">
+  <h2>理论对比</h2>
+  <table>
+    <tr><th>算法</th><th>平均</th><th>最坏</th><th>最好</th><th>空间</th><th>稳定</th><th>原地</th></tr>
+    <tr><td>冒泡排序</td><td>O(n^2)</td><td>O(n^2)</td><td>O(n)</td><td>O(1)</td><td>是</td><td>是</td></tr>
+    <tr><td>选择排序</td><td>O(n^2)</td><td>O(n^2)</td><td>O(n^2)</td><td>O(1)</td><td>否</td><td>是</td></tr>
+    <tr><td>插入排序</td><td>O(n^2)</td><td>O(n^2)</td><td>O(n)</td><td>O(1)</td><td>是</td><td>是</td></tr>
+    <tr><td>希尔排序</td><td>O(n^1.3)</td><td>O(n^2)</td><td>O(n)</td><td>O(1)</td><td>否</td><td>是</td></tr>
+    <tr><td>归并排序</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n)</td><td>是</td><td>否</td></tr>
+    <tr><td>快速排序</td><td>O(n log n)</td><td>O(n^2)</td><td>O(n log n)</td><td>O(log n)</td><td>否</td><td>是</td></tr>
+    <tr><td>堆排序</td><td>O(n log n)</td><td>O(n log n)</td><td>O(n log n)</td><td>O(1)</td><td>否</td><td>是</td></tr>
+    <tr><td>计数排序</td><td>O(n+k)</td><td>O(n+k)</td><td>O(n+k)</td><td>O(k)</td><td>是</td><td>否</td></tr>
+    <tr><td>桶排序</td><td>O(n+k)</td><td>O(n^2)</td><td>O(n)</td><td>O(n)</td><td>是</td><td>否</td></tr>
+    <tr><td>基数排序</td><td>O(d(n+k))</td><td>O(d(n+k))</td><td>O(d(n+k))</td><td>O(n+k)</td><td>是</td><td>否</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>性能基准测试</h2>
+  <p>选择数据规模，运行实际性能对比：</p>
+  <button onclick="runBenchmark(100)">小规模 (100)</button>
+  <button onclick="runBenchmark(500)">中规模 (500)</button>
+  <button onclick="runBenchmark(2000)">较大规模 (2000)</button>
+  <div id="result"></div>
+</div>
+
+<script>
+function bubbleSort(arr) {
+  const n = arr.length;
+  for (let i = 0; i < n - 1; i++) {
+    let s = false;
+    for (let j = 0; j < n - 1 - i; j++) {
+      if (arr[j] > arr[j+1]) { [arr[j], arr[j+1]] = [arr[j+1], arr[j]]; s = true; }
+    }
+    if (!s) break;
+  }
+  return arr;
+}
+
+function selectionSort(arr) {
+  const n = arr.length;
+  for (let i = 0; i < n - 1; i++) {
+    let m = i;
+    for (let j = i + 1; j < n; j++) if (arr[j] < arr[m]) m = j;
+    if (m !== i) [arr[i], arr[m]] = [arr[m], arr[i]];
+  }
+  return arr;
+}
+
+function insertionSort(arr) {
+  for (let i = 1; i < arr.length; i++) {
+    let k = arr[i], j = i - 1;
+    while (j >= 0 && arr[j] > k) { arr[j+1] = arr[j]; j--; }
+    arr[j+1] = k;
+  }
+  return arr;
+}
+
+function mergeSort(arr) {
+  if (arr.length <= 1) return arr;
+  const mid = Math.floor(arr.length / 2);
+  return merge(mergeSort(arr.slice(0, mid)), mergeSort(arr.slice(mid)));
+}
+function merge(l, r) {
+  const res = []; let i = 0, j = 0;
+  while (i < l.length && j < r.length) res.push(l[i] <= r[j] ? l[i++] : r[j++]);
+  return res.concat(l.slice(i)).concat(r.slice(j));
+}
+
+function quickSort(arr) {
+  if (arr.length <= 1) return arr;
+  const p = arr[0], l = [], r = [];
+  for (let i = 1; i < arr.length; i++) arr[i] < p ? l.push(arr[i]) : r.push(arr[i]);
+  return quickSort(l).concat(p, quickSort(r));
+}
+
+function heapSort(arr) {
+  const n = arr.length;
+  for (let i = Math.floor(n/2)-1; i >= 0; i--) siftDown(arr, n, i);
+  for (let i = n-1; i > 0; i--) { [arr[0], arr[i]] = [arr[i], arr[0]]; siftDown(arr, i, 0); }
+  return arr;
+}
+function siftDown(arr, n, i) {
+  let l = i, left = 2*i+1, right = 2*i+2;
+  if (left < n && arr[left] > arr[l]) l = left;
+  if (right < n && arr[right] > arr[l]) l = right;
+  if (l !== i) { [arr[i], arr[l]] = [arr[l], arr[i]]; siftDown(arr, n, l); }
+}
+
+function runBenchmark(size) {
+  const data = Array.from({length: size}, () => Math.floor(Math.random() * 10000));
+  const algorithms = [
+    { name: '冒泡排序', fn: (a) => { const c = [...a]; bubbleSort(c); return c; } },
+    { name: '选择排序', fn: (a) => { const c = [...a]; selectionSort(c); return c; } },
+    { name: '插入排序', fn: (a) => { const c = [...a]; insertionSort(c); return c; } },
+    { name: '归并排序', fn: (a) => { const c = [...a]; return mergeSort(c); } },
+    { name: '快速排序', fn: (a) => { const c = [...a]; return quickSort(c); } },
+    { name: '堆排序', fn: (a) => { const c = [...a]; heapSort(c); return c; } },
+  ];
+
+  let html = '<strong>数据规模：</strong>' + size + '<br><br>';
+  html += '<table><tr><th>算法</th><th>耗时 (ms)</th><th>结果正确</th></tr>';
+
+  for (const algo of algorithms) {
+    const start = performance.now();
+    const result = algo.fn(data);
+    const elapsed = (performance.now() - start).toFixed(2);
+    const correct = result.every((v, i, a) => !i || a[i-1] <= v);
+    const cls = correct ? 'class="best"' : 'class="worst"';
+    html += `<tr ${cls}><td>${algo.name}</td><td>${elapsed}</td><td>${correct ? '是' : '否'}</td></tr>`;
+  }
+
+  html += '</table>';
+  document.getElementById('result').innerHTML = html;
+}
+</script>
+</body></html>

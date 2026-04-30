@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>混入Mixin</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        .class-diagram { font-family: monospace; background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 10px 0; line-height: 1.8; }
+        .class-diagram .class-name { color: #e74c3c; font-weight: bold; }
+        .class-diagram .mixin-name { color: #27ae60; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>混入 Mixin</h2><p>将可复用的行为（方法集合）混入到类中，实现"组合优于继承"。JavaScript 通过 Object.assign 将 mixin 对象复制到原型上实现。</p></div>
+    <div class="card"><h2>Mixin vs 继承</h2><div class="class-diagram">
+        <span class="class-name">class Dog extends Animal</span>  ← 单一继承链（是-关系）<br>
+        <span class="mixin-name">Object.assign(Dog.prototype, Swimmer, Barker)</span>  ← 多重混入（有-能力）<br><br>
+        继承: "是什么"（is-a） | Mixin: "有什么能力"（has-a / can-do）
+    </div></div>
+    <div class="card"><h2>冲突解决</h2><p>多个 mixin 有同名方法时，后混入的覆盖先混入的。可以自定义冲突解决策略。</p></div>
+    <div class="card"><h2>交互演示</h2><p>
+        <button onclick="demoBasicMixin()">基础 Mixin</button>
+        <button onclick="demoMultipleMixins()">多重混入</button>
+        <button onclick="demoFunctionMixin()">函数式 Mixin</button>
+        <button onclick="demoConflictResolution()">冲突解决</button>
+        <button onclick="demoComposeMixins()">compose 组合</button>
+    </p></div>
+    <pre id="output"></pre>
+    <script>
+        const output = document.getElementById('output');
+
+        function log(msg) {
+            output.textContent += msg + '\n';
+            console.log(msg);
+        }
+
+        function clearLog() {
+            output.textContent = '';
+        }
+
+        // ========== 1. 基础 Mixin ==========
+        function demoBasicMixin() {
+            clearLog();
+            log('=== 基础 Mixin (Object.assign) ===\n');
+
+            // 定义 mixin
+            const CanLog = {
+                log(msg) {
+                    log(`[${this.name || '未知'}] ${msg}`);
+                },
+                warn(msg) {
+                    log(`[警告] ${msg}`);
+                },
+                error(msg) {
+                    log(`[错误] ${msg}`);
+                }
+            };
+
+            const TimestampMixin = {
+                getTimestamp() {
+                    return new Date().toISOString();
+                },
+                formatTime(date) {
+                    return date.toLocaleString('zh-CN');
+                }
+            };
+
+            // 使用 mixin
+            class User {
+                constructor(name) {
+                    this.name = name;
+                }
+            }
+
+            // 混入
+            Object.assign(User.prototype, CanLog, TimestampMixin);
+
+            const user = new User('张三');
+            user.log('用户登录成功');
+            user.warn('密码即将过期');
+            log(`当前时间: ${user.getTimestamp()}`);
+            log(`格式化: ${user.formatTime(new Date())}`);
+
+            log('\nMixin 可以混入任意多个对象的方法');
+        }
+
+        // ========== 2. 多重混入 ==========
+        function demoMultipleMixins() {
+            clearLog();
+            log('=== 多重混入模拟多重继承 ===\n');
+
+            // Swimmer mixin
+            const Swimmer = {
+                swim() {
+                    return `${this.name} 在游泳`;
+                },
+                dive(depth) {
+                    return `${this.name} 潜入 ${depth} 米深`;
+                }
+            };
+
+            // Flyer mixin
+            const Flyer = {
+                fly() {
+                    return `${this.name} 在飞行`;
+                },
+                land() {
+                    return `${this.name} 已着陆`;
+                }
+            };
+
+            // Runner mixin
+            const Runner = {
+                run(speed) {
+                    return `${this.name} 以 ${speed}km/h 奔跑`;
+                },
+                jump(height) {
+                    return `${this.name} 跳了 ${height} 米高`;
+                }
+            };
+
+            // 基础类
+            class Animal {
+                constructor(name) {
+                    this.name = name;
+                }
+                eat() {
+                    return `${this.name} 在吃东西`;
+                }
+            }
+
+            // 鸭子: 会游泳、会飞、会跑
+            class Duck extends Animal {}
+            Object.assign(Duck.prototype, Swimmer, Flyer, Runner);
+
+            // 鱼: 只会游泳
+            class Fish extends Animal {}
+            Object.assign(Fish.prototype, Swimmer);
+
+            const duck = new Duck('唐老鸭');
+            const fish = new Fish('尼莫');
+
+            log(duck.eat());
+            log(duck.swim());
+            log(duck.fly());
+            log(duck.run(20));
+            log(duck.dive(5));
+            log('');
+            log(fish.eat());
+            log(fish.swim());
+
+            log('\nMixin 灵活组合能力，比多重继承更简单（无菱形继承问题）');
+        }
+
+        // ========== 3. 函数式 Mixin ==========
+        function demoFunctionMixin() {
+            clearLog();
+            log('=== 函数式 Mixin（高阶函数增强类） ===\n');
+
+            // 函数式 mixin: 接收类，返回增强后的类
+            const withLogging = (Base) => {
+                return class extends Base {
+                    constructor(...args) {
+                        super(...args);
+                        this._log = [];
+                    }
+                    logAction(action) {
+                        this._log.push({ action, time: new Date() });
+                        log(`[${this.constructor.name}] ${action}`);
+                    }
+                    getLog() {
+                        return this._log;
+                    }
+                };
+            };
+
+            const withTimestamp = (Base) => {
+                return class extends Base {
+                    getTimestamp() {
+                        return Date.now();
+                    }
+                    getDateString() {
+                        return new Date().toISOString();
+                    }
+                };
+            };
+
+            const withValidation = (Base) => {
+                return class extends Base {
+                    validateEmail(email) {
+                        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+                    }
+                    validateAge(age) {
+                        return Number.isInteger(age) && age > 0 && age < 150;
+                    }
+                };
+            };
+
+            // 组合使用
+            class User {}
+            const EnhancedUser = withValidation(withTimestamp(withLogging(User)));
+
+            const user = new EnhancedUser();
+            user.logAction('用户创建');
+            user.logAction('登录系统');
+
+            log(`邮箱验证: ${user.validateEmail('test@example.com')}`);
+            log(`年龄验证: ${user.validateAge(25)}`);
+            log(`操作日志数: ${user.getLog().length}`);
+
+            log('\n函数式 Mixin 通过高阶类实现，更灵活，支持参数传递');
+        }
+
+        // ========== 4. 冲突解决 ==========
+        function demoConflictResolution() {
+            clearLog();
+            log('=== Mixin 冲突解决 ===\n');
+
+            // 两个 mixin 有同名方法
+            const MixinA = {
+                greet() { return 'Hello from A'; },
+                common() { return 'MixinA 的 common'; }
+            };
+
+            const MixinB = {
+                greet() { return 'Hello from B'; },
+                common() { return 'MixinB 的 common'; },
+                special() { return 'MixinB 独有的'; }
+            };
+
+            class MyClass {}
+            // 先混入 A，再混入 B → B 覆盖 A 的同名方法
+            Object.assign(MyClass.prototype, MixinA, MixinB);
+
+            const obj = new MyClass();
+            log(obj.greet()); // MixinB 的版本
+            log(obj.common()); // MixinB 的版本
+            log(obj.special());
+
+            // 自定义冲突解决: 显式组合
+            log('\n--- 自定义冲突解决策略 ---');
+            const CompositeMixin = {
+                greet() {
+                    // 调用两个 mixin 的版本
+                    const fromA = MixinA.greet.call(this);
+                    const fromB = MixinB.greet.call(this);
+                    return `${fromA} | ${fromB}`;
+                },
+                common() {
+                    // 合并结果
+                    return `合并: ${MixinA.common.call(this)} + ${MixinB.common.call(this)}`;
+                }
+            };
+
+            class AnotherClass {}
+            Object.assign(AnotherClass.prototype, CompositeMixin, MixinB);
+
+            const obj2 = new AnotherClass();
+            log(obj2.greet());
+            log(obj2.common());
+
+            log('\n冲突解决建议: 1) 后混入覆盖 2) 自定义组合方法 3) 命名空间化');
+        }
+
+        // ========== 5. compose 组合 mixin ==========
+        function demoComposeMixins() {
+            clearLog();
+            log('=== compose 组合 Mixin ===\n');
+
+            // compose 函数：从右向左组合 mixin
+            function compose(...mixins) {
+                return (Base) => {
+                    return mixins.reduceRight((Acc, mixin) => {
+                        const result = mixin(Acc);
+                        return result;
+                    }, Base);
+                };
+            }
+
+            // 定义 mixin 函数
+            const WithName = (Base) => {
+                return class extends Base {
+                    setName(name) { this.name = name; return this; }
+                    getName() { return this.name; }
+                };
+            };
+
+            const WithAge = (Base) => {
+                return class extends Base {
+                    setAge(age) { this.age = age; return this; }
+                    getAge() { return this.age; }
+                };
+            };
+
+            const WithGreet = (Base) => {
+                return class extends Base {
+                    greet() {
+                        const name = this.name || '未知';
+                        const age = this.age ?? '?';
+                        return `你好，我是 ${name}，${age} 岁`;
+                    }
+                };
+            };
+
+            // 组合所有 mixin
+            const ComposedClass = compose(
+                WithGreet,
+                WithAge,
+                WithName
+            )(class {});
+
+            const person = new ComposedClass();
+            person.setName('张三').setAge(25);
+            log(person.greet());
+            log(`名称: ${person.getName()}, 年龄: ${person.getAge()}`);
+
+            // 创建另一个组合（跳过 age）
+            const SimplePerson = compose(WithGreet, WithName)(class {});
+            const p2 = new SimplePerson();
+            p2.setName('李四');
+            log(p2.greet());
+
+            log('\ncompose 组合 mixin 的优势：按需组合，可复用，声明式');
+            log('Mixin vs extends: 组合优于继承，Mixin 更灵活');
+        }
+
+        log('=== 混入 Mixin 演示 ===\nMixin 通过组合方式复用代码，比继承更灵活。JS 使用 Object.assign 实现。\n\n点击上方按钮查看不同示例。');
+    </script>
+</body>
+</html>

@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python FastAPI响应模型</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📤 FastAPI 响应模型</h2><p>response_model 响应过滤、status_code 状态码、响应模型嵌套、Union/List 响应、响应 Cookies 和 Headers、额外响应模型。</p></div>
+    <div class="card">
+        <h2>response_model 基础</h2>
+        <div class="code">// ========== 响应模型 ==========
+from fastapi import FastAPI
+from pydantic import BaseModel
+from typing import Optional
+
+app = FastAPI()
+
+class ItemIn(BaseModel):        # 输入模型
+    name: str
+    description: str = ""
+    price: float
+    tax: Optional[float] = None
+    secret_code: str            # 不想返回给客户端
+
+class ItemOut(BaseModel):       # 输出模型 (不含 secret)
+    name: str
+    description: str
+    price: float
+    tax: Optional[float] = None
+
+@app.post("/items", response_model=ItemOut)
+def create_item(item: ItemIn):
+    # response_model 确保只返回 ItemOut 中的字段
+    # secret_code 会被自动过滤!
+    return item  # 即使 item 有 secret_code, 响应中也没有
+
+# ========== response_model 过滤 ==========
+class UserOut(BaseModel):
+    id: int
+    username: str
+    email: str
+    # 注意: 没有 password_hash!
+
+@app.get("/users/{user_id}", response_model=UserOut)
+def get_user(user_id: int):
+    user = db.query(User).get(user_id)
+    return user  # ORM 模型转 Pydantic, 只暴露 UserOut 字段</div>
+    </div>
+    <div class="card">
+        <h2>response_model 高级用法</h2>
+        <div class="code">// ========== 列表响应 ==========
+from typing import List
+
+class Item(BaseModel):
+    id: int
+    name: str
+    price: float
+
+@app.get("/items", response_model=List[Item])
+def list_items():
+    # 返回列表,自动验证每个元素
+    return [{"id": 1, "name": "键盘", "price": 299}]
+
+# ========== Union 响应 ==========
+from typing import Union
+
+class Success(BaseModel):
+    status: str = "ok"
+    data: dict
+
+class Error(BaseModel):
+    status: str = "error"
+    message: str
+
+@app.get("/result", response_model=Union[Success, Error])
+def get_result():
+    return Success(data={"count": 42})
+
+# ========== 响应模型排除/包含 ==========
+@app.get("/items/{item_id}", response_model=Item)
+def get_item(
+    item_id: int,
+    response_model_exclude={"secret_code"}   # 排除字段
+):
+    # response_model_exclude 和 response_model_include
+    # 动态控制输出字段
+    return get_full_item(item_id)
+
+# response_model_exclude_unset=True  # 只返回设置了值的字段
+# response_model_exclude_none=True   # 排除 None 字段
+
+# ========== status_code ==========
+@app.post("/items", status_code=201)            # 固定状态码
+def create_item(item: Item):
+    return item
+
+@app.post("/users", status_code=201)
+def create_user(user: UserIn):
+    db.save(user)
+    return user
+
+# 常用状态码:
+# 200 — OK
+# 201 — Created (创建成功)
+# 204 — No Content (删除成功)
+# 301 — Moved Permanently
+# 307 — Temporary Redirect
+# 400 — Bad Request
+# 401 — Unauthorized
+# 403 — Forbidden
+# 404 — Not Found
+# 422 — Validation Error (FastAPI 默认)
+# 500 — Internal Server Error</div>
+    </div>
+    <div class="card">
+        <h2>响应 Cookies 和 Headers</h2>
+        <div class="code">// ========== 自定义响应 ==========
+from fastapi import Response, Cookie
+from fastapi.responses import JSONResponse, HTMLResponse, PlainTextResponse
+
+@app.get("/custom")
+def custom_response():
+    content = {"message": "自定义响应"}
+    response = JSONResponse(content)
+    response.set_cookie(key="session", value="abc123")
+    response.headers["X-Custom"] = "value"
+    return response
+
+# ========== Response 参数 ==========
+from fastapi import Response
+
+@app.get("/headers-and-cookies/")
+def get_headers(response: Response):
+    response.headers["X-Powered-By"] = "FastAPI"
+    response.set_cookie(
+        key="message",
+        value="Hello",
+        max_age=3600,
+        httponly=True
+    )
+    return {"message": "带自定义头"}
+
+# ========== 不同响应类型 ==========
+@app.get("/html", response_class=HTMLResponse)
+def get_html():
+    return "<h1>Hello</h1>"
+
+@app.get("/text", response_class=PlainTextResponse)
+def get_text():
+    return "纯文本响应"
+
+@app.get("/file")
+def get_file():
+    from fastapi.responses import FileResponse
+    return FileResponse("report.pdf", media_type="application/pdf")
+
+# ========== 额外响应模型 ==========
+from fastapi.responses import JSONResponse
+from typing import Dict
+
+@app.get("/extra", response_model=Dict[str, int])
+def get_counts():
+    return {"users": 42, "items": 100}
+
+# ========== 模型 dict 方法 ==========
+# Pydantic 模型提供:
+item.dict()                        # → dict
+item.dict(exclude={"secret"})      # 排除字段
+item.dict(include={"id", "name"})  # 只包含字段
+item.json()                        # → JSON 字符串
+item.model_dump()                  # Pydantic v2 (替代 dict)</div>
+    </div>
+    <div class="card">
+        <h2>响应状态码与错误</h2>
+        <div class="code">// ========== HTTPException ==========
+from fastapi import HTTPException, status
+
+@app.get("/items/{item_id}")
+def read_item(item_id: int):
+    if item_id == 0:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="商品不存在",
+            headers={"X-Error": "not found"}
+        )
+    if item_id < 0:
+        raise HTTPException(
+            status_code=400,
+            detail={"message": "ID 不能为负数", "code": "INVALID_ID"}
+        )
+    return {"item_id": item_id}
+
+# ========== 自定义异常 ==========
+class UnicornException(Exception):
+    def __init__(self, name: str):
+        self.name = name
+
+@app.exception_handler(UnicornException)
+async def unicorn_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=418,
+        content={"message": f"错误! {exc.name}"}
+    )
+
+@app.get("/unicorns/{name}")
+def read_unicorn(name: str):
+    if name == "bad":
+        raise UnicornException(name=name)
+    return {"unicorn_name": name}
+
+# ========== status 模块 ==========
+from fastapi import status
+
+@app.post("/items", status_code=status.HTTP_201_CREATED)
+def create():
+    return {"message": "ok"}
+
+# status_code 可选值:
+# HTTP_200_OK / HTTP_201_CREATED / HTTP_204_NO_CONTENT
+# HTTP_400_BAD_REQUEST / HTTP_401_UNAUTHORIZED
+# HTTP_403_FORBIDDEN / HTTP_404_NOT_FOUND
+# HTTP_422_UNPROCESSABLE_ENTITY
+# HTTP_500_INTERNAL_SERVER_ERROR</div>
+        <div class="note">💡 响应模型要点: (1) response_model 自动过滤输出字段,保护敏感数据; (2) response_model_exclude/include 动态控制; (3) status_code 标记状态码,HTTPException 抛出错误; (4) Response.cookies/headers 自定义; (5) response_class 切换响应类型 (HTML/JSON/File)。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoResponseModel()">响应模型演示</button>
+        <button onclick="demoStatus()">状态码演示</button>
+        <button onclick="demoError()">错误处理演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoResponseModel() {
+            result.innerHTML = '';
+            log('# 响应模型演示');
+            log('');
+            log('class ItemOut(BaseModel):');
+            log('    id: int');
+            log('    name: str');
+            log('    price: float');
+            log('');
+            log('@app.get("/items", response_model=ItemOut)');
+            log('def get(): return item  # 过滤多余字段');
+            log('');
+            log('高级选项:');
+            log('  response_model_exclude={...}');
+            log('  response_model_include={...}');
+            log('  response_model_exclude_none=True');
+        }
+
+        function demoStatus() {
+            result.innerHTML = '';
+            log('# 状态码演示');
+            log('');
+            log('@app.post("/items", status_code=201)');
+            log('@app.delete("/items/{id}", status_code=204)');
+            log('');
+            log('fastapi.status:');
+            log('  200 OK         — 成功');
+            log('  201 Created    — 创建');
+            log('  204 No Content — 删除');
+            log('  400 Bad Req    — 参数错误');
+            log('  404 Not Found  — 不存在');
+            log('  422 验证失败   — FastAPI 默认');
+            log('  500 服务器错误 — 服务端异常');
+        }
+
+        function demoError() {
+            result.innerHTML = '';
+            log('# 错误处理演示');
+            log('');
+            log('HTTPException:');
+            log('  raise HTTPException(');
+            log('      status_code=404,');
+            log("      detail='Not Found')");
+            log('');
+            log('自定义异常:');
+            log('  class MyError(Exception):');
+            log('      pass');
+            log('');
+            log('  @app.exception_handler(MyError)');
+            log('  async def handler(req, exc):');
+            log('      return JSONResponse(...)');
+        }
+    </script>
+</body>
+</html>

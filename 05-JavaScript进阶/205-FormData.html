@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FormData</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #fd-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>FormData</h2><p>构建表单数据，用于文件上传和表单提交。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 创建
+const fd = new FormData();                    // 空
+const fd2 = new FormData(formElement);        // 从表单元素创建
+
+// 操作
+fd.append('username', 'Alice');               // 追加（允许同名）
+fd.set('username', 'Bob');                    // 设置（覆盖同名）
+fd.get('username');                            // 获取第一个值
+fd.getAll('username');                         // 获取所有值（数组）
+fd.has('username');                            // 是否存在
+fd.delete('username');                         // 删除
+fd.keys();                                     // 所有键
+fd.values();                                   // 所有值
+fd.entries();                                  // 所有 [键, 值] 对
+
+// 遍历
+for (const [key, value] of fd.entries()) {
+    console.log(key, value);
+}
+// 或 for (const [key, value] of fd) { }
+
+// 文件上传
+fd.append('avatar', fileInput.files[0]);
+fd.append('photos', fileInput.files[0], 'custom-name.jpg'); // 指定文件名
+
+// 字符串值 vs Blob
+fd.append('note', 'hello');                    // 字符串
+fd.append('doc', new Blob(['content']), 'doc.txt'); // Blob
+
+// 使用 fetch 发送
+fetch('/upload', {
+    method: 'POST',
+    body: fd,    // 自动设置 Content-Type: multipart/form-data
+    // ⚠️ 不要手动设置 Content-Type（浏览器会自动处理 boundary）
+});</div>
+        <div class="note">💡 FormData 的值可以是字符串、Blob、File。<br>
+        ⚠️ 通过 fetch 发送 FormData 时不要手动设置 Content-Type！<br>
+        💡 append 和 set 的区别：append 允许同名多个值，set 覆盖之前所有同名值。</div>
+    </div>
+    <div class="card">
+        <h2>从表单元素创建</h2>
+        <div class="code">// HTML 表单
+// &lt;form id="myForm"&gt;
+//   &lt;input name="username" value="Alice"&gt;
+//   &lt;input name="email" value="a@test.com"&gt;
+//   &lt;select name="role"&gt;...&lt;/select&gt;
+// &lt;/form&gt;
+
+const form = document.getElementById('myForm');
+const fd = new FormData(form);
+
+// 注意：
+// - 只包含有 name 属性的表单元素
+// - checkbox 只包含勾选的
+// - file input 包含 File 对象
+// - button 的 name/value 不会包含</div>
+    </div>
+    <div class="card">
+        <h2>演示：FormData 操作</h2>
+        <button onclick="demoFormData()">演示 FormData</button>
+        <div id="fd-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const fdResult = document.getElementById('fd-result');
+
+        function log(msg) {
+            fdResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoFormData() {
+            fdResult.innerHTML = '';
+
+            // 创建
+            const fd = new FormData();
+            fd.append('username', 'Alice');
+            fd.append('email', 'alice@example.com');
+            fd.append('tags', 'js');
+            fd.append('tags', 'html');
+            fd.append('tags', 'css');
+            fd.append('avatar', new Blob(['fake-image-data'], { type: 'image/png' }), 'avatar.png');
+
+            log('=== FormData 内容 ===');
+            log(`has username: ${fd.has('username')}`);
+            log(`get username: ${fd.get('username')}`);
+            log(`getAll tags: ${fd.getAll('tags').join(', ')}`);
+            log(`entries count: ${[...fd.entries()].length}`);
+
+            log('\n=== 遍历 ===');
+            for (const [key, val] of fd.entries()) {
+                const isFile = val instanceof File;
+                log(`  ${key}: ${isFile ? `📎 ${val.name} (${val.size}B)` : val}`);
+            }
+
+            // set 覆盖
+            fd.set('username', 'Bob');
+            log(`\nset username → Bob: ${fd.get('username')}`);
+
+            // delete
+            fd.delete('email');
+            log(`delete email → has: ${fd.has('email')}`);
+
+            // keys/values
+            log(`\nkeys: ${[...fd.keys()].join(', ')}`);
+        }
+
+        console.log('=== FormData ===');
+        console.log('FormData 支持:', typeof FormData === 'function');
+
+        document.getElementById('output').textContent =
+            `FormData: 构建表单数据\n` +
+            `append/set/get/getAll/has/delete/entries\n` +
+            `与 fetch 配合: body=fd（自动 multipart/form-data）\n` +
+            `✅ FormData 演示完成！`;
+    </script>
+</body>
+</html>

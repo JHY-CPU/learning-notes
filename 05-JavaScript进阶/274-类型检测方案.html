@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>类型检测方案</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+        th { background: #3498db; color: white; }
+        tr:nth-child(even) { background: #f8f9fa; }
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .tag-ok { background: #d5f5e3; color: #27ae60; }
+        .tag-warn { background: #fef9e7; color: #f39c12; }
+        .tag-fail { background: #fadbd8; color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>类型检测方案</h2><p>JavaScript 提供了多种类型检测方法：typeof、instanceof、Object.prototype.toString、Array.isArray、constructor、duck typing。各有优劣，需组合使用。</p></div>
+    <div class="card"><h2>五种方法对比</h2><table><tr><th>方法</th><th>适用</th><th>局限</th></tr><tr><td>typeof</td><td>基本类型 (string/number/boolean/undefined/function/bigint/symbol)</td><td>null 返回 'object'，数组返回 'object'</td></tr><tr><td>instanceof</td><td>检查原型链</td><td>跨 iframe 失效，需构造函数</td></tr><tr><td>Object.prototype.toString</td><td>获取内置类型标签</td><td>自定义类默认返回 [object Object]</td></tr><tr><td>constructor</td><td>获取构造函数</td><td>constructor 可被修改</td></tr><tr><td>duck typing</td><td>检查行为而非类型</td><td>可能误判</td></tr></table></div>
+    <div class="card"><h2>综合类型检测库实现</h2><p>组合多种方法实现可靠的类型检测函数，覆盖所有 JS 内置类型。</p></div>
+    <div class="card"><h2>交互演示</h2><p>
+        <button onclick="demoTypeof()">typeof 演示</button>
+        <button onclick="demoToString()">toString 检测</button>
+        <button onclick="demoInstanceof()">instanceof 演示</button>
+        <button onclick="demoTypeLib()">综合类型库</button>
+        <button onclick="demoDuckTyping()">鸭子类型</button>
+    </p></div>
+    <pre id="output"></pre>
+    <script>
+        const output = document.getElementById('output');
+
+        function log(msg) {
+            output.textContent += msg + '\n';
+            console.log(msg);
+        }
+
+        function clearLog() {
+            output.textContent = '';
+        }
+
+        // ========== 综合类型检测库 ==========
+        const type = {
+            // 获取类型字符串: [object Type] → type
+            get(value) {
+                return Object.prototype.toString.call(value).slice(8, -1).toLowerCase();
+            },
+
+            isString(v) { return typeof v === 'string'; },
+            isNumber(v) { return typeof v === 'number' && !isNaN(v); },
+            isBoolean(v) { return typeof v === 'boolean'; },
+            isUndefined(v) { return v === undefined; },
+            isNull(v) { return v === null; },
+            isSymbol(v) { return typeof v === 'symbol'; },
+            isBigInt(v) { return typeof v === 'bigint'; },
+            isFunction(v) { return typeof v === 'function'; },
+
+            isArray(v) { return Array.isArray(v); },
+            isObject(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); },
+            isPlainObject(v) { return this.get(v) === 'object'; },
+
+            isDate(v) { return v instanceof Date && !isNaN(v.getTime()); },
+            isRegExp(v) { return this.get(v) === 'regexp'; },
+            isMap(v) { return this.get(v) === 'map'; },
+            isSet(v) { return this.get(v) === 'set'; },
+            isWeakMap(v) { return this.get(v) === 'weakmap'; },
+            isWeakSet(v) { return this.get(v) === 'weakset'; },
+            isPromise(v) { return this.get(v) === 'promise'; },
+            isError(v) { return this.get(v) === 'error'; },
+            isTypedArray(v) {
+                return /^int(8|16|32)|uint(8|16|32)|float(32|64)|bigint64|biguint64/.test(this.get(v));
+            },
+            isArrayBuffer(v) { return this.get(v) === 'arraybuffer'; },
+            isDataView(v) { return this.get(v) === 'dataview'; },
+
+            // 检测原始类型
+            isPrimitive(v) {
+                return v === null || (typeof v !== 'object' && typeof v !== 'function');
+            },
+
+            // 检测空值
+            isEmpty(v) {
+                if (v == null) return true;
+                if (typeof v === 'string' || Array.isArray(v)) return v.length === 0;
+                if (v instanceof Map || v instanceof Set) return v.size === 0;
+                if (typeof v === 'object') return Object.keys(v).length === 0;
+                return false;
+            },
+
+            // 安全调用 toString
+            toString(v) {
+                return Object.prototype.toString.call(v);
+            }
+        };
+
+        // ========== 1. typeof 演示 ==========
+        function demoTypeof() {
+            clearLog();
+            log('=== typeof 运算符 ===\n');
+
+            const tests = [
+                { value: 'hello', label: '"hello"' },
+                { value: 42, label: '42' },
+                { value: true, label: 'true' },
+                { value: undefined, label: 'undefined' },
+                { value: null, label: 'null' },
+                { value: Symbol('s'), label: 'Symbol("s")' },
+                { value: 123n, label: '123n' },
+                { value: function(){}, label: 'function(){}' },
+                { value: {}, label: '{}' },
+                { value: [], label: '[]' },
+                { value: new Date(), label: 'new Date()' },
+            ];
+
+            tests.forEach(({ value, label }) => {
+                const result = typeof value;
+                const isAccurate = type.get(value) === result;
+                const tag = isAccurate ? '✓ 准确' : '✗ 不准确 (实际: ' + type.get(value) + ')';
+                log(`${label.padEnd(20)} → typeof = "${result}"  ${tag}`);
+            });
+
+            log('\n注意: typeof null === "object"（历史遗留 bug）');
+            log('typeof [] === "object"（数组也是对象）');
+            log('typeof new Date() === "object"（无法区分对象类型）');
+        }
+
+        // ========== 2. Object.prototype.toString 演示 ==========
+        function demoToString() {
+            clearLog();
+            log('=== Object.prototype.toString.call() ===\n');
+
+            const tests = [
+                [undefined, 'Undefined'],
+                [null, 'Null'],
+                [true, 'Boolean'],
+                [42, 'Number'],
+                ['hi', 'String'],
+                [Symbol('s'), 'Symbol'],
+                [123n, 'BigInt'],
+                [function(){}, 'Function'],
+                [{}, 'Object'],
+                [[], 'Array'],
+                [new Date(), 'Date'],
+                [/test/g, 'RegExp'],
+                [new Map(), 'Map'],
+                [new Set(), 'Set'],
+                [new WeakMap(), 'WeakMap'],
+                [new WeakSet(), 'WeakSet'],
+                [new Promise(()=>{}), 'Promise'],
+                [new Error('err'), 'Error'],
+                [new Uint8Array(), 'Uint8Array'],
+                [new ArrayBuffer(8), 'ArrayBuffer'],
+            ];
+
+            tests.forEach(([value, expected]) => {
+                const result = Object.prototype.toString.call(value);
+                const typeName = result.slice(8, -1);
+                const match = typeName === expected ? '✓' : '✗ (期望 ' + expected + ')';
+                log(`${result.padEnd(35)} → ${match}`);
+            });
+
+            log('\nObject.prototype.toString 是最可靠的内置类型检测方法');
+        }
+
+        // ========== 3. instanceof 演示 ==========
+        function demoInstanceof() {
+            clearLog();
+            log('=== instanceof 运算符 ===\n');
+
+            log('instanceof 检查对象的原型链:');
+            log(`[] instanceof Array: ${[] instanceof Array}`);
+            log(`[] instanceof Object: ${[] instanceof Object}`);
+            log(`new Date() instanceof Date: ${new Date() instanceof Date}`);
+            log(`new Date() instanceof Object: ${new Date() instanceof Object}`);
+            log(`/test/ instanceof RegExp: ${/test/ instanceof RegExp}`);
+
+            // 跨 iframe 问题
+            log('\n--- instanceof 的局限 ---');
+            log('1. 跨 iframe/跨 realm 失效（不同全局对象）');
+            log('2. 需要构造函数引用');
+
+            // 自定义 instanceof
+            log('\n--- 自定义 instanceof 行为 ---');
+            class MyArray extends Array {}
+            const myArr = new MyArray();
+            log(`myArr instanceof MyArray: ${myArr instanceof MyArray}`);
+            log(`myArr instanceof Array: ${myArr instanceof Array}`);
+
+            // Symbol.hasInstance
+            log('\n--- Symbol.hasInstance 自定义 ---');
+            class EvenNumber {
+                static [Symbol.hasInstance](instance) {
+                    return Number.isInteger(instance) && instance % 2 === 0;
+                }
+            }
+            log(`2 instanceof EvenNumber: ${2 instanceof EvenNumber}`);
+            log(`3 instanceof EvenNumber: ${3 instanceof EvenNumber}`);
+        }
+
+        // ========== 4. 综合类型库 ==========
+        function demoTypeLib() {
+            clearLog();
+            log('=== 综合类型检测库 ===\n');
+
+            const testValues = [
+                { value: 'hello', label: 'String' },
+                { value: 42, label: 'Number' },
+                { value: true, label: 'Boolean' },
+                { value: null, label: 'null' },
+                { value: undefined, label: 'undefined' },
+                { value: Symbol('s'), label: 'Symbol' },
+                { value: 100n, label: 'BigInt' },
+                { value: () => {}, label: 'Function' },
+                { value: {}, label: 'Plain Object' },
+                { value: [1, 2, 3], label: 'Array' },
+                { value: new Date(), label: 'Date' },
+                { value: /abc/gi, label: 'RegExp' },
+                { value: new Map([['a', 1]]), label: 'Map' },
+                { value: new Set([1, 2]), label: 'Set' },
+                { value: new Promise(r => r), label: 'Promise' },
+                { value: new Error('oops'), label: 'Error' },
+                { value: new Uint16Array([1, 2]), label: 'TypedArray' },
+                { value: NaN, label: 'NaN' },
+            ];
+
+            log('使用综合类型库检测:');
+            testValues.forEach(({ value, label }) => {
+                const detected = type.get(value);
+                const isPrimitive = type.isPrimitive(value);
+                const isEmpty = type.isEmpty(value);
+                log(`${label.padEnd(15)} → type: ${detected.padEnd(15)} primitive: ${isPrimitive}  empty: ${isEmpty}`);
+            });
+        }
+
+        // ========== 5. 鸭子类型 ==========
+        function demoDuckTyping() {
+            clearLog();
+            log('=== 鸭子类型 (Duck Typing) ===\n');
+            log('"如果它走起来像鸭子，叫起来像鸭子，那它就是鸭子"');
+
+            // 鸭子类型检查示例
+            function isIterable(obj) {
+                return obj != null && typeof obj[Symbol.iterator] === 'function';
+            }
+
+            function isThenable(obj) {
+                return obj != null && typeof obj.then === 'function';
+            }
+
+            function hasLength(obj) {
+                return obj != null && typeof obj.length === 'number';
+            }
+
+            log('--- isIterable (检查 Symbol.iterator) ---');
+            log(`数组可迭代: ${isIterable([1, 2, 3])}`);
+            log(`字符串可迭代: ${isIterable('hello')}`);
+            log(`Set 可迭代: ${isIterable(new Set())}`);
+            log(`普通对象可迭代: ${isIterable({})}`);
+
+            log('\n--- isThenable (检查 .then 方法) ---');
+            log(`Promise thenable: ${isThenable(Promise.resolve())}`);
+            log(`{then: fn} thenable: ${isThenable({then: () => {}})}`);
+            log(`普通对象 thenable: ${isThenable({})}`);
+
+            log('\n--- hasLength (检查 .length 属性) ---');
+            log(`数组有 length: ${hasLength([1, 2, 3])}`);
+            log(`字符串有 length: ${hasLength('hi')}`);
+            log(`函数有 length: ${hasLength(function(a,b){})}`);
+            log(`数字有 length: ${hasLength(42)}`);
+
+            log('\n鸭子类型优势：关注行为而非具体类型，更灵活');
+        }
+
+        log('=== 类型检测方案 演示 ===\n点击上方按钮查看不同类型检测方法。\n\n最佳实践：typeof 用于基本类型，Object.prototype.toString 用于内置对象，instanceof 用于自定义类。');
+    </script>
+</body>
+</html>

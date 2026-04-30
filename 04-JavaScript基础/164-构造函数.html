@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>构造函数</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #8e44ad; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>构造函数</h2><p>用 new 调用的函数，按约定首字母大写（PascalCase）。</p></div>
+    <div class="card">
+        <h2>构造函数基本用法</h2>
+        <div class="code">// 构造函数（首字母大写）
+function Person(name, age) {
+    this.name = name;
+    this.age = age;
+
+    this.sayHi = function() {
+        console.log('Hi, 我是' + this.name);
+    };
+}
+
+// 用 new 调用
+const p1 = new Person('Alice', 25);
+const p2 = new Person('Bob', 30);
+
+p1.name;     // 'Alice'
+p1.sayHi();  // 'Hi, 我是Alice'
+
+// 如果不写 new 会怎样？
+const p3 = Person('Charlie', 35);
+console.log(p3);       // undefined（没有 return）
+console.log(window.name);  // 'Charlie'（this 指向了 window！）
+
+// 防止忘记 new
+function SafePerson(name, age) {
+    if (!(this instanceof SafePerson)) {
+        return new SafePerson(name, age);
+    }
+    this.name = name;
+    this.age = age;
+}
+// 或者用 new.target
+function NewTargetPerson(name) {
+    if (!new.target) throw '必须用 new 调用';
+    this.name = name;
+}</div>
+    </div>
+    <div class="card">
+        <h2>new 操作符的执行步骤</h2>
+        <div class="code">// new Person('Alice') 做了：
+function newOperator(Constructor, ...args) {
+    // 1. 创建空对象
+    const obj = {};
+
+    // 2. 链接原型
+    Object.setPrototypeOf(obj, Constructor.prototype);
+    // 或 obj.__proto__ = Constructor.prototype
+
+    // 3. 绑定 this 并执行构造函数
+    const result = Constructor.apply(obj, args);
+
+    // 4. 返回对象
+    //    如果构造函数返回了对象，则返回那个对象
+    //    否则返回新创建的 obj
+    return result instanceof Object ? result : obj;
+}
+
+const p = newOperator(Person, 'Alice', 25);
+console.log(p.name);  // 'Alice'
+console.log(p instanceof Person);  // true</div>
+        <div class="note">💡 new.target 在构造函数内部检查：如果是 new 调用则指向构造函数，否则为 undefined。</div>
+    </div>
+    <div class="card">
+        <h2>instanceof 运算符</h2>
+        <div class="code">// instanceof 检查对象的原型链上是否有构造函数的 prototype
+p1 instanceof Person;   // true
+p1 instanceof Object;   // true（所有对象都是 Object 的实例）
+p1 instanceof Array;    // false
+
+// 手动实现 instanceof
+function myInstanceof(obj, Constructor) {
+    let proto = Object.getPrototypeOf(obj);
+    while (proto) {
+        if (proto === Constructor.prototype) return true;
+        proto = Object.getPrototypeOf(proto);
+    }
+    return false;
+}
+
+myInstanceof(p1, Person);  // true
+myInstanceof(p1, Object);  // true
+
+// constructor 属性
+p1.constructor === Person;  // true
+p1.constructor === Object;  // false</div>
+    </div>
+    <div class="card">
+        <h2>构造函数 vs 工厂函数</h2>
+        <div class="code">// 工厂函数（返回对象，不用 new）
+function createPerson(name, age) {
+    return {
+        name,
+        age,
+        sayHi() {
+            console.log('Hi, 我是' + this.name);
+        }
+    };
+}
+
+const f1 = createPerson('Alice', 25);
+// 不需要 new，不会混淆 this
+
+// 工厂 vs 构造函数
+// 工厂函数：
+//   + 不需要 new，不会忘记
+//   + 可以返回任意对象
+//   - 没有 instanceof 检查
+//   - 方法在每个实例上重新创建（内存浪费，除非提取出去）
+
+// 构造函数：
+//   + instanceof 检查
+//   + 方法在 prototype 上共享（内存高效）
+//   - 忘记 new 会出问题</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== 构造函数 ===');
+        function Person(name, age) {
+            this.name = name;
+            this.age = age;
+            this.intro = function() {
+                return '我是' + this.name + '，' + this.age + '岁';
+            };
+        }
+
+        const p1 = new Person('Alice', 25);
+        const p2 = new Person('Bob', 30);
+        console.log(p1.intro());
+        console.log(p2.intro());
+
+        console.log('=== instanceof ===');
+        console.log('p1 instanceof Person:', p1 instanceof Person);
+        console.log('p1 instanceof Object:', p1 instanceof Object);
+        console.log('p1 instanceof Array:', p1 instanceof Array);
+
+        console.log('=== constructor ===');
+        console.log('p1.constructor === Person:', p1.constructor === Person);
+        console.log('p1.constructor.name:', p1.constructor.name);
+
+        console.log('=== 忘记 new ===');
+        function StrictPerson(name) {
+            if (!new.target) {
+                return new StrictPerson(name);
+            }
+            this.name = name;
+        }
+        const p3 = StrictPerson('Safe');
+        console.log('安全调用:', p3.name);
+
+        console.log('=== new.target ===');
+        function checkNew() {
+            console.log('new.target:', new.target ? '构造函数' : '普通函数');
+        }
+        new checkNew();
+        checkNew();
+
+        document.getElementById('output').textContent =
+            `p1: ${p1.intro()}\n` +
+            `p2: ${p2.intro()}\n` +
+            `p1 instanceof Person: ${p1 instanceof Person}\n` +
+            `✅ 构造函数演示完成！`;
+    </script>
+</body>
+</html>

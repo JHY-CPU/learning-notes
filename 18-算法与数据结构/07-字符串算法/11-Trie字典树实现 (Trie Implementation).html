@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>11-Trie字典树实现 (Trie Implementation)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<h1>11 - Trie 字典树实现 (Trie Implementation)</h1>
+
+<div class="card">
+  <h2>完整 JavaScript 实现</h2>
+  <p>以下是一个功能完整的 Trie 实现，包含插入、查找、前缀检查、删除和遍历操作：</p>
+  <pre>
+class TrieNode {
+  constructor() {
+    this.children = {};     // 子节点映射: char → TrieNode
+    this.isEnd = false;     // 是否为一个完整单词的结尾
+    this.count = 0;         // (可选) 通过该节点的单词数
+    this.prefixCount = 0;   // (可选) 以该节点为前缀的单词数
+  }
+}
+
+class Trie {
+  constructor() {
+    this.root = new TrieNode();
+  }
+
+  /**
+   * 插入一个单词到 Trie 中
+   * 时间复杂度: O(m), m为单词长度
+   */
+  insert(word) {
+    let node = this.root;
+    for (const ch of word) {
+      if (!node.children[ch]) {
+        node.children[ch] = new TrieNode();
+      }
+      node = node.children[ch];
+      node.prefixCount++;
+    }
+    node.isEnd = true;
+    node.count++;
+  }
+
+  /**
+   * 查找单词是否完整存在
+   * 时间复杂度: O(m)
+   */
+  search(word) {
+    const node = this._traverse(word);
+    return node !== null && node.isEnd;
+  }
+
+  /**
+   * 检查是否有单词以给定前缀开头
+   * 时间复杂度: O(m)
+   */
+  startsWith(prefix) {
+    return this._traverse(prefix) !== null;
+  }
+
+  /**
+   * 查找单词出现的次数（允许重复插入）
+   */
+  count(word) {
+    const node = this._traverse(word);
+    return node ? node.count : 0;
+  }
+
+  /**
+   * 获取以指定前缀开头的所有单词
+   */
+  getWordsWithPrefix(prefix) {
+    const node = this._traverse(prefix);
+    if (!node) return [];
+    const result = [];
+    this._dfs(node, prefix, result);
+    return result;
+  }
+
+  /**
+   * 删除一个单词
+   * 如果该单词是其他单词的前缀，只取消 isEnd 标记
+   * 如果没有其他单词共享前缀，则删除节点
+   */
+  delete(word) {
+    const path = [];
+    let node = this.root;
+    for (const ch of word) {
+      if (!node.children[ch]) return false; // 不存在
+      path.push({ node, ch });
+      node = node.children[ch];
+    }
+    if (!node.isEnd) return false; // 不存在
+
+    node.isEnd = false;
+    node.count--;
+
+    // 从后向前清理没有子节点的路径
+    for (let i = path.length - 1; i >= 0; i--) {
+      const { node: parent, ch } = path[i];
+      const child = parent.children[ch];
+      child.prefixCount--;
+      if (child.prefixCount === 0) {
+        delete parent.children[ch];
+      }
+    }
+    return true;
+  }
+
+  /**
+   * 获取所有单词（字典序）
+   */
+  getAllWords() {
+    const result = [];
+    this._dfs(this.root, '', result);
+    return result;
+  }
+
+  /**
+   * 获取 Trie 中的单词总数
+   */
+  size() {
+    return this.root.prefixCount;
+  }
+
+  // ========== 内部辅助方法 ==========
+
+  _traverse(str) {
+    let node = this.root;
+    for (const ch of str) {
+      if (!node.children[ch]) return null;
+      node = node.children[ch];
+    }
+    return node;
+  }
+
+  _dfs(node, prefix, result) {
+    if (node.isEnd) {
+      for (let i = 0; i < node.count; i++) result.push(prefix);
+    }
+    // 按字典序遍历子节点
+    const sortedKeys = Object.keys(node.children).sort();
+    for (const ch of sortedKeys) {
+      this._dfs(node.children[ch], prefix + ch, result);
+    }
+  }
+}
+  </pre>
+</div>
+
+<div class="card">
+  <h2>核心操作详解</h2>
+
+  <h3>插入操作</h3>
+  <div class="code">
+示例: 插入 "cat"
+
+初始: root → {}
+Step 1: root → {c: ...}    (创建节点 c)
+Step 2: c → {a: ...}        (创建节点 a)
+Step 3: a → {t: ...}        (创建节点 t)
+Step 4: t.isEnd = true      (标记 t 为单词结尾)
+
+最终:
+  root → c → a → t(isEnd=true)
+  </div>
+
+  <h3>删除操作</h3>
+  <div class="code">
+示例: 从 {"and", "ant"} 中删除 "and"
+
+初始:
+  root → a → n → d(isEnd=true)
+               → t(isEnd=true)
+
+删除 "and": 取消 d.isEnd
+  检查 d 是否有子节点 → 没有，删除 d
+  检查 n 是否有其他子节点 → 有(t) → 停止
+
+最终:
+  root → a → n → t(isEnd=true)
+  </div>
+</div>
+
+<div class="card">
+  <h2>交互：完整 Trie 操作演示</h2>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <input type="text" id="wordInput" placeholder="输入单词" value="cat" style="flex:1;padding:8px;">
+    <button onclick="doInsert()">插入</button>
+    <button onclick="doSearch()">查找</button>
+    <button onclick="doPrefix()">前缀检查</button>
+    <button onclick="doDelete()">删除</button>
+  </div>
+  <br>
+  <textarea id="wordList" rows="3" style="width:100%;padding:8px;margin:5px 0;" placeholder="每行一个单词进行批量插入">cat
+car
+card
+care
+dog
+dot
+do</textarea>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;">
+    <button onclick="doBatchInsert()">批量插入</button>
+    <button onclick="doShowAll()">显示全部</button>
+    <button onclick="doReset()">重置</button>
+  </div>
+  <div id="result"></div>
+</div>
+
+<script>
+class TrieNode {
+  constructor() {
+    this.children = {};
+    this.isEnd = false;
+    this.count = 0;
+    this.prefixCount = 0;
+  }
+}
+
+class Trie {
+  constructor() { this.root = new TrieNode(); }
+
+  insert(word) {
+    let node = this.root;
+    for (const ch of word) {
+      if (!node.children[ch]) node.children[ch] = new TrieNode();
+      node = node.children[ch];
+      node.prefixCount++;
+    }
+    node.isEnd = true;
+    node.count++;
+  }
+
+  search(word) {
+    const node = this._traverse(word);
+    return node !== null && node.isEnd;
+  }
+
+  startsWith(prefix) {
+    return this._traverse(prefix) !== null;
+  }
+
+  getWordsWithPrefix(prefix) {
+    const node = this._traverse(prefix);
+    if (!node) return [];
+    const result = [];
+    this._dfs(node, prefix, result);
+    return result;
+  }
+
+  delete(word) {
+    const path = [];
+    let node = this.root;
+    for (const ch of word) {
+      if (!node.children[ch]) return false;
+      path.push({ node, ch });
+      node = node.children[ch];
+    }
+    if (!node.isEnd) return false;
+    node.isEnd = false;
+    node.count--;
+    for (let i = path.length - 1; i >= 0; i--) {
+      const { node: parent, ch } = path[i];
+      const child = parent.children[ch];
+      child.prefixCount--;
+      if (child.prefixCount === 0) delete parent.children[ch];
+    }
+    return true;
+  }
+
+  getAllWords() {
+    const result = [];
+    this._dfs(this.root, '', result);
+    return result;
+  }
+
+  _traverse(str) {
+    let node = this.root;
+    for (const ch of str) {
+      if (!node.children[ch]) return null;
+      node = node.children[ch];
+    }
+    return node;
+  }
+
+  _dfs(node, prefix, result) {
+    if (node.isEnd) {
+      for (let i = 0; i < node.count; i++) result.push(prefix);
+    }
+    const sortedKeys = Object.keys(node.children).sort();
+    for (const ch of sortedKeys) {
+      this._dfs(node.children[ch], prefix + ch, result);
+    }
+  }
+}
+
+const trie = new Trie();
+
+function doInsert() {
+  const word = document.getElementById('wordInput').value.trim();
+  if (!word) return;
+  trie.insert(word);
+  showState(`已插入: "${word}"`);
+}
+
+function doSearch() {
+  const word = document.getElementById('wordInput').value.trim();
+  if (!word) return;
+  const found = trie.search(word);
+  showState(`查找 "${word}": ${found ? '✅ 存在' : '❌ 不存在'}`);
+}
+
+function doPrefix() {
+  const word = document.getElementById('wordInput').value.trim();
+  if (!word) return;
+  const found = trie.startsWith(word);
+  const suggestions = trie.getWordsWithPrefix(word);
+  let msg = `前缀 "${word}": ${found ? '✅ 存在' : '❌ 不存在'}`;
+  if (found) msg += `<br>以 "${word}" 开头的单词: [${suggestions.join(', ')}]`;
+  showState(msg);
+}
+
+function doDelete() {
+  const word = document.getElementById('wordInput').value.trim();
+  if (!word) return;
+  const ok = trie.delete(word);
+  showState(`删除 "${word}": ${ok ? '✅ 成功' : '❌ 不存在'}`);
+}
+
+function doBatchInsert() {
+  const words = document.getElementById('wordList').value.split('\n').map(w => w.trim()).filter(w => w);
+  for (const w of words) trie.insert(w);
+  showState(`已批量插入 ${words.length} 个单词`);
+}
+
+function doShowAll() {
+  const words = trie.getAllWords();
+  const prefix = document.getElementById('wordInput').value.trim();
+  let msg = '';
+  if (prefix) {
+    const filtered = trie.getWordsWithPrefix(prefix);
+    msg = `以 "${prefix}" 为前缀的单词: [${filtered.join(', ')}]`;
+  }
+  showState(msg + `<br>全部单词 (${words.length}个): [${words.join(', ')}]`);
+}
+
+function doReset() {
+  trie.root = new TrieNode();
+  showState('Trie 已重置');
+}
+
+function showState(msg) {
+  const words = trie.getAllWords();
+  let html = `<p>${msg}</p>`;
+  html += `<p><strong>当前单词:</strong> ${words.length > 0 ? '[' + words.join(', ') + ']' : '（空）'}</p>`;
+
+  // 显示树形结构
+  if (words.length > 0) {
+    html += '<div style="font-family:monospace;background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:4px;line-height:1.6;margin-top:10px;">';
+    html += renderTreeStructure(trie.root, '');
+    html += '</div>';
+  }
+
+  document.getElementById('result').innerHTML = html;
+}
+
+function renderTreeStructure(node, prefix) {
+  let html = '';
+  const entries = Object.entries(node.children);
+  for (let i = 0; i < entries.length; i++) {
+    const [ch, child] = entries[i];
+    const isLast = i === entries.length - 1;
+    const connector = isLast ? '└── ' : '├── ';
+    const endMark = child.isEnd ? ' <span style="color:#2ecc71;">●</span>' : '';
+    html += prefix + connector + ch + endMark + '<br>';
+    const childPrefix = prefix + (isLast ? '    ' : '│   ');
+    html += renderTreeStructure(child, childPrefix);
+  }
+  return html;
+}
+</script>
+</body></html>

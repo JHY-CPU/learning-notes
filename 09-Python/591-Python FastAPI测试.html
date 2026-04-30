@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python FastAPI测试</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🧪 FastAPI 测试</h2><p>TestClient 测试客户端、pytest + FastAPI 测试、覆盖依赖注入、异步测试、数据库测试、HTTP 请求模拟。</p></div>
+    <div class="card">
+        <h2>TestClient 基础</h2>
+        <div class="code">// ========== TestClient ==========
+# pip install httpx  # TestClient 需要 httpx
+# pip install pytest
+
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+app = FastAPI()
+
+@app.get("/")
+async def read_main():
+    return {"msg": "Hello World"}
+
+@app.get("/items/{item_id}")
+async def read_item(item_id: int, q: str | None = None):
+    return {"item_id": item_id, "q": q}
+
+# 创建测试客户端:
+client = TestClient(app)
+
+# 测试:
+def test_read_main():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.json() == {"msg": "Hello World"}
+
+def test_read_item():
+    response = client.get("/items/42?q=test")
+    assert response.status_code == 200
+    assert response.json() == {"item_id": 42, "q": "test"}
+
+def test_read_item_no_query():
+    response = client.get("/items/1")
+    assert response.json() == {"item_id": 1, "q": None}</div>
+    </div>
+    <div class="card">
+        <h2>覆盖依赖注入</h2>
+        <div class="code">// ========== 依赖覆盖 ==========
+from fastapi import FastAPI, Depends
+from fastapi.testclient import TestClient
+
+app = FastAPI()
+
+# 正常依赖:
+async def get_current_user():
+    return {"username": "real_user"}
+
+@app.get("/users/me")
+async def read_me(user: dict = Depends(get_current_user)):
+    return user
+
+// ========== 测试时覆盖依赖 ==========
+# 创建测试用依赖:
+async def override_get_current_user():
+    return {"username": "test_user"}
+
+# 覆盖:
+app.dependency_overrides[get_current_user] = override_get_current_user
+
+client = TestClient(app)
+
+def test_read_me():
+    response = client.get("/users/me")
+    assert response.json() == {"username": "test_user"}
+
+# ========== 使用 conftest 管理覆盖 ==========
+# conftest.py:
+import pytest
+from fastapi.testclient import TestClient
+
+@pytest.fixture
+def client():
+    app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_user
+    yield TestClient(app)
+    app.dependency_overrides.clear()  # 清理
+
+# test_api.py:
+def test_create_item(client):
+    resp = client.post("/items", json={"title": "test"})
+    assert resp.status_code == 201</div>
+    </div>
+    <div class="card">
+        <h2>测试 CRUD API</h2>
+        <div class="code">// ========== CRUD 测试 ==========
+import pytest
+from fastapi.testclient import TestClient
+
+class TestItems:
+    """商品 API 测试"""
+
+    def test_create_item(self, client, auth_headers):
+        resp = client.post("/items/", json={
+            "title": "测试商品",
+            "price": 29.9
+        }, headers=auth_headers)
+        assert resp.status_code == 201
+        data = resp.json()
+        assert data["title"] == "测试商品"
+        assert data["price"] == 29.9
+        assert "id" in data
+
+    def test_list_items(self, client, auth_headers):
+        # 创建两个商品
+        client.post("/items/", json={"title": "A", "price": 10}, headers=auth_headers)
+        client.post("/items/", json={"title": "B", "price": 20}, headers=auth_headers)
+
+        resp = client.get("/items/")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert len(data) >= 2
+
+    def test_get_nonexistent_item(self, client):
+        resp = client.get("/items/99999")
+        assert resp.status_code == 404
+
+    def test_delete_item(self, client, auth_headers):
+        # 创建 → 删除
+        create = client.post("/items/", json={"title": "临时", "price": 1}, headers=auth_headers)
+        item_id = create.json()["id"]
+
+        resp = client.delete(f"/items/{item_id}", headers=auth_headers)
+        assert resp.status_code == 204
+
+        resp = client.get(f"/items/{item_id}")
+        assert resp.status_code == 404</div>
+    </div>
+    <div class="card">
+        <h2>测试认证与授权</h2>
+        <div class="code">// ========== 认证测试 ==========
+class TestAuth:
+
+    def test_login_success(self, client):
+        resp = client.post("/token", data={
+            "username": "testuser",
+            "password": "testpass"
+        })
+        assert resp.status_code == 200
+        token = resp.json().get("access_token")
+        assert token is not None
+
+    def test_login_failure(self, client):
+        resp = client.post("/token", data={
+            "username": "wrong",
+            "password": "wrong"
+        })
+        assert resp.status_code == 401
+
+    def test_unauthorized_access(self, client):
+        resp = client.get("/users/me")
+        assert resp.status_code == 401  # 无 token
+
+    def test_invalid_token(self, client):
+        resp = client.get("/users/me", headers={
+            "Authorization": "Bearer invalid_token"
+        })
+        assert resp.status_code == 401
+
+    def test_protected_route_with_token(self, client, auth_headers):
+        resp = client.get("/users/me", headers=auth_headers)
+        assert resp.status_code == 200
+
+// ========== Fixture 管理 ==========
+@pytest.fixture
+def auth_headers(client):
+    """创建认证请求头 fixture"""
+    # 先注册用户
+    client.post("/register", json={
+        "username": "testuser",
+        "email": "test@example.com",
+        "password": "testpass"
+    })
+    # 登录
+    resp = client.post("/token", data={
+        "username": "testuser",
+        "password": "testpass"
+    })
+    token = resp.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+# 管理员 token:
+@pytest.fixture
+def admin_headers(client):
+    resp = client.post("/token", data={
+        "username": "admin",
+        "password": "adminpass"
+    })
+    token = resp.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}</div>
+    </div>
+    <div class="card">
+        <h2>异步测试</h2>
+        <div class="code">// ========== Async 测试 ==========
+# pip install pytest-asyncio
+
+import pytest
+from httpx import AsyncClient, ASGITransport
+
+@pytest.mark.asyncio
+async def test_async_endpoint():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        response = await ac.get("/")
+    assert response.status_code == 200
+
+# ========== 数据库测试 ==========
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from app.database import Base, get_db
+
+# 使用内存数据库:
+TEST_DATABASE_URL = "sqlite:///./test.db"
+engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
+TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+def override_get_db():
+    try:
+        db = TestingSessionLocal()
+        yield db
+    finally:
+        db.close()
+
+@pytest.fixture(autouse=True)
+def setup_db():
+    """每个测试前创建表,测试后删除"""
+    Base.metadata.create_all(bind=engine)
+    yield
+    Base.metadata.drop_all(bind=engine)
+
+@pytest.fixture
+def client():
+    app.dependency_overrides[get_db] = override_get_db
+    yield TestClient(app)
+    app.dependency_overrides.clear()</div>
+        <div class="note">💡 FastAPI 测试要点: (1) TestClient(app) 模拟 HTTP 请求; (2) app.dependency_overrides 在测试中替换依赖; (3) conftest.py 共享 client/auth_headers fixture; (4) 内存数据库 (SQLite) 快速测试; (5) httpx.AsyncClient 测试异步端点。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoTestClient()">TestClient 演示</button>
+        <button onclick="demoOverride()">依赖覆盖演示</button>
+        <button onclick="demoFixture()">Fixture 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoTestClient() {
+            result.innerHTML = '';
+            log('# TestClient 演示');
+            log('');
+            log('from fastapi.testclient import TestClient');
+            log('client = TestClient(app)');
+            log('');
+            log('client.get("/items")');
+            log('client.post("/items", json={...})');
+            log('client.put("/items/1", json={...})');
+            log('client.delete("/items/1")');
+            log('');
+            log('断言:');
+            log('  resp.status_code == 200');
+            log('  resp.json() == {...}');
+        }
+
+        function demoOverride() {
+            result.innerHTML = '';
+            log('# 依赖覆盖演示');
+            log('');
+            log('正常依赖:');
+            log('  async def get_db(): ...');
+            log('');
+            log('测试覆盖:');
+            log('  def override_get_db(): ...');
+            log('  app.dependency_overrides[get_db]');
+            log('      = override_get_db');
+            log('');
+            log('清理:');
+            log('  app.dependency_overrides.clear()');
+        }
+
+        function demoFixture() {
+            result.innerHTML = '';
+            log('# pytest Fixture 演示');
+            log('');
+            log('@pytest.fixture');
+            log('def client():');
+            log('    yield TestClient(app)');
+            log('');
+            log('@pytest.fixture');
+            log('def auth_headers(client):');
+            log('    resp = client.post("/token", ...)');
+            log('    token = resp.json()["access_token"]');
+            log('    return {"Authorization": f"Bearer {token}"}');
+            log('');
+            log('测试中使用:');
+            log('  def test_create(client, auth_headers):');
+        }
+    </script>
+</body>
+</html>

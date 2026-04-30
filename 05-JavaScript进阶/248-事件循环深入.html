@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>事件循环深入</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #eventLoop-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>事件循环深入</h2><p>宏任务 / 微任务 / 渲染帧 / 空闲回调 — 执行顺序分析。</p></div>
+    <div class="card">
+        <h2>事件循环顺序</h2>
+        <div class="code">// ========== 事件循环优先级 ==========
+// 1. 同步代码 (Call Stack)
+// 2. 微任务队列 (microtask queue)
+//    - Promise.then/catch/finally
+//    - queueMicrotask
+//    - MutationObserver
+//    - process.nextTick (Node.js)
+// 3. 渲染 (requestAnimationFrame)
+// 4. 宏任务队列 (macrotask queue)
+//    - setTimeout / setInterval
+//    - I/O (DOM events, fetch, etc.)
+//    - postMessage
+//    - requestIdleCallback (空闲时)
+
+// ========== 执行规则 ==========
+// 每个宏任务后，清空整个微任务队列
+// 微任务中产生的微任务，也在当前循环执行
+// 渲染在微任务之后、下一宏任务之前
+
+// ========== 经典面试题 ==========
+console.log(1);                    // 同步: 1
+
+setTimeout(() => console.log(2));  // 宏任务
+
+Promise.resolve().then(() => {
+    console.log(3);                // 微任务
+    Promise.resolve().then(() => console.log(4)); // 微任务中的微任务
+});
+
+console.log(5);                    // 同步: 5
+
+// 输出顺序: 1, 5, 3, 4, 2</div>
+    </div>
+    <div class="card">
+        <h2>演示：事件循环顺序</h2>
+        <button onclick="demoEventLoop()">执行顺序测试</button>
+        <button onclick="demoNested()">嵌套微任务</button>
+        <div id="eventLoop-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const eventLoopResult = document.getElementById('eventLoop-result');
+
+        function log(msg) {
+            eventLoopResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoEventLoop() {
+            eventLoopResult.innerHTML = '';
+            log('⏱️ 事件循环执行顺序演示:');
+            log('查看 Console 面板的输出顺序');
+            log('');
+
+            log('--- 开始同步代码 ---');
+
+            // 同步
+            log('🟢 同步: 1');
+
+            // 宏任务
+            setTimeout(() => log('🔴 宏任务: setTimeout'), 0);
+
+            // 微任务
+            Promise.resolve().then(() => log('🟡 微任务: Promise.then'));
+
+            // 微任务
+            queueMicrotask(() => log('🟡 微任务: queueMicrotask'));
+
+            // 渲染
+            requestAnimationFrame(() => log('🟣 渲染: rAF (在宏任务前)'));
+
+            // 空闲
+            requestIdleCallback(() => log('⚪ 空闲: rIC (最后)'));
+
+            // 同步
+            log('🟢 同步: 2');
+
+            log('--- 同步代码结束 ---');
+            log('');
+            log('📌 预期顺序:');
+            log('   同步(1, 2) → 微任务(Promise, queueMicrotask)');
+            log('   → rAF → 宏任务(setTimeout) → rIC');
+        }
+
+        function demoNested() {
+            eventLoopResult.innerHTML = '';
+            log('🪆 嵌套微任务演示:');
+            log('');
+
+            log('同步代码开始');
+
+            setTimeout(() => {
+                log('宏任务 A');
+                Promise.resolve().then(() => log('  宏任务A 中的微任务'));
+            }, 0);
+
+            setTimeout(() => log('宏任务 B'), 0);
+
+            Promise.resolve().then(() => {
+                log('微任务 1');
+                // 在微任务中添加新的微任务
+                Promise.resolve().then(() => {
+                    log('  微任务 1 中的微任务');
+                    Promise.resolve().then(() => log('    微任务 1 中的微任务的微任务'));
+                });
+                queueMicrotask(() => log('  微任务 1 中的 queueMicrotask'));
+            });
+
+            Promise.resolve().then(() => log('微任务 2'));
+
+            log('同步代码结束');
+            log('');
+            log('📌 微任务队列在每一轮宏任务后清空');
+            log('📌 微任务中产生的新微任务也在本轮执行');
+        }
+
+        console.log('=== 事件循环深入 ===');
+
+        document.getElementById('output').textContent =
+            `事件循环: 同步代码 → 微任务 → rAF → 宏任务 → rIC\n` +
+            `微任务: Promise.then / queueMicrotask / MutationObserver\n` +
+            `宏任务: setTimeout / setInterval / I/O / DOM events\n` +
+            `✅ 事件循环深入演示完成！`;
+    </script>
+</body>
+</html>

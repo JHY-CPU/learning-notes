@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>纯函数</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #2ecc71; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>纯函数（Pure Function）</h2><p>相同的输入永远得到相同的输出，且没有副作用。</p></div>
+    <div class="card">
+        <h2>纯函数的两个条件</h2>
+        <div class="code">// 1. 相同输入 → 相同输出（不依赖外部状态）
+// 2. 没有副作用（不修改外部变量、不IO、不DOM操作）
+
+// ✅ 纯函数
+function add(a, b) {
+    return a + b;
+}
+// 输入(1,2)永远返回3，不修改任何东西
+
+// ❌ 非纯函数（依赖外部变量）
+let taxRate = 0.1;
+function calcPrice(price) {
+    return price * (1 + taxRate);  // taxRate 可能变化
+}
+
+// ❌ 非纯函数（修改外部变量）
+let total = 0;
+function addToTotal(price) {
+    total += price;  // 副作用：修改外部变量
+    return total;
+}</div>
+    </div>
+    <div class="card">
+        <h2>副作用示例</h2>
+        <div class="code">// 常见的副作用：
+// 1. 修改全局变量/外部变量
+// 2. console.log()
+// 3. DOM 操作
+// 4. 网络请求
+// 5. 文件读写
+// 6. Math.random()（相同输入不同输出）
+
+// ❌ 不纯
+function greet(name) {
+    console.log('Hello, ' + name);  // 副作用：控制台输出
+}
+
+function getRandom() {
+    return Math.random();  // 相同输入不同输出
+}</div>
+    </div>
+    <div class="card">
+        <h2>纯函数的优点</h2>
+        <div class="code">// 1. 可预测 — 容易 debug
+// 2. 可测试 — 不需要 mock 外部状态
+// 3. 可缓存 — 可以记住结果（memoization）
+// 4. 可并行 — 没有共享状态问题
+
+// 缓存纯函数的结果
+function memoize(fn) {
+    const cache = new Map();
+    return function(arg) {
+        if (cache.has(arg)) {
+            return cache.get(arg);  // 直接返回缓存
+        }
+        const result = fn(arg);
+        cache.set(arg, result);
+        return result;
+    };
+}
+
+const factorial = memoize(n => {
+    return n <= 1 ? 1 : n * factorial(n - 1);
+});</div>
+    </div>
+    <div class="card">
+        <h2>实践：尽量写纯函数</h2>
+        <div class="code">// ❌ 不纯：修改输入参数
+function addItem(arr, item) {
+    arr.push(item);       // 修改原数组！
+    return arr;
+}
+
+// ✅ 纯：返回新数组
+function addItemPure(arr, item) {
+    return [...arr, item];  // 不修改原数组
+}
+
+let original = [1, 2, 3];
+addItem(original, 4);     // original 被改了！
+addItemPure(original, 4); // original 不变</div>
+        <div class="note">💡 纯函数是函数式编程的基石。尽量把业务逻辑写成纯函数。</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== 纯函数 ===');
+        // ✅ 纯函数
+        function add(a, b) {
+            return a + b;
+        }
+        console.log('add(1,2):', add(1,2), 'add(1,2):', add(1,2));  // 永远一样
+
+        // ❌ 不纯：依赖外部
+        let discount = 0.8;
+        function getPrice(price) {
+            return price * discount;
+        }
+        console.log('getPrice(100):', getPrice(100));
+        discount = 0.9;
+        console.log('getPrice(100) again:', getPrice(100));  // 不一样了！
+
+        console.log('=== 纯函数不修改输入 ===');
+        function addItemPure(arr, item) {
+            return [...arr, item];
+        }
+        const original = [1, 2, 3];
+        const newArr = addItemPure(original, 4);
+        console.log('原数组不变:', original);
+        console.log('新数组:', newArr);
+
+        console.log('=== 记忆化 ===');
+        function memoize(fn) {
+            const cache = new Map();
+            return function(arg) {
+                if (cache.has(arg)) return cache.get(arg);
+                const result = fn(arg);
+                cache.set(arg, result);
+                return result;
+            };
+        }
+        // 用纯函数做记忆化
+        const double = memoize(x => {
+            console.log(`  计算 ${x} 的 double`);
+            return x * 2;
+        });
+        console.log('double(5):', double(5));
+        console.log('double(5) cache:', double(5));  // 不重新计算
+
+        document.getElementById('output').textContent =
+            `纯函数 add(1,2)=${add(1,2)}\n` +
+            `纯函数不修改原数组: [${original}] → [${newArr}]\n` +
+            `✅ 纯函数演示完成！`;
+    </script>
+</body>
+</html>

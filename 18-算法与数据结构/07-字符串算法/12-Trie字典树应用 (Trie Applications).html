@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>12-Trie字典树应用 (Trie Applications)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<h1>12 - Trie 字典树应用 (Trie Applications)</h1>
+
+<div class="card">
+  <h2>应用场景概览</h2>
+  <p>Trie 结构在以下场景中有广泛应用：</p>
+  <ul>
+    <li><strong>自动补全/输入提示</strong> — 搜索引擎、IDE、手机输入法</li>
+    <li><strong>拼写检查</strong> — 词库匹配与纠错建议</li>
+    <li><strong>IP 路由（最长前缀匹配）</strong> — 路由器查找下一跳</li>
+    <li><strong>词频统计</strong> — 在节点中记录 count</li>
+    <li><strong>字符串排序</strong> — Trie 的先序遍历即是字典序</li>
+    <li><strong>敏感词过滤</strong> — 结合 AC 自动机实现</li>
+    <li><strong>电话号码簿</strong> — 快速查找和前缀匹配</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>应用1：自动补全（AutoComplete）</h2>
+  <p>自动补全是 Trie 最经典的应用。用户在输入框中键入前缀，系统实时给出以该前缀开头的所有单词建议。</p>
+  <pre>
+/**
+ * Trie 自动补全功能
+ */
+class Trie {
+  // ... 基本操作同上 ...
+
+  /**
+   * 获取以 prefix 为前缀的所有单词
+   * 用于自动补全建议
+   */
+  autoComplete(prefix, limit = 10) {
+    const node = this._traverse(prefix);
+    if (!node) return [];
+
+    const suggestions = [];
+    this._dfsWithLimit(node, prefix, suggestions, limit);
+    return suggestions;
+  }
+
+  _dfsWithLimit(node, prefix, result, limit) {
+    if (result.length >= limit) return;
+    if (node.isEnd) result.push(prefix);
+    const keys = Object.keys(node.children).sort();
+    for (const ch of keys) {
+      if (result.length >= limit) break;
+      this._dfsWithLimit(node.children[ch], prefix + ch, result, limit);
+    }
+  }
+}
+  </pre>
+</div>
+
+<div class="card">
+  <h2>应用2：最长公共前缀（Longest Common Prefix）</h2>
+  <p>在 Trie 中，从根节点到第一个分叉点之间的路径就是所有单词的最长公共前缀。</p>
+  <div class="code">
+// 在一组字符串中找最长公共前缀
+function longestCommonPrefix(words) {
+  if (!words || words.length === 0) return '';
+  if (words.length === 1) return words[0];
+
+  // 构建 Trie
+  const trie = new Trie();
+  for (const w of words) trie.insert(w);
+
+  // 从根节点开始，只要只有一个子节点就继续
+  let node = trie.root;
+  let prefix = '';
+  while (node && !node.isEnd && Object.keys(node.children).length === 1) {
+    const ch = Object.keys(node.children)[0];
+    prefix += ch;
+    node = node.children[ch];
+  }
+  return prefix;
+}
+
+// 示例: ["flower", "flow", "flight"] → "fl"
+  </div>
+</div>
+
+<div class="card">
+  <h2>应用3：词频统计与 Top-K</h2>
+  <p>在 Trie 节点中记录 count 字段，可以统计单词出现频率，进而找出频率最高的 K 个单词：</p>
+  <pre>
+function topKFrequent(words, k) {
+  const trie = new Trie();
+  for (const w of words) trie.insert(w);
+
+  // 遍历所有单词并统计频率
+  const freq = {};
+  function dfs(node, prefix) {
+    if (node.isEnd) freq[prefix] = node.count;
+    for (const [ch, child] of Object.entries(node.children)) {
+      dfs(child, prefix + ch);
+    }
+  }
+  dfs(trie.root, '');
+
+  // 排序取前 K 个
+  return Object.entries(freq)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, k)
+    .map(entry => entry[0]);
+}
+  </pre>
+</div>
+
+<div class="card">
+  <h2>应用4：单词搜索（DFS + Trie）</h2>
+  <p>LeetCode 212. 单词搜索 II — 在二维字符网格中找出所有由相邻单元格组成的单词：</p>
+  <div class="code">
+function findWords(board, words) {
+  const trie = new Trie();
+  for (const w of words) trie.insert(w);
+
+  const result = new Set();
+  const m = board.length, n = board[0].length;
+
+  function dfs(i, j, node, path) {
+    if (node.isEnd) result.add(path);
+    if (i < 0 || i >= m || j < 0 || j >= n) return;
+    const ch = board[i][j];
+    if (ch === '#' || !node.children[ch]) return;
+
+    board[i][j] = '#'; // 标记已访问
+    for (const [dx, dy] of [[1,0],[-1,0],[0,1],[0,-1]]) {
+      dfs(i + dx, j + dy, node.children[ch], path + ch);
+    }
+    board[i][j] = ch; // 恢复
+  }
+
+  for (let i = 0; i < m; i++)
+    for (let j = 0; j < n; j++)
+      dfs(i, j, trie.root, '');
+
+  return [...result];
+}
+  </div>
+</div>
+
+<div class="card">
+  <h2>交互演示：自动补全</h2>
+  <p>在下方输入前缀，实时查看自动补全建议：</p>
+  <textarea id="dictInput" rows="4" style="width:100%;padding:8px;margin:5px 0;" placeholder="每行一个词（词典）">apple
+application
+apply
+apprentice
+banana
+band
+banner
+cat
+catalog
+catch
+category</textarea>
+  <br>
+  <button onclick="loadDict()">加载词典</button>
+  <div id="autocompleteArea" style="display:none;">
+    <input type="text" id="prefixInput" placeholder="输入前缀..." style="width:100%;padding:8px;margin:5px 0;font-size:16px;" oninput="doAutoComplete()">
+    <div id="suggestions" style="font-family:monospace;padding:10px;background:#f8f9fa;border-radius:4px;min-height:40px;"></div>
+  </div>
+  <div id="result"></div>
+</div>
+
+<script>
+class TrieNode {
+  constructor() {
+    this.children = {};
+    this.isEnd = false;
+    this.count = 0;
+  }
+}
+
+class Trie {
+  constructor() { this.root = new TrieNode(); }
+
+  insert(word) {
+    let node = this.root;
+    for (const ch of word) {
+      if (!node.children[ch]) node.children[ch] = new TrieNode();
+      node = node.children[ch];
+    }
+    node.isEnd = true;
+    node.count++;
+  }
+
+  _traverse(str) {
+    let node = this.root;
+    for (const ch of str) {
+      if (!node.children[ch]) return null;
+      node = node.children[ch];
+    }
+    return node;
+  }
+
+  autoComplete(prefix, limit = 10) {
+    const node = this._traverse(prefix);
+    if (!node) return [];
+    const result = [];
+    this._dfsWithLimit(node, prefix, result, limit);
+    return result;
+  }
+
+  _dfsWithLimit(node, prefix, result, limit) {
+    if (result.length >= limit) return;
+    if (node.isEnd) result.push(prefix);
+    const keys = Object.keys(node.children).sort();
+    for (const ch of keys) {
+      if (result.length >= limit) break;
+      this._dfsWithLimit(node.children[ch], prefix + ch, result, limit);
+    }
+  }
+
+  longestCommonPrefix() {
+    let node = this.root;
+    let prefix = '';
+    while (node && !node.isEnd && Object.keys(node.children).length === 1) {
+      const ch = Object.keys(node.children)[0];
+      prefix += ch;
+      node = node.children[ch];
+    }
+    return prefix;
+  }
+}
+
+let autoTrie = null;
+
+function loadDict() {
+  const text = document.getElementById('dictInput').value;
+  const words = text.split('\n').map(w => w.trim()).filter(w => w);
+  autoTrie = new Trie();
+  for (const w of words) autoTrie.insert(w);
+
+  const lcp = autoTrie.longestCommonPrefix();
+
+  document.getElementById('autocompleteArea').style.display = 'block';
+  document.getElementById('prefixInput').value = '';
+  document.getElementById('suggestions').innerHTML = '';
+
+  let html = `<p>✅ 已加载 ${words.length} 个单词</p>`;
+  if (lcp) html += `<p>最长公共前缀: "<strong>${lcp}</strong>"</p>`;
+
+  // 词频统计演示
+  html += '<h3>词频统计</h3>';
+  html += '<table border="1" cellpadding="5" style="border-collapse:collapse;">';
+  html += '<tr><th>单词</th><th>频率</th></tr>';
+  for (const w of words) {
+    const count = autoTrie._traverse(w) ? autoTrie._traverse(w).count : 0;
+    html += `<tr><td>${w}</td><td>${count}</td></tr>`;
+  }
+  html += '</table>';
+
+  document.getElementById('result').innerHTML = html;
+}
+
+function doAutoComplete() {
+  const prefix = document.getElementById('prefixInput').value.trim();
+  if (!autoTrie || !prefix) {
+    document.getElementById('suggestions').innerHTML = prefix ? '正在加载词典...' : '输入前缀以查看建议';
+    return;
+  }
+
+  const suggestions = autoTrie.autoComplete(prefix, 10);
+  if (suggestions.length === 0) {
+    document.getElementById('suggestions').innerHTML = '<span style="color:#999;">无建议</span>';
+    return;
+  }
+
+  let html = `<strong>建议 (${suggestions.length}个):</strong><br>`;
+  for (const s of suggestions) {
+    html += `<span style="display:inline-block;padding:4px 8px;margin:3px;background:#3498db;color:white;border-radius:4px;">${s}</span>`;
+  }
+  document.getElementById('suggestions').innerHTML = html;
+}
+</script>
+</body></html>

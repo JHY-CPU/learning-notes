@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python 异步数据库驱动</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🐘 Python 异步数据库驱动</h2><p>asyncpg PostgreSQL 驱动、aiosqlite、databases 库、异步 ORM (SQLAlchemy 1.4+ async)、连接池管理。</p></div>
+    <div class="card">
+        <h2>asyncpg 基础</h2>
+        <div class="code">// ========== asyncpg ==========
+# pip install asyncpg
+
+import asyncio
+import asyncpg
+
+# asyncpg: 高性能异步 PostgreSQL 驱动
+# 比同步 psycopg2 快 3-5 倍
+
+async def connect():
+    conn = await asyncpg.connect(
+        user="postgres",
+        password="secret",
+        database="mydb",
+        host="localhost",
+        port=5432,
+    )
+    return conn
+
+async def basic_query():
+    conn = await connect()
+
+    # 执行查询
+    rows = await conn.fetch("SELECT * FROM users WHERE age > $1", 18)
+    for row in rows:
+        print(row["name"], row["age"])
+
+    # 获取单行
+    row = await conn.fetchrow("SELECT * FROM users WHERE id = $1", 1)
+    print(row["name"])
+
+    # 获取单个值
+    count = await conn.fetchval("SELECT count(*) FROM users")
+    print(f"用户数: {count}")
+
+    # 执行 (INSERT/UPDATE/DELETE)
+    await conn.execute(
+        "INSERT INTO users (name, age) VALUES ($1, $2)",
+        "Alice", 30,
+    )
+
+    # 事务
+    async with conn.transaction():
+        await conn.execute("UPDATE users SET age = age + 1")
+        # 事务内出错自动回滚
+
+    await conn.close()
+
+asyncio.run(basic_query())</div>
+    </div>
+    <div class="card">
+        <h2>asyncpg 高级用法</h2>
+        <div class="code">// ========== 连接池 ==========
+import asyncio
+import asyncpg
+
+# 连接池 (推荐生产使用)
+
+async def pool_demo():
+    pool = await asyncpg.create_pool(
+        user="postgres",
+        password="secret",
+        database="mydb",
+        host="localhost",
+        min_size=5,       # 最小连接数
+        max_size=20,      # 最大连接数
+        max_queries=50000,# 连接复用查询次数上限
+        timeout=30,       # 获取连接超时
+    )
+
+    async with pool.acquire() as conn:
+        # 从池中获取连接
+        rows = await conn.fetch("SELECT * FROM users")
+
+    async with pool.acquire(timeout=10) as conn:
+        # 带超时的连接获取
+        pass
+
+    await pool.close()
+
+# ========== 类型适配 ==========
+import asyncpg
+from datetime import datetime
+
+# Python ↔ PostgreSQL 类型映射
+# bool      ↔ BOOLEAN
+# int       ↔ INTEGER/BIGINT
+# float     ↔ REAL/DOUBLE PRECISION
+# str       ↔ TEXT/VARCHAR
+# bytes     ↔ BYTEA
+# datetime  ↔ TIMESTAMP
+# date      ↔ DATE
+# Decimal   ↔ NUMERIC
+# list      ↔ ARRAY
+# dict      ↔ JSONB (需要转换器)
+
+# 自定义类型编解码:
+async def custom_types():
+    conn = await asyncpg.connect(dsn="postgresql://localhost/db")
+
+    # 使用 JSONB
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS config (
+            id serial PRIMARY KEY,
+            data JSONB
+        )
+    """)
+
+    # Python dict → PostgreSQL jsonb
+    await conn.execute(
+        "INSERT INTO config (data) VALUES ($1)",
+        {"key": "value", "count": 42},  # 自动序列化
+    )
+
+    row = await conn.fetchrow("SELECT data FROM config LIMIT 1")
+    print(row["data"]["key"])  # "value" 自动反序列化</div>
+    </div>
+    <div class="card">
+        <h2>aiosqlite</h2>
+        <div class="code">// ========== aiosqlite ==========
+# pip install aiosqlite
+
+import asyncio
+import aiosqlite
+
+# aiosqlite: asyncio 版 SQLite
+
+async def sqlite_demo():
+    async with aiosqlite.connect(":memory:") as db:
+        # 创建表
+        await db.execute("""
+            CREATE TABLE users (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL,
+                age INTEGER
+            )
+        """)
+
+        # 插入
+        await db.execute("INSERT INTO users (name, age) VALUES (?, ?",
+                         ("Alice", 30))
+        await db.execute("INSERT INTO users (name, age) VALUES (?, ?",
+                         ("Bob", 25))
+        await db.commit()
+
+        # 查询
+        async with db.execute("SELECT * FROM users WHERE age > ?", (20,)) as cursor:
+            async for row in cursor:
+                print(row)  # (1, 'Alice', 30), (2, 'Bob', 25)
+
+        # 使用 Row 工厂 (列名访问)
+        db.row_factory = aiosqlite.Row
+        async with db.execute("SELECT name, age FROM users") as cursor:
+            async for row in cursor:
+                print(row["name"], row["age"])
+
+        # 批量操作
+        users = [("Charlie", 35), ("Diana", 28)]
+        await db.executemany("INSERT INTO users (name, age) VALUES (?, ?)", users)
+        await db.commit()
+
+asyncio.run(sqlite_demo())</div>
+    </div>
+    <div class="card">
+        <h2>databases 库</h2>
+        <div class="code">// ========== databases ==========
+# pip install databases
+
+import asyncio
+from databases import Database
+
+# databases: 统一的异步数据库接口
+# 支持 PostgreSQL/SQLite/MySQL
+
+async def databases_demo():
+    # 创建连接
+    database = Database("sqlite+aiosqlite:///test.db")
+    # database = Database("postgresql+asyncpg://user:pass@localhost/db")
+
+    await database.connect()
+
+    # 创建表
+    query = "CREATE TABLE IF NOT EXISTS notes (id INTEGER PRIMARY KEY, text TEXT)"
+    await database.execute(query)
+
+    # 执行
+    query = "INSERT INTO notes (text) VALUES (:text)"
+    await database.execute(query, {"text": "第一条笔记"})
+
+    # 查询多条
+    query = "SELECT * FROM notes"
+    rows = await database.fetch_all(query)
+    for row in rows:
+        print(row["text"])
+
+    # 查询单条
+    query = "SELECT * FROM notes WHERE id = :id"
+    row = await database.fetch_one(query, {"id": 1})
+    print(row["text"])
+
+    # 事务
+    async with database.transaction():
+        query = "UPDATE notes SET text = :text WHERE id = :id"
+        await database.execute(query, {"text": "更新后", "id": 1})
+
+    await database.disconnect()
+
+asyncio.run(databases_demo())</div>
+    </div>
+    <div class="card">
+        <h2>SQLAlchemy 异步</h2>
+        <div class="code">// ========== SQLAlchemy 1.4+ async ==========
+# pip install sqlalchemy[asyncio]
+
+from sqlalchemy.ext.asyncio import (
+    create_async_engine,
+    AsyncSession,
+    async_sessionmaker,
+)
+from sqlalchemy.orm import declarative_base
+from sqlalchemy import Column, Integer, String, select
+
+Base = declarative_base()
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50))
+
+# 异步引擎
+engine = create_async_engine(
+    "postgresql+asyncpg://user:pass@localhost/db",
+    echo=True,
+    pool_size=5,
+    max_overflow=10,
+)
+
+# 异步会话工厂
+AsyncSessionLocal = async_sessionmaker(
+    engine,
+    class_=AsyncSession,
+    expire_on_commit=False,
+)
+
+# 创建表
+async def init_db():
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+
+# CRUD 操作
+async def crud():
+    async with AsyncSessionLocal() as session:
+        # 创建
+        user = User(name="Alice")
+        session.add(user)
+        await session.commit()
+
+        # 查询
+        result = await session.execute(select(User).where(User.id == 1))
+        user = result.scalar_one()
+
+        # 更新
+        user.name = "Alice Updated"
+        await session.commit()
+
+        # 删除
+        await session.delete(user)
+        await session.commit()
+
+async def main():
+    await init_db()
+    await crud()
+
+asyncio.run(main())</div>
+        <div class="note">💡 异步数据库: asyncpg 高性能 PostgreSQL 驱动; aiosqlite 异步 SQLite; databases 统一接口; SQLAlchemy 1.4+ 支持 async; 连接池避免频繁创建连接。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoAsyncpg()">asyncpg 演示</button>
+        <button onclick="demoPool()">连接池演示</button>
+        <button onclick="demoSA()">异步 SQLAlchemy 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoAsyncpg() {
+            result.innerHTML = '';
+            log('# asyncpg');
+            log('');
+            log("conn = await asyncpg.connect('postgresql://...')");
+            log("rows = await conn.fetch('SELECT * FROM users')");
+            log("row = await conn.fetchrow('SELECT * FROM users WHERE id=$1', 1)");
+            log("val = await conn.fetchval('SELECT count(*) FROM users')");
+            log('');
+            log("async with conn.transaction():");
+            log("    # 自动回滚");
+        }
+
+        function demoPool() {
+            result.innerHTML = '';
+            log('# 连接池');
+            log('');
+            log('pool = await asyncpg.create_pool(');
+            log('    min_size=5, max_size=20');
+            log(')');
+            log("async with pool.acquire() as conn:");
+            log("    rows = await conn.fetch('SELECT 1')");
+            log('');
+            log('await pool.close()');
+        }
+
+        function demoSA() {
+            result.innerHTML = '';
+            log('# 异步 SQLAlchemy');
+            log('');
+            log("from sqlalchemy.ext.asyncio import create_async_engine");
+            log('engine = create_async_engine("postgresql+asyncpg://...")');
+            log("session = async_sessionmaker(engine)");
+            log('');
+            log("async with session() as s:");
+            log("    user = await s.get(User, 1)");
+        }
+    </script>
+</body>
+</html>

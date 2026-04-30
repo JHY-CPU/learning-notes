@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>安全存储</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        .storage-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+        .storage-table th, .storage-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        .storage-table th { background: #f8f9fa; color: #2c3e50; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>安全存储</h2><p>HttpOnly/Secure/SameSite Cookie、敏感信息处理、Token 存储最佳实践。</p></div>
+    <div class="card">
+        <h2>安全存储 API</h2>
+        <div class="code">// ========== Cookie 安全属性 ==========
+Set-Cookie: session=abc;
+    HttpOnly     // 禁止 JS 读取 (防御 XSS)
+    Secure       // 仅 HTTPS 传输
+    SameSite=Lax // 防 CSRF
+    Domain=example.com
+    Path=/
+    Max-Age=86400
+
+// ========== Token 存储对比 ==========
+// localStorage: ❌ XSS 可读取
+// sessionStorage: ❌ XSS 可读取
+// Cookie (HttpOnly): ✅ 安全
+// 内存变量: ✅ 最安全 (刷新丢失)
+
+// ========== 敏感信息处理原则 ==========
+// 1. 不在前端存储敏感数据
+// 2. 使用短生命周期的 Token
+// 3. 敏感操作需二次验证
+// 4. HTTPS 传输</div>
+    </div>
+    <div class="card">
+        <h2>演示：安全存储</h2>
+        <button onclick="demoCookie()">Cookie 安全</button>
+        <button onclick="demoToken()">Token 存储</button>
+        <button onclick="demoBest()">最佳实践</button>
+        <button onclick="demoComparison()">方案对比</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoCookie() {
+            result.innerHTML = '';
+            log('🍪 Cookie 安全属性:');
+            log('');
+
+            log('1️⃣ HttpOnly:');
+            log('   Set-Cookie: session=abc; HttpOnly');
+            log('   效果: document.cookie 无法读取');
+            log('   防御: XSS 窃取 Cookie');
+            log('');
+
+            log('2️⃣ Secure:');
+            log('   Set-Cookie: session=abc; Secure');
+            log('   效果: 仅通过 HTTPS 传输');
+            log('   注意: localhost 开发环境也可用');
+            log('');
+
+            log('3️⃣ SameSite:');
+            log('   Set-Cookie: session=abc; SameSite=Lax');
+            log('   • Lax    — 默认, 允许 GET 导航');
+            log('   • Strict — 完全阻止跨站');
+            log('   • None   — 允许跨站 (需 Secure)');
+            log('');
+
+            log('4️⃣ 其他安全属性:');
+            log('   Domain=example.com   — 指定域名');
+            log('   Path=/api            — 限定路径');
+            log('   Max-Age=86400        — 过期时间');
+            log('   Expires=...          — 过期日期');
+            log('   Priority=High        — 优先级 (Chrome)');
+            log('');
+
+            log('5️⃣ 完整安全 Cookie 示例:');
+            log('   Set-Cookie:');
+            log('     session=abc123;');
+            log('     HttpOnly;');
+            log('     Secure;');
+            log('     SameSite=Lax;');
+            log('     Path=/;');
+            log('     Max-Age=7200;');
+            log('');
+
+            log('6️⃣ Cookie 前缀:');
+            log('   __Secure-前缀: 必须设置 Secure');
+            log('   __Host-前缀: 必须 Secure + Path=/ + 无 Domain');
+            log('   浏览器强制保证这些前缀的安全要求');
+        }
+
+        function demoToken() {
+            result.innerHTML = '';
+            log('🎫 Token 存储方案:');
+            log('');
+
+            log('1️⃣ Access Token + Refresh Token:');
+            log('   • Access Token: 短生命周期 (15分钟)');
+            log('   • Refresh Token: 长生命周期 (7天)');
+            log('   • Access Token 过期后用 Refresh Token 刷新');
+            log('');
+
+            log('2️⃣ Token 存储方案对比:');
+            log('   ┌────────────────┬────────┬────────┬────────┐');
+            log('   │ 存储位置        │ XSS    │ CSRF   │ 持久   │');
+            log('   ├────────────────┼────────┼────────┼────────┤');
+            log('   │ localStorage   │ ❌     │ ✅     │ ✅     │');
+            log('   │ sessionStorage │ ❌     │ ✅     │ ❌     │');
+            log('   │ Cookie无HttpOnly│ ❌     │ ❌     │ ✅     │');
+            log('   │ Cookie HttpOnly│ ✅     │ ❌     │ ✅     │');
+            log('   │ 内存变量       │ ✅     │ ✅     │ ❌     │');
+            log('   └────────────────┴────────┴────────┴────────┘');
+            log('');
+
+            log('3️⃣ 推荐方案:');
+            log('   // Access Token 放内存 (刷新后重新获取)');
+            log('   let accessToken = null;');
+            log('');
+            log('   // Refresh Token 放 HttpOnly Cookie');
+            log('   // 服务器设置:');
+            log('   Set-Cookie: refresh_token=abc; HttpOnly; Secure; Path=/api/auth');
+            log('');
+
+            log('4️⃣ BFF 模式 (Backend for Frontend):');
+            log('   // 前端无 Token');
+            log('   // BFF 层管理 Session/Token');
+            log('   // 前端只使用 Session Cookie');
+            log('   优点: 前端完全无 Token 管理');
+        }
+
+        function demoBest() {
+            result.innerHTML = '';
+            log('💡 安全存储最佳实践:');
+            log('');
+
+            log('1️⃣ 敏感信息处理原则:');
+            log('   • 不在前端存储密码/密钥');
+            log('   • 最小化存储敏感数据');
+            log('   • 使用短生命周期的凭证');
+            log('   • 敏感操作需二次验证');
+            log('');
+
+            log('2️⃣ 密码处理:');
+            log('   ❌ 前端存储密码');
+            log('   ❌ 前端 Hash 密码 (仍不安全)');
+            log('   ✅ HTTPS + 服务端 Hash (bcrypt/argon2)');
+            log('');
+
+            log('3️⃣ 信用卡/个人数据:');
+            log('   ❌ localStorage 存储');
+            log('   ❌ URL 参数传递');
+            log('   ✅ 服务器存储 + PCI DSS 合规');
+            log('   ✅ 显示时脱敏 (****1234)');
+            log('');
+
+            log('4️⃣ 日志与调试:');
+            log('   ❌ console.log(敏感数据)');
+            log('   ❌ 错误信息泄露敏感字段');
+            log('   ❌ URL 中带 Token/密码');
+            log('   ✅ 生产环境关闭详细日志');
+            log('');
+
+            log('5️⃣ 移动端存储:');
+            log('   尽量不要在前端存敏感信息');
+            log('   如果必须:');
+            log('   • iOS Keychain (钥匙串)');
+            log('   • Android Keystore');
+            log('   • React Native: react-native-keychain');
+            log('');
+
+            log('6️⃣ CSP 辅助:');
+            log('   // 限制数据外泄');
+            log('   Content-Security-Policy:');
+            log('     connect-src \'self\' https://api.example.com;');
+            log('     img-src \'self\';');
+        }
+
+        function demoComparison() {
+            result.innerHTML = '';
+            log('📊 存储方案全对比:');
+            log('');
+
+            // Build comparison table as text
+            log('   ┌──────────────────┬──────────┬────────┬────────┬───────┐');
+            log('   │ 特性             │ Cookie   │ local  │ session│ 内存  │');
+            log('   ├──────────────────┼──────────┼────────┼────────┼───────┤');
+            log('   │ 容量             │ 4KB      │ 5-10MB │ 5-10MB │ 不限 │');
+            log('   │ 过期控制         │ ✅       │ ✅     │ ❌     │ ❌   │');
+            log('   │ HttpOnly         │ ✅       │ ❌     │ ❌     │ ❌   │');
+            log('   │ XSS 抵抗         │ 中       │ 低     │ 低     │ 高   │');
+            log('   │ CSRF 抵抗        │ 低       │ 高     │ 高     │ 高   │');
+            log('   │ 刷新后保留       │ ✅       │ ✅     │ ❌     │ ❌   │');
+            log('   │ 跨标签共享       │ ✅       │ ✅     │ ❌     │ ❌   │');
+            log('   │ 自动携带请求     │ ✅       │ ❌     │ ❌     │ ❌   │');
+            log('   │ 服务端设置       │ ✅       │ ❌     │ ❌     │ ❌   │');
+            log('   └──────────────────┴──────────┴────────┴────────┴───────┘');
+            log('');
+
+            log('🏆 推荐组合方案:');
+            log('   敏感 Token: HttpOnly Cookie (Refresh Token)');
+            log('   用户设置: localStorage (主题/偏好)');
+            log('   临时状态: sessionStorage (表单数据)');
+            log('   当前凭证: 内存变量 (Access Token)');
+            log('   缓存数据: IndexedDB (离线数据)');
+            log('');
+
+            log('⚠️ 不推荐的方案:');
+            log('   ❌ JWT 放 localStorage (XSS 可窃取)');
+            log('   ❌ 密码明文存储');
+            log('   ❌ API Key 在前端硬编码');
+            log('   ❌ 敏感数据用 URL 参数传递');
+        }
+
+        console.log('=== 安全存储 ===');
+        document.getElementById('output').textContent =
+            `安全存储: HttpOnly Cookie / Token存储 / 敏感信息处理 / 方案对比\n` +
+            `✅ 安全存储演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>惰性求值</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        .perf-compare { display: flex; gap: 20px; margin: 10px 0; }
+        .perf-compare > div { flex: 1; background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; }
+        .perf-compare .big { font-size: 28px; font-weight: bold; color: #3498db; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>惰性求值 Lazy Evaluation</h2><p>将计算推迟到真正需要结果时才执行。Generator 函数天然支持惰性求值，每次调用 next() 才计算下一个值。</p></div>
+    <div class="card"><h2>惰性序列 Lazy Sequence</h2><p>基于 Generator 实现的惰性序列，支持 map/filter/take 等操作。与数组方法不同，惰性操作不会创建中间数组。</p></div>
+    <div class="card"><h2>无限序列</h2><p>惰性求值可以表示无限序列（如自然数、斐波那契数列、素数），仅在需要时计算特定数量的值。</p></div>
+    <div class="card"><h2>性能优势</h2><p>避免创建中间数组，减少内存使用。对大型数据集或无限序列特别有用。</p></div>
+    <div class="card"><h2>交互演示</h2><p>
+        <button onclick="demoLazyRange()">惰性范围</button>
+        <button onclick="demoLazyMapFilter()">惰性 map/filter</button>
+        <button onclick="demoInfinite()">无限序列</button>
+        <button onclick="demoPerformance()">性能对比</button>
+        <button onclick="demoFibonacci()">斐波那契序列</button>
+    </p></div>
+    <pre id="output"></pre>
+    <script>
+        const output = document.getElementById('output');
+
+        function log(msg) {
+            output.textContent += msg + '\n';
+            console.log(msg);
+        }
+
+        function clearLog() {
+            output.textContent = '';
+        }
+
+        // ========== LazySequence 惰性序列实现 ==========
+        class LazySequence {
+            constructor(generatorFn) {
+                this.generatorFn = generatorFn;
+            }
+
+            // 转换为数组（触发实际求值）
+            toArray() {
+                return [...this.generatorFn()];
+            }
+
+            // 取前 n 个
+            take(n) {
+                const self = this;
+                return new LazySequence(function*() {
+                    let count = 0;
+                    for (const val of self.generatorFn()) {
+                        if (count >= n) break;
+                        yield val;
+                        count++;
+                    }
+                });
+            }
+
+            // 跳过前 n 个
+            skip(n) {
+                const self = this;
+                return new LazySequence(function*() {
+                    let count = 0;
+                    for (const val of self.generatorFn()) {
+                        if (count >= n) yield val;
+                        count++;
+                    }
+                });
+            }
+
+            // map
+            map(fn) {
+                const self = this;
+                return new LazySequence(function*() {
+                    for (const val of self.generatorFn()) {
+                        yield fn(val);
+                    }
+                });
+            }
+
+            // filter
+            filter(pred) {
+                const self = this;
+                return new LazySequence(function*() {
+                    for (const val of self.generatorFn()) {
+                        if (pred(val)) yield val;
+                    }
+                });
+            }
+
+            // reduce
+            reduce(fn, initial) {
+                let acc = initial;
+                for (const val of this.generatorFn()) {
+                    acc = fn(acc, val);
+                }
+                return acc;
+            }
+
+            // 遍历
+            forEach(fn) {
+                for (const val of this.generatorFn()) {
+                    fn(val);
+                }
+            }
+
+            // 获取第一个
+            first() {
+                const gen = this.generatorFn();
+                return gen.next().value;
+            }
+
+            // 判断是否存在满足条件的值
+            some(pred) {
+                for (const val of this.generatorFn()) {
+                    if (pred(val)) return true;
+                }
+                return false;
+            }
+
+            // 判断是否所有都满足
+            every(pred) {
+                for (const val of this.generatorFn()) {
+                    if (!pred(val)) return false;
+                }
+                return true;
+            }
+        }
+
+        // 创建惰性范围
+        function lazyRange(start = 0, end = Infinity, step = 1) {
+            return new LazySequence(function*() {
+                let i = start;
+                if (end === Infinity) {
+                    while (true) {
+                        yield i;
+                        i += step;
+                    }
+                } else {
+                    while (i < end) {
+                        yield i;
+                        i += step;
+                    }
+                }
+            });
+        }
+
+        // ========== 1. 惰性范围 ==========
+        function demoLazyRange() {
+            clearLog();
+            log('=== 惰性范围 LazyRange ===\n');
+
+            const range = lazyRange(0, 10);
+            log(`lazyRange(0, 10): ${range.toArray().join(', ')}`);
+
+            log('\n只取前 5 个:');
+            log(`range.take(5): ${range.take(5).toArray().join(', ')}`);
+
+            log('\n跳过后取:');
+            log(`range.skip(3).take(4): ${range.skip(3).take(4).toArray().join(', ')}`);
+
+            log('\n链式操作:');
+            const result = lazyRange(0, 20)
+                .filter(x => x % 2 === 0)
+                .map(x => x * 10)
+                .take(5)
+                .toArray();
+            log(`range(0,20).filter(even).map(x10).take(5): [${result.join(', ')}]`);
+        }
+
+        // ========== 2. 惰性 map/filter ==========
+        function demoLazyMapFilter() {
+            clearLog();
+            log('=== 惰性 map/filter（无中间数组） ===\n');
+
+            // 命令式（会创建中间数组）
+            function eagerVersion() {
+                const arr = Array.from({ length: 100 }, (_, i) => i);
+                const filtered = arr.filter(x => x % 2 === 0);
+                const mapped = filtered.map(x => x * 3);
+                const result = mapped.slice(0, 5);
+                return result;
+            }
+
+            // 惰性（不创建中间数组）
+            function lazyVersion() {
+                const result = lazyRange(0, 100)
+                    .filter(x => x % 2 === 0)
+                    .map(x => x * 3)
+                    .take(5)
+                    .toArray();
+                return result;
+            }
+
+            log(`命令式结果: [${eagerVersion().join(', ')}] (创建了中间数组)`);
+            log(`惰性结果: [${lazyVersion().join(', ')}] (不创建中间数组)`);
+
+            log('\n每次操作都 log 输出:');
+            lazyRange(0, 100)
+                .filter(x => { log(`  filter(${x})`); return x % 2 === 0; })
+                .map(x => { log(`  map(${x}) → ${x * 3}`); return x * 3; })
+                .take(3)
+                .forEach(x => log(`  final: ${x}`));
+
+            log('\n注意: 每个元素依次通过整个管道，而不是先完成全部 filter 再 map');
+        }
+
+        // ========== 3. 无限序列 ==========
+        function demoInfinite() {
+            clearLog();
+            log('=== 无限序列 ===\n');
+
+            // 自然数序列
+            const naturals = lazyRange(1);
+            log('自然数 (无限): 1, 2, 3, 4, ...');
+            log(`取前 10 个: ${naturals.take(10).toArray().join(', ')}`);
+            log(`取第 100-105 个: ${naturals.skip(99).take(6).toArray().join(', ')}`);
+
+            // 偶数序列
+            const evens = lazyRange(0, Infinity, 2);
+            log(`\n偶数: ${evens.take(8).toArray().join(', ')}`);
+
+            // 平方数序列
+            const squares = lazyRange(0).map(x => x * x);
+            log(`\n平方数: ${squares.take(10).toArray().join(', ')}`);
+
+            log('\n无限序列的优势：只在需要时计算，不会耗尽内存');
+        }
+
+        // ========== 4. 性能对比 ==========
+        function demoPerformance() {
+            clearLog();
+            log('=== 性能对比: 惰性 vs 命令式 ===\n');
+
+            const SIZE = 1000000;
+
+            // 命令式（创建中间数组）
+            log(`数据集大小: ${SIZE}`);
+            log('\n命令式 (filter → map → slice):');
+
+            let start = performance.now();
+            const arr = Array.from({ length: SIZE }, (_, i) => i);
+            const eagerResult = arr
+                .filter(x => x % 2 === 0)
+                .map(x => x * 3)
+                .slice(0, 5);
+            let eagerTime = (performance.now() - start).toFixed(1);
+
+            log(`  耗时: ${eagerTime}ms`);
+            log(`  结果: [${eagerResult.join(', ')}]`);
+            log(`  中间数组已全部创建（内存占用大）`);
+
+            // 惰性
+            log('\n惰性 (filter → map → take):');
+            start = performance.now();
+            const lazyResult = lazyRange(0, SIZE)
+                .filter(x => x % 2 === 0)
+                .map(x => x * 3)
+                .take(5)
+                .toArray();
+            let lazyTime = (performance.now() - start).toFixed(1);
+
+            log(`  耗时: ${lazyTime}ms`);
+            log(`  结果: [${lazyResult.join(', ')}]`);
+            log(`  不创建中间数组（内存占用小）`);
+
+            const speedup = (parseFloat(eagerTime) / parseFloat(lazyTime)).toFixed(1);
+            log(`\n速度提升: ${speedup}x`);
+            log('惰性求值对大型数据集优势显著');
+        }
+
+        // ========== 5. 斐波那契无限序列 ==========
+        function demoFibonacci() {
+            clearLog();
+            log('=== 斐波那契无限序列 ===\n');
+
+            const fibonacci = new LazySequence(function*() {
+                let a = 0, b = 1;
+                while (true) {
+                    yield a;
+                    [a, b] = [b, a + b];
+                }
+            });
+
+            log(`前 10 个斐波那契数: ${fibonacci.take(10).toArray().join(', ')}`);
+            log(`前 15 个斐波那契数: ${fibonacci.take(15).toArray().join(', ')}`);
+
+            // 过滤偶数斐波那契
+            log(`\n偶数斐波那契数 (前6个): ${fibonacci.filter(x => x % 2 === 0).take(6).toArray().join(', ')}`);
+
+            // 超过 100 的第一个斐波那契数
+            const firstOver100 = fibonacci.filter(x => x > 100).first();
+            log(`大于 100 的第一个斐波那契数: ${firstOver100}`);
+
+            log('\n惰性斐波那契可以无限生成，不会栈溢出或死循环');
+        }
+
+        log('=== 惰性求值 演示 ===\n惰性求值推迟计算到需要时，避免不必要的计算和内存分配。\n\n点击上方按钮查看不同示例。');
+    </script>
+</body>
+</html>

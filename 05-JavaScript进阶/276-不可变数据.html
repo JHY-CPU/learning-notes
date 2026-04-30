@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>不可变数据</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        .compare-grid { display: flex; gap: 20px; margin: 10px 0; }
+        .compare-grid > div { flex: 1; background: #f8f9fa; padding: 15px; border-radius: 8px; }
+        .compare-grid h4 { margin: 0 0 8px 0; }
+        .mutation-demo { margin: 10px 0; padding: 10px; background: white; border-radius: 4px; }
+        .ref { color: #7f8c8d; font-size: 12px; }
+        .highlight { background: #fef9e7; padding: 2px 6px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>不可变数据 Immutability</h2><p>数据一旦创建就不能被修改。任何"修改"操作都返回新的数据对象，原始数据保持不变。带来可预测性、方便变更检测、便于调试。</p></div>
+    <div class="card"><h2>实现不可变的技术</h2><p><b>Object.freeze：</b> 浅层冻结。<b>展开运算符：</b> {...obj} 创建浅拷贝。<b>structuredClone：</b> 深拷贝。<b>自定义 update 函数：</b> 使用路径语法更新嵌套属性。</p></div>
+    <div class="card"><h2>Immer 原理</h2><p>Immer 库的 produce() 函数允许你"修改"一个 draft 对象，实际返回基于原始数据的新对象。通过 Proxy 记录所有修改操作并生成不可变结果。</p><div class="code">const nextState = produce(baseState, draft => { draft.count++ });</div></div>
+    <div class="card"><h2>交互演示</h2><p>
+        <button onclick="demoMutationProblem()">可变数据的问题</button>
+        <button onclick="demoSpread()">展开运算符</button>
+        <button onclick="demoFreeze()">Object.freeze</button>
+        <button onclick="demoStructuredClone()">structuredClone</button>
+        <button onclick="demoImmerPrinciple()">Immer 原理模拟</button>
+        <button onclick="demoUpdatePattern()">update 函数</button>
+    </p></div>
+    <pre id="output"></pre>
+    <script>
+        const output = document.getElementById('output');
+
+        function log(msg) {
+            output.textContent += msg + '\n';
+            console.log(msg);
+        }
+
+        function clearLog() {
+            output.textContent = '';
+        }
+
+        // ========== 嵌套属性更新函数（路径语法） ==========
+        function update(obj, path, value) {
+            const keys = path.split('.');
+            const result = { ...obj };
+
+            let current = result;
+            for (let i = 0; i < keys.length - 1; i++) {
+                current[keys[i]] = { ...current[keys[i]] };
+                current = current[keys[i]];
+            }
+            current[keys[keys.length - 1]] = value;
+
+            return result;
+        }
+
+        // ========== 简化版 Immer produce ==========
+        function produce(base, recipe) {
+            // 使用 Proxy 记录变更
+            const copies = new Map();
+
+            const handler = {
+                get(target, key) {
+                    const value = Reflect.get(target, key);
+                    if (value !== null && typeof value === 'object') {
+                        if (!copies.has(value)) {
+                            copies.set(value, Array.isArray(value) ? [...value] : { ...value });
+                        }
+                        return copies.get(value);
+                    }
+                    return value;
+                },
+                set(target, key, value) {
+                    if (!copies.has(target)) {
+                        copies.set(target, Array.isArray(target) ? [...target] : { ...target });
+                    }
+                    copies.get(target)[key] = value;
+                    return true;
+                }
+            };
+
+            const draft = new Proxy(base, handler);
+            recipe(draft);
+
+            // 构建新对象
+            function finalize(obj) {
+                if (copies.has(obj)) {
+                    const copy = copies.get(obj);
+                    for (const key of Object.keys(copy)) {
+                        if (typeof copy[key] === 'object' && copy[key] !== null) {
+                            copy[key] = finalize(copy[key]);
+                        }
+                    }
+                    return copy;
+                }
+                return obj;
+            }
+
+            return finalize(base);
+        }
+
+        // ========== 1. 可变数据的问题 ==========
+        function demoMutationProblem() {
+            clearLog();
+            log('=== 可变数据的问题 ===\n');
+
+            const user = { name: '张三', address: { city: '北京' } };
+            const user2 = user; // 引用赋值
+
+            log('原始数据:');
+            log(`user = ${JSON.stringify(user)}`);
+            log(`user2 = ${JSON.stringify(user2)}`);
+
+            // 意外修改
+            user2.name = '李四';
+            user2.address.city = '上海';
+
+            log('\n修改 user2 后:');
+            log(`user.name = "${user.name}" (也被改了!)`);
+            log(`user.address.city = "${user.address.city}" (也被改了!)`);
+            log(`user === user2: ${user === user2} (同一个引用)`);
+
+            log('\n问题: 对 user2 的修改意外影响了 user');
+            log('在 React/Redux 等框架中导致不可预测的 UI 更新');
+
+            // 对比 JSON
+            log('\n使用不可变方式:');
+            const original = { name: '张三', address: { city: '北京' } };
+            const updated = { ...original, name: '李四', address: { ...original.address, city: '上海' } };
+            log(`original.name = "${original.name}" (保持不变)`);
+            log(`updated.name = "${updated.name}"`);
+            log(`original.address.city = "${original.address.city}" (保持不变)`);
+        }
+
+        // ========== 2. 展开运算符 ==========
+        function demoSpread() {
+            clearLog();
+            log('=== 展开运算符 {...} ===\n');
+
+            const obj = { a: 1, b: { c: 2, d: [3, 4] } };
+            const copy = { ...obj };
+
+            log('浅拷贝: copy = { ...obj }');
+            log(`copy.a === obj.a: ${copy.a === obj.a}`);
+            log(`copy.b === obj.b: ${copy.b === obj.b} (嵌套对象共享引用)`);
+
+            // 修改嵌套对象
+            copy.b.c = 999;
+            log(`\n修改 copy.b.c = 999 后:`);
+            log(`obj.b.c = ${obj.b.c} (受影响，因为浅拷贝)`);
+
+            log('\n展开运算符只做一层深拷贝，嵌套对象仍共享引用');
+            log('需要手动深拷贝嵌套层级');
+        }
+
+        // ========== 3. Object.freeze ==========
+        function demoFreeze() {
+            clearLog();
+            log('=== Object.freeze ===\n');
+
+            const obj = Object.freeze({ a: 1, b: { c: 2 } });
+            log(`原始: ${JSON.stringify(obj)}`);
+
+            obj.a = 999; // 静默失败（严格模式抛异常）
+            log(`obj.a = 999 后: obj.a = ${obj.a} (修改被忽略)`);
+
+            // 但 freeze 是浅层的
+            obj.b.c = 999;
+            log(`obj.b.c = 999 后: obj.b.c = ${obj.b.c} (嵌套对象仍可修改)`);
+
+            log('\nObject.freeze 的特点:');
+            log('1. 浅层冻结，嵌套对象可修改');
+            log('2. 不可逆（无法解冻）');
+            log('3. 严格模式下修改会抛出 TypeError');
+            log('4. 使用 Object.isFrozen() 检测: ' + Object.isFrozen(obj));
+        }
+
+        // ========== 4. structuredClone ==========
+        function demoStructuredClone() {
+            clearLog();
+            log('=== structuredClone ===\n');
+
+            const original = {
+                name: '测试',
+                date: new Date(),
+                arr: [1, { x: 10 }],
+                nested: { a: { b: 'deep' } }
+            };
+
+            const cloned = structuredClone(original);
+
+            log('修改克隆数据:');
+            cloned.name = '已修改';
+            cloned.arr[1].x = 999;
+            cloned.nested.a.b = 'modified';
+
+            log(`original.name = "${original.name}"`);
+            log(`cloned.name = "${cloned.name}"`);
+            log(`original.arr[1].x = ${original.arr[1].x} (不受影响)`);
+            log(`original.nested.a.b = "${original.nested.a.b}" (不受影响)`);
+            log(`cloned.date instanceof Date: ${cloned.date instanceof Date}`);
+
+            log('\nstructuredClone 是内置深拷贝方案，支持 Map/Set/Date/RegExp/ArrayBuffer 等');
+            log('但不支持函数、Symbol、WeakMap、原型链');
+        }
+
+        // ========== 5. Immer 原理模拟 ==========
+        function demoImmerPrinciple() {
+            clearLog();
+            log('=== Immer produce() 原理 ===\n');
+
+            const base = {
+                count: 0,
+                user: { name: '张三', age: 25 },
+                items: ['a', 'b', 'c']
+            };
+
+            log('原始数据:');
+            log(JSON.stringify(base, null, 2));
+
+            // 使用 produce
+            const next = produce(base, draft => {
+                draft.count += 1;
+                draft.user.age = 26;
+                draft.user.name = '李四';
+                draft.items.push('d');
+            });
+
+            log('\n修改后 (next):');
+            log(JSON.stringify(next, null, 2));
+
+            log('\n原始数据 (base):');
+            log(JSON.stringify(base, null, 2));
+
+            log(`\nbase === next: ${base === next} (不同对象)`);
+            log(`base.user === next.user: ${base.user === next.user} (不同对象)`);
+            log(`base.items === next.items: ${base.items === next.items} (不同对象)`);
+            log(`base.count === next.count: ${base.count === next.count} (false，已修改)`);
+
+            log('\nImmer 通过 Proxy 记录对 draft 的操作，生成新的不可变对象');
+            log('未修改的属性共享引用（结构共享），节省内存');
+        }
+
+        // ========== 6. update 函数 ==========
+        function demoUpdatePattern() {
+            clearLog();
+            log('=== update 函数（路径更新） ===\n');
+
+            const state = {
+                user: {
+                    profile: {
+                        name: '张三',
+                        settings: {
+                            theme: 'dark',
+                            fontSize: 14
+                        }
+                    },
+                    scores: [95, 87, 92]
+                }
+            };
+
+            log('原始 state:');
+            log(JSON.stringify(state, null, 2));
+
+            // 使用 update 函数
+            const nextState1 = update(state, 'user.profile.name', '李四');
+            const nextState2 = update(nextState1, 'user.profile.settings.theme', 'light');
+
+            log('\n更新后的 state:');
+            log(JSON.stringify(nextState2, null, 2));
+
+            log('\n不变性验证:');
+            log(`state.user.profile.name = "${state.user.profile.name}" (不变)`);
+            log(`nextState2.user.profile.name = "${nextState2.user.profile.name}" (已更新)`);
+            log(`state.user.profile.settings.theme = "${state.user.profile.settings.theme}" (不变)`);
+            log(`state.user.scores === nextState2.user.scores: ${state.user.scores === nextState2.user.scores} (共享引用，未修改)`);
+
+            log('\n优势：清晰的路径语法 + 不可变更新，适合 Redux reducer');
+        }
+
+        log('=== 不可变数据 演示 ===\n不可变数据带来可预测性、方便变更检测和撤销/重做。\n\n点击上方按钮查看不同示例。');
+    </script>
+</body>
+</html>

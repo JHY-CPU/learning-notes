@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python FastAPI请求体与Pydantic</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📦 FastAPI 请求体与 Pydantic</h2><p>Pydantic 模型定义请求体、字段类型与验证、嵌套模型、模型配置 (Config)、请求体合并参数、Field 验证、模型示例。</p></div>
+    <div class="card">
+        <h2>Pydantic 模型</h2>
+        <div class="code">// ========== 定义模型 ==========
+from pydantic import BaseModel
+from typing import Optional, List
+
+class Item(BaseModel):
+    name: str                    # 必需字符串
+    description: Optional[str] = None  # 可选,默认 None
+    price: float                 # 必需浮点数
+    tax: Optional[float] = None  # 可选
+    tags: List[str] = []         # 列表,默认空
+
+# ========== 在路径操作中使用 ==========
+from fastapi import FastAPI
+
+app = FastAPI()
+
+@app.post("/items")
+def create_item(item: Item):     # FastAPI 自动解析 JSON 请求体
+    # item 是 Item 实例 (已验证)
+    return {
+        "name": item.name,
+        "price": item.price,
+        "tax": item.tax,
+        "total": item.price + (item.tax or 0)
+    }
+
+# POST /items 请求体:
+# {
+#     "name": "键盘",
+#     "price": 299.0,
+#     "tax": 0.15,
+#     "tags": ["电子", "外设"]
+# }
+
+# 响应:
+# {
+#     "name": "键盘",
+#     "price": 299.0,
+#     "tax": 0.15,
+#     "total": 343.85
+# }</div>
+    </div>
+    <div class="card">
+        <h2>字段类型与验证</h2>
+        <div class="code">// ========== Pydantic 字段类型 ==========
+from pydantic import BaseModel
+from typing import Optional, List, Set, Dict, Tuple
+from datetime import datetime, date
+from decimal import Decimal
+from enum import Enum
+
+class Color(str, Enum):
+    red = "red"
+    green = "green"
+    blue = "blue"
+
+class Product(BaseModel):
+    # 基本类型:
+    id: int
+    name: str
+    price: float
+    is_active: bool = True
+
+    # 特殊类型:
+    created_at: datetime
+    release_date: Optional[date] = None
+    rating: Decimal = Decimal("0.0")
+    tags: List[str] = []
+    metadata: Dict[str, str] = {}
+
+    # 枚举:
+    color: Color = Color.red
+
+    # 唯一集合:
+    unique_codes: Set[str] = set()
+
+    # 嵌套模型:
+    variants: List["ProductVariant"] = []
+
+class ProductVariant(BaseModel):
+    sku: str
+    stock: int</div>
+    </div>
+    <div class="card">
+        <h2>Field 验证</h2>
+        <div class="code">// ========== Field 验证器 ==========
+from pydantic import BaseModel, Field
+from typing import Optional
+
+class User(BaseModel):
+    username: str = Field(..., min_length=3, max_length=20, regex="^[a-z]+$")
+    email: str = Field(..., max_length=100)
+    age: int = Field(18, ge=0, le=150)     # 默认 18,范围 0-150
+    score: float = Field(0, ge=0, le=100)
+    bio: Optional[str] = Field(None, max_length=500)
+
+    class Config:
+        title = "用户模型"
+        description = "系统用户信息"
+
+# 示例值 (在文档中显示):
+class Item(BaseModel):
+    name: str = Field(..., example="机械键盘")
+    price: float = Field(..., example=299.0, description="价格 (含税)")
+    tax: float = Field(0.1, example=0.15)
+
+# ========== 自定义验证 ==========
+from pydantic import validator
+
+class Order(BaseModel):
+    items: List[str]
+    quantity: int = Field(..., ge=1)
+    price: float = Field(..., gt=0)
+    discount: float = 0
+
+    @validator("discount")
+    def discount_must_be_reasonable(cls, v, values):
+        if v < 0 or v > 1:
+            raise ValueError("折扣必须在 0-1 之间")
+        return v
+
+    @validator("items")
+    def items_not_empty(cls, v):
+        if not v:
+            raise ValueError("至少需要一个商品")
+        return v
+
+    # 根验证器 (多个字段):
+    @validator("price")
+    def price_positive(cls, v):
+        if v <= 0:
+            raise ValueError("价格必须大于 0")
+        return v</div>
+    </div>
+    <div class="card">
+        <h2>嵌套模型</h2>
+        <div class="code">// ========== 复杂嵌套 ==========
+from pydantic import BaseModel
+from typing import List, Optional
+
+# 内层:
+class Image(BaseModel):
+    url: str
+    alt: str = ""
+
+# 中层:
+class Category(BaseModel):
+    id: int
+    name: str
+
+# 外层 (嵌套):
+class Article(BaseModel):
+    title: str
+    content: str
+    images: List[Image] = []         # 列表嵌套
+    category: Optional[Category] = None  # 可选嵌套
+    related_ids: List[int] = []
+
+# 使用:
+@app.post("/articles")
+def create_article(article: Article):
+    return {
+        "title": article.title,
+        "image_count": len(article.images),
+        "category": article.category.name if article.category else None
+    }
+
+# POST /articles 请求体:
+# {
+#     "title": "FastAPI 教程",
+#     "content": "...",
+#     "images": [
+#         {"url": "https://example.com/img1.png"},
+#         {"url": "https://example.com/img2.png"}
+#     ],
+#     "category": {"id": 1, "name": "技术"}
+# }
+
+# ========== 深度嵌套 ==========
+class Address(BaseModel):
+    street: str
+    city: str
+    country: str
+    zip_code: str
+
+class Company(BaseModel):
+    name: str
+    address: Address                  # 嵌套模型
+
+class Employee(BaseModel):
+    name: str
+    company: Company                  # 深层嵌套
+    skills: List[str] = []</div>
+    </div>
+    <div class="card">
+        <h2>请求体合并</h2>
+        <div class="code">// ========== 请求体 + 路径 + 查询 ==========
+from fastapi import FastAPI, Path, Query
+from pydantic import BaseModel
+from typing import Optional
+
+app = FastAPI()
+
+class Item(BaseModel):
+    name: str
+    price: float
+    discount: Optional[float] = None
+
+@app.put("/items/{item_id}")
+def update_item(
+    item_id: int = Path(..., title="商品 ID"),
+    item: Item = ...,                      # 请求体
+    q: Optional[str] = Query(None),        # 查询参数
+    user: str = Query(...)                 # 必需?user=xxx
+):
+    result = {"item_id": item_id, **item.dict()}
+    if q:
+        result["q"] = q
+    result["user"] = user
+    return result
+
+# ========== 多个请求体参数 ==========
+class User(BaseModel):
+    username: str
+    email: str
+
+class Privileges(BaseModel):
+    role: str
+    permissions: List[str]
+
+@app.put("/users/{user_id}")
+def update_user(
+    user_id: int,
+    user: User,                  # 第一个模型
+    privileges: Privileges,      # 第二个模型
+    # 默认: user 和 privileges 分别对应嵌套字段
+):
+    return {
+        "user_id": user_id,
+        "user": user,
+        "privileges": privileges
+    }
+
+# 请求体:
+# {
+#     "user": {"username": "alice", "email": "a@b.com"},
+#     "privileges": {"role": "admin", "permissions": ["read", "write"]}
+# }
+
+# ========== Body 嵌入 ==========
+from fastapi import Body
+
+@app.post("/items")
+def create_item(
+    item: Item = Body(..., embed=True)  # 嵌入到 {"item": {...}}
+):
+    # 请求体: {"item": {"name": "...", "price": ...}}
+    return item</div>
+        <div class="note">💡 请求体要点: (1) Pydantic BaseModel 定义请求体,自动 JSON 解析和验证; (2) Field 添加约束: min_length/ge/le/regex; (3) 嵌套模型支持列表和可选嵌套; (4) 请求体 + 路径参数 + 查询参数可同时使用; (5) Body(embed=True) 添加外层 key。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoModel()">Pydantic 模型演示</button>
+        <button onclick="demoNested()">嵌套模型演示</button>
+        <button onclick="demoValidation()">Field 验证演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoModel() {
+            result.innerHTML = '';
+            log('# Pydantic 模型演示');
+            log('');
+            log('class Item(BaseModel):');
+            log('    name: str');
+            log('    description: str | None = None');
+            log('    price: float');
+            log('    tax: float | None = None');
+            log('    tags: list[str] = []');
+            log('');
+            log('自动功能:');
+            log('  ✅ JSON 解析');
+            log('  ✅ 类型验证');
+            log('  ✅ 字段默认值');
+            log('  ✅ 描述性错误信息');
+        }
+
+        function demoNested() {
+            result.innerHTML = '';
+            log('# 嵌套模型演示');
+            log('');
+            log('class Image(BaseModel):');
+            log('    url: str');
+            log('    alt: str = ""');
+            log('');
+            log('class Article(BaseModel):');
+            log('    title: str');
+            log('    images: list[Image] = []');
+            log('    category: Category | None = None');
+            log('');
+            log('JSON: {"title": "...",');
+            log('       "images": [{"url": "..."}]}');
+        }
+
+        function demoValidation() {
+            result.innerHTML = '';
+            log('# Field 验证演示');
+            log('');
+            log('Field(..., min_length=3, max_length=20)');
+            log('Field(18, ge=0, le=150)');
+            log('Field(..., regex="^[a-z]+$")');
+            log('Field(None, max_length=500)');
+            log('');
+            log('@validator("field_name")');
+            log('def validate_field(cls, v):');
+            log('    if not v:');
+            log("        raise ValueError('...')");
+            log('    return v');
+        }
+    </script>
+</body>
+</html>

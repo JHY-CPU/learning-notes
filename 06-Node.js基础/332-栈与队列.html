@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>栈与队列</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>栈与队列</h2><p>栈(LIFO)实现、队列(FIFO)实现、优先级队列、循环队列。</p></div>
+    <div class="card">
+        <h2>栈与队列实现</h2>
+        <div class="code">// ========== 栈 (LIFO) ==========
+class Stack {
+    constructor() { this.items = []; }
+    push(v) { this.items.push(v); }
+    pop() { return this.items.pop(); }
+    peek() { return this.items[this.items.length - 1]; }
+    get size() { return this.items.length; }
+    get isEmpty() { return this.items.length === 0; }
+}
+
+// ========== 队列 (FIFO) ==========
+class Queue {
+    constructor() { this.items = []; }
+    enqueue(v) { this.items.push(v); }
+    dequeue() { return this.items.shift(); }
+    front() { return this.items[0]; }
+    get size() { return this.items.length; }
+    get isEmpty() { return this.items.length === 0; }
+}
+
+// ========== 优先级队列 ==========
+class PriorityQueue {
+    constructor() { this.heap = []; }
+    enqueue(val, priority) { /* 按优先级插入 */ }
+    dequeue() { /* 取出最高优先级 */ }
+}
+
+// ========== 循环队列 ==========
+class CircularQueue {
+    constructor(capacity) {
+        this.items = new Array(capacity);
+        this.capacity = capacity;
+        this.head = 0;
+        this.tail = 0;
+        this.count = 0;
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：栈与队列</h2>
+        <button onclick="demoStack()">栈 (LIFO)</button>
+        <button onclick="demoQueue()">队列 (FIFO)</button>
+        <button onclick="demoPriority()">优先级队列</button>
+        <button onclick="demoApplications()">应用场景</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        // ========== 栈 ==========
+        class Stack {
+            constructor() { this.items = []; }
+            push(v) { this.items.push(v); }
+            pop() { return this.items.pop(); }
+            peek() { return this.items[this.items.length - 1]; }
+            get size() { return this.items.length; }
+            get isEmpty() { return this.items.length === 0; }
+            toArray() { return [...this.items]; }
+        }
+
+        // ========== 队列 ==========
+        class Queue {
+            constructor() {
+                this.items = {};
+                this.head = 0;
+                this.tail = 0;
+            }
+            enqueue(v) { this.items[this.tail++] = v; }
+            dequeue() {
+                if (this.isEmpty) return undefined;
+                const v = this.items[this.head];
+                delete this.items[this.head++];
+                return v;
+            }
+            front() { return this.items[this.head]; }
+            get size() { return this.tail - this.head; }
+            get isEmpty() { return this.size === 0; }
+            toArray() { return Object.values(this.items); }
+        }
+
+        function demoStack() {
+            result.innerHTML = '';
+            log('📚 栈 (LIFO — 后进先出):');
+            log('');
+
+            const stack = new Stack();
+            log('操作过程:');
+            log('   push(10) → push(20) → push(30)');
+            stack.push(10); stack.push(20); stack.push(30);
+            log(`   当前栈: [${stack.toArray()}] (栈顶: ${stack.peek()})`);
+
+            log('');
+            log('   pop() → 弹出:', stack.pop());
+            log(`   当前栈: [${stack.toArray()}]`);
+            log('   pop() → 弹出:', stack.pop());
+            log(`   当前栈: [${stack.toArray()}]`);
+            log('   peek() → 栈顶:', stack.peek());
+
+            log('');
+            log('括号匹配应用:');
+            function isValidBrackets(s) {
+                const pairs = { ')': '(', ']': '[', '}': '{' };
+                const stack = [];
+                for (const ch of s) {
+                    if ('({['.includes(ch)) stack.push(ch);
+                    else if (stack.pop() !== pairs[ch]) return false;
+                }
+                return stack.length === 0;
+            }
+            const tests = ['()', '()[]{}', '([)]', '{[]}'];
+            tests.forEach(t => log(`   "${t}" → ${isValidBrackets(t) ? '✅' : '❌'}`));
+        }
+
+        function demoQueue() {
+            result.innerHTML = '';
+            log('🗂️ 队列 (FIFO — 先进先出):');
+            log('');
+
+            const queue = new Queue();
+            log('操作过程:');
+            log('   enqueue(A) → enqueue(B) → enqueue(C)');
+            queue.enqueue('A'); queue.enqueue('B'); queue.enqueue('C');
+            log(`   队列: [${queue.toArray()}] (队首: ${queue.front()})`);
+
+            log('');
+            log('   dequeue() →', queue.dequeue());
+            log(`   队列: [${queue.toArray()}]`);
+            log('   enqueue(D)');
+            queue.enqueue('D');
+            log(`   队列: [${queue.toArray()}]`);
+            log('   dequeue() →', queue.dequeue());
+            log(`   队列: [${queue.toArray()}]`);
+
+            log('');
+            log('约瑟夫环 (热土豆):');
+            function hotPotato(names, num) {
+                const q = new Queue();
+                names.forEach(n => q.enqueue(n));
+                while (q.size > 1) {
+                    for (let i = 0; i < num; i++) q.enqueue(q.dequeue());
+                    log(`   淘汰: ${q.dequeue()}`);
+                }
+                return q.dequeue();
+            }
+            const winner = hotPotato(['Alice', 'Bob', 'Charlie', 'Diana'], 3);
+            log(`   获胜者: ${winner}`);
+        }
+
+        function demoPriority() {
+            result.innerHTML = '';
+            log('⭐ 优先级队列 (最小堆):');
+            log('');
+
+            class PriorityQueue {
+                constructor() { this.heap = []; }
+
+                enqueue(val, priority) {
+                    this.heap.push({ val, priority });
+                    this._bubbleUp(this.heap.length - 1);
+                }
+
+                dequeue() {
+                    if (this.heap.length === 0) return null;
+                    const top = this.heap[0];
+                    const bottom = this.heap.pop();
+                    if (this.heap.length > 0) {
+                        this.heap[0] = bottom;
+                        this._sinkDown(0);
+                    }
+                    return top;
+                }
+
+                _bubbleUp(idx) {
+                    while (idx > 0) {
+                        const parent = Math.floor((idx - 1) / 2);
+                        if (this.heap[parent].priority <= this.heap[idx].priority) break;
+                        [this.heap[parent], this.heap[idx]] = [this.heap[idx], this.heap[parent]];
+                        idx = parent;
+                    }
+                }
+
+                _sinkDown(idx) {
+                    while (true) {
+                        let smallest = idx;
+                        const left = 2 * idx + 1, right = 2 * idx + 2;
+                        if (left < this.heap.length && this.heap[left].priority < this.heap[smallest].priority) smallest = left;
+                        if (right < this.heap.length && this.heap[right].priority < this.heap[smallest].priority) smallest = right;
+                        if (smallest === idx) break;
+                        [this.heap[idx], this.heap[smallest]] = [this.heap[smallest], this.heap[idx]];
+                        idx = smallest;
+                    }
+                }
+
+                toArray() { return this.heap.map(h => `${h.val}(${h.priority})`); }
+            }
+
+            const pq = new PriorityQueue();
+            pq.enqueue('急诊', 1);
+            pq.enqueue('普通', 3);
+            pq.enqueue('优先', 2);
+            pq.enqueue('危重', 0);
+
+            log(`入队顺序: 急诊(1), 普通(3), 优先(2), 危重(0)`);
+            log(`堆状态: [${pq.toArray()}]`);
+            log('');
+
+            log('出队顺序:');
+            let item;
+            while ((item = pq.dequeue())) {
+                log(`   → ${item.val} (优先级 ${item.priority})`);
+            }
+
+            log('');
+            log('📌 优先级队列应用:');
+            log('   • 任务调度 (OS)');
+            log('   • Dijkstra 最短路径');
+            log('   • Huffman 编码');
+            log('   • 合并 K 个有序链表');
+        }
+
+        function demoApplications() {
+            result.innerHTML = '';
+            log('💡 栈与队列应用场景:');
+            log('');
+
+            log('1️⃣ 栈的应用:');
+            log('   • 函数调用栈 (Call Stack)');
+            log('   • 撤销/重做 (Undo/Redo)');
+            log('   • 浏览器后退/前进');
+            log('   • 括号匹配、表达式求值');
+            log('   • 深度优先搜索 (DFS)');
+            log('');
+
+            log('2️⃣ 队列的应用:');
+            log('   • 任务队列 (异步操作)');
+            log('   • 消息队列 (RabbitMQ/Redis)');
+            log('   • 事件循环 (Event Loop)');
+            log('   • 广度优先搜索 (BFS)');
+            log('   • 打印队列');
+            log('');
+
+            log('3️⃣ 双端队列 (Deque):');
+            class Deque {
+                constructor() { this.items = []; }
+                addFront(v) { this.items.unshift(v); }
+                addBack(v) { this.items.push(v); }
+                removeFront() { return this.items.shift(); }
+                removeBack() { return this.items.pop(); }
+                toArray() { return [...this.items]; }
+            }
+
+            const deque = new Deque();
+            deque.addBack('A'); deque.addBack('B');
+            deque.addFront('Z');
+            log(`   Deque: [${deque.toArray()}]`);
+            log(`   removeFront: ${deque.removeFront()}`);
+            log(`   removeBack: ${deque.removeBack()}`);
+            log(`   Deque: [${deque.toArray()}]`);
+
+            log('');
+            log('4️⃣ 循环队列:');
+            class CircularQueue {
+                constructor(k) {
+                    this.queue = new Array(k);
+                    this.capacity = k;
+                    this.head = 0;
+                    this.size = 0;
+                }
+                enqueue(v) {
+                    if (this.size === this.capacity) return false;
+                    this.queue[(this.head + this.size) % this.capacity] = v;
+                    this.size++;
+                    return true;
+                }
+                dequeue() {
+                    if (this.size === 0) return false;
+                    this.head = (this.head + 1) % this.capacity;
+                    this.size--;
+                    return true;
+                }
+                toArray() {
+                    const arr = [];
+                    for (let i = 0; i < this.size; i++) {
+                        arr.push(this.queue[(this.head + i) % this.capacity]);
+                    }
+                    return arr;
+                }
+            }
+
+            const cq = new CircularQueue(3);
+            cq.enqueue(1); cq.enqueue(2); cq.enqueue(3);
+            log(`   循环队列 (cap=3): [${cq.toArray()}]`);
+            cq.dequeue(); cq.enqueue(4);
+            log(`   出队+入队4: [${cq.toArray()}]`);
+        }
+
+        console.log('=== 栈与队列 ===');
+        document.getElementById('output').textContent = `栈与队列: Stack(LIFO) / Queue(FIFO) / Deque / 优先级队列 / 循环队列\n✅ 栈与队列演示完成！`;
+    </script>
+</body>
+</html>

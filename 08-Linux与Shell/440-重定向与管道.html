@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>重定向与管道</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔀 重定向与管道</h2><p>标准输入/输出/错误、重定向操作符、管道组合、tee 命令、重定向技巧。</p></div>
+    <div class="card">
+        <h2>标准流 (Standard Streams)</h2>
+        <p>Linux 中每个进程都有三个标准 I/O 流,以文件描述符 (FD) 表示。</p>
+        <div class="code">// ========== 标准流 ==========
+// 文件描述符  名称      默认连接    用途
+// ─────────────────────────────────────────
+// 0           stdin    键盘        输入
+// 1           stdout   终端        输出
+// 2           stderr   终端        错误信息
+
+// ========== 重定向操作符 ==========
+// >   重定向 stdout 到文件 (覆盖)
+// >>  重定向 stdout 到文件 (追加)
+// <   从文件读取 stdin
+// 2>  重定向 stderr 到文件
+// 2>> 追加 stderr 到文件
+// &>  重定向 stdout+stderr (Bash 4+)
+// 2>&1 stderr 重定向到 stdout
+
+// ========== 基本重定向 ==========
+// 输出到文件:
+//   $ echo "Hello" > file.txt      # 覆盖写入
+//   $ echo "World" >> file.txt     # 追加写入
+//   $ ls > files.txt               # 命令输出到文件
+//
+// 输入重定向:
+//   $ sort < file.txt              # 从文件读取输入
+//   $ wc -l < file.txt             # 读取内容并计数
+//
+// 错误重定向:
+//   $ ls /nonexistent 2> error.log # 错误信息到文件
+//   $ cmd > output.log 2>&1        # stdout+stderr 到同一文件
+//   $ cmd &> output.log            # 同上 (Bash 4+)
+//
+// 丢弃输出:
+//   $ cmd > /dev/null              # 丢弃 stdout
+//   $ cmd 2> /dev/null             # 丢弃 stderr
+//   $ cmd &> /dev/null             # 丢弃全部</div>
+    </div>
+    <div class="card">
+        <h2>管道 (Pipe)</h2>
+        <p>管道 | 将一个命令的 stdout 连接到另一个命令的 stdin，形成数据处理链条。</p>
+        <div class="code">// ========== 管道基本用法 ==========
+// command1 | command2 | command3 ...
+//
+// 基本示例:
+//   $ ls -la | less                # 分页查看文件列表
+//   $ cat file.txt | wc -l         # 计算行数
+//   $ ps aux | grep node           # 查找 node 进程
+//
+// ========== 经典管道组合 ==========
+// 查找大文件:
+//   $ find / -type f -size +100M 2>/dev/null | head -10
+//
+// 统计日志中的错误数:
+//   $ grep ERROR app.log | wc -l
+//
+// 查看最耗 CPU 的进程:
+//   $ ps aux --sort=-%cpu | head -5
+//
+// 查看磁盘使用情况:
+//   $ df -h | grep '/dev/sda'
+//
+// 查看最近的安装日志:
+//   $ tail -100 /var/log/dpkg.log | grep "install"
+
+// ========== 管道与重定向结合 ==========
+// $ grep ERROR app.log | sort | uniq -c | sort -nr | head -10
+//    ↑ 查找错误     ↑ 排序   ↑ 计数    ↑ 逆序排 ↑ 前10
+//
+// 逐步分解:
+//   grep ERROR app.log     → 提取所有错误行
+//   sort                   → 排序
+//   uniq -c                → 统计重复 (计次数)
+//   sort -nr               → 按次数逆序排
+//   head -10               → 显示 Top 10</div>
+    </div>
+    <div class="card">
+        <h2>tee — 分流输出</h2>
+        <p>tee 同时将输出发送到文件和终端——像三通管一样分流。</p>
+        <div class="code">// ========== tee 命令 ==========
+// $ cmd | tee file.txt               # 显示输出并保存到文件
+// $ cmd | tee -a file.txt             # 追加模式
+// $ cmd | tee file1.txt file2.txt     # 同时保存到多个文件
+// $ cmd | tee >(cmd2) >(cmd3) >/dev/null # 多路分发
+//
+// 经典用法:
+//   $ tail -f app.log | tee log-copy.txt
+//   # 实时查看日志同时保存到文件
+//
+// sudo 结合:
+//   $ echo "config" | sudo tee /etc/config.yml
+//   # 重定向需要 root, 用 tee 绕开
+//   # (echo "config" > /etc/config.yml 会权限不够)
+
+// ========== 管道链中的 stderr ==========
+// 默认管道只传递 stdout, stderr 仍显示在终端
+//
+// 包含 stderr:
+//   $ cmd 2>&1 | grep error          # stderr 也进管道
+//   $ cmd |& grep error              # 同上 (Bash 4+)
+//
+// 分离输出:
+//   $ cmd > output.log 2> error.log  # stdout 和 stderr 分开
+
+// ========== 命名管道 (FIFO) ==========
+// 用于进程间通信的特殊文件
+// $ mkfifo mypipe
+// $ ls -la mypipe
+// prw-r--r-- 1 alice alice 0 Jan 15 10:00 mypipe
+//   ↑ p (管道文件)
+//
+// 用法:
+//   终端 1: $ cat file.txt > mypipe
+//   终端 2: $ cat < mypipe</div>
+        <div class="note">🔀 管道的灵魂在于"组合"——复杂的任务分解成简单的命令,用管道串联。这正是 Unix 哲学的体现: 每个命令只做好一件事,然后通过管道组合。</div>
+    </div>
+    <div class="card">
+        <h2>重定向进阶技巧</h2>
+        <div class="code">// ========== Here Document ==========
+// 在脚本中嵌入多行文本
+//
+// $ cat << EOF > config.yml
+// database:
+//   host: localhost
+//   port: 5432
+//   name: myapp
+// EOF
+
+// ========== Here String ==========
+// $ grep "error" <<< "no errors here"
+// $ read first <<< "a b c" && echo $first  # a
+
+// ========== 进程替换 ==========
+// 将命令输出作为文件传递
+//
+// $ diff <(ls dir1) <(ls dir2)
+// # 比较两个目录的文件列表
+
+// ========== 重定向顺序 ==========
+// 重要! 重定向是从左到右解析的
+//
+// ✅ 正确: cmd > file 2>&1
+//    stdout → file, stderr → stdout → file
+//
+// ❌ 错误: cmd 2>&1 > file
+//    stderr → 终端 (stdout 原来的位置)
+//    stdout → file
+//    stderr 仍然去了终端!
+
+// ========== 实用组合 ==========
+// 只保留错误,丢弃正常输出:
+//   $ cmd > /dev/null
+//
+// 只保留正常输出,丢弃错误:
+//   $ cmd 2> /dev/null
+//
+// 全部丢弃:
+//   $ cmd &> /dev/null
+//
+// 保持安静但检查退出码:
+//   $ cmd &> /dev/null || echo "失败"
+//   if cmd &> /dev/null; then echo "成功"; fi</div>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function pipelineDemo() {
+            result.innerHTML = '';
+            log('🔀 管道链示例: 统计日志中最常见的错误类型');
+            log('');
+            log('$ grep "ERROR" app.log | cut -d" " -f3 | sort | uniq -c | sort -nr | head -5');
+            log('');
+            log('步骤分解:');
+            log('1. grep "ERROR" app.log');
+            log('   → 提取所有含 ERROR 的行');
+            log('2. cut -d" " -f3');
+            log('   → 提取第三个字段 (错误类型)');
+            log('3. sort');
+            log('   → 排序 (使相同的相邻)');
+            log('4. uniq -c');
+            log('   → 统计每种错误出现次数');
+            log('5. sort -nr');
+            log('   → 按次数逆序排列');
+            log('6. head -5');
+            log('   → 显示 Top 5');
+            log('');
+            log('结果:');
+            log('  245 DatabaseConnectionError');
+            log('  189 TimeoutError');
+            log('  156 ValidationError');
+            log('   89 AuthenticationError');
+            log('   45 RateLimitError');
+        }
+
+        log('点击按钮查看管道链示例');
+    </script>
+    <button onclick="pipelineDemo()">管道链演示</button>
+</body>
+</html>

@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python异常处理try-except</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚠️ Python 异常处理 try-except</h2><p>try/except/else/finally 完整语法、异常类型层次、raise 与 assert、异常链、常见异常处理模式 (EAFP vs LBYL)、最佳实践。</p></div>
+    <div class="card">
+        <h2>异常处理基础</h2>
+        <div class="code">// ========== try/except 基本语法 ==========
+try:
+    result = 10 / 0            # 可能出错的代码
+except ZeroDivisionError:      # 捕获特定异常
+    print("不能除以零!")
+
+// ========== 完整的 try 结构 ==========
+try:
+    file = open("test.txt", "r")
+    content = file.read()
+except FileNotFoundError:
+    print("文件不存在")
+except PermissionError:
+    print("没有权限")
+except Exception as e:         # 捕获所有其他异常
+    print(f"未知错误: {e}")
+else:
+    print(f"文件内容: {content}")  # 没有异常时执行
+finally:
+    file.close()               # 总是执行 (清理资源)
+
+// 顺序: try → except(匹配) → else → finally
+//        try → (无异常) → else → finally
+// 无论有没有异常,finally 都会执行
+
+// ========== 捕获多个异常 ==========
+# 方式 1: 多个 except 块
+try:
+    x = int(input("输入数字: "))
+    result = 100 / x
+except ValueError:
+    print("请输入有效数字")
+except ZeroDivisionError:
+    print("不能除以零")
+
+# 方式 2: 元组捕获
+try:
+    value = {"a": 1}["b"]
+    result = 10 / 0
+except (KeyError, ZeroDivisionError) as e:
+    print(f"捕获到: {type(e).__name__}: {e}")</div>
+    </div>
+    <div class="card">
+        <h2>异常类型层次</h2>
+        <div class="code">// ========== 内置异常层次 ==========
+// BaseException
+// ├── SystemExit           — sys.exit()
+// ├── KeyboardInterrupt    — Ctrl+C
+// └── Exception            — 所有常规异常
+//     ├── AttributeError   — 属性不存在
+//     ├── TypeError        — 类型错误
+//     ├── ValueError       — 值错误
+//     ├── KeyError         — 字典键不存在
+//     ├── IndexError       — 列表索引越界
+//     ├── NameError        — 变量未定义
+//     ├── FileNotFoundError — 文件不存在
+//     ├── ZeroDivisionError — 除以零
+//     ├── StopIteration    — 迭代器结束
+//     └── ...
+
+// 注意: except Exception 不会捕获 SystemExit 和 KeyboardInterrupt
+// 通常只捕获 Exception 的子类
+
+// ========== 捕获细节 ==========
+try:
+    risky_operation()
+except Exception as e:         # 捕获异常对象
+    print(type(e).__name__)    # 异常类型名
+    print(str(e))              # 异常消息
+    print(e.args)              # 异常参数元组
+
+// ========== except 注意事项 ==========
+// 避免空 except (会捕获所有异常包括 SystemExit)
+try:
+    pass
+except:                        # ❌ 捕获一切,包括 Ctrl+C
+    pass
+
+// ✅ 正确:
+try:
+    pass
+except Exception:              # 只捕获常规异常
+    pass
+
+// 捕获顺序: 子类在前,父类在后
+try:
+    x = int("abc")
+except ValueError as e:        # 更具体的在前
+    print("值错误")
+except Exception as e:         # 更通用的在后
+    print("其他错误")</div>
+    </div>
+    <div class="card">
+        <h2>raise 与 assert</h2>
+        <div class="code">// ========== raise 抛出异常 ==========
+// raise 用于主动触发异常
+
+def divide(a, b):
+    if b == 0:
+        raise ValueError("除数不能为零")  # 主动抛出
+    return a / b
+
+# 调用:
+try:
+    result = divide(10, 0)
+except ValueError as e:
+    print(e)                    # 除数不能为零
+
+// ========== 重新抛出异常 ==========
+try:
+    divide(10, 0)
+except ValueError:
+    print("记录日志...")
+    raise                      # 重新抛出,不修改异常
+
+// ========== 异常链 ==========
+# raise ... from ... — 保留原始异常上下文
+
+def process_data(filename):
+    try:
+        with open(filename) as f:
+            return int(f.read())
+    except (FileNotFoundError, ValueError) as e:
+        # 抛出新异常,同时保留原始异常
+        raise RuntimeError(f"处理文件失败: {filename}") from e
+
+try:
+    process_data("missing.txt")
+except RuntimeError as e:
+    print(e)                   # 处理文件失败: missing.txt
+    print(e.__cause__)         # 原始异常 (FileNotFoundError)
+
+// ========== assert ==========
+// assert 条件, 消息 — 调试用断言
+// 条件为 False 时抛出 AssertionError
+// 可用 -O 选项禁用
+
+def withdraw(balance, amount):
+    assert amount > 0, "取款金额必须为正"  # 调试断言
+    assert balance >= amount, "余额不足"
+    return balance - amount
+
+# 生产环境用 -O 运行会跳过所有 assert
+# 所以业务验证不要用 assert,用 raise
+
+// ✅ 业务验证用:
+def withdraw(balance, amount):
+    if amount <= 0:
+        raise ValueError("取款金额必须为正")
+    if balance < amount:
+        raise ValueError("余额不足")
+    return balance - amount</div>
+    </div>
+    <div class="card">
+        <h2>EAFP vs LBYL 与异常模式</h2>
+        <div class="code">// ========== EAFP vs LBYL ==========
+// Python 推荐 EAFP 风格
+
+// LBYL: Look Before You Leap (先检查再操作)
+def get_value_lbyl(d, key):
+    if key in d:               # 先检查
+        return d[key]
+    return None
+
+// EAFP: Easier to Ask for Forgiveness than Permission (请求原谅比请求许可容易)
+def get_value_eafp(d, key):
+    try:
+        return d[key]          # 直接尝试
+    except KeyError:
+        return None
+
+// Python 推荐 EAFP:
+// - 不需要额外的 if 检查
+// - 避免竞态条件
+// - 代码更流畅
+
+// ========== 常见异常模式 ==========
+// 模式 1: 异常 → 默认值
+def parse_int(value, default=0):
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
+// 模式 2: 重试
+def retry_on_error(func, max_attempts=3):
+    for attempt in range(max_attempts):
+        try:
+            return func()
+        except Exception as e:
+            if attempt == max_attempts - 1:
+                raise
+            print(f"重试 {attempt + 1}/{max_attempts}: {e}")
+
+// 模式 3: 资源清理 (finally)
+def process_file(filename):
+    f = None
+    try:
+        f = open(filename, encoding="utf-8")
+        return f.read()
+    except FileNotFoundError:
+        return ""
+    finally:
+        if f:
+            f.close()          # 总是关闭
+
+// 模式 4: 异常转换
+class DataError(Exception):
+    pass
+
+def fetch_data():
+    try:
+        # 可能抛出各种底层异常
+        return api_call()
+    except (ConnectionError, TimeoutError) as e:
+        raise DataError("数据获取失败") from e</div>
+        <div class="note">💡 异常处理要点: (1) try/except/else/finally 完整结构,finally 总是执行; (2) 异常类型有序: 子类在前父类在后; (3) 避免空 except,用 except Exception; (4) Python 推荐 EAFP (try) 而非 LBYL (if); (5) raise ... from e 保留异常链。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoTry()">try/except 演示</button>
+        <button onclick="demoEAFP()">EAFP 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoTry() {
+            result.innerHTML = '';
+            log('# 异常处理演示');
+            log('');
+            log('完整结构:');
+            log('try:');
+            log('    risky()');
+            log('except ValueError:');
+            log('    print("值错误")');
+            log('except Exception as e:');
+            log('    print(e)');
+            log('else:');
+            log('    print("成功!")');
+            log('finally:');
+            log('    cleanup()');
+            log('');
+            log('捕获多个:');
+            log('  except (KeyError, ValueError) as e:');
+            log('    print(e)');
+        }
+
+        function demoEAFP() {
+            result.innerHTML = '';
+            log('# EAFP vs LBYL 演示');
+            log('');
+            log('LBYL: (先检查)');
+            log('  if key in d:');
+            log('      return d[key]');
+            log('  return None');
+            log('');
+            log('EAFP: (先尝试)');
+            log('  try:');
+            log('      return d[key]');
+            log('  except KeyError:');
+            log('      return None');
+            log('');
+            log('Python 推荐 EAFP:');
+            log('  ✅ 更简洁');
+            log('  ✅ 无竞态条件');
+            log('  ✅ "请求原谅比请求许可容易"');
+            log('');
+            log('raise from 保留异常链:');
+            log('  raise RuntimeError("X") from e');
+        }
+    </script>
+</body>
+</html>

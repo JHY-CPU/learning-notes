@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>节点遍历</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #2980b9; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        .tree { font-family: monospace; margin: 10px 0; }
+        .tree ul { list-style: none; padding-left: 20px; }
+        .tree li { padding: 3px 0; }
+        .tree .el { color: #2980b9; }
+        .tree .text { color: #7f8c8d; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>节点遍历</h2><p>在 DOM 树中上下左右移动，访问父/子/兄弟节点。</p></div>
+    <div class="card">
+        <h2>父节点访问</h2>
+        <div class="code">// parentNode — 父节点（可能不是元素）
+const parent = element.parentNode;
+// 如果元素没有父节点，返回 null
+// document.documentElement.parentNode === document
+
+// parentElement — 父元素节点
+const parentEl = element.parentElement;
+// 如果父节点不是元素，返回 null
+// document.body.parentElement === document.documentElement (&lt;html&gt;)
+// document.documentElement.parentElement === null
+
+// closest — 向上查找最近的匹配选择器的祖先
+const closest = element.closest('.card');
+const closest2 = element.closest('#container');
+// 从元素自身开始查找，沿父级向上
+// 没找到返回 null
+// 常用：事件委托中找目标元素</div>
+    </div>
+    <div class="card">
+        <h2>子节点访问</h2>
+        <div class="code">// childNodes — 所有子节点（包括文本和注释节点）
+const allChildren = element.childNodes;  // NodeList（live）
+
+// children — 所有元素子节点（只包括 Element）
+const elementChildren = element.children;  // HTMLCollection（live）
+
+// firstChild — 第一个子节点（可能是文本）
+const first = element.firstChild;
+
+// lastChild — 最后一个子节点
+const last = element.lastChild;
+
+// firstElementChild — 第一个元素子节点
+const firstEl = element.firstElementChild;
+
+// lastElementChild — 最后一个元素子节点
+const lastEl = element.lastElementChild;
+
+// childElementCount — 子元素数量
+const count = element.childElementCount;
+// 等价于 element.children.length</div>
+    </div>
+    <div class="card">
+        <h2>兄弟节点访问</h2>
+        <div class="code">// previousSibling — 上一个兄弟节点（可能是文本）
+const prev = element.previousSibling;
+
+// nextSibling — 下一个兄弟节点（可能是文本）
+const next = element.nextSibling;
+
+// previousElementSibling — 上一个元素兄弟
+const prevEl = element.previousElementSibling;
+
+// nextElementSibling — 下一个元素兄弟
+const nextEl = element.nextElementSibling;
+
+// 遍历兄弟元素
+let current = element.firstElementChild;
+while (current) {
+    console.log(current.textContent);
+    current = current.nextElementSibling;
+}
+
+// 反向遍历兄弟
+let current = element.lastElementChild;
+while (current) {
+    console.log(current.textContent);
+    current = current.previousElementSibling;
+}</div>
+    </div>
+    <div class="card">
+        <h2>节点类型检测</h2>
+        <div class="code">// nodeType — 节点类型数字
+element.nodeType;  // 1 — 元素
+// 属性 nodeType: 2
+text.nodeType;     // 3 — 文本
+comment.nodeType;  // 8 — 注释
+document.nodeType; // 9 — 文档
+
+// nodeName — 节点名称
+element.nodeName;  // 'DIV', 'SPAN', 'P'（大写）
+text.nodeName;     // '#text'
+comment.nodeName;  // '#comment'
+
+// tagName — 元素标签名（仅元素节点有效）
+element.tagName;   // 'DIV', 'SPAN'
+
+// nodeValue — 节点值
+element.nodeValue; // null
+text.nodeValue;    // 文本内容
+comment.nodeValue; // 注释内容</div>
+    </div>
+    <div class="card" id="demo-card">
+        <h2>演示区域</h2>
+        <div class="tree" id="tree-root">
+            <ul>
+                <li><span class="el">&lt;div#tree-root&gt;</span>
+                    <ul>
+                        <li><span class="el">&lt;span.item-1&gt;</span> <span class="text">"项目1"</span> <span class="el">&lt;/span&gt;</span></li>
+                        <li><span class="el">&lt;span.item-2&gt;</span> <span class="text">"项目2"</span> <span class="el">&lt;/span&gt;</span></li>
+                        <li><span class="el">&lt;span.item-3&gt;</span> <span class="text">"项目3"</span> <span class="el">&lt;/span&gt;</span></li>
+                    </ul>
+                </li>
+            </ul>
+        </div>
+        <span id="tree-item-1" class="tree-item">项目1</span>
+        <span id="tree-item-2" class="tree-item">项目2</span>
+        <span id="tree-item-3" class="tree-item">项目3</span>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const card = document.getElementById('demo-card');
+        const item2 = document.getElementById('tree-item-2');
+        const treeRoot = document.getElementById('tree-root');
+
+        console.log('=== 父节点访问 ===');
+        console.log('item2.parentNode:', item2.parentNode?.tagName);
+        console.log('item2.parentElement:', item2.parentElement?.tagName);
+        console.log('item2.closest(".card"):', item2.closest('.card')?.className);
+
+        console.log('=== 子节点访问 ===');
+        console.log('card.childNodes 数:', card.childNodes.length);
+        console.log('card.children 数:', card.children.length);
+        console.log('card.firstChild:', card.firstChild?.nodeName);
+        console.log('card.firstElementChild:', card.firstElementChild?.tagName);
+        console.log('card.lastElementChild:', card.lastElementChild?.tagName);
+
+        console.log('=== 兄弟节点访问 ===');
+        const item1 = document.getElementById('tree-item-1');
+        const item3 = document.getElementById('tree-item-3');
+        console.log('item2.previousElementSibling:', item2.previousElementSibling?.id);
+        console.log('item2.nextElementSibling:', item2.nextElementSibling?.id);
+        console.log('item1.nextElementSibling === item2:', item1.nextElementSibling === item2);
+
+        console.log('=== 遍历兄弟元素 ===');
+        console.log('从 item1 向后遍历:');
+        let current = item1;
+        while (current) {
+            console.log('  -', current.id || current.textContent);
+            current = current.nextElementSibling;
+        }
+
+        console.log('=== nodeType / nodeName ===');
+        console.log('元素 nodeType:', item2.nodeType, 'nodeName:', item2.nodeName);
+        console.log('属性 nodeType:', item2.attributes[0]?.nodeType);
+
+        // 获取文本节点
+        const textNode = card.childNodes[0];
+        if (textNode?.nodeType === 3) {
+            console.log('文本 nodeType:', textNode.nodeType, 'nodeName:', textNode.nodeName);
+        }
+
+        console.log('=== closest 向上查找 ===');
+        const span = card.querySelector('.tree-item');
+        console.log('span.closest(".card") id:', span?.closest('.card')?.id);
+        console.log('span.closest("body"):', span?.closest('body')?.tagName);
+        console.log('span.closest(".nonexist"):', span?.closest('.nonexist'));
+
+        document.getElementById('output').textContent =
+            `item2.parentElement: ${item2.parentElement?.tagName}\n` +
+            `item2.nextSibling: ${item2.nextSibling?.nodeName}\n` +
+            `item2.closest('.card').id: ${item2.closest('.card')?.id}\n` +
+            `✅ 节点遍历演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>37-算法中的滑动窗口技巧 (Sliding Window)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Sliding Window</h2>
+  <div class="code">滑动窗口是数组/字符串子区间问题的核心技巧，灵活控制窗口大小。</div>
+  <pre>// 滑动窗口框架
+function slidingWindow(s) {
+  const window = new Map();
+  let l = 0, r = 0;
+  while (r < s.length) {
+    // 扩大窗口
+    const c = s[r++];
+    window.set(c, (window.get(c)||0) + 1);
+    // 缩小窗口条件
+    while (/* 需要缩小 */false) {
+      const d = s[l++];
+      window.set(d, window.get(d) - 1);
+    }
+    // 更新答案
+  }
+}
+// 最小覆盖子串
+function minWindow(s, t) {
+  const need = new Map();
+  for (const c of t) need.set(c, (need.get(c)||0)+1);
+  let l=0, r=0, valid=0, start=0, len=Infinity;
+  const window = new Map();
+  while (r < s.length) {
+    const c = s[r++];
+    if (need.has(c)) {
+      window.set(c, (window.get(c)||0)+1);
+      if (window.get(c) === need.get(c)) valid++;
+    }
+    while (valid === need.size) {
+      if (r - l < len) { start = l; len = r - l; }
+      const d = s[l++];
+      if (need.has(d)) {
+        if (window.get(d) === need.get(d)) valid--;
+        window.set(d, window.get(d)-1);
+      }
+    }
+  }
+  return len === Infinity ? '' : s.substr(start, len);
+}
+console.log(minWindow('ADOBECODEBANC', 'ABC')); // BANC</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  function mw(s,t){const need=new Map();for(const c of t)need.set(c,(need.get(c)||0)+1);let l=0,r=0,v=0,st=0,len=Infinity;const win=new Map();while(r<s.length){const c=s[r++];if(need.has(c)){win.set(c,(win.get(c)||0)+1);if(win.get(c)===need.get(c))v++;}while(v===need.size){if(r-l<len){st=l;len=r-l;}const d=s[l++];if(need.has(d)){if(win.get(d)===need.get(d))v--;win.set(d,win.get(d)-1);}}}return len===Infinity?'':s.substr(st,len);}
+  document.getElementById('result').textContent = `minWindow("ADOBECODEBANC","ABC") → "${mw("ADOBECODEBANC","ABC")}"`;
+}
+</script>
+</body>
+</html>

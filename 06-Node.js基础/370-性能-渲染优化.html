@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>性能-渲染优化</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        .anim-box { width: 50px; height: 50px; background: #3498db; border-radius: 4px; margin: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>性能-渲染优化</h2><p>重排/重绘、transform 替代 top、will-change、contain、GPU 加速。</p></div>
+    <div class="card">
+        <h2>渲染优化 API</h2>
+        <div class="code">// ========== 渲染流水线 ==========
+// JavaScript → Style → Layout → Paint → Composite
+//           重排↑        重绘↑   合成↑
+
+// ========== 触发重排 (Layout) ==========
+// 读取/修改几何属性: width/height/top/left/margin/padding
+// 读取布局信息: offsetHeight/clientHeight/getBoundingClientRect
+
+// ========== 触发重绘 (Paint) ==========
+// color, background, visibility, outline
+
+// ========== 仅触发合成 (Composite) ==========
+// transform, opacity
+// ✅ 推荐动画属性
+
+// ========== GPU 加速 ==========
+will-change: transform;  // 提示浏览器优化
+transform: translateZ(0); // 强制 GPU 层</div>
+    </div>
+    <div class="card">
+        <h2>演示：渲染优化</h2>
+        <button onclick="demoReflow()">重排重绘</button>
+        <button onclick="demoComposite()">合成优化</button>
+        <button onclick="demoWillChange()">will-change</button>
+        <button onclick="demoLayers()">分层策略</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoReflow() {
+            result.innerHTML = '';
+            log('📐 重排 (Reflow) vs 重绘 (Repaint):');
+            log('');
+
+            log('1️⃣ 渲染流水线:');
+            log('   JavaScript ─→ Style ─→ Layout ─→ Paint ─→ Composite');
+            log('                   ↓          ↓         ↓       ↓');
+            log('              样式计算     重排      重绘     合成');
+            log('');
+
+            log('2️⃣ 触发重排 (Layout) 的操作:');
+            log('   • 添加/删除 DOM 元素');
+            log('   • 改变元素尺寸 (width/height/margin/padding/border)');
+            log('   • 改变位置 (top/left/float/position)');
+            log('   • 改变内容 (文字变化 → 影响高度)');
+            log('   • 窗口 resize');
+            log('   • 读取布局属性:');
+            log('     offsetTop/offsetLeft/offsetWidth/offsetHeight');
+            log('     clientTop/clientLeft/clientWidth/clientHeight');
+            log('     scrollTop/scrollLeft/scrollWidth/scrollHeight');
+            log('     getComputedStyle()');
+            log('     getBoundingClientRect()');
+            log('');
+
+            log('3️⃣ 触发重绘 (Paint) 的操作:');
+            log('   • color / background / background-image');
+            log('   • visibility / outline / box-shadow');
+            log('   • border-color / border-radius');
+            log('   • text-decoration / filter');
+            log('');
+
+            log('4️⃣ 批量读写优化:');
+            log('   // ❌ 反复触发重排');
+            log('   for (let i = 0; i < 100; i++) {');
+            log('     box.style.left = box.offsetLeft + 10 + "px";');
+            log('   }');
+            log('');
+            log('   // ✅ 批量读取, 批量写入');
+            log('   const left = box.offsetLeft;  // 读');
+            log('   box.style.left = left + 1000 + "px";  // 写');
+            log('');
+
+            log('5️⃣ 文档片段优化:');
+            log('   // ❌ 多次插入');
+            log('   for (const item of items) {');
+            log('     ul.appendChild(document.createElement("li"));');
+            log('   }');
+            log('');
+            log('   // ✅ 使用 DocumentFragment');
+            log('   const fragment = document.createDocumentFragment();');
+            log('   for (const item of items) {');
+            log('     fragment.appendChild(document.createElement("li"));');
+            log('   }');
+            log('   ul.appendChild(fragment);');
+        }
+
+        function demoComposite() {
+            result.innerHTML = '';
+            log('🎯 合成 (Composite) 优化:');
+            log('');
+
+            log('1️⃣ 仅触发合成的属性:');
+            log('   transform — 平移/旋转/缩放/倾斜');
+            log('   opacity   — 透明度');
+            log('   filter    — 滤镜 (某些情况)');
+            log('');
+
+            log('2️⃣ transform vs top 动画:');
+            log('   // ❌ 触发重排 (Layout)');
+            log('   element.style.top = newTop + "px";');
+            log('   // 触发: Layout → Paint → Composite');
+            log('');
+            log('   // ✅ 仅合成 (Composite)');
+            log('   element.style.transform = \'translateY(\' + offset + \'px)\';');
+            log('   // 触发: Composite (跳过 Layout + Paint)');
+            log('');
+
+            log('3️⃣ 性能对比:');
+            log('   ┌──────────────┬────────┬────────┬──────────┐');
+            log('   │ 属性         │ Layout │ Paint  │ Composite│');
+            log('   ├──────────────┼────────┼────────┼──────────┤');
+            log('   │ top/left     │ ✅     │ ✅     │ ✅      │');
+            log('   │ transform    │ ❌     │ ❌     │ ✅      │');
+            log('   │ opacity      │ ❌     │ ❌     │ ✅      │');
+            log('   │ color        │ ❌     │ ✅     │ ✅      │');
+            log('   │ width/height │ ✅     │ ✅     │ ✅      │');
+            log('   └──────────────┴────────┴────────┴──────────┘');
+            log('');
+
+            log('4️⃣ requestAnimationFrame:');
+            log('   // 使用 rAF 在帧开始前更新');
+            log('   function animate() {');
+            log('     element.style.transform = \'translateX(\' + x + \'px)\';');
+            log('     requestAnimationFrame(animate);');
+            log('   }');
+            log('');
+
+            log('5️⃣ contain 属性:');
+            log('   contain: layout;       // 限制重排影响范围');
+            log('   contain: paint;        // 限制重绘范围');
+            log('   contain: size;         // 尺寸独立');
+            log('   contain: style;        // 样式独立');
+            log('   contain: strict;       // = layout paint size');
+            log('   contain: content;      // = layout paint style');
+        }
+
+        function demoWillChange() {
+            result.innerHTML = '';
+            log('⚡ will-change:');
+            log('');
+
+            log('1️⃣ 作用:');
+            log('   提前告知浏览器哪些属性会变化');
+            log('   浏览器预先优化 (创建独立层)');
+            log('');
+
+            log('2️⃣ 用法:');
+            log('   .animated-element {');
+            log('     will-change: transform, opacity;');
+            log('   }');
+            log('');
+
+            log('3️⃣ 注意事项:');
+            log('   • 不要给太多元素加 (消耗 GPU 内存)');
+            log('   • 动画结束后移除');
+            log('   • 不要在默认状态加 (在 JS 中加)');
+            log('');
+
+            log('4️⃣ 最佳实践:');
+            log('   // 鼠标悬停时添加, 动画结束移除');
+            log('   element.addEventListener("mouseenter", () => {');
+            log('     element.style.willChange = "transform";');
+            log('   });');
+            log('   element.addEventListener("animationend", () => {');
+            log('     element.style.willChange = "auto";');
+            log('   });');
+            log('');
+
+            log('5️⃣ 常用值:');
+            log('   will-change: transform;');
+            log('   will-change: opacity;');
+            log('   will-change: top, left;');
+            log('   will-change: contents;  // 内容变化');
+            log('   will-change: scroll-position;  // 滚动');
+        }
+
+        function demoLayers() {
+            result.innerHTML = '';
+            log('🧩 分层 (Layer) 策略:');
+            log('');
+
+            log('1️⃣ 什么情况下创建新层:');
+            log('   • <video>/<canvas>/<iframe>');
+            log('   • will-change 属性');
+            log('   • transform: translateZ(0) / translate3d()');
+            log('   • opacity < 1');
+            log('   • position: fixed');
+            log('   • CSS filter');
+            log('');
+
+            log('2️⃣ GPU 加速 (硬件合成):');
+            log('   // 强制 GPU 层 (旧方法)');
+            log('   .gpu-layer {');
+            log('     transform: translateZ(0);');
+            log('   }');
+            log('');
+            log('   // 或');
+            log('   .gpu-layer {');
+            log('     will-change: transform;');
+            log('   }');
+            log('');
+
+            log('3️⃣ 层爆炸 (Layer Explosion):');
+            log('   ❌ 太多独立层 = GPU 内存耗尽');
+            log('   ❌ 移动端尤需注意 (内存有限)');
+            log('   ❌ 层过多导致合成时间变长');
+            log('');
+
+            log('4️⃣ Chrome DevTools 层分析:');
+            log('   Performance → Frames → Layer');
+            log('   Rendering → Layer borders');
+            log('   Layers 面板 (3D View)');
+            log('');
+
+            log('5️⃣ 渲染优化清单:');
+            log('   ✅ 动画使用 transform + opacity');
+            log('   ✅ 避免频繁读写布局属性');
+            log('   ✅ 使用 DocumentFragment 批量 DOM 操作');
+            log('   ✅ 使用 contain 隔离子元素');
+            log('   ✅ 合理使用 will-change');
+            log('   ✅ 考虑虚拟滚动 (长列表)');
+            log('   ✅ 懒加载非首屏元素');
+        }
+
+        console.log('=== 性能-渲染优化 ===');
+        document.getElementById('output').textContent =
+            `渲染优化: 重排/重绘 / transform vs top / will-change / 分层策略 / GPU加速\n` +
+            `✅ 渲染优化演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BigInt</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #d35400; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>BigInt — 大整数</h2><p>表示任意大的整数，超出 Number 安全范围（2^53 - 1）时使用。</p></div>
+    <div class="card">
+        <h2>创建 BigInt</h2>
+        <div class="code">// 方式1：n 后缀
+const big1 = 123n;
+const big2 = 9007199254740993n;  // 超出 Number.MAX_SAFE_INTEGER
+
+// 方式2：BigInt() 函数
+const big3 = BigInt(123);           // 123n
+const big4 = BigInt('9007199254740993');  // 从字符串转
+const big5 = BigInt('0x1f');        // 31n（支持十六进制字符串）
+
+// 常见进制
+const hex = 0xFFn;        // 255n（十六进制）
+const oct = 0o77n;        // 63n（八进制）
+const bin = 0b1010n;      // 10n（二进制）
+
+// ⚠️ 不能 new BigInt()
+// const x = new BigInt(1);  // ❌ TypeError</div>
+    </div>
+    <div class="card">
+        <h2>BigInt 运算</h2>
+        <div class="code">// 算术运算（只能与 BigInt 运算）
+const a = 10n;
+const b = 3n;
+
+a + b;   // 13n
+a - b;   // 7n
+a * b;   // 30n
+a / b;   // 3n（除法向下取整，BigInt 是整数）
+a % b;   // 1n
+a ** b;  // 1000n
+
+// 比较运算（可以和 Number 混用）
+10n == 10;    // true（宽松相等）
+10n === 10;   // false（严格相等，类型不同）
+10n < 20;     // true
+10n > 5;      // true
+
+// 位运算
+10n & 3n;     // 2n
+10n | 3n;     // 11n
+10n ^ 3n;     // 9n
+10n << 1n;    // 20n
+
+// ⚠️ 不能混用 Number 和 BigInt 运算
+// 10n + 5     // ❌ TypeError
+// Math.max(1n, 2n)  // ❌ TypeError
+// +10n         // ❌ TypeError（一元正号）
+
+// 必须显式转换
+BigInt(5) + 10n;  // 15n
+Number(10n) + 5;  // 15（注意可能丢失精度）</div>
+            <div class="note">💡 BigInt 不支持一元 + 运算符，除法会自动向下取整（不是浮点数）。</div>
+    </div>
+    <div class="card">
+        <h2>BigInt 与 Number 比较</h2>
+        <div class="code">// Number 的精度限制
+console.log(Number.MAX_SAFE_INTEGER);  // 9007199254740991
+console.log(9007199254740993);         // 9007199254740992（精度丢失！）
+
+// BigInt 没有限制
+console.log(9007199254740993n);        // 9007199254740993n ✅
+
+// 类型转换
+BigInt(123);           // 123n
+BigInt(true);          // 1n
+BigInt('456');         // 456n
+BigInt(null);          // ❌ TypeError
+BigInt(undefined);     // ❌ TypeError
+BigInt('abc');         // ❌ SyntaxError
+
+// Number → BigInt：安全（只要整数在范围内）
+Number(123n);          // 123
+Number(9007199254740993n);  // 9007199254740992（精度丢失！）
+
+// 布尔转换（所有 BigInt 都是 truthy，除了 0n）
+!!1n;  // true
+!!0n;  // false
+
+// String 转换
+String(123n);  // '123'
+123n + '';     // ❌ TypeError</div>
+    </div>
+    <div class="card">
+        <h2>实际应用</h2>
+        <div class="code">// 1. 大数计算（科学计算、金融、加密）
+const large = 123456789012345678901234567890n;
+const result = large * 2n;
+
+// 2. 高精度时间戳（微秒/纳秒级）
+// const timestamp = BigInt(Date.now()) * 1000n;
+
+// 3. 数据库中的 64 位 ID
+// 从数据库取出的 ID 可能是 bigint 类型
+// const userId = BigInt(response.id);
+
+// 4. 进制转换
+function baseConvert(value, fromBase, toBase) {
+    return BigInt('0x' + value.toString(16));  // 简化示意
+}
+
+// 5. 安全比较（不丢失精度）
+function safeCompare(a, b) {
+    return BigInt(a) === BigInt(b);
+}
+
+// 6. BigInt 与 JSON
+// JSON.stringify 不支持 BigInt 🚨
+// JSON.stringify(1n);  // ❌ TypeError
+// 需要自定义序列化
+const data = {
+    value: 123456789n,
+    toJSON() { return this.value.toString(); }
+};
+JSON.stringify(data);  // '{"value":"123456789"}'</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== 创建 BigInt ===');
+        const a = 123n;
+        const b = BigInt('9007199254740993');
+        console.log('a:', a);
+        console.log('超出安全范围的数:', b);
+        console.log('Number 丢失精度:', 9007199254740993);
+
+        console.log('=== BigInt 运算 ===');
+        const x = 10n;
+        const y = 3n;
+        console.log('10n + 3n =', x + y);
+        console.log('10n / 3n =', x / y);
+        console.log('10n ** 3n =', x ** y);
+
+        console.log('=== 比较 ===');
+        console.log('10n == 10:', 10n == 10);
+        console.log('10n === 10:', 10n === 10);
+        console.log('10n > 5n:', 10n > 5n);
+
+        console.log('=== 大数计算 ===');
+        const big = 123456789012345678901234567890n;
+        console.log('大数:', big);
+        console.log('大数 * 2n:', big * 2n);
+
+        console.log('=== 进制 ===');
+        console.log('0xFFn:', 0xFFn);
+        console.log('0b1010n:', 0b1010n);
+        console.log('BigInt("0x1f"):', BigInt('0x1f'));
+
+        document.getElementById('output').textContent =
+            `10n / 3n = ${x / y}（向下取整）\n` +
+            `大数: ${big.toString().slice(0, 20)}...\n` +
+            `10n == 10: ${10n == 10}\n` +
+            `✅ BigInt 演示完成！`;
+    </script>
+</body>
+</html>

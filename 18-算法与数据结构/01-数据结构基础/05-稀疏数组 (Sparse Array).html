@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>05-稀疏数组 (Sparse Array)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card"><h2>05-稀疏数组 (Sparse Array)</h2><p>稀疏数组是大部分元素为默认值（如0）的数组。通过只存储非默认值来节省空间。</p></div>
+
+<div class="card"><h2>稀疏数组概念</h2><p>在 JavaScript 中，稀疏数组指有大量 empty 槽位的数组，或者在算法中指大部分元素值相同的数组。</p>
+<div class="code">
+// JavaScript 中的稀疏数组（有空洞）
+let sparse = [1, , , 4, , 6];
+console.log(sparse.length); // 6
+console.log(sparse[1]); // undefined
+console.log(sparse[3]); // 4
+
+// 避免稀疏数组的技巧
+// bad: 创建时留空洞
+let bad = [1, , 3];
+
+// good: 用 undefined 占位
+let good = [1, undefined, 3];
+</div></div>
+
+<div class="card"><h2>稀疏矩阵压缩存储</h2><p>对于二维稀疏数组（稀疏矩阵），用坐标-值对来存储：</p>
+<div class="code">
+// 压缩存储表示法：[[行,列,值], ...]
+// 原始矩阵（5x5，大部分为0）：
+// 0 0 0 0 0
+// 0 1 0 0 0
+// 0 0 0 2 0
+// 0 0 0 0 0
+// 0 0 3 0 0
+
+// 压缩后只存非零元素：
+let compressed = [
+  [1, 1, 1],  // 第2行第2列=1
+  [2, 3, 2],  // 第3行第4列=2
+  [4, 2, 3]   // 第5行第3列=3
+];
+
+// 压缩算法：遍历矩阵，收集非零元素
+function compress(matrix) {
+  let result = [];
+  for (let i = 0; i < matrix.length; i++) {
+    for (let j = 0; j < matrix[i].length; j++) {
+      if (matrix[i][j] !== 0) {
+        result.push([i, j, matrix[i][j]]);
+      }
+    }
+  }
+  return result;
+}
+</div></div>
+
+<div class="card"><h2>交互演示</h2>
+<button onclick="demoSparse()">运行稀疏数组演示</button>
+<div id="result"></div>
+</div>
+
+<script>
+function demoSparse() {
+  let output = '';
+
+  output += '=== 稀疏矩阵压缩演示 ===\n\n';
+
+  // 创建一个大型稀疏矩阵（8x8，仅少量非零值）
+  let size = 8;
+  let matrix = Array.from({length: size}, () => new Array(size).fill(0));
+
+  // 添加几个非零值
+  let positions = [[1,2],[2,5],[3,0],[4,4],[5,7],[6,3],[0,6]];
+  positions.forEach(([r, c], i) => { matrix[r][c] = (i + 1) * 10; });
+
+  output += '原始稀疏矩阵 (8x8):\n';
+  for (let row of matrix) {
+    output += row.map(x => String(x).padStart(3)).join(' ') + '\n';
+  }
+
+  // 压缩存储
+  output += '\n压缩存储 (行, 列, 值):\n';
+  let compressed = [];
+  for (let i = 0; i < matrix.length; i++) {
+    for (let j = 0; j < matrix[i].length; j++) {
+      if (matrix[i][j] !== 0) {
+        compressed.push([i, j, matrix[i][j]]);
+        output += `  row=${i}, col=${j}, value=${matrix[i][j]}\n`;
+      }
+    }
+  }
+
+  let originalSize = size * size;
+  let compressedSize = compressed.length * 3;
+  output += `\n原始占用: ${originalSize} 单元\n`;
+  output += `压缩占用: ${compressedSize} 单元 (仅 ${compressed.length} 个非零元素)\n`;
+  output += `压缩率: ${((1 - compressedSize/originalSize) * 100).toFixed(1)}%\n`;
+
+  // 解压还原
+  output += '\n解压还原:\n';
+  let restored = Array.from({length: size}, () => new Array(size).fill(0));
+  for (let [r, c, v] of compressed) {
+    restored[r][c] = v;
+  }
+  let match = JSON.stringify(matrix) === JSON.stringify(restored);
+  output += `还原${match ? '成功，与原矩阵一致' : '失败'}!\n`;
+
+  document.getElementById('result').textContent = output;
+}
+</script>
+</body></html>

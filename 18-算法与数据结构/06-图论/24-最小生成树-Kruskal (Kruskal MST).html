@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>24-最小生成树-Kruskal (Kruskal MST)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Kruskal MST</h2>
+  <div class="code">Kruskal 算法按边权重从小到大选择，用并查集判断是否形成环。</div>
+  <pre>class UnionFind {
+  constructor(n) { this.parent = Array.from({length:n},(_,i)=>i); this.rank = new Array(n).fill(0); }
+  find(x) { if (this.parent[x] !== x) this.parent[x] = this.find(this.parent[x]); return this.parent[x]; }
+  union(x,y) { let px=this.find(x),py=this.find(y); if(px===py)return false; if(this.rank[px]<this.rank[py])[px,py]=[py,px]; this.parent[py]=px; if(this.rank[px]===this.rank[py])this.rank[px]++; return true; }
+}
+function kruskal(n, edges) {
+  edges.sort((a,b) => a[2] - b[2]); // 按权重排序
+  const uf = new UnionFind(n);
+  const mst = [];
+  let cost = 0;
+  for (const [u,v,w] of edges) {
+    if (uf.union(u, v)) { mst.push([u,v,w]); cost += w; }
+  }
+  return { mst, cost };
+}
+const edges = [[0,1,4],[0,2,3],[1,2,1],[1,3,2],[2,3,4]];
+console.log(kruskal(4, edges)); // cost=6</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  class UF{constructor(n){this.p=Array.from({length:n},(_,i)=>i);this.r=new Array(n).fill(0);}find(x){if(this.p[x]!==x)this.p[x]=this.find(this.p[x]);return this.p[x];}union(x,y){let px=this.find(x),py=this.find(y);if(px===py)return false;if(this.r[px]<this.r[py])[px,py]=[py,px];this.p[py]=px;if(this.r[px]===this.r[py])this.r[px]++;return true;}}
+  function kruskal(n,edges){edges.sort((a,b)=>a[2]-b[2]);const uf=new UF(n);const mst=[];let c=0;for(const[u,v,w]of edges){if(uf.union(u,v)){mst.push([u,v,w]);c+=w;}}return{edges:mst,cost:c};}
+  const r=kruskal(4,[[0,1,4],[0,2,3],[1,2,1],[1,3,2],[2,3,4]]);
+  document.getElementById('result').textContent = `MST: ${JSON.stringify(r.edges)}, 总代价: ${r.cost}`;
+}
+</script>
+</body>
+</html>

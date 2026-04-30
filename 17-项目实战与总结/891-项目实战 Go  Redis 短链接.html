@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>项目实战 Go + Redis 短链接</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📦 项目实战 5: Go + Redis 短链接</h2><p>Gin 路由框架、Base62 编码算法、Redis 键值存储、301/302 重定向、点击统计与 Dockerfile。</p></div>
+    <div class="card">
+        <h2>项目结构</h2>
+        <div class="code">// shorturl/
+// ├── main.go              # 入口
+// ├── config/
+// │   └── config.go        # 配置
+// ├── handler/
+// │   └── url.go           # HTTP 处理器
+// ├── service/
+// │   └── url.go           # 业务逻辑
+// ├── store/
+// │   └── redis.go         # Redis 存储
+// ├── Dockerfile
+// └── docker-compose.yml
+
+// ========== 配置 ==========
+// config/config.go
+type Config struct {
+    ServerPort string
+    RedisAddr  string
+    RedisPass  string
+    BaseURL    string
+}
+
+func Load() *Config {
+    return &Config{
+        ServerPort: getEnv("PORT", "8080"),
+        RedisAddr:  getEnv("REDIS_ADDR", "localhost:6379"),
+        RedisPass:  getEnv("REDIS_PASS", ""),
+        BaseURL:    getEnv("BASE_URL", "http://localhost:8080"),
+    }
+}
+
+func getEnv(key, def string) string {
+    if v := os.Getenv(key); v != "" {
+        return v
+    }
+    return def
+}
+
+// ========== Redis 存储 ==========
+// store/redis.go
+type URLStore struct {
+    client *redis.Client
+}
+
+func NewURLStore(addr, pass string) *URLStore {
+    client := redis.NewClient(&redis.Options{
+        Addr:         addr,
+        Password:     pass,
+        DB:           0,
+        PoolSize:     10,
+        MinIdleConns: 3,
+    })
+    return &URLStore{client: client}
+}
+
+// 存储短链接 → 长链接
+func (s *URLStore) Save(shortCode, longURL string, expiry time.Duration) error {
+    return s.client.Set(ctx, "url:"+shortCode, longURL, expiry).Err()
+}
+
+// 获取长链接
+func (s *URLStore) Get(shortCode string) (string, error) {
+    return s.client.Get(ctx, "url:"+shortCode).Result()
+}
+
+// 增加点击计数
+func (s *URLStore) IncrClick(shortCode string) error {
+    return s.client.Incr(ctx, "click:"+shortCode).Err()
+}
+
+// 获取点击统计
+func (s *URLStore) GetClicks(shortCode string) (int64, error) {
+    return s.client.Get(ctx, "click:"+shortCode).Int64()
+}
+
+// 检查短码是否存在
+func (s *URLStore) Exists(shortCode string) (bool, error) {
+    return s.client.Exists(ctx, "url:"+shortCode).Result()
+}</div>
+    </div>
+    <div class="card">
+        <h2>Base62 与业务逻辑</h2>
+        <div class="code">// ========== Base62 编码 ==========
+// service/url.go
+const base62Chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
+// ID → Base62 (短码)
+func toBase62(id uint64) string {
+    if id == 0 {
+        return string(base62Chars[0])
+    }
+
+    var result []byte
+    for id > 0 {
+        result = append(result, base62Chars[id%62])
+        id /= 62
+    }
+
+    // 反转
+    for i, j := 0, len(result)-1; i < j; i, j = i+1, j-1 {
+        result[i], result[j] = result[j], result[i]
+    }
+
+    return string(result)
+}
+
+// Base62 → ID (可选, 用于分析)
+func fromBase62(s string) uint64 {
+    var id uint64
+    for _, c := range s {
+        id = id * 62
+        switch {
+        case c >= '0' && c <= '9':
+            id += uint64(c - '0')
+        case c >= 'A' && c <= 'Z':
+            id += uint64(c - 'A' + 10)
+        case c >= 'a' && c <= 'z':
+            id += uint64(c - 'a' + 36)
+        }
+    }
+    return id
+}
+
+// ========== 业务服务 ==========
+type URLService struct {
+    store   *URLStore
+    counter *Counter // 发号器
+    baseURL string
+}
+
+func NewURLService(store *URLStore, baseURL string) *URLService {
+    return &URLService{
+        store:   store,
+        counter: NewCounter(store.client),
+        baseURL: baseURL,
+    }
+}
+
+// 创建短链接
+func (s *URLService) Create(longURL string, expiry time.Duration) (string, error) {
+    // 1. 获取自增 ID
+    id, err := s.counter.Next()
+    if err != nil {
+        return "", err
+    }
+
+    // 2. 编码为短码
+    code := toBase62(id)
+
+    // 3. 存储到 Redis
+    if err := s.store.Save(code, longURL, expiry); err != nil {
+        return "", err
+    }
+
+    // 4. 返回完整短链接
+    return fmt.Sprintf("%s/%s", s.baseURL, code), nil
+}
+
+// 访问短链接
+func (s *URLService) Visit(code string) (string, error) {
+    longURL, err := s.store.Get(code)
+    if err != nil {
+        return "", err
+    }
+
+    // 异步增加点击数
+    go s.store.IncrClick(code)
+
+    return longURL, nil
+}
+
+// ========== 发号器 (Redis INCR) ==========
+type Counter struct {
+    client *redis.Client
+    key    string
+}
+
+func NewCounter(client *redis.Client) *Counter {
+    return &Counter{client: client, key: "url:counter"}
+}
+
+func (c *Counter) Next() (uint64, error) {
+    return c.client.Incr(ctx, c.key).Uint64()
+}</div>
+    </div>
+    <div class="card">
+        <h2>HTTP 处理器与 Docker</h2>
+        <div class="code">// ========== HTTP 处理器 ==========
+// handler/url.go
+type URLHandler struct {
+    service *URLService
+}
+
+// POST /shorten — 创建短链接
+// Body: {"url": "https://example.com/long/url", "expiry_days": 30}
+func (h *URLHandler) Create(c *gin.Context) {
+    var req struct {
+        URL        string `json:"url" binding:"required,url"`
+        ExpiryDays int    `json:"expiry_days"`
+    }
+
+    if err := c.ShouldBindJSON(&req); err != nil {
+        c.JSON(400, gin.H{"error": "无效的 URL"})
+        return
+    }
+
+    expiry := 0 * time.Second
+    if req.ExpiryDays > 0 {
+        expiry = time.Duration(req.ExpiryDays) * 24 * time.Hour
+    }
+
+    shortURL, err := h.service.Create(req.URL, expiry)
+    if err != nil {
+        c.JSON(500, gin.H{"error": "创建失败"})
+        return
+    }
+
+    c.JSON(201, gin.H{
+        "short_url":  shortURL,
+        "long_url":   req.URL,
+        "expiry_days": req.ExpiryDays,
+    })
+}
+
+// GET /:code — 重定向
+func (h *URLHandler) Redirect(c *gin.Context) {
+    code := c.Param("code")
+
+    longURL, err := h.service.Visit(code)
+    if err != nil {
+        c.JSON(404, gin.H{"error": "链接不存在或已过期"})
+        return
+    }
+
+    c.Redirect(http.StatusMovedPermanently, longURL) // 301
+}
+
+// GET /:code/stats — 统计
+func (h *URLHandler) Stats(c *gin.Context) {
+    code := c.Param("code")
+    clicks, _ := h.store.GetClicks(code)
+    c.JSON(200, gin.H{"code": code, "clicks": clicks})
+}
+
+// ========== Main 入口 ==========
+// main.go
+func main() {
+    cfg := config.Load()
+    store := store.NewURLStore(cfg.RedisAddr, cfg.RedisPass)
+    svc := service.NewURLService(store, cfg.BaseURL)
+    h := &handler.URLHandler{Service: svc, Store: store}
+
+    r := gin.Default()
+    r.POST("/shorten", h.Create)
+    r.GET("/:code", h.Redirect)
+    r.GET("/:code/stats", h.Stats)
+    r.GET("/health", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })
+
+    r.Run(":" + cfg.ServerPort)
+}
+
+// ========== Dockerfile ==========
+// FROM golang:1.22-alpine AS builder
+// WORKDIR /app
+// COPY go.mod go.sum ./
+// RUN go mod download
+// COPY . .
+// RUN CGO_ENABLED=0 go build -o shorturl .
+//
+// FROM alpine:3.19
+// RUN apk add --no-cache ca-certificates
+// COPY --from=builder /app/shorturl /usr/local/bin/
+// EXPOSE 8080
+// CMD ["shorturl"]</div>
+        <div class="note">💡 Go + Redis 短链接要点: Base62 编码可逆; Redis INCR 发号器; 301 Moved Permanently 浏览器缓存; 302 Found 用于统计 (不缓存); 点击统计异步 INCR; 可选过期 TTL; Docker 多阶段构建; 短码 7 位支持 62^7 ≈ 3.5万亿 组合。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoBase62()">Base62</button>
+        <button onclick="demoFlow()">请求流程</button>
+        <button onclick="demoStats()">统计</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoBase62() {
+            result.innerHTML = '';
+            log('# Base62 编码');
+            log('');
+            log('字符集:');
+            log('  0-9 + A-Z + a-z = 62 字符');
+            log('');
+            log('容量:');
+            log('  6位: 62^6 ≈ 568 亿');
+            log('  7位: 62^7 ≈ 3.5 万亿');
+            log('');
+            log('编码: ID → Base62');
+            log('  1 → "1"');
+            log('  62 → "10"');
+            log('  123456 → "W7E"');
+        }
+
+        function demoFlow() {
+            result.innerHTML = '';
+            log('# 短链接请求流程');
+            log('');
+            log('创建:');
+            log('  POST /shorten {"url": "..."}');
+            log('  → Redis INCR 获取ID');
+            log('  → Base62 编码');
+            log('  → Redis SET url:code');
+            log('  → 返回 short_url');
+            log('');
+            log('访问:');
+            log('  GET /abc123');
+            log('  → Redis GET url:abc123');
+            log('  → IncrClick (异步)');
+            log('  → 301 重定向');
+        }
+
+        function demoStats() {
+            result.innerHTML = '';
+            log('# 点击统计');
+            log('');
+            log('每次访问:');
+            log('  go store.IncrClick(code)');
+            log('  Redis INCR click:code');
+            log('');
+            log('查询:');
+            log('  GET /:code/stats');
+            log('  返回: {"code":"abc","clicks":42}');
+            log('');
+            log('其他功能:');
+            log('  过期时间: TTL');
+            log('  自定义短码: 用户指定');
+            log('  批量创建: 批量接口');
+        }
+    </script>
+</body>
+</html>

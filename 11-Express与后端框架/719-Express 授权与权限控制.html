@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express 授权与权限控制</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔒 Express 授权与权限控制</h2><p>RBAC 基于角色的访问控制、ABAC 基于属性的访问控制、权限中间件、资源所有权检查、ACL 访问控制列表、权限声明设计、动态权限检查。</p></div>
+    <div class="card">
+        <h2>RBAC 角色控制</h2>
+        <div class="code">// ========== RBAC ==========
+// Role-Based Access Control
+
+// ========== 角色定义 ==========
+const ROLES = {
+    ADMIN: 'admin',
+    MODERATOR: 'moderator',
+    USER: 'user',
+    GUEST: 'guest',
+};
+
+// ========== 角色层级 ==========
+// admin > moderator > user > guest
+// 高级角色自动拥有低级角色的所有权限
+
+const ROLE_HIERARCHY = {
+    admin: ['admin', 'moderator', 'user', 'guest'],
+    moderator: ['moderator', 'user', 'guest'],
+    user: ['user', 'guest'],
+    guest: ['guest'],
+};
+
+// ========== 权限中间件 ==========
+function authorize(...allowedRoles) {
+    return (req, res, next) => {
+        if (!req.user) {
+            throw new UnauthorizedError('Authentication required');
+        }
+
+        const userRole = req.user.role;
+        const hasAccess = allowedRoles.some(role =>
+            ROLE_HIERARCHY[userRole]?.includes(role)
+        );
+
+        if (!hasAccess) {
+            throw new ForbiddenError('Insufficient permissions');
+        }
+
+        next();
+    };
+}
+
+// 使用:
+router.get('/admin', authenticate, authorize('admin'), adminHandler);
+router.get('/moderator', authenticate, authorize('admin', 'moderator'), modHandler);
+router.get('/profile', authenticate, authorize('user', 'admin'), profileHandler);
+
+// ========== 资源级别权限 ==========
+// 用户可以编辑自己的资源, admin 可以编辑所有
+function authorizeResource(resourceModel) {
+    return async (req, res, next) => {
+        const resource = await resourceModel.findById(req.params.id);
+
+        if (!resource) {
+            throw new NotFoundError('Resource not found');
+        }
+
+        // admin 可以操作所有
+        if (req.user.role === 'admin') {
+            req.resource = resource;
+            return next();
+        }
+
+        // 普通用户只能操作自己的
+        const ownerField = resource.user || resource.userId || resource.author;
+        if (ownerField?.toString() !== req.user.sub) {
+            throw new ForbiddenError('Not authorized to modify this resource');
+        }
+
+        req.resource = resource;
+        next();
+    };
+}
+
+// 使用:
+router.put('/posts/:id', authenticate, authorizeResource(Post), updatePost);</div>
+    </div>
+    <div class="card">
+        <h2>权限声明 (Claims)</h2>
+        <div class="code">// ========== 声明式权限 ==========
+// 更细粒度的权限控制
+
+// ========== 权限定义 ==========
+const PERMISSIONS = {
+    // 用户管理
+    USER_CREATE: 'user:create',
+    USER_READ: 'user:read',
+    USER_UPDATE: 'user:update',
+    USER_DELETE: 'user:delete',
+
+    // 文章管理
+    POST_CREATE: 'post:create',
+    POST_READ: 'post:read',
+    POST_UPDATE: 'post:update',
+    POST_DELETE: 'post:delete',
+    POST_PUBLISH: 'post:publish',
+
+    // 系统管理
+    SYSTEM_SETTINGS: 'system:settings',
+    SYSTEM_LOGS: 'system:logs',
+};
+
+// ========== 角色-权限映射 ==========
+const ROLE_PERMISSIONS = {
+    admin: Object.values(PERMISSIONS),  // 所有权限
+
+    moderator: [
+        PERMISSIONS.POST_CREATE,
+        PERMISSIONS.POST_READ,
+        PERMISSIONS.POST_UPDATE,
+        PERMISSIONS.POST_DELETE,
+        PERMISSIONS.POST_PUBLISH,
+        PERMISSIONS.USER_READ,
+    ],
+
+    user: [
+        PERMISSIONS.POST_CREATE,
+        PERMISSIONS.POST_READ,
+        PERMISSIONS.POST_UPDATE,  // 仅自己的
+    ],
+
+    guest: [
+        PERMISSIONS.POST_READ,
+    ],
+};
+
+// ========== 权限检查中间件 ==========
+function requirePermission(...permissions) {
+    return (req, res, next) => {
+        if (!req.user) {
+            throw new UnauthorizedError('Authentication required');
+        }
+
+        const userPermissions = ROLE_PERMISSIONS[req.user.role] || [];
+        const hasAll = permissions.every(p => userPermissions.includes(p));
+
+        if (!hasAll) {
+            throw new ForbiddenError('Missing required permission');
+        }
+
+        next();
+    };
+}
+
+// 使用:
+router.get('/posts', authenticate, requirePermission(PERMISSIONS.POST_READ), listPosts);
+router.post('/posts', authenticate, requirePermission(PERMISSIONS.POST_CREATE), createPost);
+router.delete('/posts/:id', authenticate, requirePermission(PERMISSIONS.POST_DELETE), deletePost);</div>
+    </div>
+    <div class="card">
+        <h2>ABAC 属性控制</h2>
+        <div class="code">// ========== ABAC ==========
+// Attribute-Based Access Control
+// 基于用户/资源/环境属性动态判定
+
+// ========== ABAC 策略引擎 ==========
+class ABACEngine {
+    constructor() {
+        this.policies = [];
+    }
+
+    // 注册策略
+    addPolicy(name, conditionFn) {
+        this.policies.push({ name, conditionFn });
+    }
+
+    // 评估访问
+    async evaluate(action, resource, user, context = {}) {
+        for (const policy of this.policies) {
+            const result = await policy.conditionFn({
+                action,     // 'read' | 'write' | 'delete'
+                resource,   // 资源对象
+                user,       // 用户对象
+                time: new Date(),
+                ip: context.ip,
+                ...context,
+            });
+
+            if (result === false) return false;  // 显式拒绝
+            if (result === true) return true;     // 显式允许
+            // undefined → 继续评估下一策略
+        }
+
+        return false;  // 默认拒绝
+    }
+}
+
+// ========== 定义策略 ==========
+const abac = new ABACEngine();
+
+// 1. 管理员有所有权限
+abac.addPolicy('admin-full-access', ({ user }) => {
+    if (user.role === 'admin') return true;
+});
+
+// 2. 只能编辑自己的文章 (发布后不可编辑)
+abac.addPolicy('owner-edit', async ({ action, resource, user }) => {
+    if (action === 'edit' && resource.author === user.sub) {
+        if (resource.status === 'published') return false;  // 已发布不可编辑
+        return true;
+    }
+});
+
+// 3. 工作时间 (9-18点) 外禁止写操作
+abac.addPolicy('business-hours', ({ action, time }) => {
+    if (['write', 'delete'].includes(action)) {
+        const hour = time.getHours();
+        if (hour < 9 || hour >= 18) return false;
+    }
+});
+
+// 4. 免费用户只能发布 5 篇文章
+abac.addPolicy('free-tier-limit', async ({ action, user }) => {
+    if (action === 'create' && user.plan === 'free') {
+        const count = await Post.countDocuments({ author: user.sub });
+        if (count >= 5) return false;
+    }
+});
+
+// ========== ABAC 中间件 ==========
+function abacMiddleware(action, resourceType) {
+    return async (req, res, next) => {
+        const resource = req.resource || req.body;
+        const allowed = await abac.evaluate(action, resource, req.user, {
+            ip: req.ip,
+        });
+
+        if (!allowed) {
+            throw new ForbiddenError('Access denied by policy');
+        }
+
+        next();
+    };
+}
+
+router.put('/posts/:id',
+    authenticate,
+    authorizeResource(Post),       // 获取资源 → req.resource
+    abacMiddleware('edit', 'post'),
+    updatePost
+);</div>
+    </div>
+    <div class="card">
+        <h2>权限最佳实践</h2>
+        <div class="code">// ========== 权限设计模式 ==========
+
+// ========== 1. 中间件链 ==========
+// 认证 → 角色 → 资源 → 权限
+router.delete('/posts/:id',
+    authenticate,                    // 是否登录
+    authorize('admin', 'moderator'), // 是否有角色
+    authorizeResource(Post),         // 是否资源所有者
+    requirePermission('post:delete'),// 是否有删除权限
+    deletePost
+);
+
+// ========== 2. 权限缓存 ==========
+// 避免每次请求都查数据库
+const userPermissionsCache = new Map();  // 生产用 Redis
+
+async function getUserPermissions(userId) {
+    const cacheKey = `permissions:${userId}`;
+    if (userPermissionsCache.has(cacheKey)) {
+        return userPermissionsCache.get(cacheKey);
+    }
+
+    const user = await User.findById(userId).populate('roles');
+    const permissions = user.roles.flatMap(r => r.permissions);
+
+    userPermissionsCache.set(cacheKey, permissions);
+    setTimeout(() => userPermissionsCache.delete(cacheKey), 5 * 60 * 1000);
+
+    return permissions;
+}
+
+// ========== 3. Deny 优先 ==========
+// 优先检查拒绝规则, 再检查允许规则
+// 默认拒绝 (default deny)
+// 白名单优于黑名单
+
+// ========== 4. 选择指南 ==========
+// 简单系统: RBAC (角色) 足够
+// 中等系统: RBAC + 资源所有权
+// 复杂系统: ABAC (属性) + 策略引擎
+// 超大规模: 外部授权服务 (OPA/Casbin)
+
+// ========== RBAC vs ABAC ==========
+// ┌──────────┬──────────────────┬──────────────────┐
+// │          │ RBAC             │ ABAC             │
+// ├──────────┼──────────────────┼──────────────────┤
+// │ 粒度      │ 粗 (角色级)     │ 细 (属性级)      │
+// │ 管理      │ 简单             │ 复杂             │
+// │ 灵活      │ 低               │ 高               │
+// │ 场景      │ 多数系统         │ 复杂规则         │
+// └──────────┴──────────────────┴──────────────────┘</div>
+        <div class="note">💡 授权要点: RBAC 角色分级 (admin > moderator > user); 权限声明 (user:create) 细粒度控制; ABAC 基于属性动态判定; 资源所有权检查确保用户只操作自己的数据; 中间件链组合认证+角色+资源+权限; 默认拒绝; 缓存权限提升性能; 简单用 RBAC, 复杂用 ABAC。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoRBAC()">RBAC 角色</button>
+        <button onclick="demoClaims()">权限声明</button>
+        <button onclick="demoABAC()">ABAC 策略</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoRBAC() {
+            result.innerHTML = '';
+            log('# RBAC 角色控制');
+            log('');
+            log('admin:    所有权限');
+            log('moderator: 管理文章 + 读用户');
+            log('user:      CRUD 自己的文章');
+            log('guest:     只读');
+            log('');
+            log('// 使用:');
+            log('authorize("admin", "moderator")');
+        }
+
+        function demoClaims() {
+            result.innerHTML = '';
+            log('# 权限声明');
+            log('');
+            log('user:create   创建用户');
+            log('user:read     读取用户');
+            log('user:update   更新用户');
+            log('user:delete   删除用户');
+            log('');
+            log('post:create   创建文章');
+            log('post:publish  发布文章');
+            log('');
+            log('requirePermission("post:create")');
+        }
+
+        function demoABAC() {
+            result.innerHTML = '';
+            log('# ABAC 属性控制');
+            log('');
+            log('// 基于: 用户 + 资源 + 环境');
+            log('');
+            log('策略示例:');
+            log('- admin 全权限');
+            log('- 只能编辑自己的文章');
+            log('- 工作时间外禁止写');
+            log('- 免费用户限 5 篇');
+            log('');
+            log('默认拒绝 (default deny)');
+        }
+    </script>
+</body>
+</html>

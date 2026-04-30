@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>history与screen</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e67e22; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 15px; font-size: 13px; }
+        .info-grid .key { color: #7f8c8d; font-weight: bold; }
+        #screen-info, #history-state { background: #f8f9fa; padding: 15px; border-radius: 4px; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>history 与 screen</h2><p>浏览历史与屏幕信息。</p></div>
+    <div class="card">
+        <h2>history — 浏览历史</h2>
+        <div class="code">// history 对象管理浏览器会话历史
+
+// 基本属性
+history.length  // 历史记录数量
+
+// 导航方法
+history.back()      // 后退（等价于 history.go(-1)）
+history.forward()   // 前进（等价于 history.go(1)）
+history.go(-2)      // 后退两步
+history.go(2)       // 前进两步
+history.go(0)       // 刷新当前页
+
+// ⚠️ 不能读取具体的历史 URL（隐私限制）
+// ⚠️ 只能通过 length 知道有多少条记录</div>
+    </div>
+    <div class="card">
+        <h2>pushState / replaceState — 无刷新改 URL</h2>
+        <div class="code">// pushState — 添加历史记录（不刷新页面）
+history.pushState(state, title, url);
+
+// state — 与记录关联的数据（可以是任何可序列化数据）
+// title — 标题（目前大部分浏览器忽略此参数）
+// url — 新 URL（可选，必须同源）
+
+// 示例：
+history.pushState({ page: 1 }, '', '?page=1');
+history.pushState({ page: 2 }, '', '?page=2');
+
+// replaceState — 替换当前历史记录（不新增）
+history.replaceState({ page: 3 }, '', '?page=3');
+
+// 应用：单页应用（SPA）路由
+function navigate(path) {
+    history.pushState({ path }, '', path);
+    renderPage(path);  // 根据路径渲染内容
+}
+
+// popstate 事件 — 当用户点击前进/后退时触发
+window.addEventListener('popstate', (event) => {
+    console.log('状态变化:', event.state);
+    // event.state 就是 pushState 传入的 state
+});
+
+// ⚠️ pushState/replaceState 不触发 popstate
+// ⚠️ 只有用户点击前进/后退时才触发 popstate</div>
+    </div>
+    <div class="card">
+        <h2>screen — 屏幕信息</h2>
+        <div class="code">// screen 对象包含显示屏幕的信息
+
+screen.width        // 屏幕宽度（物理像素）
+screen.height       // 屏幕高度（物理像素）
+screen.availWidth   // 可用宽度（排除任务栏）
+screen.availHeight  // 可用高度（排除任务栏）
+screen.colorDepth   // 色彩深度（通常 24 或 32）
+screen.pixelDepth   // 像素深度（通常等于 colorDepth）
+screen.orientation  // 屏幕方向
+
+// screen 和 window 的区别：
+// screen — 整个物理屏幕的尺寸
+// window.inner — 浏览器视口尺寸
+// window.outer — 浏览器窗口尺寸
+
+// 示例：
+// 1920x1080 屏幕，浏览器全屏：
+screen.width        // 1920
+screen.height       // 1080
+window.innerWidth   // ~1920（有边框则略小）
+window.outerWidth   // 1920
+
+// 检查屏幕方向
+screen.orientation?.type   // 'landscape-primary' 或 'portrait-primary'
+screen.orientation?.angle  // 旋转角度
+
+// 锁定屏幕方向（需要用户手势触发）
+// screen.orientation?.lock('portrait');</div>
+    </div>
+    <div class="card">
+        <h2>信息展示</h2>
+        <div id="screen-info"></div>
+        <div id="history-state" style="margin-top:10px;min-height:30px;"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin:10px 0;flex-wrap:wrap;">
+        <button onclick="demoPushState()">pushState 演示</button>
+        <button onclick="demoReplaceState()">replaceState</button>
+        <button onclick="goBack()">history.back()</button>
+        <button onclick="goForward()">history.forward()</button>
+        <button onclick="refreshScreen()">刷新屏幕信息</button>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const stateDisplay = document.getElementById('history-state');
+        const screenInfo = document.getElementById('screen-info');
+
+        function refreshScreen() {
+            screenInfo.innerHTML = `
+                <div class="info-grid">
+                    <span class="key">screen.width:</span><span>${screen.width}px</span>
+                    <span class="key">screen.height:</span><span>${screen.height}px</span>
+                    <span class="key">availWidth:</span><span>${screen.availWidth}px</span>
+                    <span class="key">availHeight:</span><span>${screen.availHeight}px</span>
+                    <span class="key">colorDepth:</span><span>${screen.colorDepth}bit</span>
+                    <span class="key">pixelDepth:</span><span>${screen.pixelDepth}bit</span>
+                    <span class="key">orientation:</span><span>${screen.orientation?.type || 'N/A'}</span>
+                    <span class="key">window.inner:</span><span>${window.innerWidth}x${window.innerHeight}</span>
+                    <span class="key">window.outer:</span><span>${window.outerWidth}x${window.outerHeight}</span>
+                    <span class="key">history.length:</span><span>${history.length}</span>
+                </div>
+            `;
+            document.getElementById('output').textContent += '屏幕信息已刷新\n';
+        }
+        refreshScreen();
+
+        function updateStateDisplay(msg) {
+            stateDisplay.innerHTML = `<div>${msg}</div><div>history.length: ${history.length}</div>`;
+        }
+
+        let stateCounter = 0;
+
+        function demoPushState() {
+            stateCounter++;
+            const state = { key: 'page-' + stateCounter, time: Date.now() };
+            history.pushState(state, '', '?state=' + stateCounter);
+            updateStateDisplay(
+                `pushState: ${JSON.stringify(state)}<br>URL: ${location.pathname}${location.search}`
+            );
+            console.log('pushState:', state);
+        }
+
+        function demoReplaceState() {
+            const state = { replaced: true, time: Date.now() };
+            history.replaceState(state, '', '?replaced=true');
+            updateStateDisplay(
+                `replaceState: ${JSON.stringify(state)}<br>URL: ${location.pathname}${location.search}`
+            );
+            console.log('replaceState:', state);
+        }
+
+        function goBack() {
+            history.back();
+        }
+
+        function goForward() {
+            history.forward();
+        }
+
+        // popstate 事件
+        window.addEventListener('popstate', function(e) {
+            const msg = `popstate 事件触发! state: ${JSON.stringify(e.state)}`;
+            updateStateDisplay(msg);
+            console.log('popstate:', e.state);
+        });
+
+        console.log('=== history 对象 ===');
+        console.log('history.length:', history.length);
+
+        console.log('=== screen 对象 ===');
+        console.log('screen.width:', screen.width);
+        console.log('screen.height:', screen.height);
+        console.log('screen.availWidth:', screen.availWidth);
+        console.log('screen.availHeight:', screen.availHeight);
+        console.log('screen.colorDepth:', screen.colorDepth);
+        console.log('screen.orientation:', screen.orientation?.type);
+
+        console.log('=== pushState/replaceState ===');
+        // pushState 示意
+        history.pushState({ demo: true }, '', '?demo=1');
+        console.log('pushState 后 length:', history.length);
+
+        // 回到原始状态
+        // history.replaceState({}, '', location.pathname);
+
+        document.getElementById('output').textContent = '✅ history 与 screen 演示完成！\n' +
+            '(点击按钮体验 pushState / replaceState / back / forward)';
+    </script>
+</body>
+</html>

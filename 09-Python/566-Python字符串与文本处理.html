@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python字符串与文本处理</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📝 Python 字符串与文本处理</h2><p>string 模块常量与模板、str 编码解码 encode/decode、textwrap 文本包装/缩进、difflib 文本比较、多行字符串与格式化技巧。</p></div>
+    <div class="card">
+        <h2>string 模块常量</h2>
+        <div class="code">// ========== string 常量 ==========
+import string
+
+# 字符集常量:
+print(string.ascii_lowercase)  # 'abcdefghijklmnopqrstuvwxyz'
+print(string.ascii_uppercase)  # 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'
+print(string.ascii_letters)    # 'abc...XYZ' (大小写合并)
+print(string.digits)           # '0123456789'
+print(string.hexdigits)        # '0123456789abcdefABCDEF'
+print(string.octdigits)        # '01234567'
+print(string.punctuation)      # '!"#$%&\'()*+,-./:;<=>?@[\]^_`{|}~'
+print(string.whitespace)       # ' \t\n\r\x0b\x0c'
+print(string.printable)        # 所有可打印字符
+
+# 实用: 密码字符集
+import random
+password_chars = string.ascii_letters + string.digits + "!@#$%"
+password = ''.join(random.choices(password_chars, k=12))
+print(password)                # 随机 12 位密码</div>
+    </div>
+    <div class="card">
+        <h2>string 模板格式化</h2>
+        <div class="code">// ========== string.Template ==========
+from string import Template
+
+# 简单的字符串替换 (比 % 和 f-string 更安全)
+t = Template("$name 今年 $age 岁")
+msg = t.substitute(name="小明", age=18)
+print(msg)                     # 小明今年 18 岁
+
+# safe_substitute: 缺失变量不报错
+t2 = Template("Hello $name, $title")
+msg2 = t2.safe_substitute(name="World", title="")
+print(msg2)                    # Hello World,
+
+# $ 转义:
+t3 = Template("$$ ${name}的余额")
+print(t3.substitute(name="小明"))  # $ 小明的余额
+
+# 适合: 用户提供的模板 (避免注入)
+# 比 f-string 更安全</div>
+    </div>
+    <div class="card">
+        <h2>编码与解码</h2>
+        <div class="code">// ========== str.encode / bytes.decode ==========
+# 字符串 → 字节:
+text = "你好 Python"
+utf8_bytes = text.encode("utf-8")
+print(utf8_bytes)               # b'\xe4\xbd\xa0\xe5\xa5\xbd Python'
+print(type(utf8_bytes))         # <class 'bytes'>
+
+# 不同编码:
+gbk_bytes = text.encode("gbk")
+print(gbk_bytes)                # b'\xc4\xe3\xba\xc3 Python'
+
+# 字节 → 字符串:
+decoded = utf8_bytes.decode("utf-8")
+print(decoded)                  # '你好 Python'
+
+# ========== 编码错误处理 ==========
+# errors: 'strict' (默认) / 'ignore' / 'replace' / 'backslashreplace'
+text_en = "Hello 你好"
+
+# ignore: 忽略无法编码的字符
+print(text_en.encode("ascii", errors="ignore"))
+# b'Hello '
+
+# replace: 用 ? 替换
+print(text_en.encode("ascii", errors="replace"))
+# b'Hello ??'
+
+# backslashreplace: 用 \x 转义
+print(text_en.encode("ascii", errors="backslashreplace"))
+# b'Hello \\u4f60\\u597d'
+
+# 解码错误处理:
+broken = b"Hello \xff\xfe"
+print(broken.decode("utf-8", errors="replace"))
+# 'Hello ��'
+
+# ========== bytes 与 bytearray ==========
+b = b"hello"                     # 不可变
+ba = bytearray(b"hello")         # 可变
+ba[0] = 72                       # 修改
+print(ba.decode())               # 'Hello'</div>
+    </div>
+    <div class="card">
+        <h2>textwrap 文本包装</h2>
+        <div class="code">// ========== textwrap 模块 ==========
+import textwrap
+
+text = "Python 是一种解释型、面向对象、动态数据类型的高级程序设计语言。由 Guido van Rossum 于 1989 年底发明。"
+
+# ========== wrap: 按宽度换行 ==========
+lines = textwrap.wrap(text, width=20)
+for line in lines:
+    print(line)
+# Python 是一种解释型、面
+# 向对象、动态数据类型的
+# 高级程序设计语言。由
+# Guido van Rossum 于
+# 1989 年底发明。
+
+# ========== fill: 直接返回字符串 ==========
+wrapped = textwrap.fill(text, width=30)
+print(wrapped)
+# Python 是一种解释型、面向对
+# 象、动态数据类型的高级程序设
+# 计语言。由 Guido van Rossum...
+
+# ========== shorten: 截断文本 ==========
+short = textwrap.shorten(text, width=30, placeholder="...")
+print(short)
+# Python 是一种解释型、面向对象、...
+
+# ========== dedent / indent ==========
+# 移除公共缩进:
+code = """
+    def hello():
+        print("world")
+"""
+clean = textwrap.dedent(code)
+print(clean)
+# def hello():
+#     print("world")
+
+# 添加缩进:
+indented = textwrap.indent("line1\nline2\n", ">> ")
+print(indented)
+# >> line1
+# >> line2</div>
+    </div>
+    <div class="card">
+        <h2>difflib 文本比较</h2>
+        <div class="code">// ========== difflib 模块 ==========
+import difflib
+
+# 字符串相似度:
+a = "Python 编程"
+b = "Python 程序"
+
+ratio = difflib.SequenceMatcher(None, a, b).ratio()
+print(f"相似度: {ratio:.2%}")    # 相似度: 77.78%
+
+# 找出差异:
+diff = difflib.unified_diff(
+    ["line1\n", "line2\n", "line3\n"],
+    ["line1\n", "modified\n", "line3\n"],
+    fromfile="old.py", tofile="new.py"
+)
+print(''.join(diff))
+# --- old.py
+# +++ new.py
+# @@ -1,3 +1,3 @@
+#  line1
+# -line2
+# +modified
+#  line3
+
+# 最佳匹配:
+words = ["Python", "Java", "JavaScript", "Go"]
+print(difflib.get_close_matches("Jva", words))
+# ['Java', 'JavaScript']</div>
+    </div>
+    <div class="card">
+        <h2>文本格式化技巧</h2>
+        <div class="code">// ========== 多行字符串 ==========
+# 括号隐式连接:
+text = ("这是第一行 "
+        "这是第二行 "
+        "这是第三行")
+print(text)   # 一行字符串
+
+# 反斜杠续行:
+text = "第一行 \
+第二行 \
+第三行"
+
+# 三引号 (保持格式):
+text = """第一行
+    第二行 (有缩进)
+第三行"""
+
+// ========== 对齐与填充 ==========
+print("左对齐".ljust(20, "-"))    # '左对齐-----------------'
+print("右对齐".rjust(20, "-"))    # '-----------------右对齐'
+print("居中".center(20, "-"))     # '--------居中--------'
+print("42".zfill(5))              # '00042' (前导零填充)
+
+// ========== 前缀/后缀检查 ==========
+url = "https://example.com"
+print(url.startswith("https"))    # True
+print(url.endswith(".com"))       # True
+
+// ========== 分割与连接 ==========
+csv = "苹果,香蕉,橘子"
+items = csv.split(",")            # ['苹果', '香蕉', '橘子']
+print("|".join(items))            # '苹果|香蕉|橘子'
+
+// ========== strip ==========
+text = "  \n\t Hello World \n  "
+print(text.strip())               # 'Hello World'
+print(text.lstrip())              # 去掉左边空白
+print(text.rstrip())              # 去掉右边空白
+# 也可指定字符: text.strip("*")</div>
+        <div class="note">💡 字符串处理要点: (1) string.ascii_letters/digits/punctuation 字符集常量; (2) str.encode() / bytes.decode() 编码转换; (3) textwrap.fill/wrap/dedent/indent 文本排版; (4) difflib.SequenceMatcher 比较相似度; (5) Template 安全替换,适合用户模板。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoString()">string 常量演示</button>
+        <button onclick="demoEncode()">编码演示</button>
+        <button onclick="demoTextwrap()">textwrap 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoString() {
+            result.innerHTML = '';
+            log('# string 模块常量');
+            log('');
+            log('ascii_lowercase: abcdefghijklmnopqrstuvwxyz');
+            log('ascii_uppercase: ABCDEFGHIJKLMNOPQRSTUVWXYZ');
+            log('digits: 0123456789');
+            log('hexdigits: 0123456789abcdefABCDEF');
+            log('punctuation: !"#$%&\'()*+,-./:;<=>?@[]^_`{|}~');
+            log('');
+            log('随机密码: ' + Math.random().toString(36).slice(2, 14));
+        }
+
+        function demoEncode() {
+            result.innerHTML = '';
+            log('# 编码演示');
+            log('');
+            log('"你好" UTF-8 编码:');
+            log('  e4 bd a0 e5 a5 bd');
+            log('');
+            log('"你好" GBK 编码:');
+            log('  c4 e3 ba c3');
+            log('');
+            log('编码错误处理:');
+            log('  ignore → 跳过无法编码的字符');
+            log('  replace → 用 ? 替换');
+            log('  backslashreplace → \\x转义');
+            log('');
+            log('bytes 对象: b"hello"');
+            log('bytearray: 可变的字节序列');
+        }
+
+        function demoTextwrap() {
+            result.innerHTML = '';
+            log('# textwrap 演示');
+            log('');
+            log('wrap(text, width=20) → 分行列表');
+            log('fill(text, width=30) → 换行字符串');
+            log('shorten(text, width) → 截断');
+            log('dedent(code) → 移除公共缩进');
+            log('indent(text, prefix) → 添加前缀');
+            log('');
+            log('difflib:');
+            log('  SequenceMatcher → 相似度');
+            log('  get_close_matches → 最佳匹配');
+        }
+    </script>
+</body>
+</html>

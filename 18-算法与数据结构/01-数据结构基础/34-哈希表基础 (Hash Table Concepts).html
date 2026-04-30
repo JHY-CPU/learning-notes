@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>34-哈希表基础 (Hash Table Concepts)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Hash Table Concepts</h2>
+  <div class="code">哈希表通过哈希函数将键映射到存储位置，实现 O(1) 平均复杂度的查找、插入和删除。</div>
+  <pre>class HashTable {
+  constructor(size=10) {
+    this.table = new Array(size).fill(null).map(() => []);
+    this.size = size;
+  }
+  _hash(key) {
+    return key.toString().split('').reduce((a,c) => a + c.charCodeAt(0), 0) % this.size;
+  }
+  set(key, val) {
+    const idx = this._hash(key);
+    const bucket = this.table[idx];
+    for (const pair of bucket) {
+      if (pair[0] === key) { pair[1] = val; return; }
+    }
+    bucket.push([key, val]);
+  }
+  get(key) {
+    const idx = this._hash(key);
+    for (const pair of this.table[idx]) {
+      if (pair[0] === key) return pair[1];
+    }
+    return undefined;
+  }
+}</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  class HT {
+    constructor(s=10){this.t=new Array(s).fill(null).map(()=>[]);this.s=s;}
+    _h(k){return k.toString().split('').reduce((a,c)=>a+c.charCodeAt(0),0)%this.s;}
+    set(k,v){const i=this._h(k);const b=this.t[i];for(const p of b){if(p[0]===k){p[1]=v;return;}}b.push([k,v]);}
+    get(k){const i=this._h(k);for(const p of this.t[i]){if(p[0]===k)return p[1];}return undefined;}
+  }
+  const ht = new HT();
+  ht.set('name','Alice');ht.set('age',25);
+  document.getElementById('result').textContent = `name: ${ht.get('name')}\nage: ${ht.get('age')}`;
+}
+</script>
+</body>
+</html>

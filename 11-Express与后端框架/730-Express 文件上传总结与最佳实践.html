@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express 文件上传总结与最佳实践</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📋 Express 文件上传总结与最佳实践</h2><p>文件上传技术选型、安全最佳实践、存储策略对比、性能优化、常见陷阱、综合示例、文件上传工具链全景图。</p></div>
+    <div class="card">
+        <h2>存储策略对比</h2>
+        <div class="code">// ========== 存储方案选型 ==========
+
+// ┌──────────┬────────────┬───────────┬───────────┬────────────┐
+// │          │  本地磁盘    │    S3     │   MinIO   │   CDN      │
+// ├──────────┼────────────┼───────────┼───────────┼────────────┤
+// │ 成本      │  低        │  按量     │   中      │  按量      │
+// │ 扩展性    │  差        │  好       │   好      │  极好      │
+// │ 备份      │  手动       │  自动     │   自动    │  -         │
+// │ 访问速度  │  快        │  中       │   快      │  极快      │
+// │ 适合场景  │  开发/小项目 │  生产     │   自托管  │  全球加速  │
+// └──────────┴────────────┴───────────┴───────────┴────────────┘
+
+// ========== 推荐架构 ==========
+// 开发: 本地磁盘
+// 生产小: MinIO (自托管 S3)
+// 生产中: AWS S3 + CloudFront
+// 生产大: S3 + CDN + 分片上传
+
+// ========== 文件处理流水线 ==========
+// 上传 → 验证 → 处理 → 存储 → 响应
+//
+// 1. multer 接收文件
+// 2. 文件类型/大小验证
+// 3. sharp 处理 (resize/格式转换/水印)
+// 4. 保存到 S3/本地
+// 5. 缩略图生成
+// 6. 数据库记录
+// 7. 返回 URL
+
+// ========== 环境配置 ==========
+// config/upload.js:
+const config = {
+    local: {
+        storage: 'local',
+        uploadDir: path.join(__dirname, '..', 'uploads'),
+        maxFileSize: 10 * 1024 * 1024,
+        allowedTypes: ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'],
+        thumbnail: { width: 200, height: 200, quality: 70 },
+    },
+    s3: {
+        storage: 's3',
+        bucket: process.env.S3_BUCKET,
+        region: process.env.AWS_REGION,
+        accessKey: process.env.AWS_ACCESS_KEY_ID,
+        secretKey: process.env.AWS_SECRET_ACCESS_KEY,
+        cdnUrl: process.env.CDN_URL,
+        presignedUrlExpiry: 3600,
+    },
+};
+
+// ========== 文件服务抽象 ==========
+// 统一接口, 切换存储后端
+class FileStorage {
+    async save(buffer, filename, mimetype) { throw new Error('Not implemented'); }
+    async delete(key) { throw new Error('Not implemented'); }
+    async getStream(key) { throw new Error('Not implemented'); }
+    async getPresignedUrl(key) { throw new Error('Not implemented'); }
+}
+
+class LocalStorage extends FileStorage {
+    async save(buffer, filename, mimetype) {
+        const filePath = path.join(config.local.uploadDir, filename);
+        await fs.promises.writeFile(filePath, buffer);
+        return { url: `/uploads/${filename}`, path: filePath };
+    }
+    async delete(key) {
+        await fs.promises.unlink(path.join(config.local.uploadDir, key));
+    }
+    async getStream(key) {
+        return fs.createReadStream(path.join(config.local.uploadDir, key));
+    }
+}
+
+class S3Storage extends FileStorage {
+    async save(buffer, filename, mimetype) {
+        const key = `uploads/${Date.now()}-${filename}`;
+        await s3.send(new PutObjectCommand({
+            Bucket: config.s3.bucket, Key: key, Body: buffer, ContentType: mimetype,
+        }));
+        const url = config.s3.cdnUrl
+            ? `${config.s3.cdnUrl}/${key}`
+            : `https://${config.s3.bucket}.s3.amazonaws.com/${key}`;
+        return { url, key };
+    }
+    async delete(key) {
+        await s3.send(new DeleteObjectCommand({ Bucket: config.s3.bucket, Key: key }));
+    }
+    async getPresignedUrl(key) {
+        const cmd = new GetObjectCommand({ Bucket: config.s3.bucket, Key: key });
+        return getSignedUrl(s3, cmd, { expiresIn: config.s3.presignedUrlExpiry });
+    }
+}
+
+// 工厂
+function createFileStorage() {
+    switch (config.local.storage) {
+        case 's3': return new S3Storage();
+        default: return new LocalStorage();
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>安全最佳实践</h2>
+        <div class="code">// ========== 文件上传安全 ==========
+
+// ========== 1. 文件类型验证 ==========
+function validateFile(file) {
+    // 不要信任 extension!
+    // 检查 MIME type + Magic Bytes
+
+    const magicBytes = {
+        'image/jpeg': [0xFF, 0xD8, 0xFF],
+        'image/png': [0x89, 0x50, 0x4E, 0x47],
+        'image/gif': [0x47, 0x49, 0x46],
+        'image/webp': [0x52, 0x49, 0x46, 0x46],  // RIFF...
+        'application/pdf': [0x25, 0x50, 0x44, 0x46],
+    };
+
+    const header = file.buffer.slice(0, 4);
+    const signature = magicBytes[file.mimetype];
+
+    if (!signature) return false;  // 不在白名单
+
+    for (let i = 0; i < signature.length; i++) {
+        if (header[i] !== signature[i]) return false;
+    }
+    return true;
+}
+
+// ========== 2. 路径遍历防护 ==========
+function sanitizeFilename(filename) {
+    // 防止 ../../../etc/passwd
+    const basename = path.basename(filename);
+    // 只保留安全字符
+    return basename.replace(/[^a-zA-Z0-9._-]/g, '_');
+}
+
+// ========== 3. 文件大小限制 ==========
+// multer limits.fileSize
+// 请求体大小限制:
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// ========== 4. 用户配额 ==========
+async function checkQuota(userId, fileSize) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const todayUsage = await File.aggregate([
+        { $match: { userId, createdAt: { $gte: today } } },
+        { $group: { _id: null, total: { $sum: '$size' } } },
+    ]);
+
+    const dailyQuota = 100 * 1024 * 1024;  // 100MB/天
+    const used = todayUsage[0]?.total || 0;
+
+    if (used + fileSize > dailyQuota) {
+        throw new Error('Daily upload quota exceeded');
+    }
+}
+
+// ========== 5. 文件隔离 ==========
+// 上传目录不在静态文件目录内
+// uploads/ 不上传到 git
+// 文件名不保留用户原始名 (防止特殊字符)
+// 文件 URL 使用 ID 而不是路径
+
+// ========== 6. 可执行文件扫描 ==========
+// 禁止上传: .exe .sh .bat .jar .class
+// 图片重新编码 (去掉隐藏脚本):
+//   sharp(buffer)  → 重新编码, 去掉 EXIF 元数据
+
+// ========== 7. 速率限制 ==========
+const uploadLimiter = rateLimit({
+    windowMs: 60 * 1000,
+    max: 10,              // 每分钟 10 次上传
+    message: 'Too many uploads',
+});
+
+app.post('/upload', authenticate, uploadLimiter, upload.single('file'), handler);</div>
+    </div>
+    <div class="card">
+        <h2>性能优化</h2>
+        <div class="code">// ========== 文件上传性能优化 ==========
+
+// ========== 1. 图片优化流水线 ==========
+// 上传 → 原图 → WebP 转换 → 多尺寸 → 保存
+// 使用 Promise.all 并行处理多尺寸
+
+async function processImage(buffer) {
+    const metadata = await sharp(buffer).metadata();
+
+    // 并行生成所有尺寸
+    const sizes = [
+        { width: 1920, suffix: '-lg', quality: 80 },
+        { width: 800, suffix: '-md', quality: 75 },
+        { width: 400, suffix: '-sm', quality: 70 },
+        { width: 150, suffix: '-thumb', quality: 60 },
+    ];
+
+    const results = await Promise.all(sizes.map(async ({ width, suffix, quality }) => {
+        const processed = await sharp(buffer)
+            .resize(width, undefined, { withoutEnlargement: true })
+            .webp({ quality })
+            .toBuffer();
+
+        const filename = `${Date.now()}${suffix}.webp`;
+        // 并行写文件
+        await fs.promises.writeFile(path.join('uploads', filename), processed);
+
+        return { width, filename, size: processed.length };
+    }));
+
+    return { metadata, versions: results };
+}
+
+// ========== 2. 流式处理大文件 ==========
+// 超过 50MB 的文件用 stream, 不用 Buffer
+// 使用文件系统临时文件
+
+const tmpUpload = multer({ dest: 'uploads/tmp/' });
+
+app.post('/upload/large', tmpUpload.single('file'), async (req, res) => {
+    // req.file.path 是临时文件路径
+    const { path: tmpPath, originalname } = req.file;
+
+    // 流式处理
+    const readStream = fs.createReadStream(tmpPath);
+    const writeStream = fs.createWriteStream(
+        path.join('uploads', `${Date.now()}-${originalname}`)
+    );
+
+    readStream.pipe(writeStream);
+
+    writeStream.on('finish', async () => {
+        // 删除临时文件
+        await fs.promises.unlink(tmpPath);
+        res.json({ message: 'Large file uploaded' });
+    });
+});
+
+// ========== 3. 懒生成缩略图 ==========
+// 上传时不生成, 首次访问时生成并缓存
+const thumbCache = new Map();
+
+async function getThumbnail(fileId) {
+    if (thumbCache.has(fileId)) return thumbCache.get(fileId);
+
+    const file = await File.findById(fileId);
+    const thumbName = `thumb-${fileId}.webp`;
+    const thumbPath = path.join('uploads/thumbs', thumbName);
+
+    if (!fs.existsSync(thumbPath)) {
+        await sharp(file.path)
+            .resize(200, 200, { fit: 'cover' })
+            .webp({ quality: 70 })
+            .toFile(thumbPath);
+    }
+
+    thumbCache.set(fileId, `/uploads/thumbs/${thumbName}`);
+    return thumbCache.get(fileId);
+}
+
+// ========== 4. CDN 缓存策略 ==========
+// 图片设置长缓存 + 内容哈希
+// /uploads/1712345678-lg.webp?v=2
+// Cache-Control: public, max-age=31536000, immutable
+
+// ========== 5. 上传队列 ==========
+// 大文件处理放队列, 不阻塞响应
+const bull = require('bull');
+const imageQueue = new Bull('image-processing', process.env.REDIS_URL);
+
+imageQueue.process(async (job) => {
+    const { fileId } = job.data;
+    const file = await File.findById(fileId);
+    // ... 处理图片
+    file.status = 'ready';
+    await file.save();
+});
+
+app.post('/upload', upload.single('file'), async (req, res) => {
+    const file = await File.create({ ... });
+    // 异步处理
+    await imageQueue.add({ fileId: file._id });
+    res.success({ file, message: 'Processing in background' });
+});</div>
+        <div class="note">💡 最佳实践: 存储策略抽象 (Local/S3/MinIO 切换); 文件类型验证用 Magic Bytes; 路径遍历防护 path.basename; 用户配额限制; 文件隔离 (上传目录独立); 图片重编码防恶意内容; 速率限制; 多尺寸并行生成; 流式处理 > 50MB; 懒生成缩略图; CDN 长缓存; 后台队列处理大文件。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoStrategy()">存储策略</button>
+        <button onclick="demoSecurity()">安全实践</button>
+        <button onclick="demoPerf()">性能优化</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoStrategy() {
+            result.innerHTML = '';
+            log('# 文件存储策略');
+            log('');
+            log('开发环境: 本地磁盘');
+            log('  简单直接, 无需外部服务');
+            log('');
+            log('生产环境: S3 + CloudFront');
+            log('  高可用, CDN 加速, 无限扩展');
+            log('');
+            log('自托管: MinIO');
+            log('  S3 兼容, 私有部署');
+            log('');
+            log('统一接口 FileStorage:');
+            log('  save/delete/getStream/getPresignedUrl');
+            log('  切换后端只需改配置!');
+        }
+
+        function demoSecurity() {
+            result.innerHTML = '';
+            log('# 文件上传安全检查清单');
+            log('');
+            log('✅ 文件类型白名单 + Magic Bytes');
+            log('✅ 文件大小限制 (multer.limits)');
+            log('✅ 路径遍历防护 (path.basename)');
+            log('✅ 文件名安全字符过滤');
+            log('✅ 上传目录独立 (非 static)');
+            log('✅ 用户每日配额限制');
+            log('✅ 速率限制 (express-rate-limit)');
+            log('✅ 图片重编码 (sharp 去 EXIF)');
+            log('✅ 禁止可执行文件');
+            log('✅ 请求体大小限制 (express.json)');
+        }
+
+        function demoPerf() {
+            result.innerHTML = '';
+            log('# 文件上传性能优化');
+            log('');
+            log('1. 并行处理多尺寸');
+            log('   Promise.all(sizes.map(sharp))');
+            log('');
+            log('2. 流式处理大文件');
+            log('   > 50MB 用 stream, 不用 Buffer');
+            log('');
+            log('3. 懒生成缩略图');
+            log('   首次访问时生成, 缓存结果');
+            log('');
+            log('4. CDN 长缓存');
+            log('   Cache-Control: max-age=31536000');
+            log('');
+            log('5. 后台队列');
+            log('   Bull/Redis 异步处理');
+        }
+    </script>
+</body>
+</html>

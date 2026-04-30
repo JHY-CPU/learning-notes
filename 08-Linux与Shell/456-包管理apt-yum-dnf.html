@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>包管理apt-yum-dnf</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📦 包管理 apt/yum/dnf</h2><p>Debian vs Red Hat 包管理、仓库配置、软件搜索/安装/升级/卸载、源码编译。</p></div>
+    <div class="card">
+        <h2>包管理基础</h2>
+        <div class="code">// ========== 包管理生态 ==========
+// Debian 系 (apt/.deb):
+//   Debian, Ubuntu, Linux Mint, Kali, Pop!_OS
+//   dpkg → 底层包管理
+//   apt/apt-get → 上层包管理 (自动处理依赖)
+//
+// Red Hat 系 (yum/dnf/.rpm):
+//   RHEL, CentOS, Fedora, Rocky Linux, AlmaLinux
+//   rpm → 底层包管理
+//   yum (旧) / dnf (新) → 上层包管理
+//
+// Arch 系 (pacman):
+//   Arch Linux, Manjaro
+//   pacman → 包管理
+
+// ========== 包文件格式 ==========
+// .deb — Debian 包 (Debian/Ubuntu 系列)
+// .rpm — RPM 包 (Red Hat/Fedora 系列)
+// .tar.gz/.tar.xz — 源码/二进制压缩包
+// .snap — Snap 通用包
+// .flatpakref — Flatpak 桌面应用
+// AppImage — 单文件应用
+
+// ========== 底层工具 ==========
+// Debian:
+dpkg -i package.deb         # 安装本地 .deb
+dpkg -r package              # 删除包
+dpkg -l                      # 列出所有已安装包
+dpkg -L package              # 列出包的文件
+dpkg -S /path/to/file        # 文件属于哪个包
+
+// Red Hat:
+rpm -ivh package.rpm         # 安装 .rpm
+rpm -e package               # 删除
+rpm -qa                      # 列出所有已安装
+rpm -ql package              # 列出包的文件
+rpm -qf /path/to/file        # 文件属于哪个包</div>
+    </div>
+    <div class="card">
+        <h2>apt — Debian 包管理</h2>
+        <div class="code">// ========== apt 命令 ==========
+// apt 是 apt-get + apt-cache 的简化版 (Ubuntu 16.04+)
+
+// 更新索引 (安装/升级前先做!)
+apt update           # 从仓库更新包索引
+
+// 安装
+apt install nginx        # 安装包
+apt install -y nginx     # 自动确认
+apt install ./local.deb  # 安装本地 deb
+apt install nginx=1.18.0 # 指定版本
+
+// 升级
+apt upgrade              # 升级所有可升级的包
+apt full-upgrade         # 升级+处理依赖变更
+apt list --upgradable    # 查看可升级的包
+
+// 搜索与查看
+apt search keyword       # 搜索包
+apt show nginx           # 查看包信息
+apt list                 # 列出所有包
+apt list --installed     # 已安装的
+apt list nginx           # 匹配包
+
+// 卸载
+apt remove nginx         # 卸载 (保留配置)
+apt purge nginx          # 彻底卸载 (删配置)
+apt autoremove           # 自动删除不需要的依赖
+
+// 清理
+apt clean                # 清理下载的 .deb 缓存
+apt autoclean            # 只清理过期的缓存
+
+// ========== /etc/apt/sources.list ==========
+// 软件源配置:
+// deb http://archive.ubuntu.com/ubuntu/ focal main restricted
+// deb-src http://archive.ubuntu.com/ubuntu/ focal main restricted
+//
+// 字段: deb|deb-src URI distribution components
+// components: main, universe, restricted, multiverse
+
+// 添加 PPA (Personal Package Archive):
+add-apt-repository ppa:nginx/stable
+apt update
+apt install nginx
+
+// ========== apt vs apt-get ==========
+// apt 合并了 apt-get 和 apt-cache 的常用功能
+// 有进度条和彩色输出
+// 适合交互使用,脚本中建议用 apt-get
+
+// apt-get 命令对应:
+// apt-get update        → apt update
+// apt-get install       → apt install
+// apt-get upgrade       → apt upgrade
+// apt-get remove        → apt remove
+// apt-cache search      → apt search
+// apt-cache show        → apt show</div>
+    </div>
+    <div class="card">
+        <h2>yum / dnf — Red Hat 包管理</h2>
+        <div class="code">// ========== yum (CentOS 7/RHEL 7) ==========
+yum install nginx       # 安装
+yum remove nginx        # 卸载
+yum update              # 更新所有包
+yum update nginx        # 更新指定包
+yum search keyword      # 搜索
+yum info nginx          # 包信息
+yum list installed      # 已安装列表
+yum list available      # 可用列表
+yum provides /usr/bin/nginx  # 文件属于哪个包
+yum groupinstall "Development Tools"  # 安装组
+yum clean all           # 清理缓存
+yum repolist            # 列出仓库
+
+// ========== dnf (Fedora/CentOS 8+/RHEL 8+) ==========
+// dnf 是 yum 的下一代替代,性能更好,依赖解析更强
+// 用法基本兼容 yum
+
+dnf install nginx
+dnf remove nginx
+dnf update
+dnf search keyword
+dnf info nginx
+dnf list --installed
+dnf groupinstall "Development Tools"
+dnf clean all
+dnf repolist
+
+// dnf 新特性:
+dnf history              # 包操作历史
+dnf check-update         # 检查更新 (退出码区分有无)
+dnf reinstall nginx      # 重新安装
+dnf downgrade nginx      # 降级
+dnf autoremove           # 自动删除孤儿依赖
+
+// ========== yum/dnf 仓库配置 ==========
+// /etc/yum.repos.d/ 目录下的 .repo 文件
+//
+// [nginx-stable]
+// name=nginx stable repo
+// baseurl=http://nginx.org/packages/rhel/$releasever/$basearch/
+// gpgcheck=1
+// enabled=1
+// gpgkey=https://nginx.org/keys/nginx_signing.key
+
+// 添加 EPEL (Extra Packages for Enterprise Linux):
+yum install epel-release
+dnf install epel-release
+
+// ========== 三大命令对照 ==========
+// 操作          apt                yum              dnf
+// ─────────────────────────────────────────────────
+// 安装          apt install        yum install      dnf install
+// 删除          apt remove         yum remove       dnf remove
+// 更新索引      apt update         yum makecache    dnf makecache
+// 升级包        apt upgrade        yum update       dnf update
+// 搜索          apt search         yum search       dnf search
+// 查看          apt show           yum info         dnf info
+// 清理          apt clean          yum clean all    dnf clean all</div>
+    </div>
+    <div class="card">
+        <h2>源码编译与第三方包</h2>
+        <div class="code">// ========== 源码编译 (三步曲) ==========
+// 场景: 官方包太旧,需要特定版本或定制编译
+
+// 步骤:
+./configure --prefix=/usr/local --enable-option
+make -j$(nproc)
+sudo make install
+
+// 常用开发工具组 (编译依赖):
+apt install build-essential           # Debian
+dnf groupinstall "Development Tools"  # Red Hat
+
+// ========== 具体示例: 编译 Nginx ==========
+apt install build-essential libpcre3-dev zlib1g-dev libssl-dev
+
+wget https://nginx.org/download/nginx-1.24.0.tar.gz
+tar xzf nginx-1.24.0.tar.gz
+cd nginx-1.24.0
+
+./configure \
+    --prefix=/etc/nginx \
+    --sbin-path=/usr/sbin/nginx \
+    --with-http_ssl_module \
+    --with-http_v2_module \
+    --with-stream
+
+make -j$(nproc)
+sudo make install
+
+// ========== 检查编译选项 ==========
+nginx -V                # 查看编译参数
+nginx -V 2>&1 | tr ' ' '\n'  # 每行一个参数
+
+// ========== pip / npm / cargo ==========
+// 语言级包管理器:
+pip install flask        # Python
+npm install express      # Node.js
+cargo install ripgrep    # Rust
+go install github.com/...  # Go
+
+// 对比:
+// 系统包管理器: 全局安装,影响系统
+// 语言包管理器: 项目本地,不影响系统
+// 推荐: 优先用 apt/yum,语言工具用语言级包管理器</div>
+        <div class="note">💡 apt update 一定要先于 apt install! 很多安装失败是因为本地的包索引过旧。建议把 apt update && apt upgrade -y 作为新服务器的第一件事。生产服务器锁定软件版本,不要随意 apt upgrade。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoApt()">apt 演示</button>
+        <button onclick="demoDnf()">dnf 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoApt() {
+            result.innerHTML = '';
+            log('# apt 包管理演示');
+            log('');
+            log('$ apt update');
+            log('  Hit:1 http://archive.ubuntu.com/ubuntu focal InRelease');
+            log('  Reading package lists... Done');
+            log('');
+            log('$ apt search "web server"');
+            log('  nginx/focal 1.18.0-0ubuntu1 amd64');
+            log('  apache2/focal 2.4.41-4ubuntu3 amd64');
+            log('  caddy/focal 2.0.0-1 amd64');
+            log('');
+            log('$ apt show nginx');
+            log('  Package: nginx');
+            log('  Version: 1.18.0-0ubuntu1');
+            log('  Maintainer: Ubuntu Developers');
+            log('  Description: high performance web server');
+            log('');
+            log('$ sudo apt install -y nginx');
+            log('  Reading package lists... Done');
+            log('  Building dependency tree... Done');
+            log('  The following NEW packages will be installed:');
+            log('    nginx nginx-core nginx-common');
+        }
+
+        function demoDnf() {
+            result.innerHTML = '';
+            log('# dnf 包管理演示');
+            log('');
+            log('$ dnf install nginx');
+            log('  Dependencies resolved.');
+            log('  Package         Arch   Version          Repo');
+            log('  nginx           x86_64 1:1.20.1-1.el9   epel');
+            log('  Install  1 Package');
+            log('  Total download: 1.2 M');
+            log('  Is this ok [y/N]:');
+            log('');
+            log('$ dnf info installed nginx');
+            log('  Name         : nginx');
+            log('  Version      : 1.20.1');
+            log('  Release      : 1.el9');
+            log('  Architecture : x86_64');
+            log('  Size         : 4.5 M');
+            log('  License      : BSD');
+            log('');
+            log('$ dnf history');
+            log('  ID | Command line            | Date');
+            log('  12 | install nginx            | 2024-01-15');
+            log('  11 | update                   | 2024-01-10');
+            log('  10 | remove apache2           | 2024-01-08');
+        }
+    </script>
+</body>
+</html>

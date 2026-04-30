@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CommonJS模块</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #cjs-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>CommonJS 模块</h2><p>require、module.exports/exports、循环依赖、模块缓存。</p></div>
+    <div class="card">
+        <h2>CommonJS 语法</h2>
+        <div class="code">// ========== 导出 ==========
+// math.js
+const PI = 3.14159;
+function sum(a, b) { return a + b; }
+
+// 方式 1: module.exports
+module.exports = { PI, sum };
+
+// 方式 2: exports 快捷方式
+exports.PI = PI;
+exports.sum = sum;
+
+// ⚠️ 不能直接给 exports 赋值:
+// exports = { PI, sum }; // ❌ 断开引用
+
+// ========== 导入 ==========
+// app.js
+const math = require('./math.js');
+console.log(math.PI);
+console.log(math.sum(1, 2));
+
+// 解构导入
+const { PI, sum } = require('./math.js');
+
+// ========== 模块缓存 ==========
+// require 会缓存模块，第二次加载使用缓存
+const m1 = require('./math.js'); // 加载并执行
+const m2 = require('./math.js'); // 从缓存取 (不执行)
+
+// 清除缓存 (调试用)
+delete require.cache[require.resolve('./math.js')];
+
+// ========== 加载顺序 ==========
+require('./module');   // 相对路径
+require('fs');         // 内置模块
+require('lodash');     // node_modules 包
+require('/abs/path');  // 绝对路径</div>
+        <div class="note">💡 CommonJS 是同步加载，适合服务端。<br>
+        💡 exports 是 module.exports 的引用。<br>
+        💡 ES 模块使用 import/export，与 CJS 不同。<br>
+        ⚠️ 循环依赖需谨慎处理。</div>
+    </div>
+    <div class="card">
+        <h2>演示：模块系统</h2>
+        <button onclick="demoCJS()">模拟 CommonJS</button>
+        <button onclick="demoCache()">模块缓存</button>
+        <div id="cjs-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const cjsResult = document.getElementById('cjs-result');
+
+        function log(msg) {
+            cjsResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // 模拟 CommonJS 模块系统
+        const ModuleSystem = {
+            cache: new Map(),
+            registry: {},
+
+            define(name, factory) {
+                this.registry[name] = factory;
+            },
+
+            require(name) {
+                if (this.cache.has(name)) {
+                    log(`   📦 缓存命中: ${name}`);
+                    return this.cache.get(name);
+                }
+                log(`   📥 加载模块: ${name}`);
+                const factory = this.registry[name];
+                if (!factory) throw new Error(`Module not found: ${name}`);
+                const module = { exports: {} };
+                this.cache.set(name, module.exports);
+                factory(module, module.exports);
+                this.cache.set(name, module.exports);
+                return module.exports;
+            }
+        };
+
+        // 定义模块
+        ModuleSystem.define('math', (module, exports) => {
+            log('   🔧 执行 math 模块...');
+            exports.PI = 3.14159;
+            exports.sum = (a, b) => a + b;
+            exports.multiply = (a, b) => a * b;
+        });
+
+        ModuleSystem.define('greet', (module, exports) => {
+            log('   🔧 执行 greet 模块...');
+            const math = ModuleSystem.require('math');
+            exports.sayHello = (name) => `Hello, ${name}!`;
+            exports.random = () => Math.random();
+        });
+
+        function demoCJS() {
+            cjsResult.innerHTML = '';
+            log('📦 CommonJS 模块系统模拟:');
+            log('');
+
+            const math = ModuleSystem.require('math');
+            log(`   math.PI = ${math.PI}`);
+            log(`   math.sum(1, 2) = ${math.sum(1, 2)}`);
+            log('');
+
+            const greet = ModuleSystem.require('greet');
+            log(`   greet.sayHello("Node") = ${greet.sayHello("Node")}`);
+
+            log('');
+            log('📌 CommonJS 特点:');
+            log('   • 同步加载');
+            log('   • 模块缓存');
+            log('   • exports vs module.exports');
+            log('   • .js 文件默认 CJS');
+        }
+
+        function demoCache() {
+            cjsResult.innerHTML = '';
+            log('🔄 模块缓存演示:');
+            log('');
+
+            // 清空缓存
+            ModuleSystem.cache.clear();
+
+            log('第一次加载:');
+            const m1 = ModuleSystem.require('math');
+            log('');
+
+            log('第二次加载 (应走缓存):');
+            const m2 = ModuleSystem.require('math');
+            log('');
+
+            log(`导出对象相同: ${m1 === m2 ? '✅ 同一个引用' : '❌ 不同对象'}`);
+            log('');
+            log('📌 缓存机制:');
+            log('   • require 时先查缓存');
+            log('   • 第二次不会执行模块代码');
+            log('   • 可手动删除缓存');
+        }
+
+        console.log('=== CommonJS 模块 ===');
+
+        document.getElementById('output').textContent =
+            `CommonJS: require / module.exports / exports / 模块缓存\n` +
+            `同步加载 / 缓存机制 / 循环依赖 / node_modules\n` +
+            `✅ CommonJS 模块演示完成！`;
+    </script>
+</body>
+</html>

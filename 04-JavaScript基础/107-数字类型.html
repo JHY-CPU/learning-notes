@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字类型</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>数字类型 number</h2>
+        <p>JavaScript 的 number 是 64 位双精度浮点数（IEEE 754）。</p>
+    </div>
+
+    <div class="card">
+        <h2>数字的写法</h2>
+        <div class="code">
+let int = 42;              // 整数
+let float = 3.14;          // 浮点数
+let negative = -10;        // 负数
+let scientific = 1.5e6;    // 科学计数法 = 1500000
+let scientific2 = 1e-3;    // = 0.001
+
+// 不同进制
+let hex = 0xFF;            // 十六进制 = 255
+let octal = 0o77;          // 八进制 = 63
+let binary = 0b1010;       // 二进制 = 10
+
+// 数字分隔符（ES2021，提高可读性）
+let bigNum = 1_000_000;    // = 1000000
+let price = 99_99;         // = 9999
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>特殊数字值</h2>
+        <div class="code">
+// NaN - Not a Number（非数字）
+let notNum = 0 / 0;         // NaN
+let nan2 = parseInt('abc'); // NaN
+console.log(NaN === NaN);   // false ← NaN 不等于自身！
+
+// Infinity - 无穷大
+let posInf = 1 / 0;         // Infinity
+let negInf = -1 / 0;        // -Infinity
+
+// 判断方法
+isNaN(NaN);              // true
+isNaN('123');            // false（会先转数字）
+Number.isNaN(NaN);       // true（推荐，不强制转换）
+isFinite(Infinity);      // false
+isFinite(42);            // true
+Number.isFinite(42);     // true
+        </div>
+        <div class="note">isNaN('123abc') → true （因为 '123abc' 转数字是 NaN）<br>Number.isNaN('abc') → false（不转换类型，更严格）</div>
+    </div>
+
+    <div class="card">
+        <h2>浮点数精度问题</h2>
+        <div class="code">
+// 经典问题
+console.log(0.1 + 0.2);        // 0.30000000000000004
+console.log(0.1 + 0.2 === 0.3); // false！
+
+// 为什么？IEEE 754 二进制无法精确表示 0.1
+
+// 解决方法：用 toFixed 或乘以整数
+let sum = (0.1 * 10 + 0.2 * 10) / 10;  // 0.3
+console.log(sum.toFixed(1));   // "0.3"（注意返回字符串）
+        </div>
+        <div class="note">⚠️ 做金额计算时注意精度，建议使用整数（分）计算，或使用专门的库。</div>
+    </div>
+
+    <div class="card">
+        <h2>Number 方法</h2>
+        <div class="code">
+let num = 123.456;
+
+num.toFixed(2);          // "123.46"（四舍五入，返回字符串）
+num.toPrecision(4);      // "123.5"（指定总位数）
+num.toString(16);        // "7b.74..."（转16进制字符串）
+
+Number.isInteger(42);    // true
+Number.isInteger(3.14);  // false
+Number.isNaN(NaN);       // true（推荐）
+Number.isFinite(Infinity); // false
+Number.parseFloat('3.14px'); // 3.14
+Number.parseInt('100px', 10); // 100
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Number.EPSILON 与安全整数</h2>
+        <div class="code">
+// 最小精度
+Number.EPSILON;  // 2.220446049250313e-16
+
+// 安全整数范围
+Number.MAX_SAFE_INTEGER; // 9007199254740991 (2^53 - 1)
+Number.MIN_SAFE_INTEGER; // -9007199254740991
+Number.MAX_VALUE;        // 1.7976931348623157e+308
+Number.MIN_VALUE;        // 5e-324（最小的正数）
+
+// 超出安全整数的运算会不精确
+console.log(9999999999999999); // 10000000000000000
+        </div>
+        <div class="note">超出安全整数范围用 BigInt（末尾加 n）</div>
+    </div>
+
+    <pre id="output"></pre>
+
+    <script>
+        // ====================
+        // 数字演示
+        // ====================
+
+        // 不同写法
+        console.log('=== 数字写法 ===');
+        console.log('十进制:', 42);
+        console.log('十六进制 0xFF:', 0xFF);
+        console.log('八进制 0o77:', 0o77);
+        console.log('二进制 0b1010:', 0b1010);
+        console.log('科学计数法 1.5e6:', 1.5e6);
+        console.log('数字分隔符 1_000_000:', 1_000_000);
+
+        // 特殊值
+        console.log('=== 特殊值 ===');
+        console.log('NaN:', 0/0);
+        console.log('Infinity:', 1/0);
+        console.log('NaN === NaN:', NaN === NaN); // false
+        console.log('isNaN(NaN):', isNaN(NaN));
+        console.log('Number.isNaN(NaN):', Number.isNaN(NaN));
+
+        // 精度问题
+        console.log('=== 精度 ===');
+        console.log('0.1 + 0.2 =', 0.1 + 0.2);
+        console.log('(0.1*10 + 0.2*10)/10 =', (0.1*10 + 0.2*10)/10);
+
+        // 方法
+        console.log('=== Number方法 ===');
+        let n = 123.456;
+        console.log('toFixed(2):', n.toFixed(2));
+        console.log('toPrecision(4):', n.toPrecision(4));
+        console.log('toString(16):', n.toString(16));
+        console.log('Number.isInteger(42):', Number.isInteger(42));
+        console.log('Number.parseInt("100px"):', Number.parseInt('100px'));
+        console.log('Number.parseFloat("3.14px"):', Number.parseFloat('3.14px'));
+
+        // 安全整数
+        console.log('=== 安全整数 ===');
+        console.log('MAX_SAFE_INTEGER:', Number.MAX_SAFE_INTEGER);
+        console.log('超出安全:', 9999999999999999);
+
+        document.getElementById('output').textContent =
+            `0.1 + 0.2 = ${0.1 + 0.2}\n` +
+            `NaN === NaN: ${NaN === NaN}\n` +
+            `123.456.toFixed(2) = ${n.toFixed(2)}\n` +
+            `Number.MAX_SAFE_INTEGER = ${Number.MAX_SAFE_INTEGER}\n` +
+            `✅ 数字类型演示完成！`;
+    </script>
+</body>
+</html>

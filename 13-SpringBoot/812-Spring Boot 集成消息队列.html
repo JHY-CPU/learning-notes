@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot 集成消息队列</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📨 Spring Boot 集成消息队列</h2><p>RabbitMQ 交换机/队列/绑定、@RabbitListener 消息监听、Kafka 生产者/消费者、@KafkaListener、消息可靠性保证、序列化配置。</p></div>
+    <div class="card">
+        <h2>RabbitMQ 基础</h2>
+        <div class="code">// ========== RabbitMQ ==========
+// 消息代理: Producer → Exchange → Queue → Consumer
+// 交换机类型: Direct / Topic / Fanout / Headers
+
+// ========== 依赖 ==========
+// &lt;dependency&gt;
+//     &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+//     &lt;artifactId&gt;spring-boot-starter-amqp&lt;/artifactId&gt;
+// &lt;/dependency&gt;
+
+// ========== 配置 ==========
+// application.yml:
+
+spring:
+  rabbitmq:
+    host: localhost
+    port: 5672
+    username: guest
+    password: guest
+    virtual-host: /
+    listener:
+      simple:
+        concurrency: 3                    # 并发消费者数
+        max-concurrency: 10
+        prefetch: 1                       # 每次取 1 条
+        acknowledge-mode: auto            # auto/manual/none
+        retry:
+          enabled: true                   # 重试
+          max-attempts: 3
+          initial-interval: 1000ms
+    template:
+      retry:
+        enabled: true
+        max-attempts: 3
+
+// ========== 队列/交换机/绑定配置 ==========
+@Configuration
+public class RabbitMQConfig {
+
+    // ========== 交换机 ==========
+    @Bean
+    public DirectExchange directExchange() {
+        return new DirectExchange("exchange.direct");
+    }
+
+    @Bean
+    public TopicExchange topicExchange() {
+        return new TopicExchange("exchange.topic");
+    }
+
+    @Bean
+    public FanoutExchange fanoutExchange() {
+        return new FanoutExchange("exchange.fanout");
+    }
+
+    // ========== 队列 ==========
+    @Bean
+    public Queue directQueue() {
+        return QueueBuilder.durable("queue.direct")
+            .deadLetterExchange("exchange.dlx")        // 死信交换机
+            .deadLetterRoutingKey("dead")
+            .ttl(60000)                                  // 消息 TTL
+            .maxLength(10000)                            // 最大长度
+            .build();
+    }
+
+    @Bean
+    public Queue topicQueue() {
+        return new Queue("queue.topic");
+    }
+
+    @Bean
+    public Queue fanoutQueue() {
+        return new Queue("queue.fanout");
+    }
+
+    // ========== 绑定 ==========
+    @Bean
+    public Binding directBinding() {
+        return BindingBuilder.bind(directQueue())
+            .to(directExchange())
+            .with("direct.key");            // 路由键
+    }
+
+    @Bean
+    public Binding topicBinding() {
+        return BindingBuilder.bind(topicQueue())
+            .to(topicExchange())
+            .with("order.#");               // 通配符: order.created, order.paid
+    }
+
+    @Bean
+    public Binding fanoutBinding() {
+        return BindingBuilder.bind(fanoutQueue())
+            .to(fanoutExchange());
+    }
+
+    // ========== 死信队列 ==========
+    @Bean
+    public Queue deadLetterQueue() {
+        return new Queue("queue.dlx");
+    }
+
+    @Bean
+    public DirectExchange deadLetterExchange() {
+        return new DirectExchange("exchange.dlx");
+    }
+
+    @Bean
+    public Binding deadLetterBinding() {
+        return BindingBuilder.bind(deadLetterQueue())
+            .to(deadLetterExchange())
+            .with("dead");
+    }
+
+    // ========== JSON 序列化 ==========
+    @Bean
+    public MessageConverter messageConverter() {
+        Jackson2JsonMessageConverter converter =
+            new Jackson2JsonMessageConverter();
+        converter.setCreateMessageIds(true);
+        return converter;
+    }
+
+    @Bean
+    public RabbitTemplate rabbitTemplate(ConnectionFactory factory,
+            MessageConverter converter) {
+        RabbitTemplate template = new RabbitTemplate(factory);
+        template.setMessageConverter(converter);
+        template.setConfirmCallback((correlation, ack, reason) -> {
+            if (ack) log.info("消息确认: {}", correlation);
+            else log.warn("消息未确认: {} reason: {}", correlation, reason);
+        });
+        return template;
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>RabbitMQ 生产者与消费者</h2>
+        <div class="code">// ========== 消息生产者 ==========
+
+@Service
+@RequiredArgsConstructor
+public class OrderMessageProducer {
+
+    private final RabbitTemplate rabbitTemplate;
+
+    // 发送到 Direct 交换机
+    public void sendDirect(OrderMessage message) {
+        rabbitTemplate.convertAndSend(
+            "exchange.direct",
+            "direct.key",
+            message);
+    }
+
+    // 发送到 Topic 交换机
+    public void sendOrderCreated(OrderEvent event) {
+        rabbitTemplate.convertAndSend(
+            "exchange.topic",
+            "order.created",                // 路由键
+            event);
+    }
+
+    public void sendOrderPaid(OrderEvent event) {
+        rabbitTemplate.convertAndSend(
+            "exchange.topic",
+            "order.paid",
+            event);
+    }
+
+    // 广播到 Fanout 交换机 (所有绑定队列)
+    public void broadcast(Notification notification) {
+        rabbitTemplate.convertAndSend(
+            "exchange.fanout",
+            "",                             // Fanout 忽略路由键
+            notification);
+    }
+
+    // 带延迟的消息 (插件: rabbitmq-delayed-message-exchange)
+    public void sendDelayed(OrderMessage message, long delayMs) {
+        rabbitTemplate.convertAndSend(
+            "exchange.delayed",
+            "delayed.key",
+            message,
+            msg -> {
+                msg.getMessageProperties()
+                    .setDelayLong(delayMs);  // 延迟毫秒
+                return msg;
+            });
+    }
+}
+
+// ========== 消息消费者 ==========
+
+@Component
+@Slf4j
+public class OrderMessageConsumer {
+
+    // 监听 Direct 队列
+    @RabbitListener(queues = "queue.direct")
+    public void handleDirectMessage(OrderMessage message) {
+        log.info("收到 Direct 消息: {}", message);
+        // 处理订单...
+    }
+
+    // 监听 Topic 队列
+    @RabbitListener(queues = "queue.topic")
+    public void handleOrderCreated(OrderEvent event) {
+        log.info("订单事件: {} -> {}", event.getOrderId(), event.getStatus());
+        // 根据事件类型处理
+        switch (event.getStatus()) {
+            case "CREATED" -> handleCreation(event);
+            case "PAID" -> handlePayment(event);
+        }
+    }
+
+    // 监听 Fanout 队列
+    @RabbitListener(queues = "queue.fanout")
+    public void handleBroadcast(Notification notification) {
+        log.info("广播通知: {}", notification.getMessage());
+    }
+
+    // 手动确认
+    @RabbitListener(queues = "queue.direct")
+    public void handleWithManualAck(
+            OrderMessage message,
+            Channel channel,
+            @Header(AmqpHeaders.DELIVERY_TAG) long deliveryTag) throws IOException {
+
+        try {
+            // 处理消息
+            processMessage(message);
+            // 手动确认
+            channel.basicAck(deliveryTag, false);
+        } catch (Exception e) {
+            // 拒绝并重新入队
+            channel.basicNack(deliveryTag, false, true);
+            // 或拒绝并不重新入队 → 死信队列
+            // channel.basicReject(deliveryTag, false);
+        }
+    }
+
+    // 监听死信队列
+    @RabbitListener(queues = "queue.dlx")
+    public void handleDeadLetter(OrderMessage message) {
+        log.error("死信消息: {}", message);
+        // 告警 + 人工处理
+    }
+}
+
+// ========== 消息 DTO ==========
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class OrderMessage {
+    private Long orderId;
+    private String orderNo;
+    private BigDecimal amount;
+}
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class OrderEvent {
+    private Long orderId;
+    private String status;              // CREATED, PAID, SHIPPED
+    private LocalDateTime timestamp;
+}
+
+@Data
+@AllArgsConstructor
+public class Notification {
+    private String type;                // SYSTEM, PROMOTION
+    private String message;
+}</div>
+    </div>
+    <div class="card">
+        <h2>Kafka 基础</h2>
+        <div class="code">// ========== Apache Kafka ==========
+// 分布式消息流平台
+// Topic → Partition → Offset
+// 适合: 高吞吐/日志/事件流/数据管道
+
+// ========== 依赖 ==========
+// &lt;dependency&gt;
+//     &lt;groupId&gt;org.springframework.kafka&lt;/groupId&gt;
+//     &lt;artifactId&gt;spring-kafka&lt;/artifactId&gt;
+// &lt;/dependency&gt;
+
+// ========== 配置 ==========
+// application.yml:
+
+spring:
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+      acks: all                          # 0/1/all (all=最高可靠性)
+      retries: 3
+      compression-type: snappy           # 压缩
+      properties:
+        enable.idempotence: true         # 幂等生产者
+        max.in.flight.requests.per.connection: 5
+    consumer:
+      group-id: order-service
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"    # 信任所有包
+        spring.json.type.mapping: "orderEvent:com.example.dto.OrderEvent"
+      auto-offset-reset: earliest        # earliest/latest/none
+      enable-auto-commit: false          # 手动提交
+      max-poll-records: 500
+    listener:
+      ack-mode: manual                   # MANUAL / BATCH / RECORD
+      concurrency: 3                     # 并发消费者数
+
+// ========== Kafka 配置类 ==========
+@Configuration
+public class KafkaConfig {
+
+    @Bean
+    public KafkaAdmin kafkaAdmin(
+            KafkaProperties properties) {
+        Map&lt;String, Object&gt; configs = new HashMap&lt;&gt;();
+        configs.put(AdminClientConfig.BOOTSTRAP_SERVERS_CONFIG,
+            properties.getBootstrapServers());
+        return new KafkaAdmin(configs);
+    }
+
+    // 自动创建 Topic
+    @Bean
+    public NewTopic orderTopic() {
+        return TopicBuilder.name("order-events")
+            .partitions(6)                  // 6 个分区
+            .replicas(3)                    // 3 副本
+            .config(TopicConfig.RETENTION_MS_CONFIG, "604800000")  // 7 天
+            .build();
+    }
+
+    @Bean
+    public NewTopic notificationTopic() {
+        return TopicBuilder.name("notifications")
+            .partitions(3)
+            .replicas(1)
+            .build();
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>Kafka 生产者与消费者</h2>
+        <div class="code">// ========== Kafka 生产者 ==========
+
+@Service
+@RequiredArgsConstructor
+public class OrderEventProducer {
+
+    private final KafkaTemplate&lt;String, Object&gt; kafkaTemplate;
+
+    // 发送事件 (默认 topic)
+    public void sendOrderEvent(OrderEvent event) {
+        CompletableFuture&lt;SendResult&lt;String, Object&gt;&gt; future =
+            kafkaTemplate.send("order-events",
+                event.getOrderId().toString(),  // key (分区依据)
+                event);                          // value
+
+        // 异步回调
+        future.whenComplete((result, ex) -> {
+            if (ex == null) {
+                log.info("消息发送成功: topic={}, partition={}, offset={}",
+                    result.getRecordMetadata().topic(),
+                    result.getRecordMetadata().partition(),
+                    result.getRecordMetadata().offset());
+            } else {
+                log.error("消息发送失败", ex);
+                // 重试或写入死信
+            }
+        });
+    }
+
+    // 发送到指定分区
+    public void sendToPartition(String topic, String key,
+            Object message, int partition) {
+        var producerRecord = new ProducerRecord&lt;&gt;(topic, partition, key, message);
+        kafkaTemplate.send(producerRecord);
+    }
+
+    // 发送事务消息
+    @Transactional
+    public void sendInTransaction(OrderEvent event, Notification notification) {
+        // 多条消息在同一个事务中
+        kafkaTemplate.send("order-events", event);
+        kafkaTemplate.send("notifications", notification);
+        // 事务提交时一起发送
+    }
+}
+
+// ========== Kafka 消费者 ==========
+
+@Component
+@Slf4j
+public class OrderEventConsumer {
+
+    // 单条消息消费
+    @KafkaListener(topics = "order-events",
+                   groupId = "order-service",
+                   concurrency = "3")
+    public void consumeOrderEvent(
+            @Payload OrderEvent event,
+            @Header(KafkaHeaders.RECEIVED_KEY) String key,
+            @Header(KafkaHeaders.RECEIVED_PARTITION) int partition,
+            @Header(KafkaHeaders.OFFSET) long offset) {
+
+        log.info("收到订单事件: key={}, partition={}, offset={}, event={}",
+            key, partition, offset, event);
+
+        // 处理业务逻辑
+        switch (event.getStatus()) {
+            case "CREATED" -> handleOrderCreated(event);
+            case "PAID" -> handleOrderPaid(event);
+        }
+    }
+
+    // 批量消费
+    @KafkaListener(topics = "notifications",
+                   groupId = "notification-service")
+    public void consumeBatch(
+            List&lt;Notification&gt; notifications,
+            Acknowledgment acknowledgment) {
+
+        log.info("批量收到 {} 条通知", notifications.size());
+        notifications.forEach(this::sendNotification);
+
+        // 批量手动提交 offset
+        acknowledgment.acknowledge();
+    }
+
+    // 手动提交
+    @KafkaListener(topics = "order-events",
+                   groupId = "order-service-audit")
+    public void consumeWithManualAck(
+            @Payload String message,
+            Acknowledgment acknowledgment) {
+
+        try {
+            process(message);
+            acknowledgment.acknowledge();   // 手动确认
+        } catch (Exception e) {
+            // 记录并跳过 (避免阻塞)
+            log.error("处理失败", e);
+            acknowledgment.acknowledge();   // 确认跳过
+        }
+    }
+
+    // 错误处理
+    @KafkaListener(topics = "order-events",
+                   groupId = "order-service-dlq",
+                   errorHandler = "kafkaErrorHandler")
+    public void consumeWithErrorHandler(OrderEvent event) {
+        // 消费失败自动进入 errorHandler
+    }
+}
+
+// ========== 自定义 ErrorHandler ==========
+@Component
+public class KafkaErrorHandler
+        implements CommonErrorHandler {
+
+    @Override
+    public boolean handleOne(Exception thrownException,
+            ConsumerRecord&lt;?, ?&gt; record,
+            Consumer&lt;?, ?&gt; consumer,
+            MessageListenerContainer container) {
+
+        log.error("Kafka 消费失败: topic={}, partition={}, offset={}",
+            record.topic(), record.partition(), record.offset(), thrownException);
+
+        // 写入死信 Topic
+        kafkaTemplate.send("order-events-dlq", record.value());
+        return true;  // 跳过
+    }
+}
+
+// ========== KafkaTemplate 配置 ==========
+@Configuration
+public class KafkaProducerConfig {
+
+    @Bean
+    public KafkaTemplate&lt;String, Object&gt; kafkaTemplate(
+            ProducerFactory&lt;String, Object&gt; factory) {
+        return new KafkaTemplate&lt;&gt;(factory);
+    }
+
+    @Bean
+    public ProducerFactory&lt;String, Object&gt; producerFactory() {
+        Map&lt;String, Object&gt; props = new HashMap&lt;&gt;();
+        props.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
+        props.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG,
+            StringSerializer.class);
+        props.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG,
+            JsonSerializer.class);
+        props.put(ProducerConfig.ACKS_CONFIG, "all");
+        props.put(ProducerConfig.RETRIES_CONFIG, 3);
+        props.put(ProducerConfig.ENABLE_IDEMPOTENCE_CONFIG, true);
+        return new DefaultKafkaProducerFactory&lt;&gt;(props);
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>RabbitMQ vs Kafka 对比</h2>
+        <div class="code">// ========== RabbitMQ vs Kafka 对比 ==========
+
+// ┌──────────────┬─────────────────────┬──────────────────────────┐
+// │              │ RabbitMQ            │ Kafka                    │
+// ├──────────────┼─────────────────────┼──────────────────────────┤
+// │ 模型         │ 交换机/队列         │ Topic/Partition          │
+// │ 消息存储     │ 消费即删除          │ 持久化 (按 TTL)          │
+// │ 吞吐         │ 万级/秒             │ 百万级/秒                │
+// │ 延迟         │ 微秒级              │ 毫秒级                   │
+// │ 路由         │ 灵活 (4种交换机)    │ 固定 (key→partition)     │
+// │ 顺序保证     │ 单队列              │ 单分区内有序             │
+// │ 消息重试     │ 内置 (死信队列)     │ 需手动实现               │
+// │ 学习曲线     │ 低                  │ 中                       │
+// │ 运维复杂度   │ 低                  │ 中高                     │
+// │ 适用场景     │ 任务队列/异步/解耦  │ 日志/事件流/大数据       │
+// └──────────────┴─────────────────────┴──────────────────────────┘
+
+// ========== 选型建议 ==========
+// RabbitMQ 更适合:
+// - 任务队列 (延迟任务/定时任务)
+// - 复杂路由 (Direct/Topic/Fanout)
+// - 需要立即确认的业务消息
+// - 中小规模系统
+
+// Kafka 更适合:
+// - 高吞吐事件流 (日志/埋点/审计)
+// - 事件溯源/Event Sourcing
+// - 数据管道 (ETL)
+// - 大规模分布式系统
+
+// ========== 消息可靠性 ==========
+// 发送端:
+// RabbitMQ: Publisher Confirm + Return Callback
+// Kafka: acks=all + enable.idempotence=true
+
+// 消费端:
+// RabbitMQ: auto/manual ack, 重试, 死信队列
+// Kafka: 手动 commit offset, 重试, DLQ Topic
+
+// ========== 消息幂等性 ==========
+// 消息可能重复投递, 消费端需幂等
+
+// 方案 1: 业务唯一键去重
+@RabbitListener(queues = "queue.order")
+public void handleOrder(OrderMessage msg) {
+    // 检查订单是否已处理
+    if (processedOrderService.exists(msg.getOrderId())) {
+        log.info("订单已处理, 跳过: {}", msg.getOrderId());
+        return;
+    }
+    // 处理订单...
+}
+
+// 方案 2: 去重表 (Redis/DB)
+public boolean isProcessed(String messageId) {
+    return Boolean.TRUE.equals(
+        redisTemplate.opsForValue()
+            .setIfAbsent("processed:" + messageId, "1",
+                1, TimeUnit.HOURS));
+}
+
+// ========== 消息轨迹 ==========
+// 全链路追踪: 消息 ID 贯穿 Producer → MQ → Consumer
+// MDC 中放入 messageId, 日志关联
+// 数据库记录消息投递/消费状态</div>
+        <div class="note">💡 消息队列要点: @EnableRabbit + @RabbitListener 消费; RabbitTemplate 发消息; Direct/Topic/Fanout 交换机; @EnableKafka + @KafkaListener; KafkaTemplate 发事件; 手动 ack 确认; 死信队列/DLQ; 重试机制; 消息幂等性; 全链路追踪; RabbitMQ 业务消息, Kafka 事件流。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoRabbit()">RabbitMQ</button>
+        <button onclick="demoKafka()">Kafka</button>
+        <button onclick="demoCompare()">对比选型</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoRabbit() {
+            result.innerHTML = '';
+            log('# RabbitMQ 核心概念');
+            log('');
+            log('交换机类型:');
+            log('  Direct   — 固定路由键');
+            log('  Topic    — 通配符 (order.#)');
+            log('  Fanout   — 广播');
+            log('  Headers  — 头匹配');
+            log('');
+            log('消息流程:');
+            log('  Producer → Exchange → Queue → Consumer');
+            log('');
+            log('可靠性:');
+            log('  Publisher Confirm');
+            log('  手动 ack / nack');
+            log('  死信队列 DLX');
+            log('  重试机制');
+        }
+
+        function demoKafka() {
+            result.innerHTML = '';
+            log('# Kafka 核心概念');
+            log('');
+            log('Topic → Partition → Offset');
+            log('');
+            log('Producer:');
+            log('  发送到指定 topic + key');
+            log('  key 决定分区');
+            log('  acks=all 最高可靠性');
+            log('');
+            log('Consumer:');
+            log('  消费者组 groupId');
+            log('  分区再均衡 Rebalance');
+            log('  手动 commit offset');
+            log('');
+            log('特性:');
+            log('  高吞吐 (百万/秒)');
+            log('  持久化 (磁盘)');
+            log('   Exactly-Once 语义');
+        }
+
+        function demoCompare() {
+            result.innerHTML = '';
+            log('# RabbitMQ vs Kafka');
+            log('');
+            log('RabbitMQ 选型:');
+            log('  ✅ 任务队列 / 延迟任务');
+            log('  ✅ 复杂路由');
+            log('  ✅ 业务消息 (订单/通知)');
+            log('  ✅ 中小规模');
+            log('');
+            log('Kafka 选型:');
+            log('  ✅ 高吞吐事件流');
+            log('  ✅ 日志/埋点/审计');
+            log('  ✅ 事件溯源 / Event Sourcing');
+            log('  ✅ 大规模系统');
+            log('');
+            log('共同关注:');
+            log('  幂等性 (去重)');
+            log('  消息轨迹 (追踪)');
+            log('  死信处理 (容错)');
+        }
+    </script>
+</body>
+</html>

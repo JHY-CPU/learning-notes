@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express 业务逻辑层</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🧠 Express 业务逻辑层</h2><p>Service 层设计模式、事务管理、跨服务调用、业务事件、依赖注入、Service 层测试、常见业务逻辑模式 (下单/支付/通知)、复杂业务编排。</p></div>
+    <div class="card">
+        <h2>Service 层设计</h2>
+        <div class="code">// ========== Service 层职责 ==========
+// 1. 业务规则验证
+// 2. 数据组合/转换
+// 3. 跨资源操作 (如: 下单同时减库存)
+// 4. 调用外部服务/API
+// 5. 事务管理
+// 6. 事件/通知触发
+
+// ========== 订单 Service 示例 ==========
+// services/orderService.js:
+const Product = require('../models/Product');
+const Order = require('../models/Order');
+const Inventory = require('../models/Inventory');
+const { BadRequestError } = require('../utils/errors');
+
+class OrderService {
+
+    async createOrder(userId, items) {
+        // 1. 验证库存
+        for (const item of items) {
+            const inventory = await Inventory.findOne({ productId: item.productId });
+            if (!inventory || inventory.quantity < item.quantity) {
+                throw new BadRequestError(`Insufficient inventory for product ${item.productId}`);
+            }
+        }
+
+        // 2. 计算总价
+        const products = await Product.find({
+            _id: { $in: items.map(i => i.productId) }
+        });
+        const productMap = new Map(products.map(p => [p._id.toString(), p]));
+
+        let totalAmount = 0;
+        const orderItems = items.map(item => {
+            const product = productMap.get(item.productId);
+            const subtotal = product.price * item.quantity;
+            totalAmount += subtotal;
+            return {
+                product: item.productId,
+                name: product.name,
+                price: product.price,
+                quantity: item.quantity,
+                subtotal,
+            };
+        });
+
+        // 3. 创建订单
+        const order = await Order.create({
+            user: userId,
+            items: orderItems,
+            totalAmount,
+            status: 'pending',
+        });
+
+        // 4. 扣减库存
+        for (const item of items) {
+            await Inventory.updateOne(
+                { productId: item.productId },
+                { $inc: { quantity: -item.quantity } }
+            );
+        }
+
+        // 5. 触发事件
+        eventEmitter.emit('order.created', order);
+
+        return order;
+    }
+}
+
+module.exports = new OrderService();</div>
+    </div>
+    <div class="card">
+        <h2>事务管理</h2>
+        <div class="code">// ========== MongoDB 事务 ==========
+// MongoDB 4.0+ 多文档事务 (副本集必需)
+
+// services/orderService.js:
+async createOrderWithTransaction(userId, items) {
+    const session = await mongoose.startSession();
+    session.startTransaction();
+
+    try {
+        // 所有操作使用同一个 session
+        const order = await Order.create([{
+            user: userId,
+            items,
+            status: 'pending',
+        }], { session });
+
+        for (const item of items) {
+            const result = await Inventory.findOneAndUpdate(
+                { productId: item.productId, quantity: { $gte: item.quantity } },
+                { $inc: { quantity: -item.quantity } },
+                { session, new: true }
+            );
+            if (!result) {
+                throw new Error('Insufficient inventory');
+            }
+        }
+
+        await session.commitTransaction();
+        return order[0];
+    } catch (err) {
+        await session.abortTransaction();
+        throw new BadRequestError('Order failed: ' + err.message);
+    } finally {
+        session.endSession();
+    }
+}
+
+// ========== Service 层装饰器 ==========
+// 事务装饰器, 自动管理事务:
+function transactional(target, key, descriptor) {
+    const original = descriptor.value;
+    descriptor.value = async function (...args) {
+        const session = await mongoose.startSession();
+        session.startTransaction();
+        try {
+            const result = await original.apply(this, [...args, session]);
+            await session.commitTransaction();
+            return result;
+        } catch (err) {
+            await session.abortTransaction();
+            throw err;
+        } finally {
+            session.endSession();
+        }
+    };
+    return descriptor;
+}
+
+class PaymentService {
+    @transactional
+    async processRefund(orderId, amount, session) {
+        // 在事务中执行
+        await Order.findByIdAndUpdate(orderId,
+            { $inc: { refundedAmount: amount } },
+            { session }
+        );
+        await Payment.updateOne(
+            { orderId },
+            { $inc: { refunded: amount } },
+            { session }
+        );
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>事件驱动与通知</h2>
+        <div class="code">// ========== 业务事件 ==========
+// Service 层触发事件, 解耦通知/审计/分析
+
+const EventEmitter = require('events');
+const eventEmitter = new EventEmitter();
+eventEmitter.setMaxListeners(50);
+
+// ========== 事件定义 ==========
+// events/orderEvents.js:
+const EVENTS = {
+    ORDER_CREATED: 'order.created',
+    ORDER_PAID: 'order.paid',
+    ORDER_SHIPPED: 'order.shipped',
+    ORDER_CANCELLED: 'order.cancelled',
+};
+
+// ========== 监听器 ==========
+// listeners/emailListener.js:
+eventEmitter.on(EVENTS.ORDER_CREATED, async (order) => {
+    await emailService.sendOrderConfirmation(order.user, order);
+});
+
+// listeners/auditListener.js:
+eventEmitter.on(EVENTS.ORDER_CREATED, async (order) => {
+    await AuditLog.create({
+        action: 'ORDER_CREATED',
+        resource: 'Order',
+        resourceId: order._id,
+        userId: order.user,
+        data: { totalAmount: order.totalAmount },
+    });
+});
+
+// listeners/inventoryListener.js:
+eventEmitter.on(EVENTS.ORDER_CANCELLED, async (order) => {
+    for (const item of order.items) {
+        await Inventory.updateOne(
+            { productId: item.product },
+            { $inc: { quantity: item.quantity } }  // 恢复库存
+        );
+    }
+});
+
+// ========== 导出 ==========
+module.exports = { eventEmitter, EVENTS };  // events = require('./events');
+// 初始化监听器: require('./listeners');
+
+// ========== Service 中使用 ==========
+const { eventEmitter, EVENTS } = require('../events');
+const { emailService } = require('../services');
+
+class OrderService {
+    async createOrder(userId, items) {
+        // ... 业务逻辑 ...
+        const order = await Order.create({ ... });
+
+        // 触发事件 (异步, 不阻塞主流程)
+        setImmediate(() => {
+            eventEmitter.emit(EVENTS.ORDER_CREATED, order);
+        });
+
+        return order;
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>Service 层测试</h2>
+        <div class="code">// ========== 测试 Service ==========
+// 单元测试, 模拟 Model/Database
+
+const OrderService = require('./orderService');
+const Order = require('../models/Order');
+const Inventory = require('../models/Inventory');
+
+// Jest 测试:
+jest.mock('../models/Order');
+jest.mock('../models/Inventory');
+
+describe('OrderService', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    describe('createOrder', () => {
+        it('should create order successfully', async () => {
+            // 模拟数据
+            const mockItems = [
+                { productId: 'p1', quantity: 2 },
+            ];
+
+            Inventory.findOne.mockResolvedValue({ quantity: 10 });
+            Order.create.mockResolvedValue({
+                _id: 'order1',
+                user: 'u1',
+                items: mockItems,
+                totalAmount: 200,
+                status: 'pending',
+            });
+
+            // 执行
+            const result = await OrderService.createOrder('u1', mockItems);
+
+            // 断言
+            expect(Order.create).toHaveBeenCalledTimes(1);
+            expect(Inventory.updateOne).toHaveBeenCalledWith(
+                { productId: 'p1' },
+                { $inc: { quantity: -2 } }
+            );
+            expect(result.status).toBe('pending');
+        });
+
+        it('should throw if insufficient inventory', async () => {
+            Inventory.findOne.mockResolvedValue({ quantity: 0 });
+
+            await expect(
+                OrderService.createOrder('u1', [{ productId: 'p1', quantity: 1 }])
+            ).rejects.toThrow('Insufficient inventory');
+
+            expect(Order.create).not.toHaveBeenCalled();
+        });
+    });
+});</div>
+        <div class="note">💡 Service 层要点: 封装所有业务逻辑, 控制器只负责输入/输出; 事务保证跨文档/跨集合一致性; 事件驱动解耦业务与通知/审计; Service 可独立测试 (mock 数据层); 复杂业务如下单涉及验证/计算/扣库存/通知多步骤; Service 调用 Service (但避免循环依赖); 分层让代码可测可维护。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoService()">Service 职责</button>
+        <button onclick="demoTransaction()">事务处理</button>
+        <button onclick="demoEvent()">事件驱动</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoService() {
+            result.innerHTML = '';
+            log('# Service 层职责');
+            log('');
+            log('1. 业务规则验证');
+            log('2. 数据组合/计算');
+            log('3. 跨资源操作');
+            log('4. 外部服务调用');
+            log('5. 事务管理');
+            log('6. 事件触发');
+            log('');
+            log('下单流程:');
+            log('验库存 → 算总价 → 创建订单 → 扣库存 → 发通知');
+        }
+
+        function demoTransaction() {
+            result.innerHTML = '';
+            log('# 事务管理');
+            log('');
+            log('const session = await mongoose.startSession();');
+            log('session.startTransaction();');
+            log('try {');
+            log('  await Model.create([data], { session });');
+            log('  await session.commitTransaction();');
+            log('} catch (err) {');
+            log('  await session.abortTransaction();');
+            log('} finally {');
+            log('  session.endSession();');
+            log('}');
+        }
+
+        function demoEvent() {
+            result.innerHTML = '';
+            log('# 事件驱动');
+            log('');
+            log('Service 触发:');
+            log('eventEmitter.emit("order.created", order);');
+            log('');
+            log('监听器解耦:');
+            log('→ Email: 发确认邮件');
+            log('→ Audit: 记录日志');
+            log('→ Analytics: 统计');
+            log('→ Notification: 推送');
+            log('');
+            log('主流程不被通知阻塞');
+        }
+    </script>
+</body>
+</html>

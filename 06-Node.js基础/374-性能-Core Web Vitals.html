@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>性能-Core Web Vitals</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        .metric-card { background: #f8f9fa; border-left: 4px solid #3498db; padding: 10px 15px; margin: 8px 0; border-radius: 0 4px 4px 0; }
+        .metric-card.good { border-left-color: #2ecc71; }
+        .metric-card.need-improve { border-left-color: #f39c12; }
+        .metric-card.poor { border-left-color: #e74c3c; }
+        .metric-card .label { font-weight: bold; color: #2c3e50; }
+        .metric-card .value { font-size: 13px; color: #7f8c8d; }
+        .metric-card .threshold { font-size: 12px; color: #95a5a6; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>性能-Core Web Vitals</h2><p>LCP/FID/CLS/INP/FCP/TTFB 指标定义、测量、优化策略。</p></div>
+    <div class="card">
+        <h2>Web Vitals API</h2>
+        <div class="code">// ========== Core Web Vitals ==========
+// LCP — Largest Contentful Paint   (≤2.5s)
+// FID — First Input Delay          (≤100ms) → INP
+// CLS — Cumulative Layout Shift    (≤0.1)
+
+// ========== 其他指标 ==========
+// FCP  — First Contentful Paint   (≤1.8s)
+// TTFB — Time to First Byte       (≤800ms)
+// INP  — Interaction to Next Paint (≤200ms) 新取代 FID
+
+// ========== JS 测量 ==========
+new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+        console.log('LCP:', entry.startTime);
+    }
+}).observe({ type: 'largest-contentful-paint', buffered: true });</div>
+    </div>
+    <div class="card">
+        <h2>演示：Web Vitals</h2>
+        <button onclick="demoLCP()">LCP</button>
+        <button onclick="demoINP()">INP/FID</button>
+        <button onclick="demoCLS()">CLS</button>
+        <button onclick="demoOptimize()">优化策略</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoLCP() {
+            result.innerHTML = '';
+            log('🖼️ LCP (Largest Contentful Paint):');
+            log('');
+
+            log('1️⃣ 定义:');
+            log('   最大内容绘制 — 视口中最大可见元素');
+            log('   的绘制时间');
+            log('');
+
+            log('2️⃣ 阈值:');
+            log('   <div class="metric-card good">');
+            log('   ✅ 良好: ≤ 2.5s');
+            log('   <div class="metric-card need-improve">');
+            log('   ⚠️ 需改进: 2.5s ~ 4.0s');
+            log('   <div class="metric-card poor">');
+            log('   ❌ 差: > 4.0s');
+            log('');
+
+            log('3️⃣ LCP 元素:');
+            log('   • <img> 元素');
+            log('   • <svg> 内的 <image>');
+            log('   • <video> 封面图 (poster)');
+            log('   • 背景图片 (CSS url())');
+            log('   • 文本块 (块级元素)');
+            log('');
+
+            log('4️⃣ JS 测量:');
+            log('   const observer = new PerformanceObserver((list) => {');
+            log('     const entries = list.getEntries();');
+            log('     const last = entries[entries.length - 1];');
+            log('     console.log("LCP:", last.startTime / 1000 + "s");');
+            log('     console.log("元素:", last.element);');
+            log('   });');
+            log('   observer.observe({');
+            log('     type: "largest-contentful-paint",');
+            log('     buffered: true');
+            log('   });');
+            log('');
+
+            log('5️⃣ 优化:');
+            log('   • 优化图片加载 (压缩/WebP/preload)');
+            log('   • 减少 TTFB (服务器/网络)');
+            log('   • 优化关键渲染路径');
+            log('   • 移除渲染阻塞资源');
+            log('   • 使用 CDN');
+        }
+
+        function demoINP() {
+            result.innerHTML = '';
+            log('👆 INP (Interaction to Next Paint):');
+            log('');
+
+            log('1️⃣ 定义:');
+            log('   交互到下一次绘制的时间');
+            log('   测量所有交互 (点击/按键/触摸) 的延迟');
+            log('   2024 年 3 月取代 FID');
+            log('');
+
+            log('2️⃣ 阈值:');
+            log('   ✅ 良好: ≤ 200ms');
+            log('   ⚠️ 需改进: 200ms ~ 500ms');
+            log('   ❌ 差: > 500ms');
+            log('');
+
+            log('3️⃣ FID (First Input Delay):');
+            log('   • 首次输入延迟 (只测量首次)');
+            log('   • 从用户交互到事件处理开始的时间');
+            log('   • 主要受主线程长任务影响');
+            log('');
+
+            log('4️⃣ JS 测量 INP:');
+            log('   const observer = new PerformanceObserver((list) => {');
+            log('     for (const entry of list.getEntries()) {');
+            log('       const delay = entry.processingStart - entry.startTime;');
+            log('       console.log("交互延迟:", delay + "ms");');
+            log('     }');
+            log('   });');
+            log('   observer.observe({ type: "first-input", buffered: true });');
+            log('');
+
+            log('5️⃣ 优化 FID/INP:');
+            log('   • 拆分长任务 (≤50ms)');
+            log('   • 延迟加载非关键 JS');
+            log('   • 使用 Web Worker 处理计算');
+            log('   • 代码分割 + 懒加载');
+            log('   • 减少浏览器主线程负担');
+        }
+
+        function demoCLS() {
+            result.innerHTML = '';
+            log('📐 CLS (Cumulative Layout Shift):');
+            log('');
+
+            log('1️⃣ 定义:');
+            log('   累积布局偏移 — 页面布局');
+            log('   意外移动的总分数');
+            log('');
+
+            log('2️⃣ 阈值:');
+            log('   ✅ 良好: ≤ 0.1');
+            log('   ⚠️ 需改进: 0.1 ~ 0.25');
+            log('   ❌ 差: > 0.25');
+            log('');
+
+            log('3️⃣ CLS 分数计算:');
+            log('   CLS = impactFraction × distanceFraction');
+            log('   impactFraction = 移动元素占视口比例');
+            log('   distanceFraction = 移动距离比例');
+            log('');
+
+            log('4️⃣ 常见的 CLS 原因:');
+            log('   • 无尺寸的图片/视频 → 设置 width/height');
+            log('   • 动态插入的内容 → 预留空间');
+            log('   • 字体切换 (FOUT/FOIT) → font-display: swap');
+            log('   • 广告/嵌入 → 占位尺寸');
+            log('   • 动画/过渡 → 使用 transform 动画');
+            log('');
+
+            log('5️⃣ JS 测量:');
+            log('   new PerformanceObserver((list) => {');
+            log('     for (const entry of list.getEntries()) {');
+            log('       if (!entry.hadRecentInput) {');
+            log('         console.log("CLS:", entry.value);');
+            log('       }');
+            log('     }');
+            log('   }).observe({ type: "layout-shift", buffered: true });');
+            log('');
+
+            log('6️⃣ 优化:');
+            log('   // 图片设置尺寸');
+            log('   <img src="photo.jpg" width="800" height="600">');
+            log('');
+            log('   // CSS 预留空间');
+            log('   .ad-container { min-height: 250px; }');
+            log('');
+            log('   // 字体加载策略');
+            log('   @font-face { font-display: swap; }');
+        }
+
+        function demoOptimize() {
+            result.innerHTML = '';
+            log('🎯 优化策略总结:');
+            log('');
+
+            log('📊 指标总览:');
+            log('   ┌──────┬──────────────┬──────────┬──────────┐');
+            log('   │ 指标  │ 测量         │ 良好     │ 差       │');
+            log('   ├──────┼──────────────┼──────────┼──────────┤');
+            log('   │ LCP  │ 加载性能     │ ≤2.5s    │ >4.0s   │');
+            log('   │ INP  │ 交互性能     │ ≤200ms   │ >500ms  │');
+            log('   │ CLS  │ 视觉稳定     │ ≤0.1     │ >0.25   │');
+            log('   │ FCP  │ 首屏         │ ≤1.8s    │ >3.0s   │');
+            log('   │ TTFB │ 服务器响应   │ ≤800ms   │ >1.8s   │');
+            log('   └──────┴──────────────┴──────────┴──────────┘');
+            log('');
+
+            log('🛠️ 优化 LCP:');
+            log('   ① preload 关键资源 (hero 图片)');
+            log('   ② 优化图片 (WebP/AVIF/压缩)');
+            log('   ③ 使用 CDN + 缓存');
+            log('   ④ 优化 TTFB (服务器/数据库)');
+            log('   ⑤ 移除渲染阻塞资源');
+            log('');
+
+            log('🛠️ 优化 INP:');
+            log('   ① 代码分割 (减少主线程负载)');
+            log('   ② 长任务分片 (yieldToMain)');
+            log('   ③ Web Worker 处理计算');
+            log('   ④ 用 transform/opacity 动画');
+            log('');
+
+            log('🛠️ 优化 CLS:');
+            log('   ① 所有媒体设置宽高');
+            log('   ② 动态内容预留空间');
+            log('   ③ 使用 font-display: swap');
+            log('   ④ 用 transform 做动画');
+            log('');
+
+            log('📏 测量工具:');
+            log('   • Lighthouse (实验室)');
+            log('   • Chrome DevTools (实验室)');
+            log('   • PageSpeed Insights (真实用户)');
+            log('   • Chrome 用户体验报告 (CrUX)');
+            log('   • web-vitals 库 (JS 测量)');
+        }
+
+        console.log('=== Core Web Vitals ===');
+        document.getElementById('output').textContent =
+            `Core Web Vitals: LCP / INP(FID) / CLS / FCP / TTFB / 优化策略\n` +
+            `✅ Web Vitals 演示完成！`;
+    </script>
+</body>
+</html>

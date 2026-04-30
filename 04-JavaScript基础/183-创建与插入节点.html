@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>创建与插入节点</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e67e22; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        #container { background: white; border: 2px dashed #3498db; padding: 15px; border-radius: 8px; min-height: 60px; margin: 10px 0; }
+        #container .item { background: #3498db; color: white; padding: 8px 12px; margin: 5px; border-radius: 4px; display: inline-block; }
+        #container .item.special { background: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>创建与插入节点</h2><p>动态创建 DOM 元素并插入到文档中。</p></div>
+    <div class="card">
+        <h2>createElement — 创建元素</h2>
+        <div class="code">// 创建元素节点
+const div = document.createElement('div');
+const p = document.createElement('p');
+const span = document.createElement('span');
+const img = document.createElement('img');
+const input = document.createElement('input');
+
+// 创建后需要设置属性和内容
+div.textContent = 'Hello';
+div.className = 'item';
+div.id = 'item-1';
+div.setAttribute('data-id', '123');
+div.style.color = 'red';
+
+// 创建文本节点（通常不直接使用）
+const text = document.createTextNode('纯文本');
+
+// 创建注释节点
+const comment = document.createComment('这是注释');
+
+// 创建 DocumentFragment（用于批量操作）
+const fragment = document.createDocumentFragment();</div>
+    </div>
+    <div class="card">
+        <h2>appendChild / append</h2>
+        <div class="code">// appendChild — 在末尾追加子节点（只能传节点）
+parent.appendChild(child);
+parent.appendChild(document.createElement('div'));
+
+// 如果 child 已在文档中，会先移除再追加（移动位置）
+
+// append — 更灵活（可以传节点和字符串）
+parent.append(child);
+parent.append('文本节点', document.createElement('span'), '更多文本');
+// append 可以传多个参数
+// 字符串自动转为文本节点
+
+// append vs appendChild：
+// appendChild: 只能传1个节点，返回追加的节点
+// append: 可以传多个节点/字符串，返回 undefined
+// appendChild: 兼容性更好（老浏览器）
+// append: 更灵活（推荐使用）</div>
+    </div>
+    <div class="card">
+        <h2>prepend / insertBefore / after / before</h2>
+        <div class="code">// prepend — 在开头插入
+parent.prepend('开头文本');
+parent.prepend(document.createElement('div'), '文本');
+
+// insertBefore — 在参照节点前插入
+parent.insertBefore(newNode, referenceNode);
+parent.insertBefore(newNode, parent.firstChild);  // 开头
+parent.insertBefore(newNode, null);                // 末尾（等价 appendChild）
+parent.insertBefore(newNode, parent.children[3]);  // 第4个之前
+
+// after — 在元素后面插入（兄弟节点）
+element.after(newNode);
+element.after('文本', document.createElement('div'));
+
+// before — 在元素前面插入（兄弟节点）
+element.before(newNode);
+element.before('文本', document.createElement('div'));
+
+// 对比总结：
+// parent.append(child)      — 内部末尾
+// parent.prepend(child)     — 内部开头
+// element.after(child)      — 后面兄弟
+// element.before(child)     — 前面兄弟
+// parent.insertBefore(c, r) — 内部参照节点前</div>
+    </div>
+    <div class="card">
+        <h2>insertAdjacentElement / insertAdjacentHTML</h2>
+        <div class="code">// insertAdjacentElement — 在指定位置插入元素
+// 位置：'beforebegin', 'afterbegin', 'beforeend', 'afterend'
+element.insertAdjacentElement('beforebegin', newElement);
+element.insertAdjacentElement('afterbegin', newElement);
+element.insertAdjacentElement('beforeend', newElement);
+element.insertAdjacentElement('afterend', newElement);
+
+// insertAdjacentHTML — 在指定位置插入 HTML 字符串
+element.insertAdjacentHTML('beforeend', '<div>HTML</div>');
+
+// insertAdjacentText — 在指定位置插入文本
+element.insertAdjacentText('beforeend', '纯文本');
+
+// 位置图示：
+// beforebegin  →  <div id="target">  ← afterbegin
+//                   ...内容...
+// beforeend    →  </div>              ← afterend</div>
+    </div>
+    <div class="card">
+        <h2>DocumentFragment — 批量插入</h2>
+        <div class="code">// DocumentFragment 轻量文档片段
+// 在内存中操作，不会触发重排
+// 一次插入到 DOM 中（只触发一次重排）
+
+const fragment = document.createDocumentFragment();
+
+for (let i = 0; i &lt; 1000; i++) {
+    const div = document.createElement('div');
+    div.textContent = '项目 ' + i;
+    div.className = 'item';
+    fragment.appendChild(div);
+}
+
+// 一次性插入（只触发一次重排/重绘）
+parent.appendChild(fragment);
+// fragment 的子节点全部转入 parent
+// fragment 本身变为空
+
+// ✅ 比循环内逐个 appendChild 性能好得多</div>
+    </div>
+    <div id="container">
+        <span class="item">已存在的项目</span>
+    </div>
+    <div style="display:flex;gap:10px;margin:10px 0;flex-wrap:wrap;">
+        <button onclick="addItem()">appendChild 追加</button>
+        <button onclick="prependItem()">prepend 开头</button>
+        <button onclick="insertBefore()">insertBefore 第2个</button>
+        <button onclick="addAfter()">after 在后面</button>
+        <button onclick="addHTML()">insertAdjacentHTML</button>
+        <button onclick="batchAdd()">DocumentFragment 批量</button>
+        <button onclick="clearItems()">清空</button>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const container = document.getElementById('container');
+        const out = document.getElementById('output');
+
+        function createItem(text, cls = 'item') {
+            const el = document.createElement('span');
+            el.className = cls;
+            el.textContent = text;
+            return el;
+        }
+
+        function addItem() {
+            const item = createItem('append 项目 #' + (container.children.length + 1));
+            container.appendChild(item);
+            out.textContent = '已追加: ' + item.textContent;
+        }
+        function prependItem() {
+            const item = createItem('prepend 项目');
+            container.prepend(item);
+            out.textContent = '已开头插入: ' + item.textContent;
+        }
+        function insertBefore() {
+            const ref = container.children[1];
+            if (!ref) { out.textContent = '没有第2个元素'; return; }
+            const item = createItem('insertBefore 项目');
+            container.insertBefore(item, ref);
+            out.textContent = '在第2个前插入: ' + item.textContent;
+        }
+        function addAfter() {
+            const ref = container.firstElementChild;
+            if (!ref) { out.textContent = '没有元素'; return; }
+            const item = createItem('after 项目');
+            ref.after(item);
+            out.textContent = ref.textContent + ' 后面插入: ' + item.textContent;
+        }
+        function addHTML() {
+            const count = container.children.length + 1;
+            container.insertAdjacentHTML('beforeend',
+                '<span class="item">insertAdjacentHTML #' + count + '</span>');
+            out.textContent = 'insertAdjacentHTML 追加完成';
+        }
+        function batchAdd() {
+            const frag = document.createDocumentFragment();
+            for (let i = 0; i < 5; i++) {
+                frag.appendChild(createItem('批量项目 #' + (i + 1)));
+            }
+            container.appendChild(frag);
+            out.textContent = 'DocumentFragment 批量插入5个项目';
+        }
+        function clearItems() {
+            container.innerHTML = '';
+            out.textContent = '已清空';
+        }
+
+        console.log('=== createElement ===');
+        const newDiv = document.createElement('div');
+        newDiv.textContent = '动态创建';
+        newDiv.style.background = '#e8f5e9';
+        newDiv.style.padding = '5px';
+        console.log('创建的元素:', newDiv);
+
+        console.log('=== appendChild 返回值 ===');
+        const child = document.createElement('span');
+        child.textContent = '返回值测试';
+        const result = container.appendChild(child);
+        console.log('appendChild 返回:', result === child);
+
+        console.log('=== append 支持文本 ===');
+        container.append(' (文本节点) ');
+
+        console.log('=== DocumentFragment ===');
+        const frag = document.createDocumentFragment();
+        for (let i = 0; i < 3; i++) {
+            const el = document.createElement('span');
+            el.textContent = 'F#' + i + ' ';
+            frag.appendChild(el);
+        }
+        console.log('fragment 子节点:', frag.childNodes.length);
+        container.appendChild(frag);
+        console.log('插入后 fragment 为空:', frag.childNodes.length);
+
+        document.getElementById('output').textContent =
+            `容器子元素数: ${container.children.length}\n` +
+            `✅ 创建与插入节点演示完成！`;
+    </script>
+</body>
+</html>

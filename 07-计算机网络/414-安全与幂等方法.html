@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>安全与幂等方法</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔒 安全与幂等方法</h2><p>HTTP 安全方法定义、幂等性深入理解、幂等键实现、重试语义与保障策略。</p></div>
+    <div class="card">
+        <h2>安全方法 (Safe Methods)</h2>
+        <p>安全方法是指不会修改服务器状态的 HTTP 方法——语义上只读。</p>
+        <div class="code">// ========== 安全方法 ==========
+// 定义: 调用者不承担修改服务器状态的义务
+// 实现: 服务器不应因安全方法而产生副作用
+//
+// 安全方法列表:
+//   GET     — 获取资源
+//   HEAD    — 获取响应头 (不返回体)
+//   OPTIONS — 查询支持的方法
+//   TRACE   — 回显请求
+//
+// 非安全方法:
+//   POST, PUT, PATCH, DELETE
+
+// ========== 安全 ≠ 无副作用 ==========
+// 安全方法可以产生副作用,但不应"被期望"产生副作用
+//
+// 可接受的副作用:
+//   GET /articles/123 → 记录访问日志
+//   GET /api/search   → 缓存查询结果
+//   GET /images/logo  → CDN 缓存
+//
+// 不可接受的副作用:
+//   GET /delete/user/123 → 删除用户! ❌
+//   GET /api/checkout   → 创建订单! ❌
+//
+// ========== 实际意义 ==========
+// 安全方法可被:
+//   - 浏览器安全地预加载 (prefetch/preload)
+//   - CDN 安全地缓存
+//   - 爬虫安全地访问
+//   - 链接安全地分享</div>
+    </div>
+    <div class="card">
+        <h2>幂等性 (Idempotency)</h2>
+        <p>幂等指多次执行同一操作的结果与执行一次相同。</p>
+        <div class="code">// ========== 数学定义 ==========
+// f(f(x)) = f(x)
+// 重复应用函数不会改变结果
+//
+// 数学幂等例子:
+//   abs(abs(-5)) = abs(-5) = 5
+//   max(5, max(5, 3)) = max(5, 3) = 5
+//
+// ========== HTTP 幂等 ==========
+// 自然幂等方法:
+//   GET:   多次读取同一资源,结果相同
+//   PUT:   多次 PUT 相同数据,资源不变
+//   DELETE:多次删除同个资源,结果相同 (404 也是相同)
+//   HEAD:  同 GET,不返回体
+//   OPTIONS:查询总是返回相同结果
+//
+// 非幂等方法:
+//   POST:  多次提交创建多个资源
+//   PATCH:  增量操作可能不幂等
+//
+// ========== DELETE 幂等示例 ==========
+// 第 1 次: DELETE /users/123 → 200 OK (删除成功)
+// 第 2 次: DELETE /users/123 → 404 Not Found (已删除)
+// 第 3 次: DELETE /users/123 → 404 Not Found (已删除)
+//
+// 服务器状态: 都是"用户 123 不存在"
+// → 幂等成立</div>
+    </div>
+    <div class="card">
+        <h2>幂等键 (Idempotency-Key)</h2>
+        <p>对于天然非幂等的 POST/PATCH，用幂等键保证安全重试。</p>
+        <div class="code">// ========== 幂等键机制 ==========
+// 客户端在请求头中提供唯一键:
+//   POST /api/payments
+//   Idempotency-Key: 550e8400-e29b-41d4-a716-446655440000
+//   { "amount": 100, "currency": "USD" }
+//
+// 服务器:
+//   1. 检查该键是否已处理 → 返回之前的结果
+//   2. 未处理 → 执行并缓存结果
+//   3. 返回结果
+//
+// 流程:
+//   客户端 → POST /payments (key=K1) → 服务器处理 → 返回 200
+//   客户端 → POST /payments (key=K1) → 返回缓存 200 (重复!)
+//   客户端 → POST /payments (key=K2) → 新处理 → 返回 200
+
+// ========== 幂等键实现 ==========
+// Node.js 中间件示例:
+//
+//   const idempotency = new Map(); // 或用 Redis
+//
+//   app.post('/payments', async (req, res) => {
+//     const key = req.headers['idempotency-key'];
+//     if (!key) return res.status(400).send('Missing key');
+//
+//     if (idempotency.has(key)) {
+//       return res.json(idempotency.get(key));
+//     }
+//
+//     const result = await processPayment(req.body);
+//     idempotency.set(key, result);
+//     // 设置 TTL 防止内存泄漏
+//     setTimeout(() => idempotency.delete(key), 86400000);
+//     res.json(result);
+//   });</div>
+        <div class="note">💳 幂等键在支付场景中至关重要——你的银行不会因为网络重试而重复扣款。Stripe 的幂等键是业界标准实现。</div>
+    </div>
+    <div class="card">
+        <h2>重试语义与最佳实践</h2>
+        <div class="code">// ========== 重试策略 ==========
+// 客户端网络请求失败时自动重试
+// 需要区分可重试和不可重试:
+//
+// 可自动重试:
+//   网络超时 (ETIMEDOUT) → 幂等方法安全,非幂等方法需幂等键
+//   服务器 5xx → 可能重试 (服务器未处理)
+//   HTTP 429 Too Many Requests → 带 Retry-After 重试
+//
+// 不可自动重试:
+//   客户端 4xx (除 429) → 请求本身有问题
+//   POST 且无幂等键 → 不确定服务器是否已处理
+
+// ========== 幂等键最佳实践 ==========
+// 1. 幂等键必须是全局唯一的
+//    推荐使用 UUID v4
+//   也可用哈希 (用户ID + 时间戳 + 随机数)
+//
+// 2. 键值存储需设置 TTL
+//   至少 24 小时
+//   支付场景建议 7 天
+//
+// 3. 键到期后的重试风险
+//   可接受的业务风险
+//   关键操作可人工审核
+
+// ========== 条件请求策略 ==========
+// 用 ETag/If-Match 实现条件更新:
+//
+//   GET /users/123 → ETag: "v1"
+//   PUT /users/123
+//   If-Match: "v1"  ← 只有版本匹配才更新
+//   { name: "Alice" }
+//
+// 如果中途被别人改了,服务器返回 412 Precondition Failed
+// 客户端需要重新获取最新版本再决定如何处理</div>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('🔒 安全与幂等方法');
+        log('');
+        log('安全方法: GET/HEAD/OPTIONS — 不改变服务器状态');
+        log('幂等方法: GET/HEAD/OPTIONS/PUT/DELETE — 多次执行结果一致');
+        log('非幂等: POST/PATCH — 重复执行产生不同结果');
+        log('幂等键: Idempotency-Key 头 + 服务器缓存结果');
+        log('条件请求: ETag + If-Match 防止并发修改冲突');
+    </script>
+</body>
+</html>

@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot CORS 与国际化</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🌐 Spring Boot CORS 与国际化</h2><p>CORS 跨域配置 (全局/方法/注解)、预检请求、安全策略、i18n 国际化 MessageSource、LocaleResolver、请求头语言切换、消息模板。</p></div>
+    <div class="card">
+        <h2>CORS 基础</h2>
+        <div class="code">// ========== CORS (跨域资源共享) ==========
+// 浏览器安全策略: 不同源(协议/域名/端口) AJAX 请求受限
+// 服务端需返回 CORS 头告知浏览器允许跨域
+
+// ========== 方式 1: 全局 CORS 配置 ==========
+// 推荐: 统一管理跨域策略
+
+@Configuration
+public class CorsConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/api/**")              // 匹配路径
+            .allowedOrigins("https://frontend.com") // 允许的源
+            .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+            .allowedHeaders("*")                    // 允许的请求头
+            .exposedHeaders("X-Total-Count", "Authorization")  // 暴露的响应头
+            .allowCredentials(true)                 // 允许携带凭证 (cookie)
+            .maxAge(3600);                          // 预检缓存时间 (秒)
+    }
+}
+
+// ========== 方式 2: @CrossOrigin 注解 ==========
+// 细粒度控制单个控制器或方法
+
+@RestController
+@RequestMapping("/api/users")
+@CrossOrigin(origins = "https://frontend.com")     // 类级别
+public class UserController {
+
+    @GetMapping("/{id}")
+    @CrossOrigin(origins = "*")                     // 方法级别覆盖
+    public User getUser(@PathVariable Long id) { ... }
+
+    @PostMapping
+    @CrossOrigin(origins = {
+        "https://frontend.com",
+        "https://admin.example.com"
+    })
+    public User createUser(@RequestBody CreateUserRequest req) { ... }
+}
+
+// ========== 方式 3: CorsFilter Bean ==========
+// 最低层, 完全控制
+
+@Bean
+public CorsFilter corsFilter() {
+    CorsConfiguration config = new CorsConfiguration();
+    config.setAllowCredentials(true);
+    config.setAllowedOriginPatterns(List.of("*"));   // 允许所有 (配合 credentials)
+    config.setAllowedMethods(List.of("*"));
+    config.setAllowedHeaders(List.of("*"));
+    config.setExposedHeaders(List.of("Authorization", "X-Request-Id"));
+    config.setMaxAge(3600L);
+
+    UrlBasedCorsConfigurationSource source =
+        new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/api/**", config);
+    return new CorsFilter(source);
+}
+
+// ========== CORS 配置与 Security 整合 ==========
+// 启用 Spring Security 时需要单独配置 CORS
+
+@Configuration
+@EnableWebSecurity
+public class SecurityConfig {
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            // ... 其他配置
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()));
+        return http.build();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOrigins(List.of(
+            "https://frontend.com",
+            "http://localhost:3000"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+        config.setExposedHeaders(List.of("Authorization"));
+        config.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source =
+            new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/**", config);
+        return source;
+    }
+}
+
+// ========== application.yml CORS 配置 ==========
+// Spring Boot 3 不支持直接通过配置设置 CORS
+// 使用 Java Config</div>
+    </div>
+    <div class="card">
+        <h2>CORS 深入</h2>
+        <div class="code">// ========== 预检请求 (Preflight) ==========
+// 非简单请求 (自定义头/非 GET-POST/JSON) 先发 OPTIONS
+
+// 预检请求:
+// OPTIONS /api/users
+// Origin: https://frontend.com
+// Access-Control-Request-Method: POST
+// Access-Control-Request-Headers: Authorization
+
+// 预检响应:
+// HTTP/1.1 204 No Content
+// Access-Control-Allow-Origin: https://frontend.com
+// Access-Control-Allow-Methods: POST, GET, PUT
+// Access-Control-Allow-Headers: Authorization
+// Access-Control-Max-Age: 3600
+
+// ========== 简单请求与复杂请求 ==========
+// 简单请求 (不触发预检):
+// - GET/HEAD/POST
+// - 仅允许的请求头 (Accept/Content-Type/Language)
+// - Content-Type: text/plain, multipart/form-data, application/x-www-form-urlencoded
+
+// 复杂请求 (触发预检):
+// - PUT/DELETE/PATCH
+// - 自定义头 (Authorization, X-Custom)
+// - Content-Type: application/json
+
+// ========== allowedOriginPatters ==========
+// 使用模式匹配替代多个固定源
+
+// 匹配所有子域名:
+config.setAllowedOriginPatterns(List.of("https://*.example.com"));
+// 匹配任何源 (配合 allowCredentials):
+config.setAllowedOriginPatterns(List.of("*"));
+
+// ========== allowCredentials 与 allowedOrigins 冲突 ==========
+// allowCredentials=true 时 allowedOrigins 不能为 "*"
+// 需要明确指定源或使用 allowedOriginPatterns
+
+// ❌ 错误:
+config.setAllowCredentials(true);
+config.setAllowedOrigins(List.of("*"));  // 抛异常
+
+// ✅ 正确:
+config.setAllowCredentials(true);
+config.setAllowedOriginPatterns(List.of("*"));  // 或明确列出
+
+// ========== CORS 常见问题 ==========
+// 1. No 'Access-Control-Allow-Origin' header
+//    → 服务端未配置 CORS
+//
+// 2. Credentials flag is 'true', but the 'Access-Control-Allow-Origin' is '*'
+//    → allowCredentials + allowedOrigins 冲突
+//
+// 3. Response to preflight doesn't pass access control check
+//    → OPTIONS 请求未处理或 Security 拦截
+//
+// 4. Multiple CORS header 'Access-Control-Allow-Origin'
+//    → 重复配置 (Spring + Nginx + Security)</div>
+    </div>
+    <div class="card">
+        <h2>国际化 i18n</h2>
+        <div class="code">// ========== 国际化 (i18n) ==========
+// Internationalization: 18 个字母 (i18n)
+// 支持多语言: 中文/英文/日文等
+
+// ========== 1. 消息资源文件 ==========
+// 位置: src/main/resources/messages.properties (默认)
+// src/main/resources/messages_zh_CN.properties
+// src/main/resources/messages_en_US.properties
+// src/main/resources/messages_ja_JP.properties
+
+// messages.properties (默认 = 英文):
+// user.notfound=User not found
+// user.created=User created successfully
+// user.welcome=Welcome, {0}!
+// validation.required={0} is required
+// error.server=Internal server error
+
+// messages_zh_CN.properties (中文):
+// user.notfound=用户不存在
+// user.created=用户创建成功
+// user.welcome=欢迎, {0}!
+// validation.required={0} 是必填项
+// error.server=服务器内部错误
+
+// messages_en_US.properties (美式英文):
+// user.notfound=User not found
+// user.created=User created successfully
+
+// ========== 2. 配置 ==========
+// application.yml:
+
+spring:
+  messages:
+    basename: messages                    # 资源文件基名
+    encoding: UTF-8                       # 编码
+    fallback-to-system-locale: false      # 是否回退到系统语言
+    cache-duration: 3600                  # 缓存秒数 (0=每次读取)
+
+// ========== 3. LocaleResolver ==========
+// 决定当前请求使用什么语言
+
+@Configuration
+public class I18nConfig {
+
+    // SessionLocaleResolver: 基于 Session 的语言设置
+    @Bean
+    public LocaleResolver localeResolver() {
+        SessionLocaleResolver resolver = new SessionLocaleResolver();
+        resolver.setDefaultLocale(Locale.SIMPLIFIED_CHINESE);  // 默认中文
+        return resolver;
+    }
+
+    // CookieLocaleResolver: 基于 Cookie
+    // @Bean
+    // public LocaleResolver localeResolver() {
+    //     CookieLocaleResolver resolver = new CookieLocaleResolver();
+    //     resolver.setDefaultLocale(Locale.US);
+    //     resolver.setCookieName("lang");
+    //     resolver.setCookieMaxAge(3600 * 24 * 30);  // 30 天
+    //     return resolver;
+    // }
+
+    // AcceptHeaderLocaleResolver: 基于请求头
+    // @Bean
+    // public LocaleResolver localeResolver() {
+    //     AcceptHeaderLocaleResolver resolver = new AcceptHeaderLocaleResolver();
+    //     resolver.setDefaultLocale(Locale.CHINA);
+    //     return resolver;
+    // }
+}
+
+// ========== 4. LocaleChangeInterceptor ==========
+// 通过请求参数切换语言
+
+@Configuration
+public class I18nConfig implements WebMvcConfigurer {
+
+    @Bean
+    public LocaleResolver localeResolver() {
+        SessionLocaleResolver resolver = new SessionLocaleResolver();
+        resolver.setDefaultLocale(Locale.CHINA);
+        return resolver;
+    }
+
+    @Bean
+    public LocaleChangeInterceptor localeChangeInterceptor() {
+        LocaleChangeInterceptor interceptor = new LocaleChangeInterceptor();
+        interceptor.setParamName("lang");   // 请求参数名: ?lang=zh_CN
+        return interceptor;
+    }
+
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        registry.addInterceptor(localeChangeInterceptor());
+    }
+}
+
+// 切换语言:
+// GET /api/users?lang=zh_CN  → 中文
+// GET /api/users?lang=en_US  → 英文
+// GET /api/users?lang=ja_JP  → 日文</div>
+    </div>
+    <div class="card">
+        <h2>国际化使用</h2>
+        <div class="code">// ========== 在代码中使用 MessageSource ==========
+
+@Service
+@RequiredArgsConstructor
+public class I18nService {
+
+    private final MessageSource messageSource;
+
+    // 带参数的消息
+    public String getMessage(String code, Object... args) {
+        return messageSource.getMessage(code, args, LocaleContextHolder.getLocale());
+    }
+
+    // 带默认值
+    public String getMessageOrDefault(String code, Object[] args, String defaultMsg) {
+        try {
+            return messageSource.getMessage(code, args, LocaleContextHolder.getLocale());
+        } catch (NoSuchMessageException e) {
+            return defaultMsg;
+        }
+    }
+
+    // 指定语言
+    public String getMessageForLocale(String code, Locale locale, Object... args) {
+        return messageSource.getMessage(code, args, locale);
+    }
+}
+
+// ========== 在 Controller 中使用 ==========
+
+@RestController
+@RequestMapping("/api")
+@RequiredArgsConstructor
+public class MessageController {
+
+    private final MessageSource messageSource;
+
+    @GetMapping("/welcome")
+    public ResponseEntity&lt;Map&lt;String, String&gt;&gt; welcome(
+            @RequestHeader(name = "Accept-Language", required = false) Locale locale) {
+        if (locale == null) {
+            locale = LocaleContextHolder.getLocale();
+        }
+
+        String message = messageSource.getMessage(
+            "user.welcome",
+            new Object[]{"Alice"},
+            locale);
+
+        return ResponseEntity.ok(Map.of("message", message));
+    }
+}
+
+// ========== 在异常处理中使用 ==========
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    private final MessageSource messageSource;
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; handleNotFound(
+            ResourceNotFoundException ex) {
+        String message = messageSource.getMessage(
+            "user.notfound",
+            null,
+            LocaleContextHolder.getLocale());
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            .body(ApiResponse.error(404, message));
+    }
+}
+
+// ========== 在 Validation 中使用 ==========
+// 配合 Bean Validation 国际化错误消息
+
+// 方式 1: 在 messages.properties 覆盖默认验证消息
+// javax.validation.constraints.NotBlank.message = {0} 不能为空
+// javax.validation.constraints.Email.message = 邮箱格式不正确
+// javax.validation.constraints.Size.message = {0} 长度必须在 {min} 到 {max} 之间
+
+// 方式 2: 自定义消息
+@Data
+public class CreateUserRequest {
+    @NotBlank(message = "{user.username.required}")
+    private String username;
+
+    @Email(message = "{user.email.invalid}")
+    private String email;
+}
+
+// ========== Thymeleaf 模板中使用 ==========
+// &lt;!DOCTYPE html&gt;
+// &lt;html xmlns:th="http://www.thymeleaf.org"&gt;
+// &lt;body&gt;
+//     &lt;h1 th:text="#{user.welcome(${username})}"&gt;Welcome!&lt;/h1&gt;
+//     &lt;p th:text="#{user.notfound}"&gt;User not found&lt;/p&gt;
+// &lt;/body&gt;
+// &lt;/html&gt;</div>
+    </div>
+    <div class="card">
+        <h2>最佳实践</h2>
+        <div class="code">// ========== CORS 最佳实践 ==========
+
+// ========== 1. 最小权限原则 ==========
+// 只开放需要的源和方法
+// 避免 allowCredentials + allowedOrigins="*"
+// 生产环境禁止 allowedOriginPatterns="*"
+
+// ========== 2. 统一配置 ==========
+// 全局 CorsConfig 优于 @CrossOrigin 注解
+// 避免多处配置冲突
+
+// ========== 3. Security 集成 ==========
+// Spring Security 必须配置 cors()
+// 否则 Security 在 CORS 之前拦截
+
+// ========== 4. Nginx 处理 CORS ==========
+// 可让 Nginx 处理 CORS, 减少应用负担
+// 注意: 不要应用和 Nginx 双重配置
+
+// ========== 5. 预检请求优化 ==========
+// maxAge 缓存预检结果 (建议 3600 秒)
+// 减少 OPTIONS 请求
+
+// ========== 国际化最佳实践 ==========
+
+// ========== 1. 资源文件管理 ==========
+// messages.properties — 默认 (英文, 必须完整)
+// messages_zh_CN.properties — 中文 (补充覆盖)
+// 使用 IDE 插件 (Resource Bundle Editor) 管理
+
+// ========== 2. 键命名规范 ==========
+// 模块.功能.描述 = 翻译文本
+// user.notfound=用户不存在
+// order.payment.success=支付成功
+// validation.required={0} 必填
+
+// ========== 3. LocaleContextHolder ==========
+// 在非 Controller 层获取当前语言
+// 自动从请求上下文获取, 无需传递参数
+
+// ========== 4. 前端国际化 ==========
+// 后端返回 i18n code, 前端负责翻译
+// 或后端直接返回翻译文本
+// 混合: 后端返回结构 + 前端动态替换
+
+// ========== 5. 缓存 ==========
+// 资源文件缓存提高性能
+// 开发时 cache-duration=0 避免重启
+// 生产时 cache-duration=3600+
+
+// ========== 6. 枚举国际化 ==========
+public enum UserStatus {
+    ACTIVE("user.status.active"),
+    INACTIVE("user.status.inactive"),
+    BANNED("user.status.banned");
+
+    private final String messageKey;
+
+    public String getDisplayName(MessageSource ms, Locale locale) {
+        return ms.getMessage(messageKey, null, locale);
+    }
+}</div>
+        <div class="note">💡 CORS 与 i18n 要点: WebMvcConfigurer addCorsMappings 全局配置; @CrossOrigin 注解; Security + CORS 整合; 预检 OPTIONS; allowedOriginPatterns 模式; MessageSource 国际化; messages.properties 资源文件; LocaleResolver 语言解析; LocaleChangeInterceptor 参数切换; LocaleContextHolder 非 Web 层获取语言。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCors()">CORS 配置</button>
+        <button onclick="demoI18n()">国际化</button>
+        <button onclick="demoBest()">最佳实践</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCors() {
+            result.innerHTML = '';
+            log('# CORS 跨域配置');
+            log('');
+            log('三种配置方式:');
+            log('  1. WebMvcConfigurer addCorsMappings');
+            log('  2. @CrossOrigin 注解');
+            log('  3. CorsFilter Bean');
+            log('');
+            log('关键属性:');
+            log('  allowedOrigins     — 允许的源');
+            log('  allowedMethods     — 允许的方法');
+            log('  allowedHeaders     — 允许的请求头');
+            log('  allowCredentials   — 是否携带凭证');
+            log('  maxAge             — 预检缓存时间');
+            log('');
+            log('预检请求: OPTIONS (复杂请求先发)');
+        }
+
+        function demoI18n() {
+            result.innerHTML = '';
+            log('# 国际化 i18n');
+            log('');
+            log('资源文件:');
+            log('  messages.properties (默认)');
+            log('  messages_zh_CN.properties');
+            log('  messages_en_US.properties');
+            log('');
+            log('LocaleResolver:');
+            log('  SessionLocaleResolver — Session');
+            log('  CookieLocaleResolver  — Cookie');
+            log('  AcceptHeaderLocaleResolver — 请求头');
+            log('');
+            log('切换语言:');
+            log('  ?lang=zh_CN, ?lang=en_US');
+            log('  或 Accept-Language 请求头');
+        }
+
+        function demoBest() {
+            result.innerHTML = '';
+            log('# CORS + i18n 最佳实践');
+            log('');
+            log('CORS:');
+            log('  ✅ 最小权限原则');
+            log('  ✅ 统一全局配置');
+            log('  ✅ Security + cors() 整合');
+            log('  ✅ maxAge 预检缓存');
+            log('  ❌ 避免 allowCredentials + *');
+            log('');
+            log('i18n:');
+            log('  ✅ 键命名: 模块.功能.描述');
+            log('  ✅ LocaleContextHolder 获取语言');
+            log('  ✅ 生产 cache-duration 缓存');
+            log('  ✅ 枚举国际化 messageKey');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>13-快速排序-第K大 (Quick Select)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; white-space: pre-wrap; }
+</style></head>
+<body>
+<div class="card">
+  <h2>快速选择 (Quick Select)</h2>
+  <p>快速选择算法用于在未排序数组中查找第 K 大（或第 K 小）元素。它基于快速排序的分区思想，但只需递归处理一侧，平均时间复杂度为 O(n)。</p>
+  <div class="note">
+    <strong>与快速排序的区别：</strong>快速排序需要对分区两侧递归排序，而快速选择只对包含目标元素的那一侧递归。
+  </div>
+</div>
+
+<div class="card">
+  <h2>算法思路</h2>
+  <ol>
+    <li>选择一个基准元素进行分区操作</li>
+    <li>检查基准元素的位置 pivotIndex：</li>
+    <ul>
+      <li>如果 pivotIndex === k，则找到答案</li>
+      <li>如果 pivotIndex > k，在左半部分继续查找</li>
+      <li>如果 pivotIndex < k，在右半部分继续查找</li>
+    </ul>
+  </ol>
+</div>
+
+<div class="card">
+  <h2>代码实现</h2>
+  <pre>function quickSelect(arr, k) {
+  // 查找第 k 小元素 (0-indexed)
+  function select(left, right) {
+    if (left === right) return arr[left];
+    const pivotIndex = partition(arr, left, right);
+    if (k === pivotIndex) return arr[k];
+    if (k < pivotIndex) return select(left, pivotIndex - 1);
+    return select(pivotIndex + 1, right);
+  }
+  return select(0, arr.length - 1);
+}
+
+// 第 K 大 = 第 (n - k) 小
+function findKthLargest(arr, k) {
+  return quickSelect(arr, arr.length - k);
+}</pre>
+</div>
+
+<div class="card">
+  <h2>交互演示</h2>
+  <p>在随机数组中查找第 K 大元素：</p>
+  <button onclick="runDemo()">查找第 K 大</button>
+  <div id="result"></div>
+</div>
+
+<script>
+function partition(arr, left, right) {
+  const pivot = arr[right];
+  let i = left - 1;
+  for (let j = left; j < right; j++) {
+    if (arr[j] <= pivot) {
+      i++;
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+  [arr[i + 1], arr[right]] = [arr[right], arr[i + 1]];
+  return i + 1;
+}
+
+function quickSelect(arr, k) {
+  function select(left, right) {
+    if (left === right) return arr[left];
+    const pi = partition(arr, left, right);
+    if (k === pi) return arr[k];
+    if (k < pi) return select(left, pi - 1);
+    return select(pi + 1, right);
+  }
+  return select(0, arr.length - 1);
+}
+
+function runDemo() {
+  const size = 15;
+  const arr = Array.from({length: size}, () => Math.floor(Math.random() * 100));
+  const K = Math.floor(Math.random() * size) + 1;
+
+  const sorted = [...arr].sort((a, b) => a - b);
+  const expected = sorted[size - K];
+
+  const copy = [...arr];
+  const result = quickSelect(copy, size - K);
+
+  document.getElementById('result').innerHTML =
+    '<strong>原始数组：</strong>[' + arr.join(', ') + ']<br>' +
+    '<strong>排序后数组：</strong>[' + sorted.join(', ') + ']<br><br>' +
+    '<strong>查找第 ' + K + ' 大的元素</strong><br>' +
+    '快速选择结果：<strong>' + result + '</strong><br>' +
+    '正确结果：<strong>' + expected + '</strong><br>' +
+    (result === expected ? '结果正确！' : '结果错误！');
+}
+</script>
+</body></html>

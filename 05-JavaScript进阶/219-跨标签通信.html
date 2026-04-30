@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>跨标签通信</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #comm-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        #comm-log { background: #1e1e1e; color: #d4d4d4; padding: 10px; border-radius: 4px; font-size: 12px; max-height: 150px; overflow-y: auto; font-family: monospace; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>跨标签通信</h2><p>BroadcastChannel / postMessage / storage 事件 — 标签页间传递数据。</p></div>
+    <div class="card">
+        <h2>BroadcastChannel</h2>
+        <div class="code">// BroadcastChannel — 同源下多个标签页通信（推荐）
+// 创建（同一个频道名 = 同一组）
+const channel = new BroadcastChannel('my-channel');
+
+// 发送
+channel.postMessage({ type: 'update', data: 'Hello' });
+
+// 接收
+channel.onmessage = (event) => {
+    console.log('收到:', event.data);
+};
+// 或 channel.addEventListener('message', handler)
+
+// 错误
+channel.onmessageerror = (event) => {};
+
+// 关闭连接
+channel.close();
+
+// 特点：
+// ✅ 同源下任意标签页/iframe 间通信
+// ✅ 双向通信
+// ✅ API 简洁
+// ❌ 不支持跨域</div>
+    </div>
+    <div class="card">
+        <h2>postMessage (跨窗口/iframe)</h2>
+        <div class="code">// 跨窗口消息（支持跨域）
+// 发送消息
+targetWindow.postMessage(data, targetOrigin);
+targetWindow.postMessage({ type: 'greet' }, 'https://example.com');
+targetWindow.postMessage('data', '*'); // ⚠️ 避免用 *（安全风险）
+
+// 接收消息
+window.addEventListener('message', (event) => {
+    // ⚠️ 必须验证来源！
+    if (event.origin !== 'https://trusted.com') return;
+
+    console.log('收到:', event.data);
+    console.log('来源:', event.origin);
+    console.log('来源窗口:', event.source); // window
+});
+
+// targetWindow 可以是:
+// - iframe.contentWindow
+// - window.open() 的返回值
+// - event.source（来自收到的消息）</div>
+    </div>
+    <div class="card">
+        <h2>storage 事件</h2>
+        <div class="code">// localStorage 变化时触发（其他标签页）
+// ⚠️ 当前页面不触发，只有同源的其他标签页触发
+window.addEventListener('storage', (event) => {
+    console.log('键:', event.key);
+    console.log('旧值:', event.oldValue);
+    console.log('新值:', event.newValue);
+    console.log('URL:', event.url);
+    console.log('存储区:', event.storageArea);
+});
+
+// 用途：跨标签同步状态</div>
+    </div>
+    <div class="card">
+        <h2>演示：跨标签通信</h2>
+        <p>💡 打开另一个标签页打开本文件，测试跨标签通信。</p>
+        <button onclick="broadcastMsg()">📢 BroadcastChannel 发送</button>
+        <button onclick="storageSync()">💾 localStorage 同步</button>
+        <div id="comm-log">等待消息...</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const commLog = document.getElementById('comm-log');
+
+        function log(msg) {
+            const div = document.createElement('div');
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            commLog.appendChild(div);
+            commLog.scrollTop = commLog.scrollHeight;
+            if (commLog.children.length > 20) commLog.removeChild(commLog.firstChild);
+            console.log(msg);
+        }
+
+        // BroadcastChannel
+        const channel = new BroadcastChannel('demo-channel');
+        channel.onmessage = (e) => {
+            log(`📬 BroadcastChannel 收到: ${JSON.stringify(e.data)}`);
+        };
+        log('🟢 BroadcastChannel 已就绪');
+
+        function broadcastMsg() {
+            const msg = { type: 'hello', text: `来自标签页 ${Date.now() % 1000}`, time: Date.now() };
+            channel.postMessage(msg);
+            log(`📤 已发送: ${JSON.stringify(msg)}`);
+        }
+
+        // storage 事件
+        window.addEventListener('storage', (e) => {
+            log(`💾 storage 事件: ${e.key} = ${e.newValue} (来自 ${e.url})`);
+        });
+
+        function storageSync() {
+            localStorage.setItem('cross_tab', `同步数据 ${new Date().toLocaleTimeString()}`);
+            log('💾 localStorage 已更新，其他标签页将收到 storage 事件');
+        }
+
+        // postMessage 演示（接收 iframe 消息）
+        window.addEventListener('message', (e) => {
+            if (e.origin !== window.location.origin) {
+                log(`⚠️ 跨域消息来自 ${e.origin}，已忽略`);
+                return;
+            }
+            log(`📨 postMessage 收到: ${JSON.stringify(e.data)}`);
+        });
+
+        log('💡 提示: 复制本文件 URL 在新标签页中打开，测试跨标签通信');
+
+        console.log('=== 跨标签通信 ===');
+        console.log('BroadcastChannel 支持:', typeof BroadcastChannel === 'function');
+        console.log('storage 事件监听已注册');
+
+        document.getElementById('output').textContent =
+            `跨标签通信: BroadcastChannel / postMessage / storage\n` +
+            `BroadcastChannel: 同源广播 (new BroadcastChannel('name'))\n` +
+            `postMessage: 跨域消息 (需验证 origin)\n` +
+            `storage 事件: localStorage 变化通知其他标签\n` +
+            `✅ 跨标签通信演示完成！`;
+    </script>
+</body>
+</html>

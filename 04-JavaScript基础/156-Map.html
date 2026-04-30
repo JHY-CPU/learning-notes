@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Map — 键值对集合</h2><p>键可以是任意类型（包括对象、函数），保持插入顺序。</p></div>
+    <div class="card">
+        <h2>创建与基本操作</h2>
+        <div class="code">// 创建空 Map
+const map = new Map();
+
+// 用二维数组初始化
+const map2 = new Map([
+    ['name', 'Alice'],
+    ['age', 25],
+    [true, 'boolKey']
+]);
+
+// set — 添加/更新
+map.set('name', 'Bob');
+map.set(123, 'numberKey');
+map.set({ id: 1 }, 'objectKey');  // 对象作为键
+map.set('name', 'Charlie');       // 覆盖
+
+// get — 获取
+map.get('name');     // 'Charlie'
+map.get(123);        // 'numberKey'
+map.get('nonexist'); // undefined
+
+// delete — 删除
+map.delete('name');
+
+// has — 检查存在
+map.has(123);        // true
+
+// clear — 清空
+map.clear();
+
+// size — 大小（不是 length）
+map.size;</div>
+    </div>
+    <div class="card">
+        <h2>遍历 Map</h2>
+        <div class="code">const map = new Map([
+    ['a', 1], ['b', 2], ['c', 3]
+]);
+
+// for...of — 默认 entries
+for (let [key, value] of map) {
+    console.log(key, value);
+}
+
+// for...of — keys()
+for (let key of map.keys()) {
+    console.log(key);
+}
+
+// for...of — values()
+for (let value of map.values()) {
+    console.log(value);
+}
+
+// for...of — entries()
+for (let [k, v] of map.entries()) {
+    console.log(k, v);
+}
+
+// forEach
+map.forEach((value, key) => {
+    console.log(key, value);
+});
+
+// 转数组
+const entries = [...map];
+const keys = [...map.keys()];
+const values = [...map.values()];</div>
+    </div>
+    <div class="card">
+        <h2>Map vs Object</h2>
+        <div class="code">// Map 的键可以是任意类型
+const map = new Map();
+map.set(true, 'bool');
+map.set({}, 'object');
+map.set(() => {}, 'function');
+
+// Object 的键只能是字符串或 Symbol
+const obj = {};
+obj[true] = 'bool';       // 键被转成字符串 'true'
+obj[{}] = 'object';       // 键被转成 '[object Object]'
+
+// Map 有 size（直接获取大小）
+map.size;
+
+// Object 需要 Object.keys(obj).length
+
+// Map 保持插入顺序
+// Object 在 ES6 之后也保持但规则较复杂
+
+// Map 更适合频繁增删
+// Object 更适合 JSON 序列化</div>
+    </div>
+    <div class="card">
+        <h2>Map 实际应用</h2>
+        <div class="code">// 1. DOM 元素映射数据
+const userCards = new Map();
+// const card = document.createElement('div');
+// userCards.set(card, { id: 1, name: 'Alice' });
+
+// 2. 缓存/记忆化
+function fibonacci(n, memo = new Map()) {
+    if (n <= 1) return n;
+    if (memo.has(n)) return memo.get(n);
+    const val = fibonacci(n - 1, memo) + fibonacci(n - 2, memo);
+    memo.set(n, val);
+    return val;
+}
+
+// 3. 对象作为键的计数器
+const countMap = new Map();
+function count(obj) {
+    countMap.set(obj, (countMap.get(obj) || 0) + 1);
+}
+
+// 4. Map 合并
+const m1 = new Map([['a', 1], ['b', 2]]);
+const m2 = new Map([['b', 3], ['c', 4]]);
+const merged = new Map([...m1, ...m2]);
+// {'a' => 1, 'b' => 3, 'c' => 4}</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== Map 基本操作 ===');
+        const map = new Map();
+        map.set('name', 'Alice');
+        map.set('age', 25);
+        map.set(true, 'boolKey');
+        console.log('size:', map.size);
+        console.log('get name:', map.get('name'));
+        console.log('has age:', map.has('age'));
+        console.log('has xxx:', map.has('xxx'));
+
+        console.log('=== 遍历 Map ===');
+        for (let [k, v] of map) {
+            console.log('  ', k, '=>', v);
+        }
+
+        console.log('=== 对象作为键 ===');
+        const objKey = { id: 1 };
+        map.set(objKey, 'object value');
+        console.log('对象键:', map.get(objKey));
+        console.log('不同对象:', map.get({ id: 1 }));  // undefined（引用不同）
+
+        console.log('=== Map 合并 ===');
+        const m1 = new Map([['x', 10], ['y', 20]]);
+        const m2 = new Map([['y', 99], ['z', 30]]);
+        const merged = new Map([...m1, ...m2]);
+        console.log([...merged]);
+
+        document.getElementById('output').textContent =
+            `Map size: ${map.size}\n` +
+            `name: ${map.get('name')}\n` +
+            `对象键: ${map.get(objKey)}\n` +
+            `✅ Map 演示完成！`;
+    </script>
+</body>
+</html>

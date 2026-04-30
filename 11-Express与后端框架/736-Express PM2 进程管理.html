@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express PM2 进程管理</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚙️ Express PM2 进程管理</h2><p>PM2 进程管理器、启动/停止/重启、Cluster 模式自动扩展、日志管理、监控 (monit/dashboard)、开机自启、优雅重载、环境管理、ecosystem 配置文件。</p></div>
+    <div class="card">
+        <h2>PM2 基础</h2>
+        <div class="code">// ========== PM2 ==========
+// Node.js 生产进程管理器
+// 自带负载均衡, 自动重启, 日志管理
+
+// 安装:
+// npm install -g pm2
+
+// ========== 基本命令 ==========
+// 启动应用:
+// pm2 start app.js
+// pm2 start app.js --name myapp
+// pm2 start app.js -i max              # Cluster 模式 (最大CPU)
+// pm2 start app.js -i 4                # 4 个实例
+
+// 进程管理:
+// pm2 list               # 列出所有进程
+// pm2 status             # 状态
+// pm2 show myapp         # 详细信息
+// pm2 logs               # 查看日志
+// pm2 logs myapp --lines 100
+// pm2 monit              # 监控面板
+
+// 操作:
+// pm2 stop myapp         # 停止
+// pm2 restart myapp      # 重启
+// pm2 reload myapp       # 优雅重载 (零宕机)
+// pm2 delete myapp       # 删除进程
+
+// ========== 快速开始 ==========
+// pm2 start app.js -i max --name "api-server"
+// pm2 save               # 保存进程列表
+// pm2 startup            # 开机自启
+
+// ========== 常用命令组合 ==========
+// pm2 list && pm2 monit          # 查看 + 监控
+// pm2 restart all                # 重启所有
+// pm2 reload all                 # 优雅重载所有
+// pm2 flush                      # 清空日志
+// pm2 describe myapp             # 进程详情
+// pm2 start ecosystem.config.js  # 配置文件启动</div>
+    </div>
+    <div class="card">
+        <h2>ecosystem 配置文件</h2>
+        <div class="code">// ========== ecosystem.config.js ==========
+// PM2 配置文件, 项目根目录
+
+module.exports = {
+    apps: [{
+        // 基础配置
+        name: 'api-server',
+        script: 'app.js',
+
+        // Cluster 模式
+        instances: process.env.WORKER_COUNT || 'max',  // 或数字
+        exec_mode: 'cluster',    // fork | cluster
+        instance_var: 'INSTANCE_ID',
+
+        // 环境变量
+        env: {
+            NODE_ENV: 'development',
+            PORT: 3000,
+        },
+        env_production: {
+            NODE_ENV: 'production',
+            PORT: 3000,
+            LOG_LEVEL: 'warn',
+        },
+        env_staging: {
+            NODE_ENV: 'staging',
+            PORT: 4000,
+        },
+
+        // 日志
+        log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+        error_file: './logs/pm2/err.log',
+        out_file: './logs/pm2/out.log',
+        merge_logs: true,
+
+        // 自动重启
+        max_restarts: 10,          // 10 次内重启仍失败则停止
+        min_uptime: '10s',         // 最少运行 10s 才算启动成功
+        restart_delay: 3000,       // 重启间隔
+
+        // 优雅关闭
+        kill_timeout: 5000,        // 强制 kill 等待时间
+        listen_timeout: 3000,      // 等待应用 listening
+        shutdown_with_message: true,
+
+        // 监控
+        max_memory_restart: '500M',  // 超过 500M 自动重启
+
+        // 其他
+        watch: false,              // 文件变更重启 (开发用)
+        autorestart: true,
+        cron_restart: '0 0 * * *', // 每天午夜自动重启 (防内存泄漏)
+    }],
+};
+
+// ========== 使用 ==========
+// pm2 start ecosystem.config.js
+// pm2 start ecosystem.config.js --env production
+// pm2 start ecosystem.config.js --env staging
+
+// ========== 多应用配置 ==========
+// module.exports = {
+//   apps: [
+//     {
+//       name: 'api',
+//       script: 'app.js',
+//       instances: 4,
+//       env: { PORT: 3000 },
+//     },
+//     {
+//       name: 'worker',
+//       script: 'worker.js',
+//       instances: 2,
+//       env: { QUEUE_CONCURRENCY: 5 },
+//     },
+//     {
+//       name: 'cron',
+//       script: 'cron.js',
+//       cron_restart: '0 */6 * * *',
+//       autorestart: false,
+//     },
+//   ],
+// };</div>
+    </div>
+    <div class="card">
+        <h2>PM2 高级功能</h2>
+        <div class="code">// ========== 高级功能 ==========
+
+// ========== 1. 优雅重载 (零宕机) ==========
+// pm2 reload all
+// 逐个重启 worker, 保持服务不中断
+// 类似 cluster 的优雅重启, PM2 自动完成
+
+// 应用需要支持 graceful shutdown:
+process.on('SIGINT', () => {
+    server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
+});
+
+// ========== 2. 开机自启 ==========
+// pm2 startup
+// 生成 systemd/init 启动脚本
+// pm2 save 保存当前进程列表
+//
+// 命令:
+// pm2 startup systemd
+// pm2 save
+// systemctl enable pm2-<user>
+
+// ========== 3. 日志管理 ==========
+// pm2 logs              # 查看实时日志
+// pm2 logs --json       # JSON 格式
+// pm2 logs api --lines 200
+// pm2 flush             # 清空日志
+// pm2 reloadLogs        # 重新加载日志
+
+// PM2 日志轮转 (pm2-logrotate):
+// pm2 install pm2-logrotate
+// pm2 set pm2-logrotate:max_size 10M
+// pm2 set pm2-logrotate:retain 7
+// pm2 set pm2-logrotate:compress true
+
+// ========== 4. 监控 ==========
+// pm2 monit            # 终端监控面板
+// pm2 monit 显示:
+//   - CPU 使用率
+//   - 内存占用
+//   - 请求数量
+//   - 日志
+
+// Keymetrics (PM2 官方监控):
+// pm2 link <secret> <public>
+// 浏览器远程监控: https://app.keymetrics.io
+
+// ========== 5. JS API ==========
+// 在代码中控制 PM2
+const pm2 = require('pm2');
+
+pm2.connect((err) => {
+    if (err) return console.error(err);
+
+    pm2.start({
+        script: 'app.js',
+        name: 'api',
+        instances: 4,
+        exec_mode: 'cluster',
+    }, (err, apps) => {
+        pm2.disconnect();
+    });
+});
+
+// ========== 6. 部署 ==========
+// ecosystem.config.js 可以配置部署
+// module.exports = {
+//   apps: [...],
+//   deploy: {
+//     production: {
+//       user: 'node',
+//       host: ['prod-server-1', 'prod-server-2'],
+//       ref: 'origin/main',
+//       repo: 'git@github.com:user/repo.git',
+//       path: '/var/www/myapp',
+//       'post-deploy': 'npm install && pm2 reload ecosystem.config.js --env production',
+//     },
+//   },
+// };
+//
+// 使用:
+// pm2 deploy ecosystem.config.js production setup  # 首次
+// pm2 deploy ecosystem.config.js production         # 部署</div>
+    </div>
+    <div class="card">
+        <h2>PM2 最佳实践</h2>
+        <div class="code">// ========== PM2 生产 Checklist ==========
+
+// ========== 1. 使用 Cluster 模式 ==========
+// pm2 start app.js -i max
+// 自动利用所有 CPU 核心
+
+// ========== 2. 内存限制自动重启 ==========
+// ecosystem.config.js:
+//   max_memory_restart: '500M'
+
+// 防止内存泄漏导致 OOM
+
+// ========== 3. 日志轮转 ==========
+// pm2 install pm2-logrotate
+// pm2 set pm2-logrotate:max_size 10M
+// pm2 set pm2-logrotate:retain 7
+
+// ========== 4. 开机自启 ==========
+// pm2 startup && pm2 save
+
+// ========== 5. 优雅关闭 ==========
+// 应用监听 SIGINT, 完成清理后退出
+
+// ========== 6. 健康检查 ==========
+// pm2 配合 health check 端点
+// app.get('/health', (req, res) => {
+//     res.json({
+//         status: 'ok',
+//         pid: process.pid,
+//         memory: process.memoryUsage().rss,
+//         uptime: process.uptime(),
+//     });
+// });
+
+// ========== 7. 环境管理 ==========
+// PM2 管理不同环境:
+// pm2 start ecosystem.config.js --env production
+// pm2 start ecosystem.config.js --env staging
+
+// ========== 8. 日志集中管理 ==========
+// PM2 输出到文件 → Filebeat → ELK
+// error_file 和 out_file 分开
+
+// ========== 9. PM2 vs Cluster ==========
+// ┌──────────┬──────────────────┬──────────────────┐
+// │          │  原生 Cluster    │     PM2          │
+// ├──────────┼──────────────────┼──────────────────┤
+// │ 上手     │ 写代码           │ 命令/配置        │
+// │ 功能     │ 基础             │ 丰富 (监控/日志) │
+// │ 重启     │ 手动实现         │ 自动 + 优雅重载  │
+// │ 监控     │ 无               │ monit + Keymetrics│
+// │ 推荐     │ 学习原理         │ 生产使用          │
+// └──────────┴──────────────────┴──────────────────┘
+
+// ========== 10. Docker 中的 PM2 ==========
+// Dockerfile:
+// FROM node:18-alpine
+// RUN npm install -g pm2
+// COPY . .
+// EXPOSE 3000
+// CMD ["pm2-runtime", "start", "ecosystem.config.js", "--env", "production"]
+//
+// pm2-runtime 专为容器优化, 前台运行</div>
+        <div class="note">💡 PM2 要点: 生产进程管理器; cluster 模式 -i max 自动扩展; ecosystem.config.js 配置管理; 零宕机重载 pm2 reload; pm2-logrotate 日志轮转; pm2 startup 开机自启; monit 监控面板; max_memory_restart 自动重启; 多应用同时管理; Git 部署集成; Docker 用 pm2-runtime; PM2 是生产标配。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoBasic()">PM2 基础</button>
+        <button onclick="demoEco()">ecosystem 配置</button>
+        <button onclick="demoBest()">最佳实践</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoBasic() {
+            result.innerHTML = '';
+            log('# PM2 基础命令');
+            log('');
+            log('启动:');
+            log('  pm2 start app.js');
+            log('  pm2 start app.js -i max (Cluster)');
+            log('  pm2 start app.js --name myapp');
+            log('');
+            log('管理:');
+            log('  pm2 list     查看所有进程');
+            log('  pm2 logs     实时日志');
+            log('  pm2 monit    监控面板');
+            log('  pm2 reload   零宕机重载');
+            log('');
+            log('设置:');
+            log('  pm2 startup    开机自启');
+            log('  pm2 save       保存列表');
+        }
+
+        function demoEco() {
+            result.innerHTML = '';
+            log('# ecosystem.config.js');
+            log('');
+            log('module.exports = {');
+            log('  apps: [{');
+            log('    name: "api",');
+            log('    script: "app.js",');
+            log('    instances: "max",');
+            log('    exec_mode: "cluster",');
+            log('    max_memory_restart: "500M",');
+            log('    env_production: {');
+            log('      NODE_ENV: "production",');
+            log('    },');
+            log('    error_file: "logs/err.log",');
+            log('    out_file: "logs/out.log",');
+            log('    kill_timeout: 5000,');
+            log('  }],');
+            log('};');
+        }
+
+        function demoBest() {
+            result.innerHTML = '';
+            log('# PM2 生产 Checklist');
+            log('');
+            log('✅ Cluster 模式 (多核)');
+            log('✅ 内存限制 (max_memory_restart)');
+            log('✅ 日志轮转 (pm2-logrotate)');
+            log('✅ 开机自启 (pm2 startup)');
+            log('✅ 优雅关闭 (SIGINT handler)');
+            log('✅ 健康检查端点');
+            log('✅ 环境隔离 (dev/prod)');
+            log('');
+            log('Docker:');
+            log('  CMD ["pm2-runtime", "start", "app.js"]');
+        }
+    </script>
+</body>
+</html>

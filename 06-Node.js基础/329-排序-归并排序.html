@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排序-归并排序</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>排序-归并排序</h2><p>分治合并、自顶向下/自底向上、稳定排序、外部排序。</p></div>
+    <div class="card">
+        <h2>归并排序实现</h2>
+        <div class="code">// ========== 自顶向下归并 (递归) ==========
+function mergeSort(arr) {
+    if (arr.length <= 1) return arr;
+    const mid = Math.floor(arr.length / 2);
+    const left = mergeSort(arr.slice(0, mid));
+    const right = mergeSort(arr.slice(mid));
+    return merge(left, right);
+}
+
+function merge(left, right) {
+    const result = [];
+    let i = 0, j = 0;
+    while (i < left.length && j < right.length) {
+        result.push(left[i] <= right[j] ? left[i++] : right[j++]);
+    }
+    return [...result, ...left.slice(i), ...right.slice(j)];
+}
+
+// ========== 自底向上归并 (迭代) ==========
+function mergeSortBottomUp(arr) {
+    const a = [...arr];
+    for (let size = 1; size < a.length; size *= 2) {
+        for (let left = 0; left < a.length; left += 2 * size) {
+            const mid = Math.min(left + size, a.length);
+            const right = Math.min(left + 2 * size, a.length);
+            mergeInPlace(a, left, mid, right);
+        }
+    }
+    return a;
+}
+
+// ========== 原地归并 ==========
+function mergeInPlace(arr, left, mid, right) {
+    const leftArr = arr.slice(left, mid);
+    const rightArr = arr.slice(mid, right);
+    let i = 0, j = 0, k = left;
+    while (i < leftArr.length && j < rightArr.length) {
+        arr[k++] = leftArr[i] <= rightArr[j] ? leftArr[i++] : rightArr[j++];
+    }
+    while (i < leftArr.length) arr[k++] = leftArr[i++];
+    while (j < rightArr.length) arr[k++] = rightArr[j++];
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：归并排序</h2>
+        <button onclick="demoMergeSort()">归并排序详解</button>
+        <button onclick="demoBottomUp()">自底向上</button>
+        <button onclick="demoExternal()">外部排序概念</button>
+        <button onclick="demoCompare()">算法对比</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoMergeSort() {
+            result.innerHTML = '';
+            log('🔄 归并排序详解 (自顶向下):');
+            log('');
+
+            function mergeSort(arr, depth = 0) {
+                const indent = '  '.repeat(depth);
+                if (arr.length <= 1) {
+                    log(`${indent}归并: [${arr}] → [${arr}] (基础情况)`);
+                    return arr;
+                }
+                const mid = Math.floor(arr.length / 2);
+                log(`${indent}拆分: [${arr}] → 左[${arr.slice(0, mid)}] 右[${arr.slice(mid)}]`);
+                const left = mergeSort(arr.slice(0, mid), depth + 1);
+                const right = mergeSort(arr.slice(mid), depth + 1);
+                const merged = merge(left, right);
+                log(`${indent}合并: [${left}] + [${right}] → [${merged}]`);
+                return merged;
+            }
+
+            function merge(left, right) {
+                const result = [];
+                let i = 0, j = 0;
+                while (i < left.length && j < right.length) {
+                    result.push(left[i] <= right[j] ? left[i++] : right[j++]);
+                }
+                return [...result, ...left.slice(i), ...right.slice(j)];
+            }
+
+            const data = [6, 3, 8, 1, 9, 2, 5, 7];
+            log(`原始数组: [${data}]`);
+            log('');
+            const sorted = mergeSort(data);
+            log('');
+            log(`排序结果: [${sorted}]`);
+            log('');
+            log('📌 归并排序特点:');
+            log('   • 稳定排序 (相等元素保持原顺序)');
+            log('   • 时间复杂度: O(n log n) 始终如此');
+            log('   • 空间复杂度: O(n) (需要额外数组)');
+        }
+
+        function demoBottomUp() {
+            result.innerHTML = '';
+            log('⬆️ 自底向上归并 (迭代):');
+            log('');
+
+            function mergeSortBU(arr) {
+                const a = [...arr];
+                log(`初始: [${a}]`);
+                log('');
+
+                for (let size = 1; size < a.length; size *= 2) {
+                    log(`size=${size}:`);
+                    for (let left = 0; left < a.length; left += 2 * size) {
+                        const mid = Math.min(left + size, a.length);
+                        const right = Math.min(left + 2 * size, a.length);
+                        if (mid < right) {
+                            // 合并 [left..mid-1] 和 [mid..right-1]
+                            const leftArr = a.slice(left, mid);
+                            const rightArr = a.slice(mid, right);
+                            let i = 0, j = 0, k = left;
+                            while (i < leftArr.length && j < rightArr.length) {
+                                a[k++] = leftArr[i] <= rightArr[j] ? leftArr[i++] : rightArr[j++];
+                            }
+                            while (i < leftArr.length) a[k++] = leftArr[i++];
+                            while (j < rightArr.length) a[k++] = rightArr[j++];
+                            log(`   合并 [${left}..${mid-1}] + [${mid}..${right-1}] → [${a.slice(left, right)}]`);
+                        }
+                    }
+                    log(`   结果: [${a}]`);
+                }
+                return a;
+            }
+
+            const data = [6, 3, 8, 1, 9, 2, 5, 7];
+            log(`原始数组: [${data}]`);
+            log('');
+            const sorted = mergeSortBU(data);
+            log('');
+            log(`排序结果: [${sorted}]`);
+            log('');
+            log('📌 自底向上 vs 自顶向下:');
+            log('   • 自底向上: 无递归, 迭代实现');
+            log('   • 自顶向下: 递归, 更易理解');
+            log('   • 两者时间复杂度相同 O(n log n)');
+        }
+
+        function demoExternal() {
+            result.innerHTML = '';
+            log('💾 外部排序概念:');
+            log('');
+
+            log('1️⃣ 什么是外部排序?');
+            log('   当数据量太大, 无法全部装入内存时使用');
+            log('   例如: 对 100GB 文件进行排序');
+            log('');
+
+            log('2️⃣ 外部排序流程:');
+            log('   阶段1 — 分割:');
+            log('     将大文件分割成多个小块');
+            log('     每个小块能装入内存');
+            log('   阶段2 — 排序:');
+            log('     对每个小块进行内部排序 (快排/归并)');
+            log('     将排序结果写回磁盘');
+            log('   阶段3 — 合并:');
+            log('     多路归并 (k-way merge)');
+            log('     从每个小块读取第一个元素');
+            log('     取最小写入输出文件');
+            log('');
+
+            log('3️⃣ 归并排序用于外部排序:');
+            log('   分治特性天然适合外部排序');
+            log('   自底向上的多路归并');
+            log('   每次合并已排序的块');
+            log('');
+
+            log('4️⃣ 模拟: k-way 合并');
+            function kWayMerge(sortedChunks) {
+                const result = [];
+                const pointers = sortedChunks.map(() => 0);
+                while (true) {
+                    let minVal = Infinity, minIdx = -1;
+                    for (let i = 0; i < sortedChunks.length; i++) {
+                        if (pointers[i] < sortedChunks[i].length && sortedChunks[i][pointers[i]] < minVal) {
+                            minVal = sortedChunks[i][pointers[i]];
+                            minIdx = i;
+                        }
+                    }
+                    if (minIdx === -1) break;
+                    result.push(minVal);
+                    pointers[minIdx]++;
+                }
+                return result;
+            }
+
+            const chunks = [[1, 4, 7], [2, 5, 8], [3, 6, 9]];
+            log(`   输入块: ${JSON.stringify(chunks)}`);
+            log(`   合并后: [${kWayMerge(chunks)}]`);
+        }
+
+        function demoCompare() {
+            result.innerHTML = '';
+            log('⚡ 排序算法综合对比:');
+            log('');
+
+            const size = 2000;
+            const testData = Array.from({ length: size }, () => Math.floor(Math.random() * 10000));
+            log(`测试规模: ${size} 个随机整数`);
+            log('');
+
+            // 快速排序 (函数式)
+            function quickSort(arr) {
+                if (arr.length <= 1) return arr;
+                const pivot = arr[Math.floor(arr.length / 2)];
+                const left = [], right = [], equal = [];
+                for (const v of arr) { if (v < pivot) left.push(v); else if (v > pivot) right.push(v); else equal.push(v); }
+                return [...quickSort(left), ...equal, ...quickSort(right)];
+            }
+
+            // 归并排序
+            function mergeSort(arr) {
+                if (arr.length <= 1) return arr;
+                const mid = Math.floor(arr.length / 2);
+                return merge(mergeSort(arr.slice(0, mid)), mergeSort(arr.slice(mid)));
+            }
+            function merge(left, right) {
+                const result = []; let i = 0, j = 0;
+                while (i < left.length && j < right.length) result.push(left[i] <= right[j] ? left[i++] : right[j++]);
+                return [...result, ...left.slice(i), ...right.slice(j)];
+            }
+
+            // 希尔排序
+            function shellSort(arr) {
+                const a = [...arr]; let gap = Math.floor(a.length / 2);
+                while (gap > 0) {
+                    for (let i = gap; i < a.length; i++) { const temp = a[i]; let j = i; while (j >= gap && a[j - gap] > temp) { a[j] = a[j - gap]; j -= gap; } a[j] = temp; }
+                    gap = Math.floor(gap / 2);
+                }
+                return a;
+            }
+
+            const sorts = [
+                { name: '原生 sort', fn: (arr) => [...arr].sort((a, b) => a - b) },
+                { name: '快速排序', fn: quickSort },
+                { name: '归并排序', fn: mergeSort },
+                { name: '希尔排序', fn: shellSort },
+            ];
+
+            sorts.forEach(({ name, fn }) => {
+                const start = performance.now();
+                const result_ = fn(testData);
+                const time = performance.now() - start;
+                const correct = result_.every((v, i) => i === 0 || v >= result_[i - 1]);
+                log(`   ${name.padEnd(12)} ${time.toFixed(2)}ms ${correct ? '✓' : '✗'}`);
+            });
+
+            log('');
+            log('📊 算法特性总结:');
+            log('   算法'.padEnd(12) + '稳定'.padEnd(8) + '原地'.padEnd(8) + '平均'.padEnd(16) + '最坏');
+            log('   冒泡排序'.padEnd(12) + '✓'.padEnd(8) + '✓'.padEnd(8) + 'O(n²)'.padEnd(16) + 'O(n²)');
+            log('   选择排序'.padEnd(12) + '✗'.padEnd(8) + '✓'.padEnd(8) + 'O(n²)'.padEnd(16) + 'O(n²)');
+            log('   插入排序'.padEnd(12) + '✓'.padEnd(8) + '✓'.padEnd(8) + 'O(n²)'.padEnd(16) + 'O(n²)');
+            log('   希尔排序'.padEnd(12) + '✗'.padEnd(8) + '✓'.padEnd(8) + 'O(n log² n)'.padEnd(16) + 'O(n²)');
+            log('   快速排序'.padEnd(12) + '✗'.padEnd(8) + '✓'.padEnd(8) + 'O(n log n)'.padEnd(16) + 'O(n²)');
+            log('   归并排序'.padEnd(12) + '✓'.padEnd(8) + '✗'.padEnd(8) + 'O(n log n)'.padEnd(16) + 'O(n log n)');
+        }
+
+        console.log('=== 排序-归并排序 ===');
+        document.getElementById('output').textContent = `归并排序: 自顶向下 / 自底向上 / 外部排序 / 算法对比\n✅ 归并排序演示完成！`;
+    </script>
+</body>
+</html>

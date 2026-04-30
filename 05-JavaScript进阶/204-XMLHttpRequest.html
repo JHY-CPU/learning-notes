@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XMLHttpRequest</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #xhr-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; max-height: 150px; overflow-y: auto; font-family: monospace; }
+        #xhr-progress { height: 4px; background: #ecf0f1; border-radius: 2px; margin: 5px 0; }
+        #xhr-progress .bar { height: 100%; background: #2ecc71; border-radius: 2px; width: 0%; transition: width 0.1s; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>XMLHttpRequest</h2><p>传统 AJAX 请求方式，支持进度监听。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 创建
+const xhr = new XMLHttpRequest();
+
+// 配置请求
+xhr.open(method, url, async);
+// method: 'GET' | 'POST' | 'PUT' | 'DELETE'
+// url: 请求地址
+// async: true（异步，默认）| false（同步，已弃用）
+
+// 设置请求头
+xhr.setRequestHeader('Content-Type', 'application/json');
+xhr.setRequestHeader('Authorization', 'Bearer token');
+
+// 事件
+xhr.onloadstart = () => {};   // 开始
+xhr.onprogress = (e) => {     // 进度（下载）
+    e.loaded;  // 已下载字节
+    e.total;   // 总字节（可能为0）
+};
+xhr.onload = () => {          // 加载完成
+    xhr.responseText;  // 响应文本
+    xhr.response;      // 响应体（根据 responseType）
+    xhr.status;        // 状态码
+    xhr.statusText;    // 状态文本
+};
+xhr.onerror = () => {};       // 网络错误
+xhr.ontimeout = () => {};     // 超时
+xhr.onabort = () => {};       // 中止
+xhr.onloadend = () => {};     // 请求结束（无论成功/失败）
+
+// readyState
+// 0: UNSENT — 未调用 open
+// 1: OPENED — 已调用 open
+// 2: HEADERS_RECEIVED — 已收到响应头
+// 3: LOADING — 下载中
+// 4: DONE — 请求完成
+
+// 响应类型
+xhr.responseType = 'json';      // 'text' | 'json' | 'blob' | 'arraybuffer' | 'document'
+
+// 发送
+xhr.send();                     // GET
+xhr.send(JSON.stringify(data)); // POST/PUT（带 body）
+
+// 超时
+xhr.timeout = 10000;            // 10s 超时
+
+// 中止
+xhr.abort();
+
+// 获取响应头
+xhr.getResponseHeader('Content-Type');
+xhr.getAllResponseHeaders();</div>
+    </div>
+    <div class="card">
+        <h2>与 Fetch 对比</h2>
+        <div class="note">📊 XHR vs Fetch:<br>
+        ✅ XHR 支持上传/下载进度监听（fetch 需要自行扩展）<br>
+        ✅ XHR 支持超时设置（fetch 需要 AbortController）<br>
+        ✅ XHR 支持同步请求（但已不推荐使用）<br>
+        ❌ XHR 不支持 Stream<br>
+        ❌ XHR 不支持 Service Worker<br>
+        ❌ XHR API 设计较老（事件回调 vs Promise）<br>
+        💡 新项目推荐使用 fetch，只有需要进度监听时用 XHR。</div>
+    </div>
+    <div class="card">
+        <h2>演示：XHR 请求</h2>
+        <button onclick="xhrGet()">GET 请求</button>
+        <button onclick="xhrProgress()">带进度 GET</button>
+        <button onclick="xhrAbort()">中止请求</button>
+        <div id="xhr-progress"><div class="bar" id="xhr-bar"></div></div>
+        <div id="xhr-result">点击按钮发送请求</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const xhrResult = document.getElementById('xhr-result');
+        const xhrBar = document.getElementById('xhr-bar');
+        let currentXHR = null;
+
+        function log(msg) {
+            const div = document.createElement('div');
+            div.textContent = msg;
+            xhrResult.appendChild(div);
+            console.log(msg);
+        }
+
+        function xhrGet() {
+            xhrResult.innerHTML = '';
+            xhrBar.style.width = '0%';
+            const xhr = new XMLHttpRequest();
+            currentXHR = xhr;
+
+            xhr.open('GET', 'https://jsonplaceholder.typicode.com/todos/1');
+            xhr.responseType = 'json';
+
+            xhr.onloadstart = () => log('🔄 请求开始...');
+            xhr.onload = () => {
+                log(`状态: ${xhr.status} ${xhr.statusText}`);
+                log(`响应: userId=${xhr.response.userId}, title="${xhr.response.title}"`);
+            };
+            xhr.onerror = () => log('❌ 网络错误');
+            xhr.ontimeout = () => log('⏰ 请求超时');
+            xhr.onloadend = () => {
+                log(`✅ 请求结束 (readyState=${xhr.readyState})`);
+                currentXHR = null;
+            };
+
+            xhr.send();
+            log('readyState:', new Array(5).fill(0).map((_, i) =>
+                `${i}=${['UNSENT','OPENED','HEADERS_RECEIVED','LOADING','DONE'][i]}`
+            ).join(', '));
+        }
+
+        function xhrProgress() {
+            xhrResult.innerHTML = '';
+            const xhr = new XMLHttpRequest();
+            currentXHR = xhr;
+
+            xhr.open('GET', 'https://jsonplaceholder.typicode.com/photos');
+            xhr.responseType = 'json';
+
+            xhr.onprogress = (e) => {
+                if (e.lengthComputable) {
+                    const pct = (e.loaded / e.total * 100).toFixed(1);
+                    xhrBar.style.width = pct + '%';
+                    log(`📥 下载: ${pct}% (${e.loaded}/${e.total} bytes)`);
+                } else {
+                    log(`📥 已接收: ${e.loaded} bytes`);
+                }
+            };
+
+            xhr.onload = () => log(`✅ 完成! 共 ${xhr.response.length} 条数据`);
+            xhr.onerror = () => log('❌ 错误');
+            xhr.onloadend = () => { currentXHR = null; };
+            xhr.send();
+        }
+
+        function xhrAbort() {
+            if (currentXHR) {
+                currentXHR.abort();
+                log('⏹ 请求已中止');
+                xhrBar.style.width = '0%';
+            }
+        }
+
+        console.log('=== XMLHttpRequest ===');
+        console.log('支持 XHR:', typeof XMLHttpRequest === 'function');
+
+        document.getElementById('output').textContent =
+            `XMLHttpRequest: 传统 AJAX\n` +
+            `open/send/onload/onprogress/onerror/onabort\n` +
+            `readyState: 0-4 (UNSENT→OPENED→HEADERS_RECEIVED→LOADING→DONE)\n` +
+            `✅ XHR 演示完成！`;
+    </script>
+</body>
+</html>

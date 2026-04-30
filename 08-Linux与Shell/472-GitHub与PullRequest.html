@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub与Pull Request</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔄 GitHub 与 Pull Request</h2><p>Fork 工作流、PR 流程、Code Review、GitHub CLI、GitHub Actions 入门。</p></div>
+    <div class="card">
+        <h2>GitHub 协作模型</h2>
+        <div class="code">// ========== 两种协作方式 ==========
+// 1. 共享仓库 (Shared Repository)
+//    协作者有仓库写权限,直接在分支上工作
+//    适合: 团队内部项目
+//    所有人可 push 到同一个仓库
+
+// 2. Fork + PR (Fork and Pull Request)
+//    贡献者 fork 仓库到个人账号
+//    在自己 fork 上创建分支,提交,发起 PR
+//    仓库维护者审核后合并
+//    适合: 开源项目、外部贡献
+
+// ========== Fork 工作流 ==========
+// 1. Fork 目标仓库 (GitHub 页面点 Fork)
+// 2. 克隆自己的 fork 到本地
+git clone https://github.com/myuser/repo.git
+cd repo
+git remote add upstream https://github.com/original/repo.git
+
+// 3. 创建功能分支
+git checkout -b feature/awesome-feature
+
+// 4. 开发、提交
+git add -A
+git commit -m "feat: add awesome feature"
+
+// 5. 推送到自己的 fork
+git push -u origin feature/awesome-feature
+
+// 6. 在 GitHub 上创建 PR (Pull Request)
+//    从 myuser:feature/awesome-feature → original:main
+
+// 7. 等待 Code Review,根据反馈修改
+// 8. PR 被合并后,同步本地仓库
+git checkout main
+git pull upstream main
+git push origin main
+git branch -d feature/awesome-feature</div>
+    </div>
+    <div class="card">
+        <h2>Pull Request 最佳实践</h2>
+        <div class="code">// ========== PR 规范 ==========
+// 标题: <type>(<scope>): <description>
+// 内容: What + Why + How
+
+// 好的 PR 模板:
+## 描述
+[简要描述改动内容和动机]
+
+## 改动类型
+- [ ] 新功能 (feat)
+- [ ] 修复 (fix)
+- [ ] 重构 (refactor)
+- [ ] 文档 (docs)
+- [ ] 测试 (test)
+
+## 测试
+- [ ] 单元测试
+- [ ] 手动测试
+- [ ] 测试通过
+
+## 相关问题
+Closes #123
+
+// ========== PR 原则 ==========
+// 1. 小 PR (几百行),不要超大 PR
+// 2. 一个 PR 只做一件事
+// 3. 清晰的提交历史
+// 4. 关联 Issue
+
+// ========== Code Review 要点 ==========
+// Reviewer 看什么:
+// 1. 逻辑是否正确
+// 2. 代码风格一致
+// 3. 是否有测试
+// 4. 是否有安全漏洞
+// 5. 是否有性能问题
+// 6. 命名是否合理
+
+// 如何给 Review 意见:
+// - 善意的语气
+// - 解释为什么
+// - 给出建议代码
+// - 区分"必须改"和"建议改"</div>
+    </div>
+    <div class="card">
+        <h2>GitHub CLI (gh)</h2>
+        <div class="code">// ========== 安装 gh ==========
+// macOS: brew install gh
+// Linux: apt install gh / dnf install gh
+// Windows: winget install GitHub.cli
+
+// 认证:
+gh auth login
+
+// ========== 常用 gh 命令 ==========
+// PR 操作:
+gh pr create                     # 创建 PR
+gh pr list                       # 列出 PR
+gh pr view 123                   # 查看 PR 详情
+gh pr checkout 123               # 检出 PR 到本地
+gh pr review 123 --approve       # 审核通过
+gh pr merge 123                  # 合并 PR
+gh pr close 123                  # 关闭 PR
+
+// Issue:
+gh issue create                  # 创建 Issue
+gh issue list                    # 列出 Issue
+gh issue view 456                # 查看 Issue
+
+// 仓库:
+gh repo clone user/repo          # 克隆仓库
+gh repo fork                     # Fork 仓库
+gh repo view                     # 查看仓库
+
+// 工作流:
+gh run list                      # 列出 Actions
+gh run watch                     # 实时查看运行
+gh run download                  # 下载 artifact
+
+// 创建 PR 并自动填充:
+gh pr create \
+  --title "feat: add login" \
+  --body "Implements user login with JWT" \
+  --base main \
+  --assignee @me \
+  --label feat</div>
+    </div>
+    <div class="card">
+        <h2>GitHub Actions 入门</h2>
+        <div class="code">// ========== GitHub Actions ==========
+// CI/CD 流水线,自动执行测试/构建/部署
+
+// 目录: .github/workflows/*.yml
+
+// ========== 示例: CI 流水线 ==========
+// .github/workflows/ci.yml
+
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18, 20]
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+
+    - run: npm ci
+    - run: npm test
+    - run: npm run lint
+
+// ========== Actions 市场 ==========
+// actions/checkout        - 检出代码
+// actions/setup-node      - 设置 Node.js
+// actions/setup-python    - 设置 Python
+// actions/cache           - 缓存依赖
+// actions/upload-artifact - 上传构建产物
+// docker/login-action     - Docker 登录
+// docker/build-push-action - 构建并推送镜像</div>
+        <div class="note">💡 PR 工作流是 GitHub 协作的核心——fork → branch → commit → push → PR → review → merge。Good PR = 小改动 + 清晰描述 + 通过 CI。gh CLI 可以完全用命令行管理 PR,不必打开浏览器。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoPR()">PR 流程演示</button>
+        <button onclick="demoFork()">Fork 工作流演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoPR() {
+            result.innerHTML = '';
+            log('# Pull Request 流程演示');
+            log('');
+            log('1. 创建分支');
+            log('   git checkout -b fix/login-error');
+            log('');
+            log('2. 修改、提交');
+            log('   git add -A');
+            log('   git commit -m "fix: login validation error"');
+            log('');
+            log('3. 推送');
+            log('   git push -u origin fix/login-error');
+            log('');
+            log('4. 创建 PR (gh CLI)');
+            log('   gh pr create --title "fix: login validation" \\');
+            log('     --body "Fixed validation error when email is empty" \\');
+            log('     --base main');
+            log('');
+            log('5. Review → 修改 → 合并');
+            log('   gh pr review --approve');
+            log('   gh pr merge --squash');
+        }
+
+        function demoFork() {
+            result.innerHTML = '';
+            log('# Fork 工作流演示');
+            log('');
+            log('1. 在 GitHub 上 Fork 仓库');
+            log('2. 克隆自己的 fork:');
+            log('   git clone https://github.com/myuser/repo.git');
+            log('   cd repo');
+            log('   git remote add upstream https://github.com/original/repo.git');
+            log('');
+            log('3. 同步上游更新:');
+            log('   git fetch upstream');
+            log('   git checkout main');
+            log('   git merge upstream/main');
+            log('   git push origin main');
+            log('');
+            log('4. 创建功能分支');
+            log('   git checkout -b feature/awesome');
+            log('');
+            log('5. 开发、提交、推送到 fork');
+            log('   gh pr create  # 创建 PR 到上游仓库');
+        }
+    </script>
+</body>
+</html>

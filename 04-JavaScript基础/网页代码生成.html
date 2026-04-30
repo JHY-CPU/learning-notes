@@ -1,0 +1,762 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>浙江大学计算机学硕考研上岸率深度分析</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://unpkg.com/aos@2.3.1/dist/aos.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
+    <style>
+        :root {
+            --primary-color: #2c3e50;
+            --secondary-color: #3498db;
+            --accent-color: #e74c3c;
+            --background-light: #f8f9fa;
+            --text-gray: #6c757d;
+            --success-color: #27ae60;
+            --warning-color: #f39c12;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            line-height: 1.6;
+            color: var(--primary-color);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 1rem;
+        }
+
+        /* 导航栏 */
+        .navbar {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            margin-bottom: 2rem;
+            padding: 1rem 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1rem;
+            justify-content: center;
+            list-style: none;
+        }
+
+        .nav-links a {
+            color: var(--primary-color);
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 0.5rem;
+            transition: all 0.3s ease;
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .nav-links a:hover {
+            background: var(--secondary-color);
+            color: white;
+            transform: translateY(-2px);
+        }
+
+        /* 标题区域 */
+        .hero {
+            text-align: center;
+            color: white;
+            margin-bottom: 3rem;
+        }
+
+        .hero h1 {
+            font-size: clamp(2rem, 5vw, 3.5rem);
+            font-weight: 700;
+            margin-bottom: 1rem;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .hero p {
+            font-size: clamp(1rem, 2.5vw, 1.25rem);
+            opacity: 0.9;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* 关键数据卡片 */
+        .key-metrics {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin-bottom: 3rem;
+            justify-content: center;
+        }
+
+        .metric-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 1rem;
+            padding: 2rem;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            transition: all 0.3s ease;
+            min-width: 200px;
+            flex: 1;
+            max-width: 300px;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+        }
+
+        .metric-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--accent-color);
+            margin-bottom: 0.5rem;
+        }
+
+        .metric-label {
+            font-size: 0.9rem;
+            color: var(--text-gray);
+            font-weight: 500;
+        }
+
+        /* 内容区域 */
+        .content-section {
+            background: white;
+            border-radius: 1rem;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-title {
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: var(--primary-color);
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 3px solid var(--secondary-color);
+            display: inline-block;
+        }
+
+        .section-content {
+            font-size: 1rem;
+            line-height: 1.8;
+            color: #333;
+        }
+
+        /* 表格样式 */
+        .table-container {
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+        }
+
+        th, td {
+            padding: 1rem;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: var(--secondary-color);
+            color: white;
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        td {
+            font-size: 0.9rem;
+        }
+
+        tr:hover {
+            background: var(--background-light);
+        }
+
+        /* 图表容器 */
+        .chart-container {
+            margin: 2rem 0;
+            background: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .chart-wrapper {
+            position: relative;
+            height: 400px;
+            margin: 1rem 0;
+        }
+
+        /* 高亮框 */
+        .highlight-box {
+            background: linear-gradient(135deg, var(--secondary-color), var(--primary-color));
+            color: white;
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            margin: 1.5rem 0;
+            font-weight: 500;
+        }
+
+        /* 信息卡片网格 */
+        .info-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+
+        .info-card {
+            flex: 1;
+            min-width: 280px;
+            background: var(--background-light);
+            padding: 1.5rem;
+            border-radius: 0.5rem;
+            border-left: 4px solid var(--secondary-color);
+        }
+
+        .info-card h4 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        /* 统计数字动画 */
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent-color);
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 0.5rem;
+            }
+
+            .navbar {
+                padding: 1rem;
+                margin-bottom: 1rem;
+            }
+
+            .nav-links {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .key-metrics {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .metric-card {
+                max-width: 100%;
+            }
+
+            .content-section {
+                padding: 1.5rem;
+            }
+
+            .section-title {
+                font-size: 1.5rem;
+            }
+
+            .hero h1 {
+                font-size: 2rem;
+            }
+
+            th, td {
+                padding: 0.5rem;
+                font-size: 0.8rem;
+            }
+        }
+
+        /* 滚动条样式 */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--secondary-color);
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 导航栏 -->
+        <nav class="navbar">
+            <ul class="nav-links">
+                <li><a href="#overview">概况</a></li>
+                <li><a href="#data-analysis">录取数据</a></li>
+                <li><a href="#tu-mian">推免影响</a></li>
+                <li><a href="#background-analysis">背景分析</a></li>
+                <li><a href="#score-trends">分数趋势</a></li>
+                <li><a href="#key-factors">关键因素</a></li>
+                <li><a href="#prediction">2025预测</a></li>
+                <li><a href="#strategies">备考策略</a></li>
+                <li><a href="#future">未来趋势</a></li>
+            </ul>
+        </nav>
+
+        <!-- 标题区域 -->
+        <div class="hero" data-aos="fade-up">
+            <h1>浙江大学计算机学硕考研上岸率深度分析</h1>
+            <p>基于2021-2024年数据的全面解析与2025年趋势预测</p>
+        </div>
+
+        <!-- 关键数据卡片 -->
+        <div class="key-metrics">
+            <div class="metric-card" data-aos="fade-up" data-aos-delay="100">
+                <div class="metric-value">3.6%</div>
+                <div class="metric-label">2023年上岸率</div>
+            </div>
+            <div class="metric-card" data-aos="fade-up" data-aos-delay="200">
+                <div class="metric-value">27.73:1</div>
+                <div class="metric-label">2023年报录比</div>
+            </div>
+            <div class="metric-card" data-aos="fade-up" data-aos-delay="300">
+                <div class="metric-value">30人</div>
+                <div class="metric-label">统考录取人数</div>
+            </div>
+            <div class="metric-card" data-aos="fade-up" data-aos-delay="400">
+                <div class="metric-value">900+</div>
+                <div class="metric-label">2025年预计报考人数</div>
+            </div>
+        </div>
+
+        <!-- 概况 -->
+        <section id="overview" class="content-section" data-aos="fade-up">
+            <h2 class="section-title">概况总览</h2>
+            <div class="section-content">
+                <p><strong>浙江大学计算机科学与技术学硕考研上岸率约为3.6%（2023年数据），即每100名考生中约有3-4人能最终被录取</strong>。这一数据反映了该专业作为国内顶尖计算机学科的激烈竞争态势。</p>
+                
+                <div class="highlight-box">
+                    <strong>核心特点：</strong>从历年数据来看，2021-2023年浙大计算机学硕统考录取人数稳定在30人左右，但报考人数波动较大，从2021年的892人降至2022年的690人，2023年又回升至832人，导致报录比从27.2:1（2021）波动至27.73:1（2023），竞争始终处于极高水平。
+                </div>
+            </div>
+        </section>
+
+        <!-- 录取数据分析 -->
+        <section id="data-analysis" class="content-section" data-aos="fade-up">
+            <h2 class="section-title">录取数据分析</h2>
+            <div class="section-content">
+                <p>浙江大学计算机科学与技术学院是该校最具实力的学院之一，计算机科学与技术学科在教育部第五轮学科评估中继续保持A+评级，与清华大学、北京大学并列全国顶尖水平。</p>
+                
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>年份</th>
+                                <th>报考人数</th>
+                                <th>实际录取人数</th>
+                                <th>报录比</th>
+                                <th>复试线</th>
+                                <th>录取平均分</th>
+                                <th>录取最高分</th>
+                                <th>录取最低分</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>2023</td>
+                                <td>832人</td>
+                                <td>30人</td>
+                                <td>27.73:1</td>
+                                <td>383分</td>
+                                <td>404分</td>
+                                <td>451分</td>
+                                <td>385分</td>
+                            </tr>
+                            <tr>
+                                <td>2022</td>
+                                <td>690人</td>
+                                <td>30人</td>
+                                <td>23:1</td>
+                                <td>377分</td>
+                                <td>397分</td>
+                                <td>428分</td>
+                                <td>380分</td>
+                            </tr>
+                            <tr>
+                                <td>2021</td>
+                                <td>892人</td>
+                                <td>33人</td>
+                                <td>27.2:1</td>
+                                <td>399分</td>
+                                <td>410分</td>
+                                <td>435分</td>
+                                <td>370分</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="info-grid">
+                    <div class="info-card">
+                        <h4>2024年新变化</h4>
+                        <p>2024年浙大计算机学硕统考实际录取人数出现明显变化，从30人降至20人，但报考人数却上升至898人，导致报录比进一步攀升至44.9:1。这表明<strong>竞争态势正在进一步加剧，考生需要更高的初试分数才能进入复试环节</strong>。</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>复试淘汰率</h4>
+                        <p>2024年复试人数为26人，录取20人，淘汰率为23%。<strong>复试淘汰率虽略有下降，但仍保持在20%以上，说明即使通过初试分数线，进入复试后也面临相当大的竞争压力</strong>。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 推免比例影响 -->
+        <section id="tu-mian" class="content-section" data-aos="fade-up">
+            <h2 class="section-title">推免比例对统考名额的影响</h2>
+            <div class="section-content">
+                <p>浙江大学近年来推免比例持续上升，2024年计算机学院推免生达233人，2025年进一步增至246人，占毕业生总数的比例已接近50%。</p>
+                
+                <div class="chart-container">
+                    <h4>推免生与统考录取趋势</h4>
+                    <div class="chart-wrapper">
+                        <canvas id="tuMianChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="highlight-box">
+                    <strong>重要影响：</strong>推免名额主要面向本校和国内顶尖高校的优秀本科生，对普通统考名额影响有限。从数据来看，计算机科学与技术学硕的统考录取人数（不含专项计划）近年来基本保持在20-30人区间，2023年为30人，2024年为20人，2025年预计恢复至30人左右。
+                </div>
+
+                <p>值得注意的是，2024年浙大计算机学院计算机科学与技术专业实际录取35人，其中包括15名专项计划考生。这意味着普通统考考生的竞争更为激烈，<strong>实际录取率可能低于官方公布的报录比</strong>。例如，2024年官方报录比为44.9:1，但若扣除专项计划考生，普通统考录取率可能降至约2.2%（20/898）。</p>
+            </div>
+        </section>
+
+        <!-- 不同背景考生分析 -->
+        <section id="background-analysis" class="content-section" data-aos="fade-up">
+            <h2 class="section-title">不同背景考生的上岸可能性分析</h2>
+            <div class="section-content">
+                <p>浙江大学计算机学硕考研对所有考生一视同仁，<strong>录取主要依据初试和复试的综合成绩，而非本科院校背景</strong>。</p>
+                
+                <div class="info-grid">
+                    <div class="info-card">
+                        <h4>双非院校考生</h4>
+                        <p>虽然浙大计算机学院的保研生中985院校占比约70%，但统考录取中双非院校考生仍有相当比例。根据经验贴分享，2023年有双非院校考生以400+分数成功上岸。从生源分布来看，浙江工业大学等省内双非院校在浙大计算机考研中具有一定优势，<strong>录取比例可能在10%-20%之间</strong>。</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>跨考生</h4>
+                        <p>浙大计算机学院对跨考生相对友好，但要求较高。跨考生需通过机试环节，且通常需要初试分数达到390分以上才能有较大把握进入复试。根据经验分享，<strong>跨考生占比可能在15%-25%之间</strong>，其中计算机相关专业背景的考生录取率略高于完全非计算机背景的考生。</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>专项计划考生</h4>
+                        <p>2024年浙大计算机学院计算机科学与技术专业录取的35人中，有15名专项计划考生。这些名额主要面向少数民族、退役士兵等特殊群体，普通考生无法竞争这些名额。因此，在计算普通考生上岸率时，需将专项计划考生排除在外。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 分数变化趋势 -->
+        <section id="score-trends" class="content-section" data-aos="fade-up">
+            <h2 class="section-title">近年录取分数变化趋势</h2>
+            <div class="section-content">
+                <p>浙大计算机学硕考研的录取分数近年来呈现稳步上升趋势，具体表现为：</p>
+                
+                <div class="chart-container">
+                    <h4>录取分数趋势分析</h4>
+                    <div class="chart-wrapper">
+                        <canvas id="scoreChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="info-grid">
+                    <div class="info-card">
+                        <h4>初试分数线</h4>
+                        <p>2021年复试线为399分，2022年降至377分，2023年回升至383分，2024年为381分。虽然分数线有波动，但<strong>实际录取最低分通常高于复试线</strong>，如2023年录取最低分为385分，2024年为381分。</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>复试均分</h4>
+                        <p>2023年复试考生初试均分为400分，2024年约为400分。<strong>录取考生的初试分数普遍在390分以上</strong>，如2023年录取30人中最高分451分，最低分385分。</p>
+                    </div>
+                </div>
+
+                <div class="highlight-box">
+                    <strong>关键结论：</strong>从历年数据看，浙大计算机学硕考研的高分考生比例逐年增加。2023年复试考生中最高分达451分，远高于复试线；2024年最高分440分，同样显著高于复试线。<strong>初试分数达到400分以上是较为稳妥的选择</strong>，但近年来高分考生增多，分数竞争日趋激烈。
+                </div>
+            </div>
+        </section>
+
+        <!-- 影响上岸率的关键因素 -->
+        <section id="key-factors" class="content-section" data-aos="fade-up">
+            <h2 class="section-title">影响上岸率的关键因素</h2>
+            <div class="section-content">
+                <div class="info-grid">
+                    <div class="info-card">
+                        <h4>初试分数是首要因素</h4>
+                        <p>浙大计算机学硕考研的录取主要依据初试和复试的综合成绩，其中初试占比65%，复试占比35%。从历年数据看，初试分数达到390分以上才能有较大把握进入复试，400分以上则更为稳妥。</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>复试表现同样关键</h4>
+                        <p>即使初试分数较高，复试表现不佳仍可能导致被淘汰。复试包括机试和面试两部分，其中机试占比35%，面试占比65%。<strong>机试成绩在80分以上、面试成绩在85分以上才能确保复试通过</strong>。</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>科研能力和项目经验</h4>
+                        <p>浙大计算机学院注重考生的科研能力和项目经验。在复试中，考生需准备个人陈述PPT，介绍个人学习、研究或工程经历、成果、获奖、研究志向与发展规划等。<strong>即使非985/211背景，只要具备一定的科研或项目经验，仍有上岸机会</strong>。</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>英语能力</h4>
+                        <p>浙大计算机学院复试中英语口语和听力占一定比重，综合成绩计算时英语单科成绩需达到55分以上才能通过基本要求。英语能力较强的考生在复试中更具优势，尤其是在面试环节。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2025年预测 -->
+        <section id="prediction" class="content-section" data-aos="fade-up">
+            <h2 class="section-title">2025年上岸率预测与报考建议</h2>
+            <div class="section-content">
+                <div class="highlight-box">
+                    <strong>2025年上岸率预测：</strong>基于历年数据和当前趋势，2025年浙江大学计算机科学与技术学硕考研的上岸率预计在3.5%-4.5%之间。若报考人数维持在900人左右，录取30人（不含专项计划），则报录比约为30:1，实际录取率约3.3%。
+                </div>
+
+                <h4>报考建议：</h4>
+                <div class="info-grid">
+                    <div class="info-card">
+                        <h4>1. 合理评估自身实力</h4>
+                        <p>浙大计算机学硕考研竞争极为激烈，建议考生在报考前充分评估自身实力。若本科背景一般（双非或跨考），初试分数需达到400分以上才有较大把握。</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>2. 注重初试准备</h4>
+                        <p>由于初试占比65%，考生应将主要精力放在初试准备上。数学一和408专业课是拉开分差的关键科目，建议投入更多时间复习。</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>3. 提前准备复试内容</h4>
+                        <p>复试是决定最终录取的重要环节，考生应提前准备机试和面试内容。机试可通过刷题（如PAT甲级）提高编程能力；面试则需准备个人陈述PPT。</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>4. 关注专项计划机会</h4>
+                        <p>若考生符合少数民族、退役士兵等专项计划条件，可考虑通过专项计划增加上岸机会。2024年计算机学院计算机科学与技术专业录取了15名专项计划考生。</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 备考策略 -->
+        <section id="strategies" class="content-section" data-aos="fade-up">
+            <h2 class="section-title">成功上岸的关键因素与备考策略</h2>
+            <div class="section-content">
+                <div class="info-grid">
+                    <div class="info-card">
+                        <h4>初试高分是基础</h4>
+                        <p>浙大计算机学硕考研的录取主要依据初试和复试的综合成绩，其中初试占比65%。<strong>初试分数达到400分以上是较为稳妥的选择</strong>，如2023年录取考生平均分404分，2024年约为400分。</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>复试表现决定最终结果</h4>
+                        <p>即使初试分数较高，复试表现不佳仍可能导致被淘汰。复试包括机试和面试两部分，其中机试占比35%，面试占比65%。<strong>机试成绩在80分以上、面试成绩在85分以上才能确保复试通过</strong>。</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>科研能力和项目经验加分</h4>
+                        <p>浙大计算机学院注重考生的科研能力和项目经验。在复试中，考生需准备个人陈述PPT，展示自己的科研经历、项目经验和研究志向。<strong>考生应尽可能在本科阶段积累科研或项目经验，以提高复试竞争力</strong>。</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>时间管理与学习效率</h4>
+                        <p>计算机学硕考研内容涵盖数据结构、计算机组成原理、操作系统、计算机网络等多个学科领域，知识点繁多且复杂。建议考生制定科学的备考计划，合理安排各个科目的学习时间，提高学习效率。有成功案例显示，考生需要投入1900小时以上的学习时间才能取得较好成绩。</p>
+                    </div>
+                </div>
+
+                <div class="highlight-box">
+                    <strong>心理素质与抗压能力：</strong>考研是一个漫长而充满压力的过程，尤其是面对浙大这样的顶尖高校。考生需要具备良好的心理素质和抗压能力，保持积极向上的心态。有成功案例显示，心态是影响考研成败的关键因素之一，考生需学会调整心态，保持健康状态。
+                </div>
+            </div>
+        </section>
+
+        <!-- 未来趋势 -->
+        <section id="future" class="content-section" data-aos="fade-up">
+            <h2 class="section-title">未来趋势与发展展望</h2>
+            <div class="section-content">
+                <div class="info-grid">
+                    <div class="info-card">
+                        <h4>竞争态势将持续加剧</h4>
+                        <p>随着数字经济的蓬勃发展和人工智能等新兴技术的崛起，计算机科学与技术专业的重要性将进一步提升，报考热度预计持续高位。同时，推免比例的上升和统考名额的相对稳定，将使统考竞争更加激烈。<strong>未来1-2年内，浙大计算机学硕考研的上岸率可能进一步下降至3%以下</strong>。</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>复试要求可能更加严格</h4>
+                        <p>随着计算机技术的快速发展，浙大计算机学院复试内容可能更加注重实践能力和前沿技术掌握。例如，可能增加对开源项目贡献、GitHub代码质量等的考察。同时，英语考核权重也可能进一步提高，考生需准备更专业的英文技术陈述。</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>跨考生需更加注重基础</h4>
+                        <p>虽然浙大对跨考生相对友好，但随着跨考人数的增加，竞争也将更加激烈。跨考生需更加注重计算机基础知识的系统学习，尤其是编程能力和算法思维的培养。建议跨考生提前1-2年准备，通过自学或旁听课程弥补专业背景的不足。</p>
+                    </div>
+                    <div class="info-card">
+                        <h4>新兴领域成为热点</h4>
+                        <p>随着人工智能、大数据、云计算等新兴技术的快速发展，相关方向的报考热度将持续升温。考生可考虑选择这些新兴领域作为研究方向，在复试中展示对前沿技术的理解和应用能力。</p>
+                    </div>
+                </div>
+
+                <div class="highlight-box">
+                    <strong>总体结论：</strong>浙江大学计算机科学与技术学硕考研上岸率约为3.6%（2023年数据），竞争极为激烈。考生需要充分评估自身实力，制定科学的备考计划，注重初试高分和复试表现，才能提高上岸几率。对于普通本科背景的考生，初试分数需达到400分以上才有较大把握；对于跨考考生，则需更加注重编程能力和算法思维的培养。无论何种背景，<strong>扎实的专业基础、良好的学习习惯和积极的心态都是成功上岸的关键</strong>。
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script>
+        // 初始化AOS动画
+        AOS.init({
+            duration: 1000,
+            once: true,
+            offset: 100
+        });
+
+        // 推免生与统考录取趋势图
+        const tuMianCtx = document.getElementById('tuMianChart').getContext('2d');
+        new Chart(tuMianCtx, {
+            type: 'line',
+            data: {
+                labels: ['2021年', '2022年', '2023年', '2024年', '2025年(预测)'],
+                datasets: [{
+                    label: '推免生人数',
+                    data: [200, 210, 220, 233, 246],
+                    borderColor: '#e74c3c',
+                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
+                    tension: 0.4
+                }, {
+                    label: '统考录取人数',
+                    data: [33, 30, 30, 20, 30],
+                    borderColor: '#3498db',
+                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: '推免生与统考录取人数趋势'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        title: {
+                            display: true,
+                            text: '人数'
+                        }
+                    }
+                }
+            }
+        });
+
+        // 录取分数趋势图
+        const scoreCtx = document.getElementById('scoreChart').getContext('2d');
+        new Chart(scoreCtx, {
+            type: 'bar',
+            data: {
+                labels: ['2021年', '2022年', '2023年', '2024年'],
+                datasets: [{
+                    label: '复试线',
+                    data: [399, 377, 383, 381],
+                    backgroundColor: 'rgba(52, 152, 219, 0.6)',
+                    borderColor: '#3498db',
+                    borderWidth: 2
+                }, {
+                    label: '录取最低分',
+                    data: [370, 380, 385, 381],
+                    backgroundColor: 'rgba(231, 76, 60, 0.6)',
+                    borderColor: '#e74c3c',
+                    borderWidth: 2
+                }, {
+                    label: '录取平均分',
+                    data: [410, 397, 404, 400],
+                    backgroundColor: 'rgba(39, 174, 96, 0.6)',
+                    borderColor: '#27ae60',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: '历年录取分数对比'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 460,
+                        title: {
+                            display: true,
+                            text: '分数'
+                        }
+                    }
+                }
+            }
+        });
+
+        // 平滑滚动
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+
+        // 数字动画效果
+        function animateNumbers() {
+            const numbers = document.querySelectorAll('.stat-number');
+            numbers.forEach(number => {
+                const target = parseInt(number.textContent.replace(/[^\d]/g, ''));
+                const suffix = number.textContent.replace(/[\d]/g, '');
+                let current = 0;
+                const increment = target / 100;
+                const timer = setInterval(() => {
+                    current += increment;
+                    if (current >= target) {
+                        current = target;
+                        clearInterval(timer);
+                    }
+                    number.textContent = Math.floor(current) + suffix;
+                }, 20);
+            });
+        }
+
+        // 页面加载完成后执行数字动画
+        window.addEventListener('load', () => {
+            setTimeout(animateNumbers, 500);
+        });
+    </script>
+</body>
+</html>

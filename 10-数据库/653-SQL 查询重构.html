@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 查询重构</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔄 SQL 查询重构</h2><p>查询重构原则、子查询改 JOIN、聚合改窗口函数、OR 改 UNION、复杂条件简化、SELECT * 改显式列、查询拆分、重构前后性能对比。</p></div>
+    <div class="card">
+        <h2>重构原则</h2>
+        <div class="code">// ========== 查询重构目标 ==========
+// 1. 性能提升 (减少扫描行数)
+// 2. 可读性提升 (易于理解维护)
+// 3. 正确性 (结果不变!)
+// 4. 可维护性 (易于修改)
+
+// ========== 常见重构模式 ==========
+
+// 模式 1: 子查询 → JOIN
+// 模式 2: 聚合函数 → 窗口函数
+// 模式 3: OR → UNION
+// 模式 4: SELECT * → 显式列
+// 模式 5: 复杂 CASE → 提前计算
+// 模式 6: 大查询 → 分步查询
+// 模式 7: 关联子查询 → JOIN + GROUP BY
+// 模式 8: DISTINCT → EXISTS (某些场景)</div>
+    </div>
+    <div class="card">
+        <h2>模式 1: 子查询改 JOIN</h2>
+        <div class="code">// ========== 子查询 → JOIN ==========
+
+-- ❌ 原始: 关联子查询 (每行执行一次)
+SELECT e1.name, e1.salary,
+    (SELECT AVG(e2.salary)
+     FROM employees e2
+     WHERE e2.department = e1.department
+    ) AS dept_avg
+FROM employees e1;
+
+-- ✅ 优化: JOIN + 提前聚合
+SELECT e1.name, e1.salary, d.avg_salary AS dept_avg
+FROM employees e1
+LEFT JOIN (
+    SELECT department, AVG(salary) AS avg_salary
+    FROM employees
+    GROUP BY department
+) d ON e1.department = d.department;
+
+-- ========== 子查询改 EXISTS ==========
+
+-- ❌ IN 子查询 (可能慢)
+SELECT * FROM users
+WHERE id IN (SELECT user_id FROM orders);
+
+-- ✅ EXISTS (半连接,找到即停止)
+SELECT * FROM users u
+WHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id);
+
+-- ========== NOT IN → NOT EXISTS ==========
+
+-- ❌ NOT IN (有 NULL 风险!)
+SELECT * FROM users
+WHERE id NOT IN (SELECT user_id FROM orders);
+-- 如果子查询有 NULL → 结果为空!
+
+-- ✅ NOT EXISTS (安全)
+SELECT * FROM users u
+WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id);</div>
+    </div>
+    <div class="card">
+        <h2>模式 2: 聚合改窗口函数</h2>
+        <div class="code">// ========== 聚合 → 窗口函数 ==========
+
+-- ❌ 原始: GROUP BY 丢失细节
+SELECT department, AVG(salary) AS avg_salary
+FROM employees
+GROUP BY department;
+
+-- ✅ 窗口函数: 同时看到明细和聚合
+SELECT name, department, salary,
+    AVG(salary) OVER (PARTITION BY department) AS dept_avg,
+    salary - AVG(salary) OVER (PARTITION BY department) AS diff
+FROM employees;
+
+-- ========== 模式 3: OR 改 UNION ==========
+
+-- ❌ OR (可能不走索引)
+SELECT * FROM users
+WHERE city = 'Beijing' OR age = 25;
+
+-- ✅ UNION (每个分支走索引)
+SELECT * FROM users WHERE city = 'Beijing'
+UNION
+SELECT * FROM users WHERE age = 25 AND (city <> 'Beijing' OR city IS NULL);
+
+-- ========== 模式 4: SELECT * 改显式列 ==========
+
+-- ❌ SELECT * (返回所有列)
+SELECT * FROM users WHERE email = 'a@test.com';
+
+-- ✅ 显式列 (覆盖索引,减少传输)
+SELECT id, name, email FROM users WHERE email = 'a@test.com';
+
+-- 覆盖索引: 索引 (email, id, name) → Extra: Using index</div>
+    </div>
+    <div class="card">
+        <h2>模式 5-8: 更多重构技巧</h2>
+        <div class="code">// ========== 模式 5: 复杂计算提前 ==========
+
+-- ❌ 复杂 CASE 每次查询都计算
+SELECT *,
+    CASE WHEN status = 'pending' AND created_at < DATE_SUB(NOW(), INTERVAL 1 DAY)
+         THEN '逾期'
+         WHEN status = 'pending' THEN '待处理'
+         ELSE '正常'
+    END AS order_status
+FROM orders;
+
+-- ✅ 创建视图或计算列
+ALTER TABLE orders ADD COLUMN order_status VARCHAR(20)
+    GENERATED ALWAYS AS (
+        CASE WHEN status = 'pending' AND created_at < DATE_SUB(NOW(), INTERVAL 1 DAY)
+             THEN '逾期'
+             WHEN status = 'pending' THEN '待处理'
+             ELSE '正常'
+        END
+    ) STORED;
+
+-- ========== 模式 6: 大查询拆分 ==========
+
+-- ❌ 一个复杂查询 (难以优化)
+SELECT ... FROM 20 张表 JOIN ...
+
+-- ✅ 拆分成多步
+-- 步骤 1: 获取相关 ID
+-- 步骤 2: 用 ID 查询明细
+-- 步骤 3: 应用层合并
+
+-- ========== 模式 7: DISTINCT 改 EXISTS ==========
+
+-- ❌ DISTINCT (需要排序去重)
+SELECT DISTINCT u.*
+FROM users u
+JOIN orders o ON u.id = o.user_id;
+
+-- ✅ EXISTS (找到即停止)
+SELECT u.*
+FROM users u
+WHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id);
+
+-- ========== 模式 8: 多个独立统计改条件聚合 ==========
+
+-- ❌ 多个查询
+SELECT COUNT(*) FROM orders;
+SELECT COUNT(*) FROM orders WHERE status = 'completed';
+SELECT COUNT(*) FROM orders WHERE status = 'cancelled';
+
+-- ✅ 一个查询
+SELECT
+    COUNT(*) AS total,
+    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
+    SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled
+FROM orders;</div>
+    </div>
+    <div class="card">
+        <h2>重构前后对比</h2>
+        <div class="code">// ========== 案例: 用户统计 ==========
+
+-- ❌ 原始 (慢,读多次)
+SELECT u.*,
+    (SELECT COUNT(*) FROM orders WHERE user_id = u.id) AS order_count,
+    (SELECT SUM(amount) FROM orders WHERE user_id = u.id) AS total_spent,
+    (SELECT MAX(created_at) FROM orders WHERE user_id = u.id) AS last_order
+FROM users u
+WHERE u.created_at >= '2024-01-01';
+
+-- 问题: 每个用户执行 3 个子查询!
+-- 100 个用户 → 301 次查询!
+
+-- ✅ 优化后 (只读 2 次)
+SELECT u.*,
+    COALESCE(o.order_count, 0) AS order_count,
+    COALESCE(o.total_spent, 0) AS total_spent,
+    o.last_order
+FROM users u
+LEFT JOIN (
+    SELECT user_id,
+        COUNT(*) AS order_count,
+        SUM(amount) AS total_spent,
+        MAX(created_at) AS last_order
+    FROM orders
+    GROUP BY user_id
+) o ON u.id = o.user_id
+WHERE u.created_at >= '2024-01-01';
+
+-- 性能提升: 3 次查询 → 0 次子查询!
+
+-- ========== 重构检查清单 ==========
+-- ✅ 查询结果是否正确 (首要!)
+-- ✅ EXPLAIN 是否改善 (type, rows, Extra)
+-- ✅ 实际执行时间是否降低
+-- ✅ 代码是否更容易理解
+-- ✅ 是否减少数据库负载
+
+-- "写 SQL 时想着如何让数据库少干活"</div>
+        <div class="note">💡 重构要点: 子查询改 JOIN 减少执行次数; 关联子查询改提前聚合; 窗口函数保留明细; OR 改 UNION 走索引; SELECT * 改显式列; DISTINCT 改 EXISTS; 大查询拆分可维护; 重构后用 EXPLAIN 验证效果。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSub()">子查询改 JOIN</button>
+        <button onclick="demoUnion()">OR 改 UNION</button>
+        <button onclick="demoSummary()">多查询合并</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSub() {
+            result.innerHTML = '';
+            log('# 子查询 → JOIN');
+            log('');
+            log('-- ❌ 关联子查询 (每行执行)');
+            log('SELECT *, (SELECT COUNT(*) FROM orders');
+            log('    WHERE user_id = users.id) AS cnt');
+            log('FROM users;');
+            log('');
+            log('-- ✅ JOIN 聚合 (一次查询)');
+            log('SELECT u.*, o.cnt');
+            log('FROM users u');
+            log('LEFT JOIN (SELECT user_id, COUNT(*) AS cnt');
+            log('    FROM orders GROUP BY user_id) o');
+            log('ON u.id = o.user_id;');
+        }
+
+        function demoUnion() {
+            result.innerHTML = '';
+            log('# OR → UNION');
+            log('');
+            log('-- ❌ OR 可能不走索引');
+            log("SELECT * FROM users WHERE city='Beijing' OR age=25;");
+            log('');
+            log('-- ✅ UNION 两边都走索引');
+            log("SELECT * FROM users WHERE city='Beijing'");
+            log('UNION');
+            log("SELECT * FROM users WHERE age=25 AND city<>'Beijing';");
+        }
+
+        function demoSummary() {
+            result.innerHTML = '';
+            log('# 多查询合并');
+            log('');
+            log('-- ❌ 3 次查询:');
+            log('SELECT COUNT(*) FROM orders;');
+            log("SELECT COUNT(*) FROM orders WHERE status='completed';");
+            log("SELECT COUNT(*) FROM orders WHERE status='cancelled';");
+            log('');
+            log('-- ✅ 1 次查询:');
+            log('SELECT');
+            log('    COUNT(*) AS total,');
+            log("    SUM(status='completed') AS completed,");
+            log("    SUM(status='cancelled') AS cancelled");
+            log('FROM orders;');
+        }
+    </script>
+</body>
+</html>

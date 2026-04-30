@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 表分区</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📂 SQL 表分区</h2><p>分区概念与优势、RANGE/LIST/HASH/KEY 分区类型、分区管理 (添加/删除/合并/拆分)、分区裁剪、MySQL 与 PostgreSQL 分区对比、分区注意事项。</p></div>
+    <div class="card">
+        <h2>分区基础</h2>
+        <div class="code">// ========== 分区概念 ==========
+-- 分区: 将大表按规则拆分成多个物理子表
+-- 逻辑上仍是一个表,物理上分散存储
+
+-- 优点:
+-- 1. 性能: 查询只扫描相关分区 (分区裁剪)
+-- 2. 管理: 按分区清理旧数据 (DROP PARTITION 比 DELETE 快)
+-- 3. 可用性: 分区独立维护
+-- 4. 并行: 可并行扫描多个分区
+
+-- 缺点:
+-- 1. 分区键选择不当 → 查询更慢
+-- 2. 分区数量过多 → 管理开销大
+-- 3. 跨分区查询性能差
+-- 4. 某些约束限制 (唯一索引必须包含分区键)
+
+-- ========== 分区类型 ==========
+
+-- 1. RANGE 分区: 按范围
+--    常用: 日期, ID 范围
+--    适用: 时间序列数据, 历史数据
+
+-- 2. LIST 分区: 按值列表
+--    常用: 地区, 分类
+--    适用: 枚举值分布
+
+-- 3. HASH 分区: 按哈希值
+--    常用: 均匀分布数据
+--    适用: 无自然分区的数据
+
+-- 4. KEY 分区: 类似 HASH, 使用 MySQL 内部哈希
+--    特点和 HASH 类似</div>
+    </div>
+    <div class="card">
+        <h2>RANGE 分区</h2>
+        <div class="code">// ========== RANGE 分区 ==========
+-- 按列值的范围分区,最常用
+
+-- 1. 按年份分区 (订单表)
+CREATE TABLE orders (
+    id INT NOT NULL,
+    user_id INT NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    created_at DATE NOT NULL,
+    PRIMARY KEY (id, created_at)  -- 分区键必须在主键中!
+) PARTITION BY RANGE (YEAR(created_at)) (
+    PARTITION p2022 VALUES LESS THAN (2023),
+    PARTITION p2023 VALUES LESS THAN (2024),
+    PARTITION p2024 VALUES LESS THAN (2025),
+    PARTITION p_future VALUES LESS THAN MAXVALUE
+);
+
+-- 2. 按 ID 范围分区
+CREATE TABLE logs (
+    id INT NOT NULL,
+    message TEXT,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (id, created_at)
+) PARTITION BY RANGE (id) (
+    PARTITION p0 VALUES LESS THAN (1000000),
+    PARTITION p1 VALUES LESS THAN (2000000),
+    PARTITION p2 VALUES LESS THAN (3000000),
+    PARTITION p3 VALUES LESS THAN MAXVALUE
+);
+
+-- ========== 分区管理 ==========
+-- 添加分区
+ALTER TABLE orders ADD PARTITION (
+    PARTITION p2025 VALUES LESS THAN (2026)
+);
+
+-- 删除分区 (删除数据最快!)
+ALTER TABLE orders DROP PARTITION p2022;
+-- 等价于: DELETE FROM orders WHERE YEAR(created_at) = 2022
+-- 但快得多! (直接删除物理文件)
+
+-- 拆分分区
+ALTER TABLE orders REORGANIZE PARTITION p_future INTO (
+    PARTITION p2025 VALUES LESS THAN (2026),
+    PARTITION p2026 VALUES LESS THAN (2027),
+    PARTITION p_future VALUES LESS THAN MAXVALUE
+);
+
+-- 合并分区
+ALTER TABLE orders REORGANIZE PARTITION p2025, p2026 INTO (
+    PARTITION p2025_2026 VALUES LESS THAN (2027)
+);
+
+-- 查看分区
+SELECT PARTITION_NAME, TABLE_ROWS, PARTITION_DESCRIPTION
+FROM INFORMATION_SCHEMA.PARTITIONS
+WHERE TABLE_NAME = 'orders';</div>
+    </div>
+    <div class="card">
+        <h2>LIST / HASH / KEY 分区</h2>
+        <div class="code">// ========== LIST 分区 ==========
+-- 按离散值列表分区
+
+-- 按地区分区
+CREATE TABLE orders (
+    id INT NOT NULL,
+    region VARCHAR(20) NOT NULL,
+    amount DECIMAL(12,2),
+    created_at DATE NOT NULL,
+    PRIMARY KEY (id, region)
+) PARTITION BY LIST COLUMNS(region) (
+    PARTITION p_north VALUES IN ('Beijing', 'Tianjin', 'Hebei'),
+    PARTITION p_east VALUES IN ('Shanghai', 'Jiangsu', 'Zhejiang'),
+    PARTITION p_south VALUES IN ('Guangdong', 'Shenzhen', 'Fujian'),
+    PARTITION p_other VALUES IN ('Others')
+);
+
+-- LIST 分区 (数值)
+-- PARTITION BY LIST(status) (
+--     PARTITION p_active VALUES IN (1, 2),
+--     PARTITION p_inactive VALUES IN (0, 3, 4)
+-- );
+
+-- ========== HASH 分区 ==========
+-- 按哈希值均匀分布
+
+-- 按用户 ID 哈希分区 (8 个分区)
+CREATE TABLE user_logs (
+    id INT NOT NULL AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    action VARCHAR(50),
+    created_at DATETIME,
+    PRIMARY KEY (id, user_id)
+) PARTITION BY HASH(user_id) PARTITIONS 8;
+-- 数据均匀分布到 8 个分区
+
+-- ========== KEY 分区 ==========
+-- 类似 HASH, 使用 MySQL 内部哈希函数
+-- 适用于: 除整数以外的类型 (字符串等)
+
+CREATE TABLE sessions (
+    session_id VARCHAR(128) NOT NULL,
+    user_id INT,
+    data JSON,
+    expires_at DATETIME,
+    PRIMARY KEY (session_id)
+) PARTITION BY KEY(session_id) PARTITIONS 4;
+
+-- ========== 子分区 (复合分区) ==========
+-- 先按 RANGE 分区,再按 HASH 子分区
+
+-- CREATE TABLE orders (
+--     id INT NOT NULL,
+--     created_at DATE NOT NULL,
+--     region VARCHAR(20),
+--     amount DECIMAL(12,2),
+--     PRIMARY KEY (id, created_at)
+-- ) PARTITION BY RANGE (YEAR(created_at))
+-- SUBPARTITION BY HASH (TO_DAYS(created_at)) (
+--     PARTITION p2023 VALUES LESS THAN (2024) (
+--         SUBPARTITION s2023_q1,
+--         SUBPARTITION s2023_q2,
+--         SUBPARTITION s2023_q3,
+--         SUBPARTITION s2023_q4
+--     ),
+--     PARTITION p2024 VALUES LESS THAN (2025) (
+--         SUBPARTITION s2024_q1,
+--         SUBPARTITION s2024_q2,
+--         SUBPARTITION s2024_q3,
+--         SUBPARTITION s2024_q4
+--     )
+-- );</div>
+    </div>
+    <div class="card">
+        <h2>分区裁剪与优化</h2>
+        <div class="code">// ========== 分区裁剪 (Partition Pruning) ==========
+-- 优化器自动跳过不相关的分区
+-- 查询时只扫描必要的分区
+
+-- 创建按日期分区的日志表
+CREATE TABLE access_logs (
+    id INT NOT NULL AUTO_INCREMENT,
+    log_date DATE NOT NULL,
+    url VARCHAR(500),
+    ip VARCHAR(45),
+    status_code INT,
+    PRIMARY KEY (id, log_date)
+) PARTITION BY RANGE COLUMNS(log_date) (
+    PARTITION p2024q1 VALUES LESS THAN ('2024-04-01'),
+    PARTITION p2024q2 VALUES LESS THAN ('2024-07-01'),
+    PARTITION p2024q3 VALUES LESS THAN ('2024-10-01'),
+    PARTITION p2024q4 VALUES LESS THAN ('2025-01-01')
+);
+
+-- 查询: 只扫描 Q2 分区!
+SELECT COUNT(*) FROM access_logs
+WHERE log_date BETWEEN '2024-05-01' AND '2024-06-30';
+-- EXPLAIN 显示: partitions: p2024q2
+
+-- 无法裁剪的查询:
+-- 函数包裹:
+SELECT COUNT(*) FROM access_logs
+WHERE YEAR(log_date) = 2024;  -- 不能裁剪!
+-- 应使用范围查询:
+SELECT COUNT(*) FROM access_logs
+WHERE log_date >= '2024-01-01' AND log_date < '2025-01-01';
+
+-- ========== 分区最佳实践 ==========
+-- 1. 分区键选择
+--    - 经常出现在 WHERE 条件中
+--    - 能均匀分布数据
+--    - 数值/日期类型最佳
+
+-- 2. 分区数量
+--    - 不是越多越好!
+--    - MySQL 建议: 50-100 分区
+--    - 每个分区至少 1GB 数据
+--    - 太多分区 → 文件句柄过多
+
+-- 3. 唯一索引限制
+--    - MySQL: 唯一索引必须包含全部分区键!
+--    - 主键必须包含分区键
+
+-- 4. 何时使用分区
+--    - 表 > 1GB 或行数 > 1000 万
+--    - 有明显时间维度的数据
+--    - 需要定期清理旧数据
+--    - 查询模式能利用分区裁剪</div>
+    </div>
+    <div class="card">
+        <h2>PostgreSQL 分区</h2>
+        <div class="code">// ========== PostgreSQL 分区 ==========
+-- PostgreSQL 10+ 支持声明式分区
+
+-- 1. RANGE 分区
+CREATE TABLE orders (
+    id SERIAL,
+    created_at DATE NOT NULL,
+    amount DECIMAL(12,2)
+) PARTITION BY RANGE (created_at);
+
+CREATE TABLE orders_2024_q1 PARTITION OF orders
+    FOR VALUES FROM ('2024-01-01') TO ('2024-04-01');
+
+CREATE TABLE orders_2024_q2 PARTITION OF orders
+    FOR VALUES FROM ('2024-04-01') TO ('2024-07-01');
+
+-- 2. LIST 分区
+CREATE TABLE users (
+    id SERIAL,
+    region TEXT NOT NULL,
+    name TEXT
+) PARTITION BY LIST (region);
+
+CREATE TABLE users_north PARTITION OF users
+    FOR VALUES IN ('Beijing', 'Tianjin');
+
+-- 3. HASH 分区
+CREATE TABLE logs (
+    id SERIAL,
+    user_id INT,
+    message TEXT
+) PARTITION BY HASH (user_id);
+
+CREATE TABLE logs_0 PARTITION OF logs
+    FOR VALUES WITH (MODULUS 4, REMAINDER 0);
+
+-- ========== 分区维护 (PostgreSQL) ==========
+-- 添加分区
+CREATE TABLE orders_2024_q3 PARTITION OF orders
+    FOR VALUES FROM ('2024-07-01') TO ('2024-10-01');
+
+-- 分离分区 (转为独立表)
+ALTER TABLE orders DETACH PARTITION orders_2024_q1;
+
+-- 挂载分区
+ALTER TABLE orders ATTACH PARTITION orders_2024_q1
+    FOR VALUES FROM ('2024-01-01') TO ('2024-04-01');
+
+-- ========== MySQL vs PostgreSQL 分区对比 ==========
+-- MySQL:
+--   主键必须包含分区键
+--   限制较多 (外键/全文索引)
+--   分区管理较灵活 (REORGANIZE)
+
+-- PostgreSQL:
+--   无需主键包含分区键
+--   支持更多数据类型
+--   分区可以 DETACH/ATTACH
+--   功能更完整</div>
+        <div class="note">💡 分区要点: RANGE 分区适合时间序列; LIST 分区适合枚举值; HASH 分区均匀分布; 分区裁剪是性能关键; 分区键必须在 WHERE 条件中; 主键必须包含分区键 (MySQL); 大表 + 定期清理 = 分区最佳场景。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoRange()">RANGE 分区</button>
+        <button onclick="demoList()">LIST 分区</button>
+        <button onclick="demoPrune()">分区裁剪</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoRange() {
+            result.innerHTML = '';
+            log('# RANGE 分区 (按年份)');
+            log('');
+            log('CREATE TABLE orders (');
+            log('    id INT, created_at DATE,');
+            log('    PRIMARY KEY (id, created_at)');
+            log(') PARTITION BY RANGE (YEAR(created_at)) (');
+            log('    PARTITION p2022 VALUES LESS THAN (2023),');
+            log('    PARTITION p2023 VALUES LESS THAN (2024),');
+            log('    PARTITION p2024 VALUES LESS THAN (2025)');
+            log(');');
+            log('');
+            log('ALTER TABLE orders DROP PARTITION p2022;  -- 快速删旧数据');
+        }
+
+        function demoList() {
+            result.innerHTML = '';
+            log('# LIST 分区 (按地区)');
+            log('');
+            log("PARTITION BY LIST COLUMNS(region) (");
+            log("    PARTITION p_north VALUES IN ('Beijing', 'Tianjin'),");
+            log("    PARTITION p_south VALUES IN ('Guangdong', 'Shenzhen')");
+            log(");");
+            log('');
+            log('适用: 离散值, 如地区/分类/状态');
+            log('分区键在 WHERE 中时可裁剪');
+        }
+
+        function demoPrune() {
+            result.innerHTML = '';
+            log('# 分区裁剪 (Pruning)');
+            log('');
+            log('✅ 走分区裁剪:');
+            log("  WHERE log_date BETWEEN '2024-01-01' AND '2024-06-30'");
+            log('');
+            log('❌ 不能裁剪:');
+            log("  WHERE YEAR(log_date) = 2024");
+            log('');
+            log('规则: 分区键不要用函数包裹');
+            log('EXPLAIN 看 partitions 字段');
+            log('确认只扫描了需要的分区');
+        }
+    </script>
+</body>
+</html>

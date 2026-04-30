@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>05-BFS-最短路径 (BFS Shortest Path)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>BFS 最短路径（无权图）</h2>
+  <p>在无权图中，BFS 第一次访问到目标顶点时经过的路径就是最短路径（边数最少）。</p>
+  <div class="code">function shortestPath(graph, start, end) {
+  const queue = [start];
+  const dist = { [start]: 0 };
+  const prev = { [start]: null };
+  while (queue.length) {
+    const v = queue.shift();
+    if (v === end) break;
+    for (const w of graph[v]) {
+      if (dist[w] === undefined) {
+        dist[w] = dist[v] + 1;
+        prev[w] = v;
+        queue.push(w);
+      }
+    }
+  }
+  // 回溯重建路径
+  const path = [];
+  let cur = end;
+  while (cur !== null) {
+    path.unshift(cur);
+    cur = prev[cur];
+  }
+  return { path, dist: dist[end] };
+}</div>
+</div>
+<div class="card">
+  <h2>交互演示</h2>
+  <p>查找从 A 到 G 的最短路径</p>
+  <button onclick="findPath()">查找最短路径</button>
+  <div id="result"></div>
+</div>
+<script>
+const g = { A:['B','C'], B:['A','D','E'], C:['A','F','G'], D:['B'], E:['B','F'], F:['C','E'], G:['C'] };
+function findPath() {
+  const q=['A'], dist={A:0}, prev={A:null};
+  while(q.length) {
+    const v=q.shift();
+    if(v==='G') break;
+    for(const w of g[v]) {
+      if(dist[w]===undefined) { dist[w]=dist[v]+1; prev[w]=v; q.push(w); }
+    }
+  }
+  const path=[];
+  let cur='G';
+  while(cur!==null) { path.unshift(cur); cur=prev[cur]; }
+  document.getElementById('result').textContent = '最短路径: ' + path.join(' → ') + ' (距离: ' + dist.G + ')';
+}
+</script>
+</body></html>

@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express 密码哈希与安全</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔑 Express 密码哈希与安全</h2><p>bcrypt (哈希/盐/对比)、密码安全策略 (复杂度/轮换/限制)、用户模型密码字段设计、注册/登录/修改密码流程、Argon2 替代方案、密码重置令牌。</p></div>
+    <div class="card">
+        <h2>bcrypt 密码哈希</h2>
+        <div class="code">// ========== bcrypt ==========
+// 密码哈希标准, 内置盐值 + 自适应成本
+
+npm install bcrypt
+// 或使用 bcryptjs (纯JS, 无C++编译)
+
+// ========== 哈希密码 ==========
+const bcrypt = require('bcrypt');
+const SALT_ROUNDS = 12;  // 推荐 10-12, 越高越慢但更安全
+
+async function hashPassword(password) {
+    // 自动生成盐值 + 哈希
+    const salt = await bcrypt.genSalt(SALT_ROUNDS);
+    return bcrypt.hash(password, salt);
+}
+
+// 或一步完成:
+const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+
+// bcrypt 哈希格式:
+// $2b$12$XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+// ├┘├┘├─┘├──────────────────────────────────────────┘
+// 算 版  成本  盐值(22 char) + 哈希(31 char)
+// 法 本   (2^12轮)
+
+// ========== 验证密码 ==========
+async function comparePassword(plainPassword, hashedPassword) {
+    return bcrypt.compare(plainPassword, hashedPassword);
+    // true / false
+}
+
+// ========== 成本选择 ==========
+// 成本 10: ~100ms (开发/一般)
+// 成本 12: ~300ms (推荐)
+// 成本 14: ~1s (高安全)
+//
+// 测量哈希时间:
+async function benchmark() {
+    for (const rounds of [10, 12, 14]) {
+        const start = Date.now();
+        await bcrypt.hash('test', rounds);
+        console.log(`Rounds ${rounds}: ${Date.now() - start}ms`);
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>用户模型与密码字段</h2>
+        <div class="code">// ========== Mongoose 用户模型 ==========
+// models/User.js:
+
+const mongoose = require('mongoose');
+const bcrypt = require('bcrypt');
+
+const userSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: true,
+        trim: true,
+        minlength: 2,
+        maxlength: 50,
+    },
+    email: {
+        type: String,
+        required: true,
+        unique: true,
+        lowercase: true,
+        trim: true,
+    },
+    password: {
+        type: String,
+        required: true,
+        minlength: 8,
+        maxlength: 128,
+        select: false,     // 默认查询不返回密码
+    },
+    passwordChangedAt: Date,
+    passwordResetToken: String,
+    passwordResetExpires: Date,
+    role: {
+        type: String,
+        enum: ['user', 'admin'],
+        default: 'user',
+    },
+    isActive: {
+        type: Boolean,
+        default: true,
+    },
+}, { timestamps: true });
+
+// ========== 保存前自动哈希 ==========
+userSchema.pre('save', async function(next) {
+    // 只有密码字段被修改时才哈希
+    if (!this.isModified('password')) return next();
+
+    this.password = await bcrypt.hash(this.password, 12);
+    this.passwordChangedAt = new Date();
+    next();
+});
+
+// ========== 实例方法: 密码对比 ==========
+userSchema.methods.comparePassword = async function(candidatePassword) {
+    return bcrypt.compare(candidatePassword, this.password);
+};
+
+// ========== 实例方法: 返回安全 JSON ==========
+userSchema.methods.toPublicJSON = function() {
+    return {
+        id: this._id,
+        name: this.name,
+        email: this.email,
+        role: this.role,
+        createdAt: this.createdAt,
+    };
+};
+
+module.exports = mongoose.model('User', userSchema);</div>
+    </div>
+    <div class="card">
+        <h2>注册与密码管理</h2>
+        <div class="code">// ========== 注册流程 ==========
+// authController.js:
+
+const User = require('../models/User');
+
+exports.register = asyncHandler(async (req, res) => {
+    const { name, email, password } = req.body;
+
+    // 密码强度验证 (Joi 已做, 再次确认)
+    if (password.length < 8) {
+        throw new BadRequestError('Password must be at least 8 characters');
+    }
+
+    // 创建用户 (pre-save hook 自动哈希)
+    const user = await User.create({ name, email, password });
+
+    // 签发令牌
+    const tokens = generateTokens(user);
+
+    res.status(201).json({
+        success: true,
+        data: {
+            user: user.toPublicJSON(),
+            ...tokens,
+        },
+    });
+});
+
+// ========== 修改密码 ==========
+exports.changePassword = asyncHandler(async (req, res) => {
+    const { currentPassword, newPassword } = req.body;
+
+    // 验证当前密码
+    const user = await User.findById(req.user.sub).select('+password');
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+        throw new BadRequestError('Current password is incorrect');
+    }
+
+    // 新密码和旧密码不能相同
+    if (currentPassword === newPassword) {
+        throw new BadRequestError('New password must be different');
+    }
+
+    // 更新密码 (pre-save hook 自动哈希)
+    user.password = newPassword;
+    await user.save();
+
+    // 重新签发令牌 (旧令牌失效)
+    const tokens = generateTokens(user);
+
+    res.success({ ...tokens }, 'Password changed successfully');
+});</div>
+    </div>
+    <div class="card">
+        <h2>密码重置与最佳实践</h2>
+        <div class="code">// ========== 忘记密码 / 重置密码 ==========
+const crypto = require('crypto');
+
+// 1. 生成重置令牌:
+exports.forgotPassword = asyncHandler(async (req, res) => {
+    const user = await User.findOne({ email: req.body.email });
+    if (!user) {
+        // 为安全: 不告知用户是否存在
+        return res.success(null, 'If email exists, reset link sent');
+    }
+
+    // 生成随机令牌
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    user.passwordResetToken = crypto
+        .createHash('sha256')
+        .update(resetToken)
+        .digest('hex');
+    user.passwordResetExpires = Date.now() + 60 * 60 * 1000; // 1 小时
+    await user.save({ validateBeforeSave: false });
+
+    // 发送邮件 (包含原始 resetToken, 非哈希)
+    await emailService.sendPasswordReset(user.email, resetToken);
+
+    res.success(null, 'Password reset link sent');
+});
+
+// 2. 重置密码:
+exports.resetPassword = asyncHandler(async (req, res) => {
+    const hashedToken = crypto
+        .createHash('sha256')
+        .update(req.params.token)
+        .digest('hex');
+
+    const user = await User.findOne({
+        passwordResetToken: hashedToken,
+        passwordResetExpires: { $gt: Date.now() },
+    });
+
+    if (!user) {
+        throw new BadRequestError('Token is invalid or expired');
+    }
+
+    user.password = req.body.password;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+
+    const tokens = generateTokens(user);
+    res.success({ ...tokens }, 'Password reset successful');
+});
+
+// ========== 密码安全最佳实践 ==========
+// 1. 最小 8 字符, 建议 12+
+// 2. 包含大写/小写/数字/符号
+// 3. bcrypt 成本 >= 12
+// 4. 密码从不明文存储/日志/返回
+// 5. 密码重置令牌单次有效 + 过期
+// 6. 登录失败次数限制 (防暴力破解)
+// 7. 密码修改后旧令牌失效
+// 8. 不与常见密码相同 (密码字典检查)</div>
+        <div class="note">💡 密码安全要点: bcrypt 自动加盐 + 可调成本; 成本 12 平衡安全与性能; pre-save hook 自动哈希; select:false 防止默认查询返回密码; 密码重置用 crypto 令牌 + 邮件; 令牌哈希存库 (防数据库泄露); 登录限流防暴力破解; 密码永不返回给客户端; toPublicJSON 排除敏感字段。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoBcrypt()">bcrypt 哈希</button>
+        <button onclick="demoModel()">用户模型</button>
+        <button onclick="demoReset()">密码重置</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoBcrypt() {
+            result.innerHTML = '';
+            log('# bcrypt 密码哈希');
+            log('');
+            log('const bcrypt = require("bcrypt");');
+            log('');
+            log('// 哈希:');
+            log('const hash = await bcrypt.hash(password, 12);');
+            log('$2b$12$... (60 字符)');
+            log('');
+            log('// 验证:');
+            log('const match = await bcrypt.compare(plain, hash);');
+            log('// true / false');
+        }
+
+        function demoModel() {
+            result.innerHTML = '';
+            log('# 用户模型');
+            log('');
+            log('userSchema.pre("save", async function() {');
+            log('  if (!this.isModified("password")) return;');
+            log('  this.password = await bcrypt.hash(this.password, 12);');
+            log('});');
+            log('');
+            log('userSchema.methods.comparePassword = async (pw) => {');
+            log('  return bcrypt.compare(pw, this.password);');
+            log('};');
+            log('');
+            log('select: false → 不返回密码');
+        }
+
+        function demoReset() {
+            result.innerHTML = '';
+            log('# 密码重置流程');
+            log('');
+            log('1. 用户请求重置 → 生成令牌');
+            log('   crypto.randomBytes(32)');
+            log('');
+            log('2. 令牌哈希后存库, 原始令牌发邮件');
+            log('');
+            log('3. 用户点击链接 → 验证令牌');
+            log('   检查未过期 + 匹配哈希');
+            log('');
+            log('4. 设置新密码 → 清除重置令牌');
+        }
+    </script>
+</body>
+</html>

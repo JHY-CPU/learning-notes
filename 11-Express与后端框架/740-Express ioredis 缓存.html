@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express ioredis 缓存</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚡ Express ioredis 缓存</h2><p>ioredis 客户端、缓存模式 (Cache Aside/Read-Through)、API 响应缓存、Redis Session 存储、限流实现、发布订阅、排行榜、缓存失效策略。</p></div>
+    <div class="card">
+        <h2>ioredis 基础</h2>
+        <div class="code">// ========== ioredis ==========
+// 功能最全的 Node.js Redis 客户端
+
+// 安装:
+// npm install ioredis
+
+const Redis = require('ioredis');
+
+// ========== 连接 ==========
+const redis = new Redis({
+    host: process.env.REDIS_HOST || 'localhost',
+    port: parseInt(process.env.REDIS_PORT, 10) || 6379,
+    password: process.env.REDIS_PASSWORD,
+
+    // 连接池
+    maxRetriesPerRequest: 3,
+    retryStrategy: (times) => {
+        if (times > 10) return null;  // 停止重试
+        return Math.min(times * 200, 2000);
+    },
+
+    // 自动重连
+    reconnectOnError: (err) => {
+        const targetError = 'READONLY';
+        if (err.message.includes(targetError)) return true;
+        return false;
+    },
+
+    // 超时
+    connectTimeout: 10000,
+    commandTimeout: 5000,
+
+    // 心跳
+    keepAlive: 10000,
+});
+
+// ========== 事件 ==========
+redis.on('connect', () => logger.info('Redis connected'));
+redis.on('error', (err) => logger.error('Redis error', { err }));
+redis.on('ready', () => logger.info('Redis ready'));
+
+// ========== 基础操作 ==========
+// String
+await redis.set('key', 'value');
+await redis.set('key', 'value', 'EX', 3600);  // 1小时过期
+const value = await redis.get('key');          // null 或 'value'
+await redis.del('key');
+
+// 批量
+await redis.mset({ key1: 'v1', key2: 'v2' });
+const result = await redis.mget('key1', 'key2');  // ['v1', 'v2']
+
+// 自增
+await redis.incr('counter');
+await redis.incrby('counter', 10);
+
+// ========== 关闭 ==========
+process.on('SIGTERM', async () => {
+    await redis.quit();
+});
+
+module.exports = redis;</div>
+    </div>
+    <div class="card">
+        <h2>缓存模式</h2>
+        <div class="code">// ========== Cache Aside 模式 ==========
+// 最常用的缓存模式
+
+async function getUser(id) {
+    // 1. 先查缓存
+    const cached = await redis.get(`user:${id}`);
+    if (cached) {
+        return JSON.parse(cached);
+    }
+
+    // 2. 缓存未命中 → 查数据库
+    const user = await User.findById(id).lean();
+    if (!user) return null;
+
+    // 3. 写入缓存 (1小时过期)
+    await redis.set(
+        `user:${id}`,
+        JSON.stringify(user),
+        'EX',
+        3600
+    );
+
+    return user;
+}
+
+// ========== 通用缓存中间件 ==========
+function cacheMiddleware(ttl = 60) {
+    return async (req, res, next) => {
+        // 只缓存 GET 请求
+        if (req.method !== 'GET') return next();
+
+        const key = `cache:${req.originalUrl}`;
+
+        try {
+            const cached = await redis.get(key);
+            if (cached) {
+                const data = JSON.parse(cached);
+                return res.json(data);  // 直接返回缓存
+            }
+
+            // 拦截 res.json 来缓存响应
+            const originalJson = res.json.bind(res);
+            res.json = async (body) => {
+                if (res.statusCode === 200) {
+                    await redis.set(key, JSON.stringify(body), 'EX', ttl);
+                }
+                originalJson(body);
+            };
+
+            next();
+        } catch (err) {
+            next();
+        }
+    };
+}
+
+// 使用:
+app.get('/api/users', cacheMiddleware(300), async (req, res) => {
+    const users = await User.find().lean();
+    res.json({ success: true, data: users });
+});
+
+// ========== 缓存失效策略 ==========
+// 1. TTL 过期 (被动)
+// 2. 更新时主动删除
+// 3. 通配符清除
+
+// 更新时清除:
+async function updateUser(id, data) {
+    const user = await User.findByIdAndUpdate(id, data, { new: true });
+    // 清除缓存
+    await redis.del(`user:${id}`);
+    // 清除列表缓存
+    await redis.del('cache:/api/users*');
+    return user;
+}
+
+// 通配符删除:
+async function clearCache(pattern) {
+    let cursor = '0';
+    do {
+        const [nextCursor, keys] = await redis.scan(
+            cursor, 'MATCH', pattern, 'COUNT', 100
+        );
+        if (keys.length > 0) {
+            await redis.del(keys);
+        }
+        cursor = nextCursor;
+    } while (cursor !== '0');
+}
+
+// 清除用户所有相关缓存:
+await clearCache('user:*');
+
+// ========== 防止缓存雪崩 ==========
+// 过期时间加随机偏移
+const ttl = 3600 + Math.floor(Math.random() * 600);
+await redis.set(key, data, 'EX', ttl);
+
+// ========== 防止缓存穿透 ==========
+// 查询不存在的数据也缓存空值
+const cached = await redis.get(key);
+if (cached !== null) {
+    return cached === 'NULL' ? null : JSON.parse(cached);
+}
+// 数据库查询...
+if (!data) {
+    await redis.set(key, 'NULL', 'EX', 60);  // 短时间缓存空值
+    return null;
+}</div>
+    </div>
+    <div class="card">
+        <h2>数据结构应用</h2>
+        <div class="code">// ========== Redis 数据结构 ==========
+
+// ========== 1. 排行榜 (ZSet) ==========
+// ZINCRBY leaderboard 1 userId
+await redis.zincrby('leaderboard:daily', score, userId);
+
+// 获取排行榜前十
+const top10 = await redis.zrevrange(
+    'leaderboard:daily',
+    0, 9,
+    'WITHSCORES'
+);
+// ['userId1', '100', 'userId2', '95', ...]
+
+// 用户排名
+const rank = await redis.zrevrank('leaderboard:daily', userId);
+// 0 = 第一名
+
+// ========== 2. 限流 (计数器) ==========
+const WINDOW = 60;   // 60秒
+const MAX = 100;      // 最多 100 次
+
+async function rateLimit(userId) {
+    const key = `ratelimit:${userId}:${Math.floor(Date.now() / 1000 / WINDOW)}`;
+
+    const count = await redis.incr(key);
+    if (count === 1) {
+        await redis.expire(key, WINDOW);
+    }
+
+    return count <= MAX;
+}
+
+// ========== 3. 布隆过滤器 ==========
+// 判断某值是否可能存在 (用于防穿透)
+// 需要安装 RedisBloom 模块
+// BF.ADD bloom:users user:123
+// BF.EXISTS bloom:users user:123
+
+// ========== 4. 分布式锁 ==========
+async function acquireLock(key, ttl = 3000) {
+    const result = await redis.set(
+        `lock:${key}`,
+        process.pid.toString(),
+        'PX', ttl,  // 毫秒
+        'NX'        // 不存在才设置
+    );
+    return result === 'OK';
+}
+
+async function releaseLock(key) {
+    await redis.del(`lock:${key}`);
+}
+
+// 使用:
+const locked = await acquireLock('order:123');
+if (locked) {
+    try {
+        // 处理订单...
+    } finally {
+        await releaseLock('order:123');
+    }
+}
+
+// ========== 5. 消息队列 (List) ==========
+// 生产者:
+await redis.lpush('queue:email', JSON.stringify({ to, subject }));
+
+// 消费者 (阻塞):
+while (true) {
+    const item = await redis.brpop('queue:email', 0);  // 阻塞等待
+    const email = JSON.parse(item[1]);
+    await sendEmail(email);
+}
+
+// ========== 6. Set 操作 ==========
+// 标签系统
+await redis.sadd('tag:javascript', postId);
+await redis.sadd('tag:nodejs', postId);
+// 交集: 同时有 js 和 nodejs 标签
+const common = await redis.sinter('tag:javascript', 'tag:nodejs');</div>
+    </div>
+    <div class="card">
+        <h2>Express 缓存优化实战</h2>
+        <div class="code">// ========== Express 缓存实战 ==========
+
+// ========== 1. 数据缓存服务 ==========
+class CacheService {
+    constructor(redis) {
+        this.redis = redis;
+        this.defaultTTL = 3600;
+    }
+
+    // 获取或回源
+    async getOrFetch(key, fetchFn, ttl = this.defaultTTL) {
+        const cached = await this.redis.get(key);
+        if (cached) return JSON.parse(cached);
+
+        const data = await fetchFn();
+        if (data !== null) {
+            await this.redis.set(key, JSON.stringify(data), 'EX', ttl);
+        }
+        return data;
+    }
+
+    // 批量获取
+    async getMany(keys) {
+        if (keys.length === 0) return [];
+
+        const cached = await this.redis.mget(keys);
+        return cached.map(v => v ? JSON.parse(v) : null);
+    }
+
+    // 设置缓存
+    async set(key, data, ttl = this.defaultTTL) {
+        await this.redis.set(key, JSON.stringify(data), 'EX', ttl);
+    }
+
+    // 删除缓存
+    async invalidate(key) {
+        await this.redis.del(key);
+    }
+
+    // 模式删除
+    async invalidatePattern(pattern) {
+        let cursor = '0';
+        do {
+            const [nextCursor, keys] = await this.redis.scan(
+                cursor, 'MATCH', pattern, 'COUNT', 100
+            );
+            if (keys.length > 0) {
+                await this.redis.del(keys);
+            }
+            cursor = nextCursor;
+        } while (cursor !== '0');
+    }
+}
+
+const cacheService = new CacheService(redis);
+
+// ========== 2. Express 路由中使用 ==========
+app.get('/api/products', async (req, res) => {
+    const products = await cacheService.getOrFetch(
+        `products:${req.query.category || 'all'}`,
+        () => Product.find(req.query.category ? { category: req.query.category } : {}).lean(),
+        300  // 5 分钟
+    );
+    res.success(products);
+});
+
+// 写入时清除缓存:
+app.post('/api/products', authenticate, async (req, res) => {
+    const product = await Product.create(req.body);
+    // 清除产品列表缓存
+    await cacheService.invalidatePattern('products:*');
+    res.created(product);
+});
+
+// ========== 3. 预热缓存 ==========
+// 系统启动时预加载热门数据
+async function warmupCache() {
+    const hotProducts = await Product.find({ isHot: true }).lean();
+    await cacheService.set('products:hot', hotProducts, 3600);
+
+    const categories = await Product.distinct('category');
+    for (const category of categories) {
+        const products = await Product.find({ category }).lean();
+        await cacheService.set(`products:${category}`, products, 3600);
+    }
+
+    logger.info('Cache warmed up');
+}
+
+// ========== 4. 缓存统计 ==========
+const cacheStats = { hits: 0, misses: 0 };
+async function getWithStats(key, fetchFn, ttl) {
+    const cached = await redis.get(key);
+    if (cached) {
+        cacheStats.hits++;
+        return JSON.parse(cached);
+    }
+    cacheStats.misses++;
+    // ... fetch
+}
+
+// 监控缓存命中率:
+// app.get('/admin/cache/stats', (req, res) => {
+//     const total = cacheStats.hits + cacheStats.misses;
+//     const rate = total > 0 ? (cacheStats.hits / total * 100).toFixed(1) : 0;
+//     res.json({ hits: cacheStats.hits, misses: cacheStats.misses, hitRate: `${rate}%` });
+// });</div>
+        <div class="note">💡 ioredis 要点: Cache Aside 模式; TTL 防缓存雪崩 (加随机偏移); 缓存空值防穿透; 通用缓存中间件; SCAN 通配符删除; ZSet 排行榜; 分布式锁 NX+PX; List 消息队列; Set 标签交集; 预热缓存; 命中率监控; retryStrategy 重连策略。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCache()">缓存模式</button>
+        <button onclick="demoData()">数据结构</button>
+        <button onclick="demoService()">缓存服务</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCache() {
+            result.innerHTML = '';
+            log('# Cache Aside 模式');
+            log('');
+            log('1. 查缓存 (get)');
+            log('2. 命中 → 返回');
+            log('3. 未命中 → 查数据库');
+            log('4. 写入缓存 (TTL)');
+            log('5. 更新时清除缓存');
+            log('');
+            log('防雪崩: TTL + 随机偏移');
+            log('防穿透: 缓存空值 "NULL"');
+            log('命中率: hits / (hits + misses)');
+        }
+
+        function demoData() {
+            result.innerHTML = '';
+            log('# Redis 数据结构应用');
+            log('');
+            log('String   - 缓存, 计数器');
+            log('Hash     - 对象, 在线状态');
+            log('List     - 消息队列');
+            log('Set      - 标签, 去重');
+            log('ZSet     - 排行榜, 限流');
+            log('');
+            log('分布式锁:');
+            log('SET lock:key pid PX 3000 NX');
+        }
+
+        function demoService() {
+            result.innerHTML = '';
+            log('# 缓存服务封装');
+            log('');
+            log('class CacheService {');
+            log('  async getOrFetch(key, fn, ttl) {');
+            log('    const cached = await redis.get(key);');
+            log('    if (cached) return JSON.parse(cached);');
+            log('    const data = await fn();');
+            log('    await redis.set(key, JSON.stringify(data), "EX", ttl);');
+            log('    return data;');
+            log('  }');
+            log('}');
+            log('');
+            log('预热: 启动时加载热门数据');
+            log('统计: 命中率 + 键数量');
+        }
+    </script>
+</body>
+</html>

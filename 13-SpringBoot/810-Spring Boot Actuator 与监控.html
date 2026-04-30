@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot Actuator 与监控</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📊 Spring Boot Actuator 与监控</h2><p>Actuator 端点 (health/metrics/info/env)、自定义 HealthIndicator、Metrics 指标、Micrometer 集成 Prometheus、动态日志级别、应用信息与版本。</p></div>
+    <div class="card">
+        <h2>Actuator 入门</h2>
+        <div class="code">// ========== Spring Boot Actuator ==========
+// 生产级监控和管理端点
+// 提供: 健康检查/指标/环境信息/日志/线程转储等
+
+// ========== 依赖 ==========
+// &lt;dependency&gt;
+//     &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+//     &lt;artifactId&gt;spring-boot-starter-actuator&lt;/artifactId&gt;
+// &lt;/dependency&gt;
+
+// ========== 配置端点 ==========
+// application.yml:
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,env,loggers,threaddump,heapdump,conditions,mappings,configprops,beans
+        # 包含所有: include: "*"
+        # 排除: exclude: env,beans
+      base-path: /actuator                  # 默认 /actuator
+      cors:
+        allowed-origins: http://localhost:3000
+        allowed-methods: GET,POST
+  endpoint:
+    health:
+      show-details: always                 # 显示详细健康信息 (默认 never)
+      show-components: always              # 显示组件状态
+    info:
+      enabled: true
+    env:
+      show-values: when-authorized         # 环境变量显示策略
+    configprops:
+      show-values: when-authorized
+    shutdown:
+      enabled: false                       # 关闭端点默认禁用 (危险)
+
+// ========== 常用端点 ==========
+// GET  /actuator/health        — 健康检查
+// GET  /actuator/info          — 应用信息
+// GET  /actuator/metrics       — 指标列表
+// GET  /actuator/metrics/{name} — 特定指标详情
+// GET  /actuator/env           — 环境属性
+// GET  /actuator/env/{name}    — 特定属性
+// GET  /actuator/loggers       — 日志级别
+// POST /actuator/loggers/{name} — 修改日志级别
+// GET  /actuator/conditions    — 自动配置条件
+// GET  /actuator/beans         — 所有 Bean
+// GET  /actuator/mappings      — 请求映射
+// GET  /actuator/threaddump    — 线程转储
+// GET  /actuator/heapdump      — 堆转储 (.hprof)
+// POST /actuator/shutdown      — 关闭应用
+
+// ========== 端点 URL 示例 ==========
+// http://localhost:8080/actuator/health
+// {
+//   "status": "UP",
+//   "components": {
+//     "db": { "status": "UP", "database": "MySQL", "validationQuery": "isValid()" },
+//     "redis": { "status": "UP" },
+//     "diskSpace": { "status": "UP", "total": 500107862016, "free": 320182329344 },
+//     "ping": { "status": "UP" }
+//   }
+// }</div>
+    </div>
+    <div class="card">
+        <h2>自定义 HealthIndicator</h2>
+        <div class="code">// ========== 健康检查 ==========
+// Actuator 聚合多个 HealthIndicator 判断应用状态
+
+// ========== 内置 HealthIndicator ==========
+// DiskSpaceHealthIndicator      — 磁盘空间
+// DataSourceHealthIndicator     — 数据源
+// RedisHealthIndicator          — Redis
+// MongoHealthIndicator          — MongoDB
+// ElasticsearchHealthIndicator  — ES
+// RabbitHealthIndicator         — RabbitMQ
+// CassandraHealthIndicator      — Cassandra
+
+// ========== 自定义 HealthIndicator ==========
+// 检查外部 API 是否可用
+
+@Component
+public class ExternalApiHealthIndicator implements HealthIndicator {
+
+    private final RestTemplate restTemplate;
+
+    @Override
+    public Health health() {
+        try {
+            ResponseEntity&lt;String&gt; response = restTemplate
+                .getForEntity("https://api.example.com/health", String.class);
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                return Health.up()
+                    .withDetail("url", "https://api.example.com")
+                    .withDetail("statusCode", response.getStatusCodeValue())
+                    .withDetail("responseTime", "50ms")
+                    .build();
+            } else {
+                return Health.down()
+                    .withDetail("url", "https://api.example.com")
+                    .withDetail("statusCode", response.getStatusCodeValue())
+                    .build();
+            }
+        } catch (Exception e) {
+            return Health.down(e)
+                .withDetail("url", "https://api.example.com")
+                .withDetail("error", e.getMessage())
+                .build();
+        }
+    }
+}
+
+// ========== 详细 HealthIndicator ==========
+// 检查关键业务指标
+
+@Component
+public class BusinessHealthIndicator implements HealthIndicator {
+
+    private final UserRepository userRepository;
+    private final OrderRepository orderRepository;
+
+    @Override
+    public Health health() {
+        try {
+            long userCount = userRepository.count();
+            long orderCount = orderRepository.count();
+
+            return Health.up()
+                .withDetail("totalUsers", userCount)
+                .withDetail("totalOrders", orderCount)
+                .withDetail("databaseStatus", "connected")
+                .build();
+        } catch (Exception e) {
+            return Health.down(e)
+                .withDetail("databaseStatus", "disconnected")
+                .build();
+        }
+    }
+}
+
+// ========== 健康状态权重 ==========
+// 某些服务不可用影响不同
+// 自定义 Status 聚合规则:
+
+@Component
+public class CustomHealthAggregator implements HealthAggregator {
+
+    @Override
+    public Health aggregate(Map&lt;String, Health&gt; healths) {
+        for (Health health : healths.values()) {
+            // 任何服务 DOWN, 整体 DOWN
+            if (Status.DOWN.equals(health.getStatus())) {
+                return Health.down().build();
+            }
+            // 如果有服务 OUT_OF_SERVICE
+            if (Status.OUT_OF_SERVICE.equals(health.getStatus())) {
+                return Health.outOfService().build();
+            }
+        }
+        return Health.up().build();
+    }
+}
+
+// ========== 启用所有健康详情 ==========
+// management.endpoint.health.show-details=always
+// 或:
+// management.endpoint.health.show-details=when-authorized
+// management.endpoint.health.roles=ADMIN</div>
+    </div>
+    <div class="card">
+        <h2>Info 端点与自定义信息</h2>
+        <div class="code">// ========== Info 端点 ==========
+// 显示应用构建信息、Git 提交、Java 版本等
+
+// ========== 配置静态信息 ==========
+// application.yml:
+
+info:
+  app:
+    name: '@project.name@'                # 引用 Maven 属性
+    version: '@project.version@'
+    description: '@project.description@'
+  java:
+    version: '@java.version@'
+  build:
+    artifact: '@project.artifactId@'
+    groupId: '@project.groupId@'
+  contact:
+    email: dev@example.com
+    team: backend-team
+
+// ========== Git 信息 ==========
+// 添加插件 (在 pom.xml):
+// &lt;plugin&gt;
+//     &lt;groupId&gt;pl.project13.maven&lt;/groupId&gt;
+//     &lt;artifactId&gt;git-commit-id-plugin&lt;/artifactId&gt;
+//     &lt;configuration&gt;
+//         &lt;generateGitPropertiesFile&gt;true&lt;/generateGitPropertiesFile&gt;
+//     &lt;/configuration&gt;
+// &lt;/plugin&gt;
+// 自动生成 git.properties, info 端点显示:
+// info.git.commit.id, info.git.branch, info.git.commit.time
+
+// ========== 自定义 InfoContributor ==========
+@Component
+public class CustomInfoContributor implements InfoContributor {
+
+    @Override
+    public void contribute(Info.Builder builder) {
+        builder
+            .withDetail("deployTime", LocalDateTime.now().toString())
+            .withDetail("activeProfile",
+                String.join(", ",
+                    environment.getActiveProfiles()))
+            .withDetail("memory",
+                Map.of("max", Runtime.getRuntime().maxMemory(),
+                       "total", Runtime.getRuntime().totalMemory(),
+                       "free", Runtime.getRuntime().freeMemory()))
+            .withDetail("systemInfo",
+                Map.of("os", System.getProperty("os.name"),
+                       "cpu", Runtime.getRuntime().availableProcessors()));
+    }
+}
+
+// ========== 动态修改日志级别 ==========
+// 运行时调整日志级别, 无需重启
+
+// 查看日志级别:
+// GET /actuator/loggers
+// GET /actuator/loggers/com.example
+
+// 修改日志级别 (POST):
+// POST /actuator/loggers/com.example
+// Content-Type: application/json
+// {
+//   "configuredLevel": "DEBUG"
+// }
+
+// 实现动态修改:
+@RestController
+@RequestMapping("/api/admin")
+public class LogLevelController {
+
+    private final LoggersEndpoint loggersEndpoint;
+
+    // 通过 Actuator 端点的 LoggersEndpoint 编程修改
+    @PutMapping("/log-level")
+    public ResponseEntity&lt;Void&gt; setLogLevel(
+            @RequestParam String packageName,
+            @RequestParam String level) {
+        LoggersEndpoint.LoggerLevels levels =
+            new LoggersEndpoint.LoggerLevels(null, LogLevel.valueOf(level));
+        loggersEndpoint.configureLogLevel(packageName, levels);
+        return ResponseEntity.ok().build();
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>Micrometer 与 Metrics</h2>
+        <div class="code">// ========== Micrometer ==========
+// Spring Boot Actuator 的指标系统
+// 支持: Prometheus / Graphite / Datadog / Influx / JMX
+
+// ========== 核心指标 ==========
+// /actuator/metrics 列出所有指标:
+// jvm.memory.used         — JVM 内存使用
+// jvm.memory.max          — JVM 最大内存
+// jvm.gc.pause            — GC 暂停时间
+// jvm.threads.live        — 活跃线程数
+// system.cpu.usage        — CPU 使用率
+// process.cpu.usage       — 进程 CPU
+// http.server.requests    — HTTP 请求统计
+// jdbc.connections.active — 活跃数据库连接
+// logback.events          — 日志级别统计
+
+// ========== Prometheus 集成 ==========
+// 依赖:
+// &lt;dependency&gt;
+//     &lt;groupId&gt;io.micrometer&lt;/groupId&gt;
+//     &lt;artifactId&gt;micrometer-registry-prometheus&lt;/artifactId&gt;
+// &lt;/dependency&gt;
+
+// 配置暴露 Prometheus 端点:
+// management.endpoints.web.exposure.include=prometheus
+// 或包含所有: include=*
+
+// Prometheus 抓取端点:
+// GET /actuator/prometheus
+// 返回 Prometheus 格式文本:
+// # HELP jvm_memory_used_bytes The amount of used memory
+// # TYPE jvm_memory_used_bytes gauge
+// jvm_memory_used_bytes{area="heap",id="G1 Eden Space",} 2.097152E7
+
+// ========== 自定义 Metrics ==========
+
+@Service
+public class OrderMetricsService {
+
+    private final MeterRegistry meterRegistry;
+
+    // 计数器: 订单创建数
+    private final Counter orderCreatedCounter;
+
+    // 计时器: 订单处理时间
+    private final Timer orderProcessingTimer;
+
+    // 仪表: 待处理订单数
+    private final AtomicInteger pendingOrders;
+
+    public OrderMetricsService(MeterRegistry meterRegistry) {
+        this.meterRegistry = meterRegistry;
+
+        this.orderCreatedCounter = Counter.builder("orders.created.total")
+            .description("订单创建总数")
+            .tag("type", "all")
+            .register(meterRegistry);
+
+        this.orderProcessingTimer = Timer.builder("orders.processing.duration")
+            .description("订单处理耗时")
+            .publishPercentiles(0.5, 0.95, 0.99)    // P50, P95, P99
+            .register(meterRegistry);
+
+        this.pendingOrders = meterRegistry.gauge(
+            "orders.pending.count",
+            new AtomicInteger(0));
+    }
+
+    // 记录订单创建
+    public void recordOrderCreated(String status) {
+        orderCreatedCounter.increment();
+        meterRegistry.counter("orders.created.total",
+            "status", status).increment();
+    }
+
+    // 记录处理时间
+    public void recordProcessingTime(Runnable task) {
+        orderProcessingTimer.record(task);
+    }
+
+    // 更新待处理数
+    public void setPendingOrders(int count) {
+        pendingOrders.set(count);
+    }
+
+    // 记录自定义分布
+    public void recordOrderAmount(double amount, String currency) {
+        DistributionSummary summary = DistributionSummary
+            .builder("orders.amount")
+            .description("订单金额分布")
+            .baseUnit("CNY")
+            .publishPercentiles(0.5, 0.9, 0.99)
+            .tag("currency", currency)
+            .register(meterRegistry);
+        summary.record(amount);
+    }
+}
+
+// ========== @Timed 注解 ==========
+// AOP 方式自动计时
+
+@RestController
+@RequiredArgsConstructor
+@Timed                                    // 类级别
+public class OrderController {
+
+    @Timed(value = "orders.create",       // 方法级别覆盖
+          percentiles = {0.5, 0.95},
+          description = "创建订单耗时")
+    @PostMapping("/orders")
+    public ResponseEntity&lt;Order&gt; createOrder(@RequestBody CreateOrderRequest req) {
+        // 自动记录方法执行时间
+        return ResponseEntity.ok(orderService.createOrder(req));
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>最佳实践</h2>
+        <div class="code">// ========== Actuator 最佳实践 ==========
+
+// ========== 1. 安全加固 ==========
+// Actuator 端点暴露敏感信息, 必须保护
+
+// 方式 1: 独立端口 (推荐)
+// management.server.port=8081
+// management.server.address=127.0.0.1
+
+// 方式 2: Spring Security 保护
+@Configuration
+@Order(1)
+public class ActuatorSecurityConfig {
+
+    @Bean
+    public SecurityFilterChain actuatorFilterChain(HttpSecurity http) throws Exception {
+        http
+            .securityMatcher("/actuator/**")
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/actuator/health").permitAll()   // 健康检查开放
+                .requestMatchers("/actuator/info").permitAll()
+                .anyRequest().hasRole("ADMIN")                     // 其他需 ADMIN
+            )
+            .httpBasic(Customizer.withDefaults());
+        return http.build();
+    }
+}
+
+// 方式 3: 关闭敏感端点
+// management.endpoint.shutdown.enabled=false
+// management.endpoint.env.enabled=false
+
+// ========== 2. 健康检查定制 ==========
+// 配置 K8s 就绪和存活探针
+// management.endpoint.health.probes.enabled=true
+
+// Kubernetes liveness: /actuator/health/liveness
+// Kubernetes readiness: /actuator/health/readiness
+
+// ========== 3. Prometheus + Grafana ==========
+// 集成 Prometheus 抓取 /actuator/prometheus
+// Grafana 导入 Spring Boot 仪表盘 (ID: 4701)
+
+// ========== 4. 关键指标 ==========
+// 监控重点:
+// - 堆内存使用 (OOM 预警)
+// - GC 频率和时间 (GC 问题)
+// - HTTP 请求延迟 P99 (性能)
+// - 错误率 (异常增加)
+// - 线程状态 (死锁/阻塞)
+// - 数据库连接池 (连接耗尽)
+
+// ========== 5. 日志管理 ==========
+// 通过 /actuator/loggers 动态调整日志级别
+// 生产环境默认 INFO
+// 排查问题时临时降级到 DEBUG
+
+// ========== 6. 端点访问控制 ==========
+// 启用认证 + HTTPS
+// 独立管理端口
+// 内网隔离
+
+// ========== 7. 健康检查自定义 ==========
+// 区分关键依赖和非关键依赖
+// 关键依赖 DOWN → 整体 DOWN
+// 非关键依赖 DOWN → 整体 UP 但告警
+
+// ========== 8. 监控告警 ==========
+// Prometheus + Alertmanager
+// 配置告警规则:
+// - 服务不可用 (health=DOWN > 1m)
+// - 高错误率 (http 5xx > 1%)
+// - 高延迟 (P99 > 500ms)
+// - OOM 风险 (堆 > 90%)</div>
+        <div class="note">💡 Actuator 要点: /actuator/health 健康检查; /actuator/metrics 指标; /actuator/info 应用信息; /actuator/loggers 动态日志; Micrometer + Prometheus 指标; HealthIndicator 自定义健康; @Timed 方法计时; 独立管理端口; Security 保护敏感端点; K8s 存活/就绪探针。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoEndpoints()">端点概览</button>
+        <button onclick="demoHealth()">健康检查</button>
+        <button onclick="demoMetrics()">自定义指标</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoEndpoints() {
+            result.innerHTML = '';
+            log('# Actuator 端点');
+            log('');
+            log('📋 端点列表:');
+            log('  /actuator/health     — 健康检查');
+            log('  /actuator/info       — 应用信息');
+            log('  /actuator/metrics    — 指标');
+            log('  /actuator/env        — 环境变量');
+            log('  /actuator/loggers    — 日志级别');
+            log('  /actuator/beans      — Bean 列表');
+            log('  /actuator/mappings   — 请求映射');
+            log('  /actuator/threaddump — 线程转储');
+            log('  /actuator/heapdump   — 堆转储');
+            log('');
+            log('配置暴露: include="*"');
+        }
+
+        function demoHealth() {
+            result.innerHTML = '';
+            log('# 健康检查 HealthIndicator');
+            log('');
+            log('内置健康检查:');
+            log('  DataSourceHealthIndicator');
+            log('  RedisHealthIndicator');
+            log('  DiskSpaceHealthIndicator');
+            log('');
+            log('自定义 HealthIndicator:');
+            log('  implements HealthIndicator');
+            log('  health() 返回 Health.up/down');
+            log('  withDetail(key, value) 添加详情');
+            log('');
+            log('配置: show-details=always');
+        }
+
+        function demoMetrics() {
+            result.innerHTML = '';
+            log('# Micrometer 指标');
+            log('');
+            log('核心指标类型:');
+            log('  📊 Counter      — 计数器 (只增)');
+            log('  📏 Gauge        — 仪表 (可增减)');
+            log('  ⏱ Timer        — 计时器');
+            log('  📈 DistributionSummary — 分布');
+            log('');
+            log('集成 Prometheus:');
+            log('  添加 micrometer-registry-prometheus');
+            log('  GET /actuator/prometheus');
+            log('  Grafana 仪表盘 ID: 4701');
+            log('');
+            log('自定义: meterRegistry.counter/timer/gauge');
+        }
+    </script>
+</body>
+</html>

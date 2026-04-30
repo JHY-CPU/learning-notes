@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>项目实战 Express + PostgreSQL REST API</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📦 项目实战 1: Express + PostgreSQL REST API</h2><p>完整项目: 目录结构、数据库迁移、CRUD 路由、JWT 认证、Swagger 文档。</p></div>
+    <div class="card">
+        <h2>项目结构</h2>
+        <div class="code">// myapp/
+// ├── src/
+// │   ├── config/        # 配置 (env)
+// │   │   └── index.js
+// │   ├── db/            # 数据库
+// │   │   ├── migrations/   # knex 迁移
+// │   │   └── index.js      # 连接池
+// │   ├── middleware/    # 中间件
+// │   │   ├── auth.js       # JWT 认证
+// │   │   ├── validate.js   # 请求验证
+// │   │   └── error.js      # 错误处理
+// │   ├── routes/        # 路由
+// │   │   ├── auth.js
+// │   │   └── todos.js
+// │   ├── controllers/   # 控制器
+// │   │   ├── authController.js
+// │   │   └── todoController.js
+// │   ├── models/        # 数据模型
+// │   │   └── index.js
+// │   └── app.js         # Express 入口
+// ├── tests/
+// ├── .env
+// ├── docker-compose.yml
+// └── package.json
+
+// ========== 数据库 Schema ==========
+// -- migrations/001_create_tables.js
+// exports.up = function(knex) {
+//   return knex.schema
+//     .createTable('users', table => {
+//       table.increments('id');
+//       table.string('name').notNullable();
+//       table.string('email').unique().notNullable();
+//       table.string('password_hash').notNullable();
+//       table.timestamps(true, true);
+//     })
+//     .createTable('todos', table => {
+//       table.increments('id');
+//       table.string('title').notNullable();
+//       table.boolean('completed').defaultTo(false);
+//       table.integer('user_id')
+//            .references('id').inTable('users')
+//            .onDelete('CASCADE');
+//       table.timestamps(true, true);
+//     });
+// };</div>
+    </div>
+    <div class="card">
+        <h2>核心代码</h2>
+        <div class="code">// ========== 配置 ==========
+// config/index.js
+require('dotenv').config();
+
+module.exports = {
+  db: {
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT) || 5432,
+    database: process.env.DB_NAME || 'myapp',
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASSWORD || '',
+  },
+  jwt: {
+    secret: process.env.JWT_SECRET || 'dev-secret',
+    expiresIn: process.env.JWT_EXPIRES_IN || '15m',
+  },
+  server: {
+    port: parseInt(process.env.PORT) || 3000,
+  },
+};
+
+// ========== 数据库连接池 ==========
+// db/index.js
+const knex = require('knex');
+const config = require('../config');
+
+const db = knex({
+  client: 'pg',
+  connection: config.db,
+  pool: { min: 2, max: 10 },
+});
+
+module.exports = db;
+
+// ========== JWT 中间件 ==========
+// middleware/auth.js
+const jwt = require('jsonwebtoken');
+const config = require('../config');
+
+function authenticate(req, res, next) {
+  const header = req.headers.authorization;
+  if (!header || !header.startsWith('Bearer ')) {
+    return res.status(401).json({ error: '未认证' });
+  }
+
+  const token = header.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, config.jwt.secret);
+    req.userId = decoded.userId;
+    next();
+  } catch (err) {
+    return res.status(401).json({ error: '令牌无效或已过期' });
+  }
+}
+
+module.exports = { authenticate };
+
+// ========== 控制器 ==========
+// controllers/todoController.js
+const db = require('../db');
+
+exports.list = async (req, res) => {
+  const todos = await db('todos')
+    .where({ user_id: req.userId })
+    .select('id', 'title', 'completed', 'created_at')
+    .orderBy('created_at', 'desc');
+
+  res.json({ data: todos });
+};
+
+exports.create = async (req, res) => {
+  const { title } = req.body;
+  const [todo] = await db('todos')
+    .insert({ title, user_id: req.userId })
+    .returning(['id', 'title', 'completed', 'created_at']);
+
+  res.status(201).json({ data: todo });
+};
+
+exports.update = async (req, res) => {
+  const { id } = req.params;
+  const { title, completed } = req.body;
+  const [todo] = await db('todos')
+    .where({ id, user_id: req.userId })
+    .update({ title, completed, updated_at: db.fn.now() })
+    .returning(['id', 'title', 'completed']);
+
+  if (!todo) return res.status(404).json({ error: '未找到' });
+  res.json({ data: todo });
+};
+
+exports.remove = async (req, res) => {
+  const { id } = req.params;
+  const deleted = await db('todos').where({ id, user_id: req.userId }).del();
+
+  if (!deleted) return res.status(404).json({ error: '未找到' });
+  res.status(204).send();
+};</div>
+    </div>
+    <div class="card">
+        <h2>路由与应用入口</h2>
+        <div class="code">// ========== 路由 ==========
+// routes/todos.js
+const { Router } = require('express');
+const { authenticate } = require('../middleware/auth');
+const todoController = require('../controllers/todoController');
+
+const router = Router();
+
+router.use(authenticate); // 所有 todo 路由需要认证
+
+router.get('/',    todoController.list);
+router.post('/',   todoController.create);
+router.put('/:id', todoController.update);
+router.delete('/:id', todoController.remove);
+
+module.exports = router;
+
+// ========== 应用入口 ==========
+// app.js
+const express = require('express');
+const helmet = require('helmet');
+const cors = require('cors');
+const morgan = require('morgan');
+
+const config = require('./config');
+const authRoutes = require('./routes/auth');
+const todoRoutes = require('./routes/todos');
+const errorHandler = require('./middleware/error');
+
+const app = express();
+
+// 全局中间件
+app.use(helmet());
+app.use(cors({ origin: process.env.CORS_ORIGIN }));
+app.use(morgan('combined'));
+app.use(express.json());
+
+// 路由
+app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/todos', todoRoutes);
+
+// 健康检查
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date() });
+});
+
+// 统一错误处理
+app.use(errorHandler);
+
+// 启动
+app.listen(config.server.port, () => {
+  console.log(`Server running on port ${config.server.port}`);
+});
+
+module.exports = app;
+
+// ========== Docker Compose ==========
+// docker-compose.yml:
+// version: '3.8'
+// services:
+//   api:
+//     build: .
+//     ports:
+//       - "3000:3000"
+//     environment:
+//       DB_HOST: db
+//       DB_PASSWORD: secret
+//     depends_on:
+//       db:
+//         condition: service_healthy
+//
+//   db:
+//     image: postgres:16-alpine
+//     environment:
+//       POSTGRES_PASSWORD: secret
+//       POSTGRES_DB: myapp
+//     volumes:
+//       - pgdata:/var/lib/postgresql/data
+//     healthcheck:
+//       test: ["CMD-SHELL", "pg_isready -U postgres"]
+//       interval: 5s
+//
+// volumes:
+//   pgdata:</div>
+        <div class="note">💡 Express + PostgreSQL 项目要点: knex 迁移管理 schema; JWT 认证中间件; 分层架构 (routes/controllers/models); 统一错误处理; Docker Compose 本地开发; CRUD RESTful API; .env 多环境配置; helmet/cors/morgan 生产中间件。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoProject()">项目结构</button>
+        <button onclick="demoCode()">核心代码</button>
+        <button onclick="demoAPI()">API 示例</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoProject() {
+            result.innerHTML = '';
+            log('# Express + PostgreSQL 项目');
+            log('');
+            log('目录结构:');
+            log('  src/config/   — 配置');
+            log('  src/db/       — 数据库连接+迁移');
+            log('  src/middleware/ — 中间件');
+            log('  src/routes/   — 路由');
+            log('  src/controllers/ — 控制器');
+            log('  src/app.js    — 入口');
+            log('');
+            log('技术栈:');
+            log('  Express + knex + PostgreSQL');
+            log('  JWT + bcrypt + helmet + cors');
+        }
+
+        function demoCode() {
+            result.innerHTML = '';
+            log('# 核心代码流程');
+            log('');
+            log('请求流程:');
+            log('  请求 → helmet → cors → morgan');
+            log('  → auth 中间件 → 路由 → 控制器');
+            log('  → 数据库 → 响应 → 错误处理');
+            log('');
+            log('认证:');
+            log('  POST /auth/login → JWT → Bearer token');
+            log('  后续请求带 Authorization: Bearer xxx');
+        }
+
+        function demoAPI() {
+            result.innerHTML = '';
+            log('# API 端点');
+            log('');
+            log('认证:');
+            log('  POST /api/v1/auth/register');
+            log('  POST /api/v1/auth/login');
+            log('');
+            log('Todos (需认证):');
+            log('  GET    /api/v1/todos     列表');
+            log('  POST   /api/v1/todos     创建');
+            log('  PUT    /api/v1/todos/:id  更新');
+            log('  DELETE /api/v1/todos/:id  删除');
+            log('');
+            log('其他:');
+            log('  GET /health 健康检查');
+        }
+    </script>
+</body>
+</html>

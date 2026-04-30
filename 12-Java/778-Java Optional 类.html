@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java Optional 类</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🎁 Java Optional 类</h2><p>Optional 创建 (of/ofNullable/empty)、消费 (ifPresent/ifPresentOrElse)、转换 (map/flatMap/filter)、取值 (orElse/orElseGet/orElseThrow)、Optional 最佳实践。</p></div>
+    <div class="card">
+        <h2>Optional 基础</h2>
+        <div class="code">// ========== Optional<T> (Java 8+) ==========
+// 容器: 可能包含值, 也可能为空
+// 目的: 避免 NullPointerException
+//      明确表示"可能为空"
+
+import java.util.*;
+
+public class OptionalBasics {
+
+    // ========== 创建 Optional ==========
+    public static void main(String[] args) {
+        // 1. Optional.of(value)  — 值不能为 null
+        Optional<String> opt1 = Optional.of("Hello");
+        // Optional<String> optNull = Optional.of(null);  // NullPointerException!
+
+        // 2. Optional.ofNullable(value) — 可以为 null
+        Optional<String> opt2 = Optional.ofNullable(null);   // 空
+        Optional<String> opt3 = Optional.ofNullable("Hi");   // 有值
+
+        // 3. Optional.empty() — 明确表示空
+        Optional<String> empty = Optional.empty();
+
+        // ========== 判断 ==========
+        System.out.println(opt1.isPresent());   // true (有值)
+        System.out.println(empty.isPresent());  // false
+
+        System.out.println(opt1.isEmpty());     // false (Java 11+)
+        System.out.println(empty.isEmpty());    // true
+    }
+}
+
+// ========== 取值 (谨慎!) ==========
+class OptionalGet {
+    public static void main(String[] args) {
+        Optional<String> opt = Optional.of("Hello");
+
+        // ========== get() — 不推荐! ==========
+        // 值存在 → 返回值
+        // 值不存在 → NoSuchElementException
+        System.out.println(opt.get());  // "Hello"
+        // empty.get();  // ❌ NoSuchElementException!
+
+        // ========== 安全取值 ==========
+        // orElse: 有值返回值, 无值返回默认
+        String r1 = opt.orElse("default");
+
+        // orElseGet: 有值返回值, 无值执行 Supplier (懒加载)
+        String r2 = opt.orElseGet(() -> computeDefault());
+
+        // orElseThrow: 有值返回值, 无值抛异常
+        String r3 = opt.orElseThrow(() -> new IllegalArgumentException("No value"));
+
+        // orElseThrow(): 无参版本, 抛 NoSuchElementException (Java 10+)
+        String r4 = opt.orElseThrow();  // 比 get() 语义更好
+
+        // or: 有值返回自身, 无值执行 Supplier<Optional> (Java 9+)
+        Optional<String> r5 = opt.or(() -> Optional.of("fallback"));
+    }
+
+    static String computeDefault() {
+        System.out.println("Computing default...");
+        return "computed";
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>Optional 操作</h2>
+        <div class="code">// ========== 消费 (ifPresent) ==========
+
+public class OptionalOps {
+
+    public static void main(String[] args) {
+        Optional<String> opt = Optional.of("Hello");
+
+        // ========== ifPresent ==========
+        opt.ifPresent(s -> System.out.println(s.length()));  // 5
+
+        // ========== ifPresentOrElse (Java 9+) ==========
+        opt.ifPresentOrElse(
+            s -> System.out.println("Value: " + s),
+            () -> System.out.println("No value")
+        );
+
+        Optional<String> empty = Optional.empty();
+        empty.ifPresentOrElse(
+            s -> System.out.println("Value: " + s),
+            () -> System.out.println("No value")  // 执行这个
+        );
+
+        // ========== map: 转换 (类似 Stream.map) ==========
+        Optional<String> name = Optional.of("Alice");
+        Optional<Integer> len = name.map(String::length);  // Optional[5]
+        Optional<String> upper = name.map(String::toUpperCase);
+
+        // 链式调用 (无 NPE 风险)
+        String result = name
+            .map(String::trim)
+            .filter(s -> s.length() > 3)
+            .map(String::toUpperCase)
+            .orElse("DEFAULT");
+
+        // ========== flatMap: 展平 (避免嵌套 Optional) ==========
+        // map 可能产生 Optional<Optional<...>>
+        Optional<String> opt1 = Optional.of("hello");
+        Optional<Optional<Integer>> nested = opt1.map(s -> Optional.of(s.length()));
+        // 需要两次 get
+
+        Optional<Integer> flat = opt1.flatMap(s -> Optional.of(s.length()));
+        // 一次 get
+
+        // 实际应用: 避免嵌套
+        class User {
+            Optional<String> getEmail() { return Optional.of("a@b.com"); }
+        }
+        Optional<User> user = Optional.of(new User());
+
+        // map 嵌套:
+        Optional<Optional<String>> email1 = user.map(u -> u.getEmail());
+
+        // flatMap 展平:
+        Optional<String> email2 = user.flatMap(u -> u.getEmail());
+
+        // ========== filter: 过滤 ==========
+        Optional<String> filtered = name
+            .filter(s -> s.startsWith("A"))   // "Alice" → 保留
+            .filter(s -> s.length() > 10);     // false → Optional.empty
+        System.out.println(filtered);  // Optional.empty
+
+        // ========== stream() (Java 9+) ==========
+        // Optional → Stream (0 或 1 个元素)
+        Optional<String> val = Optional.of("Hello");
+        val.stream()           // Stream<String> with 1 element
+            .map(String::length)
+            .forEach(System.out::println);
+
+        // 过滤空值:
+        List<Optional<String>> list = List.of(
+            Optional.of("a"),
+            Optional.empty(),
+            Optional.of("b")
+        );
+        List<String> values = list.stream()
+            .filter(Optional::isPresent)
+            .map(Optional::get)
+            .toList();
+        System.out.println(values);  // [a, b]
+
+        // Java 9+ 更简单:
+        List<String> flatValues = list.stream()
+            .flatMap(Optional::stream)
+            .toList();  // [a, b]
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>Optional 实战: 避免 null 检查</h2>
+        <div class="code">// ========== Optional 实战 ==========
+// 传统 null 检查 vs Optional
+
+import java.util.*;
+
+public class OptionalPractice {
+
+    // ========== 传统方式 (容易 NPE) ==========
+    static String getCityTraditional(User user) {
+        if (user != null) {
+            Address addr = user.getAddress();
+            if (addr != null) {
+                City city = addr.getCity();
+                if (city != null) {
+                    return city.getName();
+                }
+            }
+        }
+        return "Unknown";
+    }
+
+    // ========== Optional 方式 ==========
+    static String getCityOptional(User user) {
+        return Optional.ofNullable(user)
+            .map(User::getAddress)
+            .map(Address::getCity)
+            .map(City::getName)
+            .orElse("Unknown");
+    }
+
+    // ========== 辅助类 ==========
+    static class User {
+        private Address address;
+        Address getAddress() { return address; }
+    }
+    static class Address {
+        private City city;
+        City getCity() { return city; }
+    }
+    static class City {
+        private String name;
+        String getName() { return name; }
+    }
+
+    // ========== 在方法返回中使用 Optional ==========
+    // ✅ 好: 返回 Optional 表示可能无值
+    static Optional<String> findUserName(int id) {
+        if (id == 1) return Optional.of("Alice");
+        return Optional.empty();
+    }
+
+    // ❌ 不好: 返回 null
+    static String findUserNameBad(int id) {
+        if (id == 1) return "Alice";
+        return null;  // 调用方必须检查 null!
+    }
+
+    // ❌ 不好: 为集合返回 Optional
+    // 集合应该返回空集合, 而不是 Optional
+    static List<String> getNames() {
+        return Collections.emptyList();  // ✅ 空集合, 不是 Optional
+    }
+
+    public static void main(String[] args) {
+        // 使用 Optional 返回值
+        Optional<String> name = findUserName(1);
+        name.ifPresent(System.out::println);
+
+        String display = findUserName(999)
+            .orElse("Guest");
+        System.out.println(display);  // "Guest"
+    }
+}
+
+// ========== Optional 最佳实践 ==========
+// ✅ 适合:
+//   - 方法返回值: 可能没有结果
+//   - 链式调用: 避免深层 null 检查
+//   - 与 Stream 一起使用
+
+// ❌ 不适合:
+//   - 字段类型 (序列化问题)
+//   - 方法参数 (调用方可能传 null)
+//   - 集合 (用空集合替代)
+//   - 基本类型包装的性能开销 (用 OptionalInt/OptionalLong/OptionalDouble)
+
+// ========== 原始类型 Optional ==========
+// OptionalInt — 避免装箱
+// OptionalLong
+// OptionalDouble
+//
+// OptionalInt opt = OptionalInt.of(42);
+// int val = opt.orElse(0);</div>
+        <div class="note">💡 Optional 要点: of(非null)/ofNullable(可为null)/empty() 创建; orElse/orElseGet/orElseThrow 安全取值; map/flatMap/filter 链式操作; ifPresent/ifPresentOrElse 消费; 返回类型用 Optional 表示可能无值; 不要用于字段/参数/集合; flatMap 避免嵌套 Optional; stream() (Java 9+) 转 Stream。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCreate()">创建 Optional</button>
+        <button onclick="demoChain()">链式操作</button>
+        <button onclick="demoPractice()">实战对比</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCreate() {
+            result.innerHTML = '';
+            log('# 创建 Optional');
+            log('');
+            log('Optional.of("val")      // 不能 null');
+            log('Optional.ofNullable(v)  // 可 null');
+            log('Optional.empty()        // 空');
+            log('');
+            log('判断: isPresent() / isEmpty()');
+            log('');
+            log('取值:');
+            log('  orElse("default")');
+            log('  orElseGet(() -> compute())');
+            log('  orElseThrow(() -> ex)');
+        }
+
+        function demoChain() {
+            result.innerHTML = '';
+            log('# 链式操作');
+            log('');
+            log('Optional.of(" Alice ")');
+            log('  .map(String::trim)');
+            log('  .filter(s -> s.length() > 2)');
+            log('  .map(String::toUpperCase)');
+            log('  .orElse("DEFAULT")');
+            log('');
+            log('flatMap vs map:');
+            log('  map → Optional<Optional<T>>');
+            log('  flatMap → Optional<T>');
+        }
+
+        function demoPractice() {
+            result.innerHTML = '';
+            log('# 传统 vs Optional');
+            log('');
+            log('// 传统 (深层 null 检查)');
+            log('if (user != null)');
+            log('  if (addr != null)');
+            log('    if (city != null)');
+            log('      return city.getName();');
+            log('');
+            log('// Optional (函数式)');
+            log('Optional.ofNullable(user)');
+            log('  .map(User::getAddress)');
+            log('  .map(Address::getCity)');
+            log('  .map(City::getName)');
+            log('  .orElse("Unknown");');
+        }
+    </script>
+</body>
+</html>

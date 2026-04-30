@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intl-排序复数</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #collator-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Intl 排序与复数</h2><p>Collator 排序（按拼音/笔画）、PluralRules 复数规则。</p></div>
+    <div class="card">
+        <h2>Collator 和 PluralRules</h2>
+        <div class="code">// ========== Intl.Collator (排序) ==========
+const collator = new Intl.Collator(locale, options);
+
+// 选项
+{
+    sensitivity: 'base',    // 'base' / 'accent' / 'case' / 'variant'
+    ignorePunctuation: true, // 忽略标点
+    numeric: true,          // 数字排序 (1,2,10 而不是 1,10,2)
+    caseFirst: 'upper',     // 'upper' / 'lower' / 'false'
+}
+
+// 用法
+const sorted = arr.sort(collator.compare);
+
+// 中文排序
+const zhCollator = new Intl.Collator('zh-CN');
+// 默认按拼音排序
+// zh-CN-u-co-pinyin — 拼音 (默认)
+// zh-CN-u-co-stroke — 按笔画
+
+// ========== Intl.PluralRules (复数) ==========
+const pr = new Intl.PluralRules(locale, options);
+
+// 方法
+pr.select(1);    // 'one'
+pr.select(2);    // 'other'
+
+// 复数类别:
+// 'zero', 'one', 'two', 'few', 'many', 'other'
+
+// 中文: 'other' (没有复数变化)
+// 英语: 'one' / 'other'
+// 俄语: 'one' / 'few' / 'many' / 'other'
+// 阿拉伯语: 'zero' / 'one' / 'two' / 'few' / 'many' / 'other'</div>
+    </div>
+    <div class="card">
+        <h2>演示：排序与复数</h2>
+        <button onclick="demoCollator()">排序演示</button>
+        <button onclick="demoPlural()">复数规则</button>
+        <div id="collator-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const collatorResult = document.getElementById('collator-result');
+
+        function log(msg) {
+            collatorResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoCollator() {
+            collatorResult.innerHTML = '';
+            log('🔤 Collator 排序演示:');
+            log('');
+
+            // 中文名排序
+            const names = ['张三', '李四', '王五', '赵六', '陈七', '刘八', '孙九'];
+            log('1️⃣ 中文拼音排序:');
+            const pinyinCollator = new Intl.Collator('zh-CN');
+            log(`   原始: [${names.join(', ')}]`);
+            log(`   拼音: [${[...names].sort(pinyinCollator.compare).join(', ')}]`);
+
+            log('\n2️⃣ 笔画排序:');
+            try {
+                const strokeCollator = new Intl.Collator('zh-CN-u-co-stroke');
+                log(`   笔画: [${[...names].sort(strokeCollator.compare).join(', ')}]`);
+            } catch (e) {
+                log('   ⚠️ 笔画排序可能不支持');
+            }
+            log('');
+
+            // 数字排序
+            log('3️⃣ 数字排序 (numeric):');
+            const nums = ['a1', 'a10', 'a2', 'a3', 'a20'];
+            const defaultCollator = new Intl.Collator('en');
+            const numericCollator = new Intl.Collator('en', { numeric: true });
+            log(`   原始: [${nums.join(', ')}]`);
+            log(`   默认: [${[...nums].sort(defaultCollator.compare).join(', ')}]`);
+            log(`   数字: [${[...nums].sort(numericCollator.compare).join(', ')}]`);
+            log('');
+
+            // 大小写敏感度
+            log('4️⃣ 大小写敏感度:');
+            const words = ['apple', 'Apple', 'APPLE', 'banana'];
+            const base = new Intl.Collator('en', { sensitivity: 'base' });
+            const caseSensitive = new Intl.Collator('en', { sensitivity: 'case' });
+            const variant = new Intl.Collator('en', { sensitivity: 'variant' });
+            log(`   base (忽略大小写): ${base.compare('a', 'A')} (0=相同)`);
+            log(`   case: ${caseSensitive.compare('a', 'A')} (-1=不同)`);
+        }
+
+        function demoPlural() {
+            collatorResult.innerHTML = '';
+            log('🔢 PluralRules 复数规则:');
+            log('');
+
+            const locales = [
+                { code: 'zh-CN', name: '中文' },
+                { code: 'en-US', name: '英语' },
+                { code: 'ru-RU', name: '俄语' },
+                { code: 'ar-SA', name: '阿拉伯语' },
+            ];
+
+            locales.forEach(({ code, name }) => {
+                try {
+                    const pr = new Intl.PluralRules(code);
+                    log(`${name} (${code}):`);
+                    [0, 1, 2, 3, 5, 10, 21].forEach(n => {
+                        log(`   ${n} → ${pr.select(n)}`);
+                    });
+                    log('');
+                } catch (e) {
+                    log(`${name}: ⚠️ 不支持`);
+                }
+            });
+
+            log('📌 复数类: zero / one / two / few / many / other');
+            log('📌 用于: 选择正确的复数形式');
+            log('📌 配合 Intl.ListFormat 使用效果更佳');
+        }
+
+        console.log('=== Intl 排序与复数 ===');
+
+        document.getElementById('output').textContent =
+            `Intl Collator: 拼音排序 / 笔画排序 / numeric / sensitivity\n` +
+            `Intl PluralRules: zero/one/two/few/many/other 复数类别\n` +
+            `✅ Intl 排序与复数演示完成！`;
+    </script>
+</body>
+</html>

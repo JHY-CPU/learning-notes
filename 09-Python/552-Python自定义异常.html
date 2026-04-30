@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python自定义异常</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔧 Python 自定义异常</h2><p>自定义异常类、异常层次设计、异常附加数据、异常链与上下文、traceback 模块、logging 异常记录、业务异常体系设计。</p></div>
+    <div class="card">
+        <h2>自定义异常基础</h2>
+        <div class="code">// ========== 自定义异常 ==========
+// 继承 Exception (或其子类)
+
+class InsufficientFundsError(Exception):
+    """余额不足异常"""
+    pass
+
+class NegativeAmountError(Exception):
+    """负数金额异常"""
+    pass
+
+# 使用:
+def withdraw(balance, amount):
+    if amount < 0:
+        raise NegativeAmountError("取款金额不能为负")
+    if amount > balance:
+        raise InsufficientFundsError(f"余额 {balance}, 需要 {amount}")
+    return balance - amount
+
+try:
+    withdraw(100, 200)
+except InsufficientFundsError as e:
+    print(e)                   # 余额 100, 需要 200
+
+// ========== 异常层次设计 ==========
+# 设计有层次的异常体系,便于按类别捕获
+
+class AppError(Exception):
+    """应用基础异常"""
+    pass
+
+class DatabaseError(AppError):
+    """数据库相关错误"""
+    pass
+
+class ConnectionError(DatabaseError):
+    """数据库连接错误"""
+    pass
+
+class QueryError(DatabaseError):
+    """查询错误"""
+    pass
+
+class ValidationError(AppError):
+    """数据验证错误"""
+    pass
+
+class NotFoundError(AppError):
+    """资源未找到"""
+    pass
+
+# 可以捕获广义:
+try:
+    db_query()
+except DatabaseError as e:
+    print(f"数据库错误: {e}")
+
+# 也可以捕获具体:
+try:
+    db_query()
+except ConnectionError as e:
+    print(f"连接失败: {e}")</div>
+    </div>
+    <div class="card">
+        <h2>带数据的异常</h2>
+        <div class="code">// ========== 异常携带额外信息 ==========
+class ValidationError(Exception):
+    """验证错误,携带字段级错误信息"""
+    def __init__(self, message, errors=None):
+        super().__init__(message)
+        self.errors = errors or {}   # 字段错误字典
+
+try:
+    raise ValidationError("输入验证失败", {
+        "name": "名字不能为空",
+        "age": "年龄必须在 0-150 之间",
+    })
+except ValidationError as e:
+    print(e)                    # 输入验证失败
+    print(e.errors)             # {"name": "...", "age": "..."}
+    for field, msg in e.errors.items():
+        print(f"  {field}: {msg}")
+
+// ========== 带状态码的异常 ==========
+class HttpError(Exception):
+    """HTTP 错误"""
+    def __init__(self, status_code, message):
+        super().__init__(message)
+        self.status_code = status_code
+
+    def __str__(self):
+        return f"[{self.status_code}] {self.args[0]}"
+
+try:
+    raise HttpError(404, "资源未找到")
+except HttpError as e:
+    print(e)                    # [404] 资源未找到
+    print(e.status_code)       # 404
+
+// ========== 异常工厂函数 ==========
+def error_factory(name, base=Exception):
+    """动态创建异常类"""
+    return type(name, (base,), {})
+
+TimeoutError = error_factory("TimeoutError", AppError)
+raise TimeoutError("请求超时")</div>
+    </div>
+    <div class="card">
+        <h2>异常链与上下文</h2>
+        <div class="code">// ========== 异常链 ==========
+// 保留异常发生的完整上下文
+
+def load_config(filename):
+    try:
+        with open(filename) as f:
+            return parse_config(f.read())
+    except FileNotFoundError as e:
+        # 使用 raise ... from e 保留原始异常
+        raise ConfigError(f"配置文件不存在: {filename}") from e
+
+// ========== 隐式异常链 ==========
+# 如果在异常处理中抛出新异常
+# Python 自动设置 __context__
+
+try:
+    int("abc")
+except ValueError as e:
+    raise RuntimeError("转换失败")
+# 显示:
+# ValueError: invalid literal for int() with base 10: 'abc'
+# During handling of the above exception, another exception occurred:
+# RuntimeError: 转换失败
+
+// ========== 抑制异常上下文 ==========
+# raise ... from None — 不显示原始异常
+try:
+    int("abc")
+except ValueError:
+    raise RuntimeError("转换失败") from None
+# 只显示: RuntimeError: 转换失败
+
+// ========== traceback 模块 ==========
+import traceback
+import sys
+
+def detailed_error():
+    """打印详细调用栈"""
+    try:
+        raise ValueError("出错了")
+    except ValueError:
+        # 获取 traceback 字符串
+        tb_str = traceback.format_exc()
+        print(tb_str)
+
+        # 打印到 stderr
+        traceback.print_exc()
+
+        # 提取栈帧信息
+        tb = traceback.extract_stack()
+        for frame in tb:
+            print(f"  {frame.filename}:{frame.lineno} in {frame.name}")</div>
+    </div>
+    <div class="card">
+        <h2>logging 与异常最佳实践</h2>
+        <div class="code">// ========== logging 记录异常 ==========
+import logging
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+
+def process_order(order_id):
+    try:
+        # 处理订单 ...
+        if not order_id:
+            raise ValueError("订单 ID 无效")
+    except ValueError:
+        logging.exception(f"处理订单失败: {order_id}")  # 记录异常+堆栈
+        raise
+
+// ========== 业务异常体系设计 ==========
+# 完整的应用异常体系:
+
+class AppError(Exception):
+    """应用基础异常"""
+    code = "APP_ERROR"
+    status_code = 500
+
+    def __init__(self, message=None, details=None):
+        super().__init__(message or self.__doc__)
+        self.details = details or {}
+
+class NotFoundError(AppError):
+    """资源不存在"""
+    code = "NOT_FOUND"
+    status_code = 404
+
+class ValidationError(AppError):
+    """数据验证失败"""
+    code = "VALIDATION_ERROR"
+    status_code = 422
+
+class AuthError(AppError):
+    """认证失败"""
+    code = "AUTH_ERROR"
+    status_code = 401
+
+class PermissionError(AppError):
+    """权限不足"""
+    code = "FORBIDDEN"
+    status_code = 403
+
+class RateLimitError(AppError):
+    """请求过频繁"""
+    code = "RATE_LIMIT"
+    status_code = 429
+
+// 使用:
+def get_user(user_id):
+    if not user_exists(user_id):
+        raise NotFoundError(details={"user_id": user_id})
+    return fetch_user(user_id)
+
+try:
+    user = get_user(999)
+except NotFoundError as e:
+    print(f"[{e.status_code}] {e.code}: {e}")
+    print(f"详情: {e.details}")
+
+// ========== 异常处理最佳实践 ==========
+// ✓ 自定义异常继承 Exception
+// ✓ 设计有层次的异常体系
+// ✓ 用 raise ... from e 保留上下文
+// ✓ 用 logging.exception() 记录异常
+// ✓ 给异常附加上下文数据
+// ❌ 不要用 except: pass 静默忽略
+// ❌ 不要用 assert 做业务验证
+// ❌ 不要在 finally 中 return (会吞异常)</div>
+        <div class="note">💡 自定义异常要点: (1) 继承 Exception 创建自定义异常; (2) 设计层次化异常体系便于按类别捕获; (3) __init__ 中可附加额外数据 (errors/detail); (4) raise ... from e 保留异常链; (5) logging.exception() 记录异常和堆栈。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCustom()">自定义异常演示</button>
+        <button onclick="demoLogging()">异常记录演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCustom() {
+            result.innerHTML = '';
+            log('# 自定义异常演示');
+            log('');
+            log('class InsufficientFundsError(Exception):');
+            log('    pass');
+            log('');
+            log('层次设计:');
+            log('  AppError');
+            log('    ├─ DatabaseError');
+            log('    │  ├─ ConnectionError');
+            log('    │  └─ QueryError');
+            log('    ├─ ValidationError');
+            log('    └─ NotFoundError');
+            log('');
+            log('带数据:');
+            log('  raise ValidationError("msg",');
+            log('       errors={"name": "不能为空"})');
+            log('  e.errors → {"name": "不能为空"}');
+        }
+
+        function demoLogging() {
+            result.innerHTML = '';
+            log('# 异常记录最佳实践');
+            log('');
+            log('日志记录:');
+            log('  import logging');
+            log('  try:');
+            log('      risky()');
+            log('  except Exception:');
+            log("      logging.exception('出错')");
+            log('      raise  # 或处理');
+            log('');
+            log('异常链:');
+            log('  raise RuntimeError("X") from e');
+            log('  raise RuntimeError("X") from None');
+            log('');
+            log('最佳实践:');
+            log('  ✅ 自定义异常体系');
+            log('  ✅ logging.exception');
+            log('  ✅ raise from');
+            log('  ❌ 不要 except: pass');
+            log('  ❌ finally 中不要 return');
+        }
+    </script>
+</body>
+</html>

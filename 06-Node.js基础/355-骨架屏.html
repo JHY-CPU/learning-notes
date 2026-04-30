@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>骨架屏</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+
+        /* Skeleton styles */
+        .skeleton-card { background: white; border-radius: 8px; padding: 16px; margin: 10px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.1); max-width: 380px; }
+        .skeleton { background: linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 4px; }
+        .skeleton-avatar { width: 48px; height: 48px; border-radius: 50%; }
+        .skeleton-title { height: 18px; width: 60%; margin: 8px 0; }
+        .skeleton-text { height: 14px; width: 90%; margin: 6px 0; }
+        .skeleton-text.short { width: 40%; }
+        .skeleton-img { width: 100%; height: 160px; margin: 8px 0; }
+        .skeleton-btn { width: 80px; height: 32px; border-radius: 6px; margin: 8px 0; }
+        @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+        .skeleton-row { display: flex; gap: 12px; align-items: center; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>骨架屏</h2><p>骨架屏原理、CSS 实现、动画效果、Vue/React 中的实现思路。</p></div>
+    <div class="card">
+        <h2>骨架屏 API</h2>
+        <div class="code">// ========== 骨架屏原理 ==========
+// 在真实内容加载前，先显示页面结构的灰色占位
+// 内容加载完成后，骨架屏过渡消失，真实内容出现
+
+// ========== CSS 实现 ==========
+.skeleton {
+    background: linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+// ========== 骨架屏类型 ==========
+// 1. CSS 骨架 (纯样式)
+// 2. SVG 骨架 (更精细)
+// 3. 图片骨架 (LQIP/SQIP)
+// 4. 内容骨架 (文字/段落)</div>
+    </div>
+    <div class="card">
+        <h2>演示：骨架屏</h2>
+        <button onclick="demoBasic()">骨架屏基础</button>
+        <button onclick="demoTypes()">骨架类型</button>
+        <button onclick="demoTransition()">过渡切换</button>
+        <button onclick="demoFrameworks()">框架实现</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <div id="skeleton-demo"></div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        const demo = document.getElementById('skeleton-demo');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+        function clearDemo() { demo.innerHTML = ''; }
+
+        function demoBasic() {
+            clearDemo();
+            result.innerHTML = '';
+            log('🦴 骨架屏基础:');
+            log('');
+
+            log('1️⃣ 骨架屏是什么?');
+            log('   • 内容加载前的灰色占位结构');
+            log('   • 让用户感知页面正在加载');
+            log('   • 减少白屏焦虑 (Perceived Performance)');
+            log('   • 改善 LCP ( Largest Contentful Paint )');
+            log('');
+
+            log('2️⃣ CSS 核心实现:');
+            log('   .skeleton {');
+            log('     background: linear-gradient(');
+            log('       90deg, #eee 25%, #f5f5f5 50%, #eee 75%');
+            log('     );');
+            log('     background-size: 200% 100%;');
+            log('     animation: shimmer 1.5s infinite;');
+            log('   }');
+            log('   @keyframes shimmer {');
+            log('     0% { background-position: 200% 0; }');
+            log('     100% { background-position: -200% 0; }');
+            log('   }');
+            log('');
+
+            // Live skeleton demo
+            demo.innerHTML = `
+                <div class="skeleton-card">
+                    <div class="skeleton-row">
+                        <div class="skeleton skeleton-avatar"></div>
+                        <div>
+                            <div class="skeleton skeleton-title"></div>
+                            <div class="skeleton skeleton-text short"></div>
+                        </div>
+                    </div>
+                    <div class="skeleton skeleton-img"></div>
+                    <div class="skeleton skeleton-text"></div>
+                    <div class="skeleton skeleton-text short"></div>
+                    <div class="skeleton skeleton-btn"></div>
+                </div>
+            `;
+
+            log('3️⃣ 上方展示了一个卡片骨架屏');
+            log('   包含: 头像 / 标题 / 图片 / 文字 / 按钮');
+            log('');
+
+            log('4️⃣ 骨架元素类型:');
+            log('   • 圆形骨架 — 头像/图标');
+            log('   • 矩形骨架 — 图片/卡片');
+            log('   • 线段骨架 — 文字/标题');
+            log('   • 按钮骨架 — CTA 按钮');
+        }
+
+        function demoTypes() {
+            clearDemo();
+            result.innerHTML = '';
+            log('📐 骨架屏类型:');
+            log('');
+
+            log('1️⃣ 文字骨架 (Text Skeleton):');
+            log('   <div class="skeleton" style="height:14px; width:80%;"></div>');
+            log('   • 模拟段落文字');
+            log('   • 不同宽度模拟长短句');
+            log('');
+
+            // Text skeleton
+            const textDemo = document.createElement('div');
+            textDemo.className = 'skeleton-card';
+            textDemo.innerHTML = `
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text short"></div>
+            `;
+            demo.appendChild(textDemo);
+            log('   上方: 文字骨架效果');
+            log('');
+
+            log('2️⃣ 卡片骨架 (Card Skeleton):');
+            log('   • 模拟文章/商品卡片');
+            log('   • 图片 + 标题 + 描述 + 按钮');
+            log('');
+
+            log('3️⃣ 列表骨架 (List Skeleton):');
+            log('   • 重复的行结构');
+            log('   • 用于表格/列表页');
+            log('');
+
+            log('4️⃣ 表格骨架 (Table Skeleton):');
+            log('   • 行/列网格');
+            log('   • 头部 + 多行数据');
+            log('');
+
+            log('5️⃣ 图表骨架 (Chart Skeleton):');
+            log('   • 柱状图/饼图占位');
+            log('   • 圆形 + 矩形组合');
+            log('');
+
+            log('6️⃣ 全页骨架 (Page Skeleton):');
+            log('   • 完整的页面结构');
+            log('   • Header + Content + Footer');
+            log('   • 大厂常用 (美团/字节/阿里)');
+        }
+
+        function demoTransition() {
+            clearDemo();
+            result.innerHTML = '';
+            log('🔄 骨架屏过渡切换:');
+            log('');
+
+            log('1️⃣ 切换流程:');
+            log('   骨架屏显示 → 数据加载 → 内容显示 → 骨架隐藏');
+            log('');
+
+            log('2️⃣ 实现方式一: v-if/v-show (Vue):');
+            log('   <template v-if="loading">');
+            log('     <skeleton-component />');
+            log('   </template>');
+            log('   <template v-else>');
+            log('     <real-component />');
+            log('   </template>');
+            log('');
+
+            log('3️⃣ 实现方式二: CSS transition:');
+            log('   .content {');
+            log('     opacity: 0;');
+            log('     transition: opacity 0.3s;');
+            log('   }');
+            log('   .content.loaded {');
+            log('     opacity: 1;');
+            log('   }');
+            log('');
+
+            log('4️⃣ 实现方式三: 骨架叠加 (Skeleton Overlay):');
+            log('   .skeleton-wrapper { position: relative; }');
+            log('   .skeleton-overlay {');
+            log('     position: absolute; inset: 0;');
+            log('     z-index: 1;');
+            log('   }');
+            log('   .skeleton-overlay.hide {');
+            log('     opacity: 0;');
+            log('     pointer-events: none;');
+            log('   }');
+            log('');
+
+            // Simulated transition
+            const container = document.createElement('div');
+            container.className = 'skeleton-card';
+            container.style.position = 'relative';
+            container.style.minHeight = '120px';
+
+            const skeleton = document.createElement('div');
+            skeleton.innerHTML = `
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton skeleton-text"></div>
+                <div class="skeleton skeleton-text short"></div>
+            `;
+
+            const content = document.createElement('div');
+            content.style.cssText = 'opacity:0;transition:opacity 0.5s;padding:8px;';
+            content.innerHTML = '<div style="color:#2c3e50;font-weight:bold;">✅ 内容已加载</div><div style="color:#7f8c8d;font-size:13px;">这是真实的内容区域...</div>';
+
+            container.appendChild(skeleton);
+            container.appendChild(content);
+            demo.appendChild(container);
+
+            log('   模拟切换:');
+            setTimeout(() => {
+                skeleton.style.transition = 'opacity 0.3s';
+                skeleton.style.opacity = '0';
+                setTimeout(() => {
+                    skeleton.style.display = 'none';
+                    content.style.opacity = '1';
+                    log('   ✅ 骨架隐藏，真实内容显示');
+                }, 300);
+            }, 1500);
+
+            log('   等待 1.5 秒后自动切换...');
+            log('   (显示骨架 → 加载完成 → 显示内容)');
+            log('');
+
+            log('5️⃣ 最佳实践:');
+            log('   • 骨架与内容尺寸一致 (防止 CLS)');
+            log('   • 使用相同的布局结构');
+            log('   • 配合 loading state 管理');
+            log('   • 骨架过渡时间: 300-500ms');
+        }
+
+        function demoFrameworks() {
+            clearDemo();
+            result.innerHTML = '';
+            log('⚛️ 框架中的骨架屏:');
+            log('');
+
+            log('1️⃣ React 实现:');
+            log('   function UserProfile() {');
+            log('     const { loading, user } = useUser();');
+            log('');
+            log('     if (loading) return <UserSkeleton />;');
+            log('     return <UserCard user={user} />;');
+            log('   }');
+            log('');
+            log('   // React 18 Suspense');
+            log('   <Suspense fallback={<ProfileSkeleton />}>');
+            log('     <UserProfile />');
+            log('   </Suspense>');
+            log('');
+
+            log('2️⃣ Vue 实现:');
+            log('   <template>');
+            log('     <div v-if="loading">');
+            log('       <SkeletonCard v-for="n in 3" :key="n" />');
+            log('     </div>');
+            log('     <div v-else>');
+            log('       <UserCard v-for="u in users" :key="u.id" :user="u" />');
+            log('     </div>');
+            log('   </template>');
+            log('');
+
+            log('3️⃣ 自动骨架屏生成:');
+            log('   • 饿了么: element-ui 的 v-loading');
+            log('   • Ant Design: Skeleton 组件');
+            log('   • Vue Star: vue-skeleton-webpack-plugin');
+            log('   • React: react-content-loader (SVG)');
+            log('');
+
+            log('4️⃣ 构建时骨架 (Build-time):');
+            log('   // 在构建时生成页面骨架');
+            log('   // 直接注入 HTML，避免白屏');
+            log('   // 工具: puppeteer 生成骨架 DOM');
+            log('   // 插件: page-skeleton-webpack-plugin');
+            log('');
+
+            log('5️⃣ SSR 骨架屏:');
+            log('   // 服务端渲染骨架');
+            log('   // 客户端 Hydration 后替换');
+            log('   // 优点: 首屏无白屏');
+            log('   // 缺点: 实现复杂');
+            log('');
+
+            log('6️⃣ 流行骨架屏库:');
+            log('   • react-loading-skeleton — React');
+            log('   • react-content-loader — SVG 骨架 (React)');
+            log('   • vue-content-loading — Vue');
+            log('   • vue-skeleton — Vue');
+            log('   • ngx-skeleton-loader — Angular');
+        }
+
+        console.log('=== 骨架屏 ===');
+        document.getElementById('output').textContent =
+            `骨架屏: CSS 实现 / shimmer 动画 / 骨架类型 / 过渡切换 / 框架实现\n` +
+            `✅ 骨架屏演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数组静态方法</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e67e22; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>数组静态方法与 ES6+ 新方法</h2><p>Array 的静态工具方法和数组的新式方法。</p></div>
+    <div class="card">
+        <h2>Array.isArray() — 检测数组</h2>
+        <div class="code">Array.isArray([1, 2, 3]);    // true
+Array.isArray('hello');       // false
+Array.isArray({ 0: 'a' });    // false
+Array.isArray(new Array(5));  // true
+
+// 比 instanceof 更可靠（跨 iframe 也有效）</div>
+    </div>
+    <div class="card">
+        <h2>Array.from() — 类数组转数组</h2>
+        <div class="code">// 1. 字符串转数组
+Array.from('hello');        // ['h','e','l','l','o']
+
+// 2. Set 转数组
+Array.from(new Set([1,2,3])); // [1,2,3]
+
+// 3. arguments 转数组
+function showArgs() {
+    return Array.from(arguments);
+}
+showArgs(1, 2, 3);          // [1, 2, 3]
+
+// 4. 第二个参数：map 函数
+Array.from('hello', c => c.toUpperCase());
+// ['H','E','L','L','O']
+
+// 5. 创建指定长度的序列
+Array.from({length: 5}, (_, i) => i + 1);
+// [1, 2, 3, 4, 5]</div>
+    </div>
+    <div class="card">
+        <h2>Array.of() — 创建数组</h2>
+        <div class="code">Array.of(7);         // [7]（而不是 new Array(7) 的 [empty×7]）
+Array.of(1, 2, 3);  // [1, 2, 3]
+Array.of('hello');  // ['hello']</div>
+    </div>
+    <div class="card">
+        <h2>flat() / flatMap() — 展平</h2>
+        <div class="code">// flat — 展平嵌套数组
+[1, [2, [3, [4]]]].flat();          // [1, 2, [3, [4]]]（默认展平1层）
+[1, [2, [3, [4]]]].flat(2);         // [1, 2, 3, [4]]
+[1, [2, [3, [4]]]].flat(Infinity);  // [1, 2, 3, 4]
+
+// flatMap — map + flat 一步完成
+['hello world', 'hi there'].flatMap(s => s.split(' '));
+// ['hello', 'world', 'hi', 'there']
+
+// 相当于：
+['hello world', 'hi there'].map(s => s.split(' ')).flat();
+// ['hello', 'world', 'hi', 'there']</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== Array.isArray ===');
+        console.log('Array.isArray([1,2]):', Array.isArray([1,2]));
+        console.log('Array.isArray("str"):', Array.isArray('str'));
+
+        console.log('=== Array.from ===');
+        console.log("from('hello'):", Array.from('hello'));
+        console.log("from Set:", Array.from(new Set([1,2,2,3])));
+        console.log("from map fn:", Array.from('abc', c => c.toUpperCase()));
+        console.log("from range:", Array.from({length: 5}, (_, i) => i * 2));
+
+        console.log('=== Array.of ===');
+        console.log('of(7):', Array.of(7));
+        console.log('of(1,2,3):', Array.of(1,2,3));
+
+        console.log('=== flat / flatMap ===');
+        let nested = [1, [2, [3, [4]]]];
+        console.log('flat():', nested.flat());
+        console.log('flat(2):', nested.flat(2));
+        console.log('flat(Infinity):', nested.flat(Infinity));
+        console.log('flatMap:', ['a b', 'c d'].flatMap(s => s.split(' ')));
+
+        document.getElementById('output').textContent =
+            `Array.from('hello'): [${Array.from('hello')}]\n` +
+            `Array.of(7): [${Array.of(7)}]\n` +
+            `flat(Infinity): [${nested.flat(Infinity)}]\n` +
+            `✅ 数组静态方法演示完成！`;
+    </script>
+</body>
+</html>

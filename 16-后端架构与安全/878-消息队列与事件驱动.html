@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>消息队列与事件驱动</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📨 消息队列与事件驱动</h2><p>RabbitMQ (交换机/队列/路由)、Apache Kafka (主题/分区/消费者组)、事件溯源 Event Sourcing、CQRS、Saga 模式。</p></div>
+    <div class="card">
+        <h2>消息队列概念</h2>
+        <div class="code">// ========== 为什么用消息队列 ==========
+// 1. 异步处理 — 不用等待耗时操作
+// 2. 解耦 — 生产者消费者独立
+// 3. 削峰填谷 — 平滑突发流量
+// 4. 可靠 — 消息持久化 + ACK
+
+// ========== 基本模型 ==========
+// Producer → Broker (Queue/Topic) → Consumer
+//
+// 点对点 (Queue):
+//   一条消息只被一个消费者消费
+//   适合: 任务队列
+//
+// 发布订阅 (Topic):
+//   一条消息被所有订阅者消费
+//   适合: 事件广播
+
+// ========== 投递保证 ==========
+// At Most Once  (最多一次): 可能丢失
+// At Least Once (至少一次): 可能重复
+// Exactly Once  (精准一次): 最可靠, 最慢
+
+// 通常用 At Least Once + 幂等消费模拟 Exactly Once</div>
+    </div>
+    <div class="card">
+        <h2>RabbitMQ</h2>
+        <div class="code">// ========== RabbitMQ 核心 ==========
+// 交换机 (Exchange) → 绑定 (Binding) → 队列 (Queue)
+// 生产者 → 交换机 → 队列 → 消费者
+
+// 四种交换机类型:
+// 1. Direct: 路由键完全匹配
+// 2. Topic:  路由键模式匹配 (users.*)
+// 3. Fanout: 广播到所有队列
+// 4. Headers: 根据消息头匹配
+
+// ========== Go RabbitMQ ==========
+// import amqp "github.com/rabbitmq/amqp091-go"
+
+// 连接
+func connect() (*amqp.Connection, error) {
+    return amqp.Dial("amqp://guest:guest@localhost:5672/")
+}
+
+// 生产者
+func publish(ch *amqp.Channel, exchange, key string, msg []byte) error {
+    ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+    defer cancel()
+
+    return ch.PublishWithContext(ctx,
+        exchange, // exchange
+        key,      // routing key
+        false,    // mandatory
+        false,    // immediate
+        amqp.Publishing{
+            ContentType: "application/json",
+            Body:        msg,
+            DeliveryMode: amqp.Persistent, // 持久化
+        },
+    )
+}
+
+// 消费者
+func consume(ch *amqp.Channel, queue string, handler func([]byte) error) {
+    msgs, _ := ch.Consume(
+        queue,     // queue
+        "",        // consumer
+        false,     // auto-ack (手动 ACK)
+        false,     // exclusive
+        false,     // no-local
+        false,     // no-wait
+        nil,
+    )
+
+    for msg := range msgs {
+        if err := handler(msg.Body); err != nil {
+            msg.Nack(false, true) // 重新入队
+            continue
+        }
+        msg.Ack(false) // ACK
+    }
+}
+
+// ========== 死信队列 (DLX) ==========
+// 消息处理失败后的处理
+// ch.ExchangeDeclare("dlx", "direct", true, false, false, false, nil)
+// ch.QueueBind("dlq", "dlx", "dlx", nil)</div>
+    </div>
+    <div class="card">
+        <h2>Apache Kafka</h2>
+        <div class="code">// ========== Kafka 核心概念 ==========
+// Topic: 消息分类
+// Partition: 分区 (并行/有序/持久化)
+// Offset: 分区内的偏移量
+// Consumer Group: 消费组 (负载均衡)
+// Broker: 服务器节点
+
+// Kafka 特点:
+// - 高吞吐 (百万/秒)
+// - 持久化 (磁盘顺序写)
+// - 分区有序
+// - 消息回溯
+
+// ========== Go Kafka (kafkago) ==========
+// import "github.com/segmentio/kafka-go"
+
+// 生产者
+func produceKafka() {
+    writer := &kafka.Writer{
+        Addr:     kafka.TCP("localhost:9092"),
+        Topic:    "orders",
+        Balancer: &kafka.Hash{},    // 按 key 分区
+        BatchSize: 100,              // 批量发送
+    }
+
+    writer.WriteMessages(context.Background(),
+        kafka.Message{
+            Key:   []byte("user-1"),
+            Value: []byte(`{"order_id": 123, "amount": 99.9}`),
+            Headers: []kafka.Header{
+                {Key: "event_type", Value: []byte("order_created")},
+            },
+        },
+    )
+}
+
+// 消费者
+func consumeKafka() {
+    reader := kafka.NewReader(kafka.ReaderConfig{
+        Brokers:   []string{"localhost:9092"},
+        Topic:     "orders",
+        GroupID:   "order-processor",
+        MinBytes:  10,    // 最小批量
+        MaxBytes:  10e6,  // 最大批量 (10MB)
+        StartOffset: kafka.LastOffset, // 从最新开始
+    })
+
+    for {
+        msg, err := reader.ReadMessage(context.Background())
+        if err != nil {
+            log.Printf("read error: %v", err)
+            continue
+        }
+        fmt.Printf("msg: %s, key: %s, offset: %d\n",
+            msg.Value, msg.Key, msg.Offset)
+    }
+}
+
+// ========== RabbitMQ vs Kafka ==========
+// RabbitMQ:
+//   复杂路由 (Direct/Fanout/Topic)
+//   低延迟 (~ms)
+//   消息确认 (ACK)
+//   适合: 任务队列, RPC, 实时
+
+// Kafka:
+//   高吞吐 (百万/秒)
+//   持久化 + 回溯
+//   分区有序
+//   适合: 日志, 事件流, 大数据</div>
+    </div>
+    <div class="card">
+        <h2>事件驱动架构</h2>
+        <div class="code">// ========== 事件溯源 (Event Sourcing) ==========
+// 不存当前状态, 存所有事件
+// 当前状态 = 重放所有事件
+
+// 银行账户示例:
+// 事件: AccountOpened, DepositMade, WithdrawalMade
+// 状态: 重放事件计算余额
+
+// 优点:
+// - 完整审计日志
+// - 时间旅行 (回到任意状态)
+// - 事件驱动其他服务
+
+// 缺点:
+// - 查询复杂 (需重放)
+// - 事件格式演化困难
+// - 存储量大
+
+// ========== CQRS ==========
+// Command Query Responsibility Segregation
+// 命令查询职责分离
+
+// 命令侧 (写):
+// - 接收 CreateOrder, UpdateOrder
+// - 验证业务规则
+// - 发出事件
+
+// 查询侧 (读):
+// - 专门的读模型
+// - 优化查询性能
+// - 可独立扩展
+
+// 同步: 事件最终一致
+// OrderCreated → 更新读模型
+
+// ========== Saga 模式 ==========
+// 分布式事务: 一系列本地事务 + 补偿操作
+
+// 编排 Saga (Choreography):
+// Order Service → OrderCreated
+// Payment Service → 支付 → PaymentProcessed
+// Inventory Service → 扣库存 → InventoryUpdated
+
+// 出错时补偿:
+// 支付失败 → 取消订单 → 恢复库存
+
+// 编排器 Saga (Orchestrator):
+// Saga Manager 协调每一步
+// Saga Manager → Order Service → Payment Service → ...
+
+// ========== Webhook ==========
+// 事件通知到外部服务
+
+// type WebhookPayload struct {
+//     Event string      `json:"event"`
+//     Data  interface{} `json:"data"`
+//     Timestamp time.Time `json:"timestamp"`
+// }
+
+// 签名验证:
+// func signPayload(payload []byte, secret string) string {
+//     mac := hmac.New(sha256.New, []byte(secret))
+//     mac.Write(payload)
+//     return hex.EncodeToString(mac.Sum(nil))
+// }
+
+// Header: X-Signature: sha256=...</div>
+        <div class="note">💡 消息队列要点: RabbitMQ (交换机/队列/绑定/DLX), Kafka (主题/分区/消费者组/高吞吐); 投递保证: At Most/At Least/Exactly Once; 手动 ACK + 重试; 死信队列处理失败消息; 事件溯源 (存事件非状态); CQRS (读写分离); Saga (编排/舞蹈 分布式事务); Webhook 签名验证; RabbitMQ 适合实时路由, Kafka 适合高吞吐流。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoMQ()">消息队列</button>
+        <button onclick="demoKafka()">Kafka</button>
+        <button onclick="demoEvent()">事件驱动</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoMQ() {
+            result.innerHTML = '';
+            log('# 消息队列概念');
+            log('');
+            log('作用: 异步 / 解耦 / 削峰');
+            log('');
+            log('RabbitMQ:');
+            log('  Direct: 精确匹配');
+            log('  Topic:  模式匹配');
+            log('  Fanout: 广播');
+            log('  Headers: 消息头');
+        }
+
+        function demoKafka() {
+            result.innerHTML = '';
+            log('# Apache Kafka');
+            log('');
+            log('核心:');
+            log('  Topic → Partition → Offset');
+            log('  Producer → Broker → Consumer Group');
+            log('');
+            log('特点:');
+            log('  百万/秒 吞吐');
+            log('  磁盘顺序写 (持久化)');
+            log('  消息回溯 (重放)');
+            log('');
+            log('vs RabbitMQ:');
+            log('  Kafka: 高吞吐/流处理');
+            log('  Rabbit: 复杂路由/低延迟');
+        }
+
+        function demoEvent() {
+            result.innerHTML = '';
+            log('# 事件驱动架构');
+            log('');
+            log('Event Sourcing:');
+            log('  存事件 → 重放得状态');
+            log('  完整审计 + 时间旅行');
+            log('');
+            log('CQRS:');
+            log('  写: Command (事件)');
+            log('  读: Query (优化)');
+            log('');
+            log('Saga:');
+            log('  分布式事务 + 补偿');
+            log('  编排 (Choreography)');
+            log('  或编辑 (Orchestrator)');
+        }
+    </script>
+</body>
+</html>

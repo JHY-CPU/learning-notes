@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>07-图的遍历-DFS (DFS Traversal)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>深度优先搜索 (DFS)</h2>
+  <p>DFS 使用栈（递归或显式栈）尽可能深地探索图，当没有未访问的邻接顶点时回溯。</p>
+  <div class="code">// 递归实现
+function dfs(graph, v, visited = new Set()) {
+  visited.add(v);
+  console.log('访问:', v);
+  for (const neighbor of graph[v]) {
+    if (!visited.has(neighbor)) {
+      dfs(graph, neighbor, visited);
+    }
+  }
+}</div>
+</div>
+<div class="card">
+  <h2>算法特点</h2>
+  <ul>
+    <li>适合探索所有可能路径、连通分量</li>
+    <li>递归实现简洁，但深度过大可能栈溢出</li>
+    <li>可用显式栈实现迭代版本</li>
+    <li>时间复杂度 O(V+E)</li>
+  </ul>
+</div>
+<div class="card">
+  <h2>交互演示</h2>
+  <button onclick="runDFS()">从 A 开始 DFS 遍历</button>
+  <button onclick="runDFSIter()">DFS 迭代版本</button>
+  <div id="result"></div>
+</div>
+<script>
+const graph = { A:['B','C'], B:['A','D','E'], C:['A','F','G'], D:['B'], E:['B','F'], F:['C','E'], G:['C'] };
+function runDFS() {
+  const order=[], set=new Set();
+  (function rec(v){set.add(v);order.push(v);for(const w of graph[v])if(!set.has(w))rec(w);})('A');
+  document.getElementById('result').textContent = 'DFS 递归: ' + order.join(' → ');
+}
+function runDFSIter() {
+  const order=[], stack=['A'], set=new Set(['A']);
+  while(stack.length) {
+    const v=stack.pop(); order.push(v);
+    for(const w of graph[v]) if(!set.has(w)){set.add(w);stack.push(w);}
+  }
+  document.getElementById('result').textContent = 'DFS 迭代: ' + order.join(' → ');
+}
+</script>
+</body></html>

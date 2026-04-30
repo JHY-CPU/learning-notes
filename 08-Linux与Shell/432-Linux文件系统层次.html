@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Linux文件系统层次</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📁 Linux 文件系统层次</h2><p>FHS 标准、目录结构详解、各目录用途、挂载点概念。</p></div>
+    <div class="card">
+        <h2>FHS 标准目录结构</h2>
+        <p>Linux 使用 FHS (Filesystem Hierarchy Standard) 标准定义目录结构,所有发行版基本一致。</p>
+        <div class="code">// ========== 根目录 / 下的核心目录 ==========
+//
+// /bin     — 基本命令二进制 (ls/cp/mv/cat)
+//            (现代发行版通常是 /usr/bin 的符号链接)
+//
+// /sbin    — 系统管理命令 (fdisk/mkfs/iptables)
+//            需要 root 权限执行
+//
+// /etc     — 系统配置文件 (文本格式)
+//            /etc/nginx/nginx.conf
+//            /etc/ssh/sshd_config
+//            /etc/hosts, /etc/resolv.conf
+//            /etc/crontab
+//            /etc/passwd, /etc/shadow
+//
+// /usr     — 用户程序和数据 (只读,可共享)
+//            /usr/bin          大多数用户命令
+//            /usr/lib          库文件
+//            /usr/local        本地安装的程序
+//            /usr/share        共享数据 (文档/图标)
+//            /usr/include      C 头文件
+//
+// /var     — 可变数据 (运行时文件)
+//            /var/log          系统日志
+//            /var/cache        应用程序缓存
+//            /var/lib          数据库/状态数据
+//            /var/tmp          重启保留的临时文件
+//            /var/www          Web 文件
+
+// ========== 更多重要目录 ==========
+// /home    — 用户主目录
+//            /home/alice, /home/bob
+//            每个用户自己的文件
+//
+// /root    — root 用户的主目录
+//
+// /tmp     — 临时文件 (重启后清除)
+//            任何用户可读写
+//            现代系统使用 tmpfs (内存中)
+//
+// /dev     — 设备文件
+//            /dev/sda         第一块硬盘
+//            /dev/tty         终端设备
+//            /dev/null        黑洞 (丢弃写入的数据)
+//            /dev/random      随机数生成器
+//
+// /proc    — 进程信息虚拟文件系统
+//            /proc/cpuinfo    CPU 信息
+//            /proc/meminfo    内存信息
+//            /proc/1/         1号进程 (init/systemd)
+//            /proc/uptime     系统运行时间
+//
+// /sys     — 内核/硬件信息 (类似 /proc)
+//            /sys/class/net  网络接口
+//
+// /mnt     — 临时挂载点
+// /media   — 可移动媒体 (USB/光盘自动挂载)
+//
+// /boot    — 引导加载程序文件
+//            vmlinuz (内核), initrd (初始 RAM 磁盘)
+//            GRUB 配置文件</div>
+    </div>
+    <div class="card">
+        <h2>文件类型与颜色</h2>
+        <div class="code">// ========== Linux 文件类型 ==========
+// - (普通文件)     常规文件
+// d (目录)         目录
+// l (符号链接)     类似于快捷方式
+// b (块设备)       硬盘等块设备
+// c (字符设备)     终端等字符设备
+// s (套接字)       进程间通信 Socket
+// p (命名管道)     FIFO
+
+// ========== ls 颜色含义 ==========
+// 蓝色      → 目录
+// 绿色      → 可执行文件
+// 红色      → 压缩文件
+// 青色      → 符号链接
+// 黄色      → 设备文件
+// 灰色      → 其他文件
+// 白底红字  → SUID 文件 (特殊权限)
+
+// ========== 重要路径速查 ==========
+// 配置文件:   /etc/
+// 日志文件:   /var/log/
+// 应用日志:   /var/log/nginx/access.log
+// SSH 密钥:   ~/.ssh/
+// bash 配置:  ~/.bashrc, ~/.bash_profile
+// 定时任务:   /etc/crontab, crontab -e
+// 环境变量:   /etc/environment, ~/.bashrc
+// 服务单元:   /etc/systemd/system/
+// 软件安装:   /usr/local/ (手动编译)
+//             /opt/ (第三方)</div>
+        <div class="note">🗂️ Linux 目录设计哲学: /etc 是静态配置, /var 是动态数据, /usr 是只读程序, /tmp 是临时文件。理解这个分层能帮你快速定位任何文件。</div>
+    </div>
+    <div class="card">
+        <h2>挂载与文件系统</h2>
+        <div class="code">// ========== 挂载概念 ==========
+// 在 Linux 中,一切文件都以"树"的形式组织
+// 新存储设备需要"挂载"到某个目录才能访问
+//
+// 查看挂载:
+//   $ mount
+//   $ df -h    # 查看磁盘使用和挂载点
+//   $ lsblk    # 查看块设备
+//
+// 挂载命令:
+//   $ mount /dev/sdb1 /mnt/data
+//   $ umount /mnt/data      # 卸载
+//
+// 自动挂载 (/etc/fstab):
+//   /dev/sda1  /  ext4  defaults  0  1
+//   UUID=xxx   /boot  ext4  defaults  0  2
+
+// ========== 常见文件系统 ==========
+// ext4:     Linux 默认,稳定可靠
+// XFS:      高性能,适合大文件 (RHEL 默认)
+// Btrfs:    快照/压缩/校验和,现代特性
+// ZFS:      企业级,内存需求大
+// NTFS:     Windows (Linux 可读写)
+// FAT32:    兼容性好,单文件 < 4GB
+// tmpfs:    内存文件系统 (/tmp)
+// proc:     进程虚拟文件系统 (/proc)
+// sysfs:    内核对象 (/sys)
+
+// ========== 查看磁盘空间 ==========
+// $ df -h              # 所有分区的空间
+// $ du -sh /var/log    # 目录大小
+// $ du -sh * | sort -h # 当前目录各项目大小排序
+// $ ncdu               # 交互式磁盘分析 (需安装)</div>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('📁 Linux 文件系统层次');
+        log('');
+        log('/bin 命令 | /etc 配置 | /var 数据 | /usr 程序 | /home 用户');
+        log('/proc 进程 | /dev 设备 | /tmp 临时 | /boot 引导');
+        log('文件: -普通 d目录 l链接 s套接字 b块设备 c字符');
+        log('挂载: mount /dev/sdb1 /mnt — 将设备关联到目录');
+        log('df -h 磁盘 | du -sh 目录大小 | mount 查看挂载');
+    </script>
+</body>
+</html>

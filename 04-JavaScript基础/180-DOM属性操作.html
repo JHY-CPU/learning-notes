@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DOM属性操作</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #9b59b6; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        .demo-box { padding: 15px; border: 2px solid #3498db; border-radius: 8px; margin: 10px 0; transition: all 0.3s; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>DOM 属性操作</h2><p>getAttribute / setAttribute / removeAttribute / dataset。</p></div>
+    <div class="card">
+        <h2>getAttribute / setAttribute</h2>
+        <div class="code">// 获取属性值
+const type = element.getAttribute('type');
+const href = link.getAttribute('href');
+const cls = element.getAttribute('class');
+
+// 设置属性值
+element.setAttribute('class', 'active');
+element.setAttribute('data-id', '123');
+element.setAttribute('disabled', '');      // 布尔属性
+element.setAttribute('style', 'color:red');
+
+// 同时设置多个属性
+element.setAttribute('id', 'main');
+element.setAttribute('title', '提示文字');
+
+// ⚠️ 属性名不区分大小写（HTML 属性）
+// ⚠️ 自定义属性建议用 data- 前缀
+
+// ⚠️ getAttribute('class') vs .className
+// getAttribute('class') → 返回属性值
+// .className → 返回字符串
+
+// ⚠️ getAttribute('href') vs .href
+// .href → 返回完整 URL
+// getAttribute('href') → 返回属性值原样</div>
+    </div>
+    <div class="card">
+        <h2>removeAttribute / hasAttribute</h2>
+        <div class="code">// 删除属性
+element.removeAttribute('disabled');
+element.removeAttribute('data-temp');
+
+// 检查属性是否存在
+if (element.hasAttribute('disabled')) {
+    console.log('元素被禁用');
+}
+
+if (element.hasAttribute('data-id')) {
+    const id = element.getAttribute('data-id');
+}
+
+// 获取所有属性
+const attrs = element.attributes;  // NamedNodeMap
+for (let attr of attrs) {
+    console.log(attr.name, '=', attr.value);
+}
+
+// 布尔属性
+element.setAttribute('checked', '');      // 设置（空值）
+element.setAttribute('checked', 'checked'); // 也可
+element.removeAttribute('checked');        // 移除
+
+// 常见布尔属性：disabled, checked, readonly, required, hidden</div>
+    </div>
+    <div class="card">
+        <h2>元素属性（Property）与 HTML 属性（Attribute）</h2>
+        <div class="code">// HTML 属性（Attribute）— HTML 中写的
+// DOM 属性（Property）— 元素对象的属性
+
+// 大多数情况下，两者自动同步
+input.setAttribute('value', 'hello');
+console.log(input.value);        // 'hello'（同步到 property）
+
+input.value = 'world';
+console.log(input.getAttribute('value')); // 'hello'（⚠️ 不同步回去！）
+
+// 例外：input 的 value
+// 用户输入 → property 变化
+// setAttribute → property 变化
+// property 变化 → attribute 不变！
+
+// class vs className
+// HTML: class="foo"
+// JS: element.className = 'foo'
+// getAttribute('class') 和 .className 通常是同步的
+
+// style（对象 vs 字符串）
+element.style.color = 'red';     // CSSStyleDeclaration 对象
+element.setAttribute('style', 'color:red');  // 字符串
+
+// 推荐：
+// 标准属性 → .property 方式
+// 自定义属性 → getAttribute / setAttribute
+// data-* 属性 → dataset</div>
+    </div>
+    <div class="card">
+        <h2>dataset — data-* 属性</h2>
+        <div class="code">// HTML5 自定义数据属性 data-*
+// &lt;div data-id="123" data-user-name="Alice"&gt;
+
+// JS 中通过 dataset 访问
+element.dataset.id;        // '123'
+element.dataset.userName;  // 'Alice'（驼峰命名）
+
+// 设置
+element.dataset.id = '456';
+element.dataset.userName = 'Bob';
+element.dataset.newField = '新字段';  // data-new-field
+
+// 删除
+delete element.dataset.temp;
+
+// ⚠️ dataset 是 DOMStringMap 对象
+// ⚠️ data-abc-def-ghi → dataset.abcDefGhi
+// ⚠️ data- 后面的连字符转驼峰
+
+// 用途：在 DOM 元素上存储数据
+// 代替 &lt;div data-id="123"&gt;
+// 取数据时不用再解析
+
+// 常见 data 属性：
+// data-id, data-index, data-type, data-value
+// data-toggle, data-target, data-action</div>
+    </div>
+    <div class="demo-box" id="attr-demo" data-id="42" data-type="demo" data-user-role="admin">
+        这是一个带有 data-* 属性的元素
+        <br>
+        <span id="attr-info" style="color:#7f8c8d;font-size:14px;"></span>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const demoBox = document.getElementById('attr-demo');
+        const info = document.getElementById('attr-info');
+
+        console.log('=== getAttribute ===');
+        console.log('class:', demoBox.getAttribute('class'));
+        console.log('data-id:', demoBox.getAttribute('data-id'));
+
+        console.log('=== setAttribute ===');
+        demoBox.setAttribute('title', '这是通过 setAttribute 设置的 title');
+        console.log('title 已设置');
+
+        console.log('=== hasAttribute / removeAttribute ===');
+        console.log('有 data-id:', demoBox.hasAttribute('data-id'));
+        if (demoBox.hasAttribute('data-temp')) {
+            demoBox.removeAttribute('data-temp');
+        }
+
+        console.log('=== dataset ===');
+        console.log('dataset.id:', demoBox.dataset.id);
+        console.log('dataset.type:', demoBox.dataset.type);
+        console.log('dataset.userRole:', demoBox.dataset.userRole);
+
+        // 读取所有 data-*
+        console.log('所有 data 属性:');
+        for (let key in demoBox.dataset) {
+            console.log(`  ${key}: ${demoBox.dataset[key]}`);
+        }
+
+        console.log('=== 设置 dataset ===');
+        demoBox.dataset.newKey = '动态添加的';
+        console.log('新增 data-new-key:', demoBox.dataset.newKey);
+        console.log('HTML 属性:', demoBox.getAttribute('data-new-key'));
+
+        console.log('=== attributes 集合 ===');
+        console.log('所有属性:');
+        for (let attr of demoBox.attributes) {
+            console.log(`  ${attr.name}="${attr.value}"`);
+        }
+
+        info.textContent =
+            `data-id=${demoBox.dataset.id}, ` +
+            `data-type=${demoBox.dataset.type}, ` +
+            `data-user-role=${demoBox.dataset.userRole}`;
+
+        document.getElementById('output').textContent =
+            `dataset: id=${demoBox.dataset.id}, type=${demoBox.dataset.type}\n` +
+            `新增 data-new-key: ${demoBox.dataset.newKey}\n` +
+            `✅ DOM 属性操作演示完成！`;
+    </script>
+</body>
+</html>

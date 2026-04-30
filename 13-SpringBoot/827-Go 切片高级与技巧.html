@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 切片高级与技巧</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔧 Go 切片高级与操作技巧</h2><p>切片内部结构（ptr/len/cap）、扩容策略、子切片共享底层数组、零拷贝技巧、常用操作模式、内存泄漏防范。</p></div>
+    <div class="card">
+        <h2>切片内部结构</h2>
+        <div class="code">// ========== 切片底层结构 ==========
+// 运行时表示为 reflect.SliceHeader:
+// type SliceHeader struct {
+//     Data uintptr  // 底层数组指针
+//     Len  int      // 长度
+//     Cap  int      // 容量
+// }
+// 24 字节 (64位系统)
+
+// ========== 创建与初始化 ==========
+func sliceCreation() {
+    // 方式 1: make (指定 len 和 cap)
+    s1 := make([]int, 5)        // len=5, cap=5
+    s2 := make([]int, 3, 10)    // len=3, cap=10
+
+    // 方式 2: 字面量
+    s3 := []int{1, 2, 3}        // len=3, cap=3
+
+    // 方式 3: 从数组切片
+    arr := [5]int{1, 2, 3, 4, 5}
+    s4 := arr[1:4]              // len=3, cap=4 (共享底层数组)
+
+    // 方式 4: new (返回指针, 不常见)
+    s5 := new([]int)            // *[]int, 指向 nil slice
+
+    fmt.Printf("s1: len=%d, cap=%d\n", len(s1), cap(s1))
+    fmt.Printf("s4: len=%d, cap=%d\n", len(s4), cap(s4))  // 3, 4
+}
+
+// ========== 扩容策略 ==========
+// 当 append 超出 cap 时, Go 自动分配新底层数组并复制
+// 扩容规则:
+//   - cap < 256: 翻倍 (2x)
+//   - cap >= 256: 增长约 1.25x (公式: newcap = oldcap + (oldcap+768)/4)
+
+func growthPolicy() {
+    s := make([]int, 0, 1)
+    oldCap := cap(s)
+    for i := 0; i < 1000; i++ {
+        s = append(s, i)
+        if cap(s) != oldCap {
+            fmt.Printf("len=%-4d oldCap=%-4d newCap=%-4d growth=%.2fx\n",
+                len(s), oldCap, cap(s), float64(cap(s))/float64(oldCap))
+            oldCap = cap(s)
+        }
+    }
+    // len=1    oldCap=1    newCap=2    growth=2.00x
+    // len=3    oldCap=2    newCap=4    growth=2.00x
+    // len=5    oldCap=4    newCap=8    growth=2.00x
+    // len=9    oldCap=8    newCap=16   growth=2.00x
+    // len=17   oldCap=16   newCap=32   growth=2.00x
+    // len=33   oldCap=32   newCap=64   growth=2.00x
+    // len=65   oldCap=64   newCap=128  growth=2.00x
+    // len=129  oldCap=128  newCap=256  growth=2.00x
+    // len=257  oldCap=256  newCap=512  growth=2.00x
+    // len=513  oldCap=512  newCap=848  growth=1.66x  <-- 超过 256 后
+    // len=849  oldCap=848  newCap=1280 growth=1.51x
+}</div>
+    </div>
+    <div class="card">
+        <h2>子切片与共享</h2>
+        <div class="code">// ========== 子切片共享底层数组 ==========
+// 子切片与原切片共享底层数组 — 可能导致意料之外的修改
+
+func subSliceShare() {
+    s := []int{1, 2, 3, 4, 5}
+    sub := s[1:4]  // [2, 3, 4], len=3, cap=4
+
+    sub[0] = 99    // 修改 sub 影响 s!
+    fmt.Println(s)  // [1, 99, 3, 4, 5]
+
+    // append 超出子切片 cap 时触发复制 (分离)
+    sub = append(sub, 100, 200)
+    // sub 现在 cap=4, 已到 cap 边界
+    sub = append(sub, 300)  // 触发扩容, sub 指向新数组
+    sub[0] = 77             // 不再影响原切片
+    fmt.Println(s)          // [1, 99, 3, 4, 5] (不受影响)
+}
+
+// ========== 完整切片表达式 ==========
+// 完整形式: s[low:high:max]
+// max 控制子切片的 cap, 防止意外共享
+
+func fullSliceExpr() {
+    s := []int{1, 2, 3, 4, 5}
+
+    // 普通子切片 — cap 延伸到原切片末尾
+    sub1 := s[1:4]           // [2,3,4], cap=4
+    fmt.Println(cap(sub1))   // 4
+
+    // 完整切片表达式 — 限制 cap
+    sub2 := s[1:4:4]         // [2,3,4], cap=3
+    fmt.Println(cap(sub2))   // 3
+
+    // sub2 的 cap = max - low = 4 - 1 = 3
+    // sub2 append 时立即触发扩容, 不污染原数组
+    sub2 = append(sub2, 100) // 触发扩容, 安全
+}
+
+// ========== 拷贝: copy 函数 ==========
+func copyDemo() {
+    src := []int{1, 2, 3}
+    dst := make([]int, len(src))
+
+    // copy 返回拷贝的元素个数 (min(len(dst), len(src)))
+    n := copy(dst, src)
+    fmt.Println(n)  // 3
+
+    // dst 是独立副本, 不共享底层数组
+    dst[0] = 99
+    fmt.Println(src)  // [1, 2, 3] (不受影响)
+
+    // 部分拷贝: dst 比 src 短
+    dst2 := make([]int, 2)
+    copy(dst2, src)   // 只拷贝前 2 个
+    fmt.Println(dst2)  // [1, 2]
+
+    // 切片重叠拷贝: copy 正确处理重叠
+    s := []int{1, 2, 3, 4, 5}
+    copy(s[1:], s[0:]) // 右移: [1, 1, 2, 3, 4]
+}</div>
+    </div>
+    <div class="card">
+        <h2>切片操作模式</h2>
+        <div class="code">// ========== 常用操作模式 ==========
+
+// 1. 高效过滤 (原地, 零分配)
+func FilterInPlace(vs []int, fn func(int) bool) []int {
+    filtered := vs[:0]  // 复用底层数组
+    for _, v := range vs {
+        if fn(v) {
+            filtered = append(filtered, v)
+        }
+    }
+    return filtered
+}
+
+// 2. 清空切片 (保持 cap)
+func Reset(s *[]int) {
+    *s = (*s)[:0]  // len=0, cap 不变
+    // 注意: 底层元素仍存在, 但不可访问
+}
+
+// 3. 删除元素
+func Remove(s []int, i int) []int {
+    // 保持顺序
+    return append(s[:i], s[i+1:]...)
+    // s[:i] 和 append 可能共享底层数组
+}
+
+// 4. 删除不保持顺序 (更快)
+func RemoveFast(s []int, i int) []int {
+    s[i] = s[len(s)-1]
+    return s[:len(s)-1]
+}
+
+// 5. 插入
+func Insert(s []int, i int, v int) []int {
+    s = append(s, 0)       // 扩容
+    copy(s[i+1:], s[i:])    // 后移
+    s[i] = v
+    return s
+}
+
+// 6. 反转
+func Reverse[T any](s []T) {
+    for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+        s[i], s[j] = s[j], s[i]
+    }
+}
+
+// 7. 比较
+func Equal(a, b []int) bool {
+    if len(a) != len(b) {
+        return false
+    }
+    for i := range a {
+        if a[i] != b[i] {
+            return false
+        }
+    }
+    return true
+}
+
+// 8. 去重 (已排序)
+func DedupSorted(s []int) []int {
+    if len(s) == 0 {
+        return s
+    }
+    j := 0
+    for i := 1; i < len(s); i++ {
+        if s[j] != s[i] {
+            j++
+            s[j] = s[i]
+        }
+    }
+    return s[:j+1]
+}
+
+// ========== 切片转换为数组 (Go 1.20+) ==========
+func sliceToArray() {
+    s := []int{1, 2, 3, 4, 5}
+
+    arr1 := [3]int(s[:3])   // [1,2,3] — 复制
+    arr2 := (*[3]int)(s[:3]) // &[1,2,3] — 指针, 共享底层
+
+    s[0] = 99
+    fmt.Println(arr1)  // [1,2,3] (不受影响)
+    fmt.Println(arr2)  // &[99,2,3] (受影响!)
+}</div>
+    </div>
+    <div class="card">
+        <h2>内存与性能</h2>
+        <div class="code">// ========== 切片与内存泄漏 ==========
+
+// 1. 大切片截取小切片导致大数组无法 GC
+var allData []int  // 全局, 长期持有
+
+func ReadFile() []byte {
+    data := readHugeFile()  // 10MB
+    allData = data[:100]     // 只取 100 字节
+    // 问题: 10MB 底层数组始终被引用, 无法 GC
+    // 修复: 复制需要的部分
+    result := make([]byte, 100)
+    copy(result, data)
+    allData = result
+}
+
+// 2. 切片元素为指针时, 缩容不释放
+type Item struct {
+    Data [1024]byte  // 大结构体
+}
+
+func leakItems() {
+    items := make([]*Item, 1000)
+    // 填充 items...
+    items = items[:500]  // 元素 500-999 无法 GC (切片仍引用)
+    // 修复: 将 nil 赋值给不再需要的元素
+    for i := 500; i < len(items); i++ {
+        items[i] = nil  // 允许 GC
+    }
+    items = items[:500]
+}
+
+// 3. 定时器 + 切片累积
+var cache []int
+func onTimer() {
+    cache = append(cache, collectData()...)
+    // 问题: cache 无限增长
+    // 修复: 设置上限或定期清空
+    if len(cache) > 10000 {
+        cache = nil  // 或 cache = cache[:0]
+    }
+}
+
+// ========== 预分配优化 ==========
+// 已知大小: 预分配减少扩容次数
+
+// ❌ 慢: 反复扩容
+func buildSlow(n int) []int {
+    var s []int
+    for i := 0; i < n; i++ {
+        s = append(s, i)  // 多次扩容
+    }
+    return s
+}
+
+// ✅ 快: 预分配
+func buildFast(n int) []int {
+    s := make([]int, 0, n)
+    for i := 0; i < n; i++ {
+        s = append(s, i)  // 零扩容
+    }
+    return s
+}
+
+// go test -bench=BenchmarkBuild -benchmem
+// BenchmarkBuildSlow-8  100  1523 ns/op  3576 B/op  10 allocs/op
+// BenchmarkBuildFast-8  200   851 ns/op  2048 B/op   1 allocs/op
+
+// ========== nil 切片 vs 空切片 ==========
+func nilVsEmpty() {
+    var s1 []int           // nil slice, len=0, cap=0
+    s2 := []int{}          // empty slice, len=0, cap=0
+    s3 := make([]int, 0)   // empty slice, len=0, cap=0
+
+    fmt.Println(s1 == nil)  // true
+    fmt.Println(s2 == nil)  // false
+    fmt.Println(s3 == nil)  // false
+
+    // json.Marshal 的区别:
+    json1, _ := json.Marshal(s1)  // "null"
+    json2, _ := json.Marshal(s2)  // "[]"
+
+    // for range 对两者都安全:
+    for range s1 { /* 不执行 */ }
+    for range s2 { /* 不执行 */ }
+
+    // append 对 nil 切片安全:
+    s1 = append(s1, 1)  // 正常工作
+}</div>
+        <div class="note">💡 切片要点: 底层结构 Data/Len/Cap (24 字节); 扩容 cap<256 翻倍, >=256 约 1.25x; 子切片共享底层数组可能造成数据冲突; 完整切片表达式 s[low:high:max] 限制 cap 防共享; copy 创建独立副本; FilterInPlace 复用底层数组零分配; 大切片截取小部分导致内存泄漏 (复制解决); 指针元素缩容需手动置 nil; 预分配 make([]T, 0, n) 大幅减少 alloc; nil 切片 JSON 序列化为 null, 空切片为 []。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSlice()">切片内部</button>
+        <button onclick="demoShare()">共享问题</button>
+        <button onclick="demoPatterns()">操作模式</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSlice() {
+            result.innerHTML = '';
+            log('# 切片内部结构');
+            log('');
+            log('reflect.SliceHeader {');
+            log('  Data uintptr  // 指向底层数组');
+            log('  Len  int      // 长度');
+            log('  Cap  int      // 容量');
+            log('}  // 共 24 字节');
+            log('');
+            log('创建方式:');
+            log('  s := make([]int, 5)      // len=5, cap=5');
+            log('  s := make([]int, 3, 10)  // len=3, cap=10');
+            log('  s := []int{1, 2, 3}      // 字面量');
+            log('  s := arr[1:4]            // 从数组切片');
+            log('');
+            log('扩容策略:');
+            log('  cap < 256:  翻倍 (2x)');
+            log('  cap >= 256: 增长 ~1.25x');
+            log('  预分配可避免多次扩容');
+        }
+
+        function demoShare() {
+            result.innerHTML = '';
+            log('# 子切片共享问题');
+            log('');
+            log('s := []int{1, 2, 3, 4, 5}');
+            log('sub := s[1:4]     // [2,3,4], cap=4');
+            log('sub[0] = 99       // 修改 s 也受影响!');
+            log('→ s = [1, 99, 3, 4, 5]');
+            log('');
+            log('防御: 完整切片表达式');
+            log('  sub := s[1:4:4] // cap=4-1=3');
+            log('  append 立即触发扩容, 不污染原数组');
+            log('');
+            log('防御: copy 创建独立副本');
+            log('  sub := make([]int, 3)');
+            log('  copy(sub, s[1:4])');
+            log('  // 完全不共享底层数组');
+        }
+
+        function demoPatterns() {
+            result.innerHTML = '';
+            log('# 常用切片操作');
+            log('');
+            log('过滤 (原地零分配):');
+            log('  filtered := vs[:0]');
+            log('  for _, v := range vs {');
+            log('    if fn(v) { filtered = append(filtered, v) }');
+            log('  }');
+            log('');
+            log('删除:');
+            log('  保持顺序: append(s[:i], s[i+1:]...)');
+            log('  不保持:  s[i] = s[len(s)-1]; s[:len(s)-1]');
+            log('');
+            log('插入:');
+            log('  s = append(s, 0)');
+            log('  copy(s[i+1:], s[i:])');
+            log('  s[i] = v');
+            log('');
+            log('去重 (已排序):');
+            log('  双指针原地去重, 返回 s[:j+1]');
+        }
+    </script>
+</body>
+</html>

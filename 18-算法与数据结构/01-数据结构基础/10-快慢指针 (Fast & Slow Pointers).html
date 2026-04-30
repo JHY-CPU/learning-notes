@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>10-快慢指针 (Fast & Slow Pointers)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card"><h2>10-快慢指针 (Fast & Slow Pointers)</h2><p>快慢指针是双指针的一种，两个指针从同一起点出发，但移动速度不同。常用于链表环检测、寻找中点等场景。</p></div>
+
+<div class="card"><h2>快慢指针核心思想</h2>
+<div class="code">
+// 快慢指针模板：快指针每次走2步，慢指针每次走1步
+function fastSlowPointer(arr) {
+  let slow = 0;
+  let fast = 0;
+
+  while (fast < arr.length) {
+    // 慢指针条件移动
+    // 快指针条件移动（通常是2倍速）
+
+    slow++;      // 慢指针移动1步
+    fast += 2;   // 快指针移动2步
+  }
+
+  return slow; // 通常返回慢指针位置
+}
+</div></div>
+
+<div class="card"><h2>常见应用</h2>
+<div class="code">
+// 1. 寻找链表中间节点
+// 快指针到末尾时，慢指针恰好在中间
+function findMiddle(head) {
+  let slow = head;
+  let fast = head;
+  while (fast && fast.next) {
+    slow = slow.next;
+    fast = fast.next.next;
+  }
+  return slow;
+}
+
+// 2. 检测链表环
+function hasCycle(head) {
+  let slow = head;
+  let fast = head;
+  while (fast && fast.next) {
+    slow = slow.next;
+    fast = fast.next.next;
+    if (slow === fast) return true; // 相遇则有环
+  }
+  return false;
+}
+
+// 3. 移除有序数组中的重复元素
+function removeDuplicates(nums) {
+  if (nums.length === 0) return 0;
+  let slow = 0; // 不重复区域的右边界
+  for (let fast = 1; fast < nums.length; fast++) {
+    if (nums[fast] !== nums[slow]) {
+      slow++;
+      nums[slow] = nums[fast];
+    }
+  }
+  return slow + 1;
+}
+</div></div>
+
+<div class="card"><h2>交互演示</h2>
+<button onclick="demoFastSlow()">运行快慢指针演示</button>
+<div id="result"></div>
+</div>
+
+<script>
+function demoFastSlow() {
+  let output = '';
+
+  output += '=== 快慢指针演示 ===\n\n';
+
+  // 1. 寻找数组中间位置（模拟链表）
+  output += '1. 寻找中间元素:\n';
+  let arr1 = [1, 2, 3, 4, 5, 6, 7];
+  output += `   数组: [${arr1}]\n`;
+  let slow = 0, fast = 0;
+  while (fast < arr1.length - 1) {
+    slow++;
+    fast += 2;
+  }
+  output += `   中间元素: arr[${slow}] = ${arr1[slow]}\n\n`;
+
+  let arr2 = [1, 2, 3, 4, 5, 6];
+  output += `   数组: [${arr2}]\n`;
+  slow = 0; fast = 0;
+  while (fast < arr2.length - 1) {
+    slow++;
+    fast += 2;
+  }
+  output += `   中间元素（偶数长度靠右）: arr[${slow}] = ${arr2[slow]}\n\n`;
+
+  // 2. 链表环检测模拟
+  output += '2. 环检测（模拟链表）:\n';
+  // 用数组模拟链接关系
+  // 模拟一个带环的链表: 1->2->3->4->5->3（指向3）
+  class ListNode {
+    constructor(val) { this.val = val; this.next = null; }
+  }
+  let nodes = [1,2,3,4,5].map(v => new ListNode(v));
+  nodes[0].next = nodes[1];
+  nodes[1].next = nodes[2];
+  nodes[2].next = nodes[3];
+  nodes[3].next = nodes[4];
+  nodes[4].next = nodes[2]; // 形成环，指向3
+
+  let s = nodes[0], f = nodes[0];
+  let hasCycle = false;
+  while (f && f.next) {
+    s = s.next;
+    f = f.next.next;
+    if (s === f) { hasCycle = true; break; }
+  }
+  output += `   链表是否有环: ${hasCycle}\n\n`;
+
+  // 3. 数组去重
+  output += '3. 有序数组去重（快慢指针）:\n';
+  let nums = [0,0,1,1,1,2,2,3,3,4];
+  output += `   输入: [${nums}]\n`;
+
+  if (nums.length > 0) {
+    let sp = 0;
+    for (let fp = 1; fp < nums.length; fp++) {
+      if (nums[fp] !== nums[sp]) {
+        sp++;
+        nums[sp] = nums[fp];
+      }
+    }
+    output += `   去重后: [${nums.slice(0, sp + 1)}]\n`;
+    output += `   长度: ${sp + 1}\n`;
+  }
+
+  document.getElementById('result').textContent = output;
+}
+</script>
+</body></html>

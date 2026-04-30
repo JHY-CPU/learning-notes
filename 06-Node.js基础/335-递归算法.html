@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>递归算法</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>递归算法</h2><p>汉诺塔、斐波那契(记忆化)、排列组合、八皇后、调用栈分析。</p></div>
+    <div class="card">
+        <h2>递归算法实现</h2>
+        <div class="code">// ========== 阶乘 ==========
+function factorial(n) {
+    if (n <= 1) return 1;
+    return n * factorial(n - 1);
+}
+
+// ========== 斐波那契 ==========
+function fib(n) {
+    if (n <= 1) return n;
+    return fib(n - 1) + fib(n - 2);
+}
+
+// ========== 记忆化斐波那契 ==========
+function fibMemo(n, memo = {}) {
+    if (n <= 1) return n;
+    if (memo[n] !== undefined) return memo[n];
+    memo[n] = fibMemo(n - 1, memo) + fibMemo(n - 2, memo);
+    return memo[n];
+}
+
+// ========== 汉诺塔 ==========
+function hanoi(n, from, to, aux) {
+    if (n === 1) {
+        console.log(`移动 ${from} → ${to}`);
+        return;
+    }
+    hanoi(n - 1, from, aux, to);
+    console.log(`移动 ${from} → ${to}`);
+    hanoi(n - 1, aux, to, from);
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：递归算法</h2>
+        <button onclick="demoRecursion()">递归基础</button>
+        <button onclick="demoFib()">斐波那契</button>
+        <button onclick="demoHanoi()">汉诺塔</button>
+        <button onclick="demoPermute()">排列组合</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoRecursion() {
+            result.innerHTML = '';
+            log('🔄 递归基础:');
+            log('');
+
+            log('1️⃣ 阶乘 n! = n * (n-1)!');
+            function factorial(n, depth = 0) {
+                const indent = '  '.repeat(depth);
+                log(`${indent}factorial(${n})`);
+                if (n <= 1) {
+                    log(`${indent}→ return 1`);
+                    return 1;
+                }
+                const result = n * factorial(n - 1, depth + 1);
+                log(`${indent}→ return ${n} * factorial(${n - 1}) = ${result}`);
+                return result;
+            }
+            log(`结果: factorial(5) = ${factorial(5)}`);
+            log('');
+
+            log('2️⃣ 递归三要素:');
+            log('   • 终止条件 (Base Case)');
+            log('   • 递归调用 (Recursive Call)');
+            log('   • 问题规模递减');
+            log('');
+
+            log('3️⃣ 调用栈:');
+            log('   factorial(5) → 压栈');
+            log('   → factorial(4) → 压栈');
+            log('   → ... → factorial(1) → 出栈');
+            log('   → 逐层返回结果');
+        }
+
+        function demoFib() {
+            result.innerHTML = '';
+            log('📊 斐波那契数列:');
+            log('');
+
+            // 朴素递归 (指数级)
+            function fib(n) {
+                if (n <= 1) return n;
+                return fib(n - 1) + fib(n - 2);
+            }
+
+            // 记忆化 (O(n))
+            function fibMemo(n, memo = {}) {
+                if (n <= 1) return n;
+                if (memo[n] !== undefined) return memo[n];
+                memo[n] = fibMemo(n - 1, memo) + fibMemo(n - 2, memo);
+                return memo[n];
+            }
+
+            // 迭代 (O(n))
+            function fibIter(n) {
+                if (n <= 1) return n;
+                let a = 0, b = 1;
+                for (let i = 2; i <= n; i++) {
+                    [a, b] = [b, a + b];
+                }
+                return b;
+            }
+
+            log('斐波那契数列:');
+            const seq = [];
+            for (let i = 0; i <= 10; i++) seq.push(fibMemo(i));
+            log(`   [${seq.join(', ')}]`);
+            log('');
+
+            log('性能对比:');
+            log('   fib(40) — 朴素递归:');
+            let start = performance.now();
+            const r1 = fib(40);
+            log(`      ${(performance.now() - start).toFixed(2)}ms → ${r1}`);
+
+            log('   fib(1000) — 记忆化:');
+            start = performance.now();
+            const r2 = fibMemo(1000);
+            log(`      ${(performance.now() - start).toFixed(2)}ms → ${r2}`);
+
+            log('   fib(1000) — 迭代:');
+            start = performance.now();
+            const r3 = fibIter(1000);
+            log(`      ${(performance.now() - start).toFixed(2)}ms → ${r3}`);
+
+            log('');
+            log('📌 复杂度: 朴素 O(2ⁿ), 记忆化 O(n)');
+        }
+
+        function demoHanoi() {
+            result.innerHTML = '';
+            log('🏗️ 汉诺塔:');
+            log('');
+
+            const moves = [];
+
+            function hanoi(n, from, to, aux) {
+                if (n === 0) return;
+                hanoi(n - 1, from, aux, to);
+                moves.push(`${from} → ${to}`);
+                hanoi(n - 1, aux, to, from);
+            }
+
+            log('3 个盘子的汉诺塔:');
+            log('初始: A(3,2,1) B() C()');
+            log('目标: 全部从 A 移到 C');
+            log('规则: 一次移一个, 大不能压小');
+            log('');
+
+            hanoi(3, 'A', 'C', 'B');
+            log(`步骤 (${moves.length} 步):`);
+            moves.forEach((m, i) => log(`   ${i + 1}. ${m}`));
+
+            log('');
+            log('📌 汉诺塔规律:');
+            log('   • n 个盘子需要 2ⁿ - 1 步');
+            log('   • 3 个盘子 → 7 步');
+            log('   • 5 个盘子 → 31 步');
+            log('   • 10 个盘子 → 1023 步');
+        }
+
+        function demoPermute() {
+            result.innerHTML = '';
+            log('🔀 排列组合:');
+            log('');
+
+            // 全排列
+            function permute(arr) {
+                const result = [];
+
+                function backtrack(path, used) {
+                    if (path.length === arr.length) {
+                        result.push([...path]);
+                        return;
+                    }
+                    for (let i = 0; i < arr.length; i++) {
+                        if (used[i]) continue;
+                        used[i] = true;
+                        path.push(arr[i]);
+                        backtrack(path, used);
+                        path.pop();
+                        used[i] = false;
+                    }
+                }
+
+                backtrack([], Array(arr.length).fill(false));
+                return result;
+            }
+
+            // 组合 C(n, k)
+            function combine(arr, k) {
+                const result = [];
+
+                function backtrack(start, path) {
+                    if (path.length === k) {
+                        result.push([...path]);
+                        return;
+                    }
+                    for (let i = start; i < arr.length; i++) {
+                        path.push(arr[i]);
+                        backtrack(i + 1, path);
+                        path.pop();
+                    }
+                }
+
+                backtrack(0, []);
+                return result;
+            }
+
+            log('1️⃣ 全排列 [1, 2, 3]:');
+            const perms = permute([1, 2, 3]);
+            perms.forEach(p => log(`   [${p.join(', ')}]`));
+            log(`   总数: ${perms.length} = 3!`);
+
+            log('');
+            log('2️⃣ 组合 C(5, 3):');
+            const combs = combine([1, 2, 3, 4, 5], 3);
+            combs.forEach(c => log(`   [${c.join(', ')}]`));
+            log(`   总数: ${combs.length} = C(5,3)`);
+
+            log('');
+            log('3️⃣ 八皇后问题 (4 皇后):');
+            function solveNQueens(n) {
+                const result = [];
+                const board = Array(n).fill(-1);
+
+                function isValid(row, col) {
+                    for (let i = 0; i < row; i++) {
+                        if (board[i] === col || Math.abs(board[i] - col) === row - i) return false;
+                    }
+                    return true;
+                }
+
+                function backtrack(row) {
+                    if (row === n) {
+                        result.push([...board]);
+                        return;
+                    }
+                    for (let col = 0; col < n; col++) {
+                        if (isValid(row, col)) {
+                            board[row] = col;
+                            backtrack(row + 1);
+                        }
+                    }
+                }
+
+                backtrack(0);
+                return result;
+            }
+
+            const solutions = solveNQueens(4);
+            log(`   4 皇后有 ${solutions.length} 个解:`);
+            solutions.forEach((sol, idx) => {
+                log(`   解 ${idx + 1}: [${sol}]`);
+                // 打印棋盘
+                for (let row = 0; row < 4; row++) {
+                    let line = '     ';
+                    for (let col = 0; col < 4; col++) {
+                        line += sol[row] === col ? 'Q ' : '. ';
+                    }
+                    log(line);
+                }
+            });
+        }
+
+        console.log('=== 递归算法 ===');
+        document.getElementById('output').textContent = `递归算法: 阶乘 / 斐波那契 / 汉诺塔 / 排列组合 / 八皇后\n✅ 递归算法演示完成！`;
+    </script>
+</body>
+</html>

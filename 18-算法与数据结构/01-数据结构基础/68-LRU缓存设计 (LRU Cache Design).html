@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>68-LRU缓存设计 (LRU Cache Design)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>LRU Cache Design</h2>
+  <div class="code">LRU缓存淘汰最近最少使用的数据，核心是哈希表+双向链表。</div>
+  <pre>class LRUCache {
+  constructor(cap) {
+    this.cap = cap;
+    this.cache = new Map();
+  }
+  get(key) {
+    if (!this.cache.has(key)) return -1;
+    const val = this.cache.get(key);
+    this.cache.delete(key);
+    this.cache.set(key, val);
+    return val;
+  }
+  put(key, val) {
+    if (this.cache.has(key)) this.cache.delete(key);
+    else if (this.cache.size >= this.cap)
+      this.cache.delete(this.cache.keys().next().value);
+    this.cache.set(key, val);
+  }
+}</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  class LRU{
+    constructor(c){this.cap=c;this.cache=new Map();}
+    get(k){if(!this.cache.has(k))return-1;const v=this.cache.get(k);this.cache.delete(k);this.cache.set(k,v);return v;}
+    put(k,v){if(this.cache.has(k))this.cache.delete(k);else if(this.cache.size>=this.cap)this.cache.delete(this.cache.keys().next().value);this.cache.set(k,v);}
+  }
+  const lru=new LRU(3);
+  lru.put('A',1);lru.put('B',2);lru.put('C',3);lru.get('A');lru.put('D',4);
+  document.getElementById('result').textContent = `缓存内容: ${[...lru.cache.keys()].join(', ')} (A刚被使用，B被淘汰)`;
+}
+</script>
+</body>
+</html>

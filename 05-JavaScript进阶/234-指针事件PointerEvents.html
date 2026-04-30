@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>指针事件PointerEvents</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        #pointer-area { width: 100%; height: 200px; background: linear-gradient(135deg, #667eea, #764ba2); border-radius: 12px; display: flex; align-items: center; justify-content: center; color: white; font-size: 16px; touch-action: none; user-select: none; position: relative; margin: 10px 0; }
+        #pointer-info { background: #f8f9fa; padding: 15px; border-radius: 4px; font-size: 13px; }
+        #pointer-info .row { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid #eee; }
+        #pointer-info .key { color: #7f8c8d; }
+        #pointer-info .val { font-weight: bold; color: #2c3e50; font-family: monospace; }
+        #pointer-trail { position: absolute; width: 12px; height: 12px; background: rgba(255,255,255,0.6); border-radius: 50%; pointer-events: none; transform: translate(-50%,-50%); transition: opacity 0.3s; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>指针事件 Pointer Events</h2><p>统一处理鼠标/触控/触控笔事件的 API。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 指针事件（统一鼠标/触摸/笔）
+element.addEventListener('pointerdown', handler);   // 按下
+element.addEventListener('pointermove', handler);   // 移动
+element.addEventListener('pointerup', handler);     // 抬起
+element.addEventListener('pointercancel', handler); // 取消
+element.addEventListener('pointerover', handler);   // 进入
+element.addEventListener('pointerout', handler);    // 离开
+element.addEventListener('pointerenter', handler);  // 进入（不冒泡）
+element.addEventListener('pointerleave', handler);  // 离开（不冒泡）
+
+// PointerEvent 属性
+e.pointerId;      // 唯一标识符
+e.pointerType;    // 'mouse' | 'touch' | 'pen'
+e.clientX/Y;      // 视口坐标
+e.pageX/Y;        // 页面坐标
+e.screenX/Y;      // 屏幕坐标
+e.button;         // 0=左键, 1=中键, 2=右键
+e.buttons;        // 位掩码（1=左,2=右,4=中,8=后退,16=前进）
+e.pressure;       // 压力 (0~1)
+e.tiltX/Y;        // 笔倾斜角度
+e.twist;          // 笔旋转角度
+e.width/height;   // 触摸区域大小
+e.isPrimary;      // 是否为主指针（多点触控时区分）
+
+// 指针捕获（将指针事件锁定到指定元素）
+element.setPointerCapture(e.pointerId);
+element.releasePointerCapture(e.pointerId);
+element.hasPointerCapture(e.pointerId);
+
+// CSS touch-action
+// touch-action: none;          // 禁用所有默认手势
+// touch-action: pinch-zoom;    // 仅允许缩放
+// touch-action: pan-x pan-y;   // 允许滚动</div>
+        <div class="note">💡 Pointer Events 是推荐的事件 API，比分别处理 mouse/touch 更方便。<br>
+        ⚠️ 使用 setPointerCapture 后，即使指针移出元素也能收到事件。<br>
+        💡 pointerType 可用来区分鼠标和触摸，提供不同交互体验。</div>
+    </div>
+    <div class="card">
+        <h2>演示：指针事件</h2>
+        <div id="pointer-area">
+            <span id="pointer-label">🖱 在此区域操作（鼠标/触摸/笔）</span>
+        </div>
+        <div id="pointer-info">
+            <div class="row"><span class="key">事件类型</span><span class="val" id="p-type">-</span></div>
+            <div class="row"><span class="key">指针类型</span><span class="val" id="p-pointer-type">-</span></div>
+            <div class="row"><span class="key">坐标</span><span class="val" id="p-pos">-</span></div>
+            <div class="row"><span class="key">压力</span><span class="val" id="p-pressure">-</span></div>
+            <div class="row"><span class="key">按钮</span><span class="val" id="p-button">-</span></div>
+            <div class="row"><span class="key">是否主指针</span><span class="val" id="p-primary">-</span></div>
+            <div class="row"><span class="key">指针捕获</span><span class="val" id="p-capture">否</span></div>
+        </div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const pointerArea = document.getElementById('pointer-area');
+        const pType = document.getElementById('p-type');
+        const pPointerType = document.getElementById('p-pointer-type');
+        const pPos = document.getElementById('p-pos');
+        const pPressure = document.getElementById('p-pressure');
+        const pButton = document.getElementById('p-button');
+        const pPrimary = document.getElementById('p-primary');
+        const pCapture = document.getElementById('p-capture');
+
+        let captureActive = false;
+
+        function handlePointer(e) {
+            pType.textContent = e.type;
+            pPointerType.textContent = e.pointerType;
+            pPos.textContent = `${Math.round(e.clientX)}, ${Math.round(e.clientY)}`;
+            pPressure.textContent = e.pressure.toFixed(2);
+            pButton.textContent = `${e.button} (buttons=${e.buttons})`;
+            pPrimary.textContent = e.isPrimary ? '✅ 是' : '❌ 否';
+
+            console.log(e.type, e.pointerType, `(${e.clientX}, ${e.clientY})`, `pressure:${e.pressure}`);
+        }
+
+        pointerArea.addEventListener('pointerdown', handlePointer);
+        pointerArea.addEventListener('pointermove', handlePointer);
+        pointerArea.addEventListener('pointerup', handlePointer);
+        pointerArea.addEventListener('pointerover', () => pType.textContent = 'pointerover');
+        pointerArea.addEventListener('pointerout', () => pType.textContent = 'pointerout');
+        pointerArea.addEventListener('pointerenter', () => pType.textContent = 'pointerenter');
+        pointerArea.addEventListener('pointerleave', () => pType.textContent = 'pointerleave');
+
+        // pointercancel
+        pointerArea.addEventListener('pointercancel', (e) => {
+            pType.textContent = 'pointercancel';
+            console.log('pointercancel');
+        });
+
+        // 指针捕获 toggle
+        pointerArea.addEventListener('pointerdown', (e) => {
+            if (!captureActive) {
+                pointerArea.setPointerCapture(e.pointerId);
+                captureActive = true;
+                pCapture.textContent = '✅ 已捕获';
+                pointerArea.style.background = 'linear-gradient(135deg, #e74c3c, #c0392b)';
+            }
+        });
+        pointerArea.addEventListener('pointerup', () => {
+            if (captureActive) {
+                pointerArea.releasePointerCapture();
+                captureActive = false;
+                pCapture.textContent = '否';
+                pointerArea.style.background = 'linear-gradient(135deg, #667eea, #764ba2)';
+            }
+        });
+
+        console.log('=== Pointer Events ===');
+        console.log('支持:', 'PointerEvent' in window);
+
+        document.getElementById('output').textContent =
+            `Pointer Events: 统一鼠标/触摸/笔\n` +
+            `pointerType: mouse/touch/pen\n` +
+            `属性: pointerId/pressure/tiltX/tiltY/isPrimary\n` +
+            `setPointerCapture / releasePointerCapture\n` +
+            `✅ 指针事件演示完成！`;
+    </script>
+</body>
+</html>

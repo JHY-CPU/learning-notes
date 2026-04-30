@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分布式系统理论</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📐 分布式系统理论</h2><p>CAP 定理与 PACELC、一致性模型、Raft 共识算法、分布式事务 2PC vs Saga、分布式 ID 生成。</p></div>
+    <div class="card">
+        <h2>CAP 定理与 PACELC</h2>
+        <div class="code">// ========== CAP 定理 ==========
+// 分布式系统最多同时满足两个:
+//
+// C - Consistency (一致性): 所有节点看到相同数据
+// A - Availability (可用性): 每个请求都能得到响应
+// P - Partition Tolerance (分区容忍): 网络中断仍能运行
+//
+//          CP                     AP
+//   ┌──────────────┐   ┌──────────────┐
+//   │ 分区发生时    │   │ 分区发生时    │
+//   │ 停止服务保一致 │   │ 继续服务但可能│
+//   │              │   │ 数据不一致   │
+//   │  ZooKeeper   │   │  DNS         │
+//   │  etcd        │   │  CDN         │
+//   │  MongoDB(默认)│   │  Cassandra   │
+//   │  HBase       │   │  DynamoDB    │
+//   └──────────────┘   └──────────────┘
+//
+//   CA (实际不存在, 因为网络总会分区)
+//   单机系统 = CA (无分区)
+
+// ========== PACELC 扩展 ==========
+// CAP 只考虑分区时, PACELC 考虑正常时:
+//
+// 分区时 (Partition):
+//   P → A 或 C
+// 正常时 (Else):
+//   E → L (低延迟) 或 C (强一致)
+//
+// 举例:
+//   Cassandra: PA/EL (可用 + 低延迟)
+//   MongoDB:   PC/EC (一致 + 强一致)
+//   DynamoDB:  PA/EL (可用 + 低延迟)
+
+// ========== 一致性模型 (由强到弱) ==========
+// 1. 强一致性 (Linearizability)
+//    写完成后, 任何读都看到最新值
+//    性能差, 分布式难实现
+
+// 2. 顺序一致性 (Sequential)
+//    每个进程的操作顺序一致
+//    不要求实时性
+
+// 3. 因果一致性 (Causal)
+//    有因果关系的事件有序
+//    无关事件可并发的
+
+// 4. 读己之写 (Read Your Writes)
+//    写后总能读到自己的写入
+//    其他用户可能读不到
+
+// 5. 最终一致性 (Eventual)
+//    不保证何时, 但最终一致
+//    DNS: TTL 后最终一致
+//    最简单的模型</div>
+    </div>
+    <div class="card">
+        <h2>Raft 共识算法</h2>
+        <div class="code">// ========== Raft 核心 ==========
+// 管理复制日志, 保证多节点数据一致
+// 比 Paxos 更易理解
+
+// 三种角色:
+// ┌─────────┐    选举     ┌──────────┐
+// │ Leader  │←──────────→│ Follower  │
+// │ (主)    │             │ (从)      │
+// └────┬────┘   ┌────────┴──────┐
+//      │        │  Candidate    │
+//      │        │  (候选者)     │
+//      └────────┴───────────────┘
+
+// ========== Leader 选举 ==========
+// 1. Follower 超时未收到心跳 → 变成 Candidate
+// 2. Candidate 发起投票请求
+// 3. 获得多数票 → 成为 Leader
+// 4. Leader 定期发送心跳 (AppendEntries)
+//
+// 任期 (Term): 每次选举递增
+// 随机超时 (150-300ms): 防止选票分裂
+
+// ========== 日志复制 ==========
+// 1. 客户端请求 → Leader
+// 2. Leader 追加日志到本地
+// 3. Leader 并行发送 AppendEntries 到 Followers
+// 4. 多数写入成功 → 日志已提交 (committed)
+// 5. Leader 应用日志到状态机
+// 6. Leader 响应客户端
+// 7. Followers 在下次心跳确认提交
+
+// 流程:
+// Client → Leader → Follower 1 (ack)
+//                  → Follower 2 (ack)  ← 多数提交
+//                  → Follower 3 (慢)
+// Leader 提交 → 响应 Client
+//            → 下次心跳通知 Followers 提交
+
+// ========== 安全性保证 ==========
+// 1. 选举安全: 每个任期最多一个 Leader
+// 2. 日志匹配: 相同的 (term, index) 内容相同
+// 3. 完整性: 被选上的 Leader 包含所有已提交日志
+// 4. 状态机安全: 所有节点按相同顺序执行相同命令
+
+// ========== Go etcd/Raft 示例 ==========
+// import "go.etcd.io/raft/v3"
+
+// Node 接口:
+// node.Start(data)     // 提议数据
+// node.Ready()         // 获取就绪的日志
+// node.Advance()       // 处理完成
+// node.Step(msg)       // 处理接收的消息</div>
+    </div>
+    <div class="card">
+        <h2>分布式事务</h2>
+        <div class="code">// ========== 2PC (两阶段提交) ==========
+// 协调者 (Coordinator) + 参与者 (Participants)
+//
+// 阶段 1: 准备 (Prepare)
+//   协调者 → 所有参与者: "准备提交?"
+//   参与者: 执行事务, 写 Undo/Redo 日志
+//   参与者 → 协调者: Yes (准备完成) / No (失败)
+//
+// 阶段 2: 提交 (Commit)
+//   全部 Yes → 协调者 → 所有参与者: "提交"
+//   有 No    → 协调者 → 所有参与者: "回滚"
+//
+// 问题:
+//   同步阻塞: 参与者持有锁等待
+//   单点故障: 协调者宕机
+//   脑裂: 部分参与者收不到提交
+//   适用: 短事务, 小规模
+
+// ========== Saga 分布式事务 ==========
+// 每个操作都有对应的补偿操作 (Compensation)
+// 不持有锁, 适合长事务
+
+// 编排 Saga (Choreography):
+// 每个服务发布事件触发下一步
+//
+// Order 服务 → OrderCreated
+//   → Payment 服务 → PaymentProcessed
+//     → Inventory 服务 → InventoryUpdated
+//       → Notification 服务 → Notified
+//
+// 补偿 (失败时):
+// Payment 失败 → Order 取消订单 → Inventory 恢复库存
+
+// 编排器 Saga (Orchestrator):
+// Saga Manager 协调所有步骤
+//
+// Saga Manager:
+//   1. 调用 Order 服务创建订单
+//   2. 调用 Payment 服务处理支付
+//   3. 调用 Inventory 服务扣库存
+//   4. 完成
+//
+// 失败 → 反向调用补偿:
+//   Saga Manager 调用 Order 取消
+//   Saga Manager 调用 Payment 退款
+
+// ========== 分布式 ID 生成 ==========
+// 要求: 全局唯一, 趋势递增, 高可用
+
+// Snowflake (Twitter):
+// | 符号(1) | 时间戳(41) | 机器ID(10) | 序列号(12) |
+//
+// func snowflakeID(machineID int64) int64 {
+//     const (
+//         epoch        = 1672531200000 // 2023-01-01
+//         machineBits  = 10
+//         sequenceBits = 12
+//     )
+//     now := time.Now().UnixMilli() - epoch
+//     return (now << (machineBits + sequenceBits)) |
+//            (machineID << sequenceBits) |
+//            (atomic.AddInt64(&seq, 1) & ((1<<sequenceBits)-1))
+// }
+
+// 其他方案:
+// UUID v4: 随机, 不递增, 索引差
+// UUID v7: 时间前缀 + 随机, 趋势递增
+// DB 号段: 一次取一批 ID (美团 Leaf)
+// Redis INCR: 简单但依赖 Redis</div>
+        <div class="note">💡 分布式要点: CAP 三选二, 实际 P 必选 → CP 或 AP; PACELC 扩展正常时权衡; 一致性由强到弱: 线性→顺序→因果→最终; Raft: Leader 选举 + 日志复制 + 多数提交; 2PC 阻塞但强一致, Saga 补偿无锁; Snowflake ID 高性能递增; 分布式事务权衡: 一致性 vs 性能。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCAP()">CAP</button>
+        <button onclick="demoRaft()">Raft</button>
+        <button onclick="demoTX()">分布式事务</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCAP() {
+            result.innerHTML = '';
+            log('# CAP 定理');
+            log('');
+            log('C = 一致性 (所有节点相同数据)');
+            log('A = 可用性 (每个请求都响应)');
+            log('P = 分区容忍 (网络中断仍运行)');
+            log('');
+            log('三选二:');
+            log('  CP: ZooKeeper, etcd, HBase');
+            log('  AP: Cassandra, DynamoDB, DNS');
+            log('  CA: 单机系统 (不可能分布式)');
+            log('');
+            log('PACELC: 正常时也要权衡');
+            log('  低延迟 vs 强一致');
+        }
+
+        function demoRaft() {
+            result.innerHTML = '';
+            log('# Raft 共识算法');
+            log('');
+            log('角色:');
+            log('  Leader: 处理所有写入');
+            log('  Follower: 被动复制');
+            log('  Candidate: 选举中');
+            log('');
+            log('选举:');
+            log('  超时→候选→投票→多数→Leader');
+            log('  任期递增, 随机超时防分裂');
+            log('');
+            log('日志复制:');
+            log('  Client→Leader→多数Follower');
+            log('  →提交→响应→通知');
+        }
+
+        function demoTX() {
+            result.innerHTML = '';
+            log('# 分布式事务');
+            log('');
+            log('2PC (两阶段提交):');
+            log('  Prepare: 各节点准备');
+            log('  Commit: 全部提交/回滚');
+            log('  阻塞, 短事务');
+            log('');
+            log('Saga:');
+            log('  每个操作有补偿');
+            log('  不持有锁, 适合长事务');
+            log('');
+            log('分布式ID:');
+            log('  Snowflake: 时间戳+机器+序列');
+            log('  UUID v7: 时间前缀+随机');
+            log('  号段模式: 批量取ID');
+        }
+    </script>
+</body>
+</html>

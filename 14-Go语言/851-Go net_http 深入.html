@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go net/http 深入</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🌐 Go net/http 深入</h2><p>HTTP 服务器配置 (超时/优雅关闭)、自定义 Transport、连接池管理、HTTP/2 支持、Server-Sent Events、文件服务器优化。</p></div>
+    <div class="card">
+        <h2>HTTP 服务器配置</h2>
+        <div class="code">// ========== 自定义 http.Server ==========
+// 相比 http.ListenAndServe, 自定义 Server 提供精细控制
+
+func customServer() {
+    mux := http.NewServeMux()
+    mux.HandleFunc("/api", apiHandler)
+
+    srv := &http.Server{
+        Addr:         ":8080",
+        Handler:      mux,
+        ReadTimeout:  5 * time.Second,   // 读取请求超时
+        WriteTimeout: 10 * time.Second,  // 写入响应超时
+        IdleTimeout:  60 * time.Second,  // 长连接空闲超时 (HTTP/2)
+        MaxHeaderBytes: 1 << 20,         // 1MB 请求头限制
+    }
+
+    log.Fatal(srv.ListenAndServe())
+}
+
+// ========== 超时配置详解 ==========
+// 不配置超时可能导致连接耗尽
+
+func timeoutConfig() {
+    srv := &http.Server{
+        Handler:      mux,
+
+        // 从连接建立到读取请求体完毕
+        ReadTimeout:  5 * time.Second,
+
+        // 从读取请求头到发送响应完毕
+        WriteTimeout: 10 * time.Second,
+
+        // keep-alive 连接的等待时间
+        IdleTimeout:  60 * time.Second,
+
+        // 限制请求头大小 (防慢攻击)
+        MaxHeaderBytes: 1 << 20,  // 1MB
+    }
+
+    // ReadHeaderTimeout: 读取请求头的超时
+    // (默认 = ReadTimeout, 更安全单独设置)
+    srv.ReadHeaderTimeout = 5 * time.Second
+
+    _ = srv
+}
+
+// ========== 优雅关闭 (Graceful Shutdown) ==========
+// Go 1.8+ 支持平滑关闭
+
+func gracefulShutdown() {
+    srv := &http.Server{Addr: ":8080"}
+
+    // 在独立 goroutine 启动
+    go func() {
+        log.Println("server starting on :8080")
+        if err := srv.ListenAndServe(); err != nil &&
+            err != http.ErrServerClosed {
+            log.Fatalf("listen: %v", err)
+        }
+    }()
+
+    // 等待中断信号
+    quit := make(chan os.Signal, 1)
+    signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+    <-quit
+    log.Println("shutting down...")
+
+    // 给予 30 秒完成进行中的请求
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    if err := srv.Shutdown(ctx); err != nil {
+        log.Fatalf("shutdown error: %v", err)
+    }
+    log.Println("server exited")
+}
+
+// ========== 优雅关闭完整版 ==========
+func main() {
+    srv := &http.Server{Addr: ":8080", Handler: router()}
+
+    go func() {
+        if err := srv.ListenAndServe(); err != nil &&
+            err != http.ErrServerClosed {
+            log.Fatalf("listen: %v", err)
+        }
+    }()
+
+    // 监听 SIGINT 和 SIGTERM
+    stop := make(chan os.Signal, 1)
+    signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+    <-stop
+
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    if err := srv.Shutdown(ctx); err != nil {
+        log.Fatalf("forced shutdown: %v", err)
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>HTTP Client 优化</h2>
+        <div class="code">// ========== 自定义 http.Transport ==========
+// 控制连接池, 超时, TLS
+
+func customTransport() {
+    transport := &http.Transport{
+        // 连接池
+        MaxIdleConns:        100,              // 所有 host 最大空闲连接
+        MaxIdleConnsPerHost: 10,               // 每个 host 最大空闲连接
+        MaxConnsPerHost:     20,               // 每个 host 最大连接总数
+        IdleConnTimeout:     90 * time.Second, // 空闲连接超时
+
+        // TLS
+        TLSClientConfig: &tls.Config{
+            InsecureSkipVerify: false,
+        },
+
+        // 连接超时
+        DialContext: (&net.Dialer{
+            Timeout:   10 * time.Second,
+            KeepAlive: 30 * time.Second,
+        }).DialContext,
+
+        // HTTP/2
+        ForceAttemptHTTP2: true,
+
+        // 响应头超时
+        ResponseHeaderTimeout: 10 * time.Second,
+    }
+
+    client := &http.Client{
+        Transport: transport,
+        Timeout:   30 * time.Second, // 全局超时
+        // 不跟随重定向
+        // CheckRedirect: func(req *http.Request, via []*http.Request) error {
+        //     return http.ErrUseLastResponse
+        // },
+    }
+
+    resp, err := client.Get("https://api.example.com")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer resp.Body.Close()
+}
+
+// ========== HTTP/2 支持 ==========
+// Go 默认支持 HTTP/2 (如果使用 TLS)
+// 自动协商: Upgrade to HTTP/2
+
+func http2Support() {
+    // HTTP/2 服务器 (TLS 自动启用)
+    srv := &http.Server{
+        Addr:    ":443",
+        Handler: mux,
+    }
+    // 自动使用 HTTP/2 (crypto/tls)
+
+    // 强制 HTTP/2 (非 TLS 的 h2c)
+    // 需手动配置:
+    // import "golang.org/x/net/http2"
+    // http2.ConfigureServer(srv, &http2.Server{})
+
+    _ = srv
+}
+
+// ========== HTTP 连接池监控 ==========
+type PoolStats struct {
+    Idle   int
+    InUse  int
+    Wait   int
+}
+
+func getPoolStats(transport *http.Transport) PoolStats {
+    // 使用 Go 1.20+ 暴露的指标
+    // transport.IdleCount()  // 不导出的方法
+    return PoolStats{}
+}
+
+// 通过 /debug/vars 暴露 (expvar 包)
+import "expvar"
+
+var (
+    requestsTotal = expvar.NewInt("requests_total")
+    requestsActive = expvar.NewInt("requests_active")
+)
+
+func monitoredHandler(w http.ResponseWriter, r *http.Request) {
+    requestsTotal.Add(1)
+    requestsActive.Add(1)
+    defer requestsActive.Add(-1)
+    // ...
+}</div>
+    </div>
+    <div class="card">
+        <h2>高级 HTTP 功能</h2>
+        <div class="code">// ========== Server-Sent Events (SSE) ==========
+// 服务器推送, 基于 HTTP 长连接
+
+func sseHandler(w http.ResponseWriter, r *http.Request) {
+    flusher, ok := w.(http.Flusher)
+    if !ok {
+        http.Error(w, "not supported", 500)
+        return
+    }
+
+    w.Header().Set("Content-Type", "text/event-stream")
+    w.Header().Set("Cache-Control", "no-cache")
+    w.Header().Set("Connection", "keep-alive")
+
+    ticker := time.NewTicker(time.Second)
+    defer ticker.Stop()
+
+    for {
+        select {
+        case <-ticker.C:
+            // 格式: data: message\n\n
+            fmt.Fprintf(w, "data: %s\n\n", time.Now().Format(time.RFC3339))
+            flusher.Flush()
+        case <-r.Context().Done():
+            // 客户端断开
+            return
+        }
+    }
+}
+
+// 使用: mux.HandleFunc("/events", sseHandler)
+
+// ========== 文件服务器优化 ==========
+func fileServer() {
+    // 默认文件服务器
+    fs := http.FileServer(http.Dir("./static"))
+
+    // 添加缓存头 (中间件)
+    cachedFS := cacheMiddleware(fs)
+
+    mux := http.NewServeMux()
+    mux.Handle("/static/", http.StripPrefix("/static/", cachedFS))
+}
+
+func cacheMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        w.Header().Set("Cache-Control", "public, max-age=3600")
+        // 为字体/图片设置更长缓存
+        if strings.HasSuffix(r.URL.Path, ".woff2") ||
+           strings.HasSuffix(r.URL.Path, ".png") {
+            w.Header().Set("Cache-Control", "public, max-age=86400")
+        }
+        next.ServeHTTP(w, r)
+    })
+}
+
+// ========== 请求体限制 ==========
+func limitBodyMiddleware(next http.Handler) http.Handler {
+    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        // 限制请求体大小 (10MB)
+        r.Body = http.MaxBytesReader(w, r.Body, 10<<20)
+        next.ServeHTTP(w, r)
+    })
+}
+
+// ========== 自定义 404/500 ==========
+func customNotFound(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusNotFound)
+    json.NewEncoder(w).Encode(map[string]interface{}{
+        "error":   "not_found",
+        "message": "请求的资源不存在",
+    })
+}
+
+func customServerError(w http.ResponseWriter, r *http.Request) {
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(http.StatusInternalServerError)
+    json.NewEncoder(w).Encode(map[string]interface{}{
+        "error": "internal_error",
+    })
+}
+
+// ========== HTTP 方法路由 ==========
+func methodRouter(w http.ResponseWriter, r *http.Request) {
+    switch r.Method {
+    case http.MethodGet:
+        handleGet(w, r)
+    case http.MethodPost:
+        handlePost(w, r)
+    case http.MethodPut:
+        handlePut(w, r)
+    case http.MethodDelete:
+        handleDelete(w, r)
+    default:
+        w.Header().Set("Allow", "GET, POST, PUT, DELETE")
+        http.Error(w, "Method Not Allowed", http.StatusMethodNotAllowed)
+    }
+}</div>
+        <div class="note">💡 net/http 深入: 自定义 http.Server (ReadTimeout/WriteTimeout/IdleTimeout 保护); 优雅关闭 Shutdown(ctx) + signal.Notify; http.Transport 连接池 (MaxIdleConns/MaxConnsPerHost/DialContext); HTTP/2 默认支持 (TLS); SSE (Event-Stream, Flush, 检测断开); 文件服务器缓存头; MaxBytesReader 限制请求体; 自定义 404/500; switch r.Method 做路由。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoServer()">服务器配置</button>
+        <button onclick="demoClient()">客户端优化</button>
+        <button onclick="demoSSE()">SSE</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoServer() {
+            result.innerHTML = '';
+            log('# HTTP 服务器配置');
+            log('');
+            log('超时:');
+            log('  ReadTimeout: 5s  (读请求)');
+            log('  WriteTimeout: 10s (写响应)');
+            log('  IdleTimeout: 60s (空闲)');
+            log('  MaxHeaderBytes: 1MB (防攻击)');
+            log('');
+            log('优雅关闭:');
+            log('  signal.Notify(SIGINT, SIGTERM)');
+            log('  srv.Shutdown(ctx)  // 30s 超时');
+        }
+
+        function demoClient() {
+            result.innerHTML = '';
+            log('# HTTP Client 优化');
+            log('');
+            log('Transport 配置:');
+            log('  MaxIdleConns: 100');
+            log('  MaxIdleConnsPerHost: 10');
+            log('  IdleConnTimeout: 90s');
+            log('  DialContext Timeout: 10s');
+            log('  ResponseHeaderTimeout: 10s');
+            log('');
+            log('Client:');
+            log('  client.Timeout: 30s');
+            log('  CheckRedirect 控制重定向');
+        }
+
+        function demoSSE() {
+            result.innerHTML = '';
+            log('# Server-Sent Events');
+            log('');
+            log('响应头:');
+            log('  Content-Type: text/event-stream');
+            log('  Cache-Control: no-cache');
+            log('  Connection: keep-alive');
+            log('');
+            log('格式:');
+            log('  data: message\n\n');
+            log('');
+            log('关键:');
+            log('  w.(http.Flusher).Flush()');
+            log('  <-r.Context().Done() 断开检测');
+        }
+    </script>
+</body>
+</html>

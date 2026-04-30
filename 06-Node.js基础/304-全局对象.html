@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全局对象</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #global-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>全局对象</h2><p>global 全局对象、process 核心对象、Buffer、__dirname/__filename。</p></div>
+    <div class="card">
+        <h2>Node.js 全局对象</h2>
+        <div class="code">// ========== global ==========
+// Node.js 的全局对象 (类似浏览器的 window)
+global.myVar = 'accessible everywhere';
+
+// ========== process ==========
+// 进程信息和控制
+process.argv        // 命令行参数
+process.env         // 环境变量
+process.cwd()       // 当前工作目录
+process.pid         // 进程 ID
+process.platform    // 平台 (win32/darwin/linux)
+process.version     // Node 版本
+process.exit(code)  // 退出进程
+
+// ========== Buffer ==========
+// 处理二进制数据
+Buffer.from('hello')        // 字符串 → Buffer
+Buffer.alloc(1024)          // 分配 1KB
+Buffer.concat([buf1, buf2]) // 合并
+
+// ========== __dirname / __filename ==========
+// __dirname — 当前模块目录
+// __filename — 当前模块文件路径
+// ⚠️ 仅在 CommonJS 中可用
+// ESM 中需要: import.meta.url 转换
+
+// ========== 其他全局对象 ==========
+console            // 控制台
+setTimeout/clearTimeout
+setInterval/clearInterval
+setImmediate/clearImmediate  // Node 特有
+queueMicrotask
+console.time / console.timeEnd
+exports / module / require</div>
+    </div>
+    <div class="card">
+        <h2>演示：全局对象</h2>
+        <button onclick="demoGlobal()">浏览器全局对象</button>
+        <button onclick="demoProcess()">模拟 process</button>
+        <div id="global-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const globalResult = document.getElementById('global-result');
+
+        function log(msg) {
+            globalResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoGlobal() {
+            globalResult.innerHTML = '';
+            log('🌍 浏览器中的全局对象:');
+            log('');
+
+            log('1️⃣ window 全局对象:');
+            log(`   typeof window: ${typeof window}`);
+            log(`   window === globalThis: ${window === globalThis}`);
+            log('');
+
+            log('2️⃣ globalThis (通用全局对象):');
+            log(`   globalThis === window: ${globalThis === window}`);
+            log('');
+
+            log('3️⃣ Node.js 特有全局 (浏览器中):');
+            log(`   typeof global: ${typeof global} (Node 中返回 globalThis)`);
+            log(`   typeof process: ${typeof process} (仅在 Node 中)`);
+            log(`   typeof Buffer: ${typeof Buffer} (仅在 Node 中)`);
+            log(`   typeof __dirname: ${typeof __dirname} (仅在 Node CJS 中)`);
+            log('');
+
+            log('4️⃣ 浏览器特有全局:');
+            log(`   typeof document: ${typeof document}`);
+            log(`   typeof localStorage: ${typeof localStorage}`);
+            log(`   typeof fetch: ${typeof fetch}`);
+            log(`   typeof WebSocket: ${typeof WebSocket}`);
+            log('');
+
+            log('5️⃣ 时间函数 (通用):');
+            log(`   typeof setTimeout: ${typeof setTimeout}`);
+            log(`   typeof clearTimeout: ${typeof clearTimeout}`);
+            log(`   typeof queueMicrotask: ${typeof queueMicrotask}`);
+        }
+
+        function demoProcess() {
+            globalResult.innerHTML = '';
+            log('⚙️ 模拟 Node.js process 对象:');
+            log('');
+
+            // 模拟 process
+            const mockProcess = {
+                argv: ['node', 'script.js', '--flag', 'value'],
+                env: {
+                    NODE_ENV: 'production',
+                    PATH: '/usr/bin:/bin',
+                    HOME: '/home/user',
+                },
+                cwd: () => '/home/user/project',
+                pid: 12345,
+                platform: navigator.platform.toLowerCase(),
+                version: 'v20.11.0',
+                arch: 'x64',
+                uptime: () => 3600,
+                memoryUsage: () => ({
+                    rss: 30 * 1024 * 1024,
+                    heapTotal: 20 * 1024 * 1024,
+                    heapUsed: 15 * 1024 * 1024,
+                }),
+                exit: (code) => log(`   ⚠️ 进程退出 (code: ${code})`),
+                nextTick: (fn) => queueMicrotask(fn),
+            };
+
+            log('process 属性:');
+            log(`   argv: ${mockProcess.argv.join(' ')}`);
+            log(`   NODE_ENV: ${mockProcess.env.NODE_ENV}`);
+            log(`   cwd(): ${mockProcess.cwd()}`);
+            log(`   pid: ${mockProcess.pid}`);
+            log(`   platform: ${mockProcess.platform}`);
+            log(`   version: ${mockProcess.version}`);
+            log(`   uptime: ${mockProcess.uptime()}s`);
+            log(`   内存: RSS ${(mockProcess.memoryUsage().rss / 1024 / 1024).toFixed(1)}MB`);
+
+            log('');
+            log('📌 实际 process 对象 (Node.js):');
+            log('   • 提供进程控制 (exit/nextTick)');
+            log('   • 环境变量 (env)');
+            log('   • 命令行参数 (argv)');
+            log('   • 系统信息 (platform/arch)');
+        }
+
+        console.log('=== 全局对象 ===');
+
+        document.getElementById('output').textContent =
+            `全局对象: global / process / Buffer / __dirname / __filename\n` +
+            `globalThis: 跨环境的通用全局对象\n` +
+            `✅ 全局对象演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Data JPA 查询</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔍 Spring Data JPA 查询</h2><p>@Query JPQL/native 查询、@Modifying 更新、分页查询、动态查询 Specification、EntityGraph 解决 N+1。</p></div>
+    <div class="card">
+        <h2>@Query 自定义查询</h2>
+        <div class="code">// ========== @Query ==========
+// 自定义 JPQL 或原生 SQL 查询
+
+public interface UserRepository extends JpaRepository&lt;User, Long&gt; {
+
+    // ========== JPQL (对象查询) ==========
+    @Query("SELECT u FROM User u WHERE u.email = ?1")
+    Optional&lt;User&gt; findByEmailCustom(String email);
+
+    // ========== 命名参数 ==========
+    @Query("SELECT u FROM User u WHERE u.username = :username AND u.age > :minAge")
+    List&lt;User&gt; findByUsernameAndAgeMin(
+        @Param("username") String username,
+        @Param("minAge") int minAge
+    );
+
+    // ========== 多表查询 ==========
+    @Query("SELECT u FROM User u JOIN u.roles r WHERE r.name = :roleName")
+    List&lt;User&gt; findByRoleName(@Param("roleName") String roleName);
+
+    // ========== 部分字段查询 ==========
+    @Query("SELECT u.username, u.email FROM User u WHERE u.id = :id")
+    List&lt;Object[]&gt; findUsernameAndEmailById(@Param("id") Long id);
+
+    // DTO 投影
+    @Query("SELECT new com.example.dto.UserSummary(u.id, u.username, u.email) FROM User u")
+    List&lt;UserSummary&gt; findAllSummaries();
+
+    // ========== 原生 SQL ==========
+    @Query(value = "SELECT * FROM users WHERE age > :minAge", nativeQuery = true)
+    List&lt;User&gt; findUsersByAgeNative(@Param("minAge") int minAge);
+
+    // 原生 SQL + 指定结果类
+    @Query(value = "SELECT id, username FROM users WHERE status = :status",
+           nativeQuery = true,
+           resultSetMapping = "UserSummaryMapping")
+    List&lt;UserSummary&gt; findSummariesByStatus(@Param("status") String status);
+
+    // ========== 分页查询 ==========
+    @Query("SELECT u FROM User u WHERE u.status = :status")
+    Page&lt;User&gt; findByStatusWithPage(@Param("status") UserStatus status, Pageable pageable);
+
+    @Query(value = "SELECT * FROM users WHERE status = :status",
+           countQuery = "SELECT COUNT(*) FROM users WHERE status = :status",
+           nativeQuery = true)
+    Page&lt;User&gt; findByStatusNative(@Param("status") String status, Pageable pageable);
+
+    // ========== 排序 ==========
+    @Query("SELECT u FROM User u WHERE u.age > :age")
+    List&lt;User&gt; findByAgeGreaterThan(@Param("age") int age, Sort sort);
+}</div>
+    </div>
+    <div class="card">
+        <h2>@Modifying 更新</h2>
+        <div class="code">// ========== @Modifying ==========
+// 执行 UPDATE/DELETE 操作
+// 需要配合 @Transactional
+
+public interface UserRepository extends JpaRepository&lt;User, Long&gt; {
+
+    // ========== 批量更新 ==========
+    @Modifying
+    @Transactional
+    @Query("UPDATE User u SET u.status = :status WHERE u.lastLoginAt < :date")
+    int deactivateInactiveUsers(
+        @Param("status") UserStatus status,
+        @Param("date") LocalDateTime date
+    );
+
+    // ========== 更新单个字段 ==========
+    @Modifying
+    @Transactional
+    @Query("UPDATE User u SET u.email = :email WHERE u.id = :id")
+    int updateEmail(@Param("id") Long id, @Param("email") String email);
+
+    // ========== 批量删除 ==========
+    @Modifying
+    @Transactional
+    @Query("DELETE FROM User u WHERE u.status = :status")
+    int deleteByStatus(@Param("status") UserStatus status);
+
+    // ========== @Modifying 清空缓存 ==========
+    @Modifying(clearAutomatically = true)          // 执行后清空一级缓存
+    @Query("UPDATE User u SET u.password = :password WHERE u.id = :id")
+    int updatePassword(@Param("id") Long id, @Param("password") String password);
+}
+
+// ========== 派生更新 ==========
+// Spring Data JPA 3.0+ 支持派生 DELETE
+public interface UserRepository extends JpaRepository&lt;User, Long&gt; {
+    @Transactional
+    void deleteByStatus(UserStatus status);
+
+    @Transactional
+    int deleteByUsername(String username);
+
+    @Transactional
+    int deleteByAgeLessThan(int age);
+}
+
+// ========== 使用示例 ==========
+@Service
+@RequiredArgsConstructor
+public class UserAdminService {
+
+    private final UserRepository userRepository;
+
+    @Transactional
+    public int deactivateOldUsers() {
+        LocalDateTime cutoff = LocalDateTime.now().minusMonths(6);
+        int count = userRepository.deactivateInactiveUsers(
+            UserStatus.INACTIVE, cutoff);
+        log.info("已停用 {} 个用户", count);
+        return count;
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>Specification 动态查询</h2>
+        <div class="code">// ========== Specification ==========
+// 动态组合查询条件 (类似 QueryDSL)
+// 适用于: 多条件筛选, 动态 WHERE
+
+// ========== 1. Repository 继承 ==========
+public interface UserRepository extends JpaRepository&lt;User, Long&gt;,
+                                        JpaSpecificationExecutor&lt;User&gt; {
+    // 获得方法: findAll(Specification), count(Specification), findOne(Specification)
+}
+
+// ========== 2. 定义查询条件 ==========
+public class UserSpecifications {
+
+    // 用户名包含
+    public static Specification&lt;User&gt; usernameContains(String keyword) {
+        return (root, query, cb) -> {
+            if (keyword == null || keyword.isBlank()) return null;
+            return cb.like(root.get("username"), "%" + keyword + "%");
+        };
+    }
+
+    // 年龄范围
+    public static Specification&lt;User&gt; ageBetween(Integer min, Integer max) {
+        return (root, query, cb) -> {
+            if (min == null && max == null) return null;
+            if (min == null) return cb.lessThanOrEqualTo(root.get("age"), max);
+            if (max == null) return cb.greaterThanOrEqualTo(root.get("age"), min);
+            return cb.between(root.get("age"), min, max);
+        };
+    }
+
+    // 状态匹配
+    public static Specification&lt;User&gt; statusEquals(UserStatus status) {
+        return (root, query, cb) -> {
+            if (status == null) return null;
+            return cb.equal(root.get("status"), status);
+        };
+    }
+
+    // 创建时间范围
+    public static Specification&lt;User&gt; createdAtBetween(LocalDateTime start, LocalDateTime end) {
+        return (root, query, cb) -> {
+            if (start == null && end == null) return null;
+            if (start == null) return cb.lessThanOrEqualTo(root.get("createdAt"), end);
+            if (end == null) return cb.greaterThanOrEqualTo(root.get("createdAt"), start);
+            return cb.between(root.get("createdAt"), start, end);
+        };
+    }
+}
+
+// ========== 3. 使用 ==========
+@Service
+@RequiredArgsConstructor
+public class UserSearchService {
+
+    private final UserRepository userRepository;
+
+    public Page&lt;User&gt; searchUsers(UserSearchCriteria criteria, Pageable pageable) {
+        Specification&lt;User&gt; spec = Specification
+            .where(UserSpecifications.usernameContains(criteria.getKeyword()))
+            .and(UserSpecifications.ageBetween(criteria.getMinAge(), criteria.getMaxAge()))
+            .and(UserSpecifications.statusEquals(criteria.getStatus()))
+            .and(UserSpecifications.createdAtBetween(criteria.getStartDate(), criteria.getEndDate()));
+
+        return userRepository.findAll(spec, pageable);
+    }
+}
+
+// ========== 查询条件对象 ==========
+@Data
+public class UserSearchCriteria {
+    private String keyword;
+    private Integer minAge;
+    private Integer maxAge;
+    private UserStatus status;
+    private LocalDateTime startDate;
+    private LocalDateTime endDate;
+}
+
+// ========== Controller ==========
+@GetMapping("/users/search")
+public PageResponse&lt;User&gt; searchUsers(
+        @ModelAttribute UserSearchCriteria criteria,
+        @RequestParam(defaultValue = "0") int page,
+        @RequestParam(defaultValue = "20") int size) {
+    Page&lt;User&gt; result = userSearchService.searchUsers(
+        criteria, PageRequest.of(page, size, Sort.by("createdAt").descending()));
+    return PageResponse.from(result);
+}</div>
+    </div>
+    <div class="card">
+        <h2>EntityGraph 与 N+1</h2>
+        <div class="code">// ========== N+1 问题 ==========
+// 查询 N 条记录时, 额外发 N 条 SQL 查关联
+// findAll() → 1 条 SQL
+// 遍历时 user.getOrders() → N 条额外 SQL
+
+// ========== 解决方案 1: @EntityGraph ==========
+public interface UserRepository extends JpaRepository&lt;User, Long&gt; {
+
+    // fetch 关联的 orders, 用 LEFT JOIN 一次性查出
+    @EntityGraph(attributePaths = {"orders"})
+    @Query("SELECT u FROM User u WHERE u.id = :id")
+    Optional&lt;User&gt; findByIdWithOrders(@Param("id") Long id);
+
+    // 多个关联
+    @EntityGraph(attributePaths = {"orders", "roles", "profile"})
+    List&lt;User&gt; findAllWithDetails();
+}
+
+// ========== 解决方案 2: @NamedEntityGraph ==========
+@Entity
+@NamedEntityGraph(
+    name = "User.withRolesAndOrders",
+    attributeNodes = {
+        @NamedAttributeNode("roles"),
+        @NamedAttributeNode(value = "orders", subgraph = "orderItems")
+    }
+)
+public class User { ... }
+
+// Repository 中使用:
+@EntityGraph("User.withRolesAndOrders")
+List&lt;User&gt; findAll();
+
+// ========== 解决方案 3: JOIN FETCH ==========
+@Query("SELECT u FROM User u LEFT JOIN FETCH u.orders WHERE u.id = :id")
+Optional&lt;User&gt; findByIdWithOrders(@Param("id") Long id);
+
+// ========== 解决方案 4: @BatchSize ==========
+@Entity
+public class User {
+    @BatchSize(size = 20)                   // 批量加载 20 个关联
+    @OneToMany(mappedBy = "user")
+    private List&lt;Order&gt; orders = new ArrayList&lt;&gt;();
+}
+
+// ========== DTO 投影 ==========
+// 另一种避免 N+1 的方式: 只查需要的字段
+public interface UserSummary {
+    Long getId();
+    String getUsername();
+    String getEmail();
+}
+
+// Repository:
+List&lt;UserSummary&gt; findByStatus(UserStatus status);
+
+// 或使用 @Query + 构造器:
+@Query("SELECT new com.example.dto.UserDTO(u.id, u.username, u.email) FROM User u")
+List&lt;UserDTO&gt; findAllDTO();</div>
+    </div>
+    <div class="card">
+        <h2>最佳实践</h2>
+        <div class="code">// ========== 查询最佳实践 ==========
+
+// ========== 1. 优先派生查询 ==========
+// 简单查询用方法名, 复杂用 @Query
+// 派生查询简单直观, 但过长的方法名不如 @Query
+
+// ========== 2. 使用命名参数 ==========
+// @Param("name") 比 ?1 更可读
+// 重构时不会因为参数顺序出错
+
+// ========== 3. 分页永远传 Pageable ==========
+// 避免查询大量数据
+// 前端传入 page/size/sort
+
+// ========== 4. 警惕 N+1 ==========
+// 用 @EntityGraph / JOIN FETCH / @BatchSize
+// 在循环中访问关联属性会触发额外查询
+
+// ========== 5. @Modifying(clearAutomatically=true) ==========
+// 更新操作后清空一级缓存
+// 否则后续查询可能读到旧数据
+
+// ========== 6. 原生 SQL 谨慎使用 ==========
+// nativeQuery = true 时与数据库耦合
+// 仅在 JPQL 无法表达时使用
+
+// ========== 7. 只查询需要的字段 ==========
+// 使用 DTO 投影而非整个实体
+// 减少数据传输量
+
+// ========== 8. 日志监控 SQL ==========
+// show-sql=true + format_sql=true
+// 生产用监控工具: p6spy / datasource-proxy</div>
+        <div class="note">💡 查询要点: @Query JPQL 查询实体, nativeQuery 原生 SQL; @Param 命名参数; @Modifying UPDATE/DELETE; Specification 动态条件组合; @EntityGraph / JOIN FETCH 解决 N+1; DTO 投影减少数据量; Pageable 分页; 命名参数优于位置参数; clearAutomatically 清空缓存。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoQuery()">@Query 查询</button>
+        <button onclick="demoSpec()">动态查询</button>
+        <button onclick="demoN1()">N+1 解决</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoQuery() {
+            result.innerHTML = '';
+            log('# @Query 自定义查询');
+            log('');
+            log('JPQL (对象):');
+            log('  @Query("SELECT u FROM User u WHERE u.email = ?1")');
+            log('  @Query("SELECT u FROM User u WHERE u.name = :name")');
+            log('');
+            log('原生 SQL:');
+            log('  @Query(value = "SELECT * FROM users", nativeQuery = true)');
+            log('');
+            log('更新:');
+            log('  @Modifying @Transactional');
+            log('  @Query("UPDATE User u SET u.status = :s")');
+        }
+
+        function demoSpec() {
+            result.innerHTML = '';
+            log('# Specification 动态查询');
+            log('');
+            log('Repository 继承 JpaSpecificationExecutor');
+            log('');
+            log('定义:');
+            log('  Specification.where(spec1).and(spec2).or(spec3)');
+            log('');
+            log('示例:');
+            log('  cb.like(root.get("name"), "%keyword%")');
+            log('  cb.between(root.get("age"), min, max)');
+            log('  cb.equal(root.get("status"), status)');
+        }
+
+        function demoN1() {
+            result.innerHTML = '';
+            log('# N+1 问题与解决');
+            log('');
+            log('问题: 查 N 条主记录 + N 条关联查询');
+            log('');
+            log('解决:');
+            log('  1. @EntityGraph(attributePaths={"orders"})');
+            log('  2. @Query("LEFT JOIN FETCH u.orders")');
+            log('  3. @BatchSize(size=20)');
+            log('  4. DTO 投影只查需要的字段');
+        }
+    </script>
+</body>
+</html>

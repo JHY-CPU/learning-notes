@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>变量-var</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        .warn { background: #fdedec; border-left: 4px solid #e74c3c; padding: 10px 15px; font-size: 14px; color: #c0392b; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>var — 旧的变量声明</h2>
+        <p>var 是 ES6 之前的声明方式，现在<strong>不推荐使用</strong>，理解它是为了看懂老代码。</p>
+        <div class="warn">⚠️ 新代码请使用 let 和 const，不要使用 var！</div>
+    </div>
+
+    <div class="card">
+        <h2>var 的特点（也是它的缺点）</h2>
+        <div class="code">
+// 1. 函数作用域（不是块级作用域）
+if (true) {
+    var x = 10;
+}
+console.log(x); // ✅ 10（块外仍可访问！）
+
+// 2. 可以重复声明
+var y = 1;
+var y = 2;  // ✅ 不报错（后面覆盖前面）
+
+// 3. 变量提升（hoisting）
+console.log(z); // undefined（不报错！）
+var z = 5;
+// 相当于：
+// var z;
+// console.log(z); // undefined
+// z = 5;
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>变量提升（Hoisting）</h2>
+        <p>var 声明的变量会被"提升"到作用域顶部，值初始化为 undefined。</p>
+        <div class="code">
+// 代码这样写：
+console.log(a); // undefined
+var a = 10;
+
+// 实际执行时相当于：
+var a;
+console.log(a); // undefined
+a = 10;
+        </div>
+        <div class="warn">这是 var 最容易导致 bug 的特性——访问未声明变量不会报错，而是得到 undefined。</div>
+    </div>
+
+    <div class="card">
+        <h2>函数作用域 vs 块级作用域</h2>
+        <div class="code">
+// var 是函数作用域：在函数内可见
+function test() {
+    var inside = '函数内';
+    console.log(inside); // ✅
+}
+// console.log(inside);  // ❌ 报错
+
+// var 无视块级作用域
+for (var i = 0; i < 3; i++) {
+    // ...
+}
+console.log(i); // ✅ 3（循环结束还能访问！这是 bug 来源）
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>经典问题：var 在循环中</h2>
+        <div class="code">
+// var 在 for 循环中的问题
+for (var j = 0; j < 3; j++) {
+    setTimeout(function() {
+        console.log(j); // 输出 3, 3, 3（不是 0, 1, 2）
+    }, 100);
+}
+// 因为 var j 是全局的，循环结束时 j=3
+// 所有回调共享同一个 j
+
+// 用 let 修复
+for (let k = 0; k < 3; k++) {
+    setTimeout(function() {
+        console.log(k); // 输出 0, 1, 2 ✅
+    }, 100);
+}
+// 每次循环 k 都是新的变量（块级作用域）
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>var vs let vs const 对比</h2>
+        <div class="code">
+/* === 对比表 ===
+ * 特性        var       let       const
+ * 作用域    函数作用域  块级作用域  块级作用域
+ * 提升      undefined   TDZ报错    TDZ报错
+ * 重复声明   允许      不允许      不允许
+ * 重新赋值   允许      允许       不允许
+ * 必须初始化 否        否         是
+ */
+        </div>
+        <div class="note">💡 默认用 const，需要重新赋值用 let，不要用 var。</div>
+    </div>
+
+    <pre id="output"></pre>
+
+    <script>
+        // ====================
+        // var 演示
+        // ====================
+
+        // 1. 函数作用域（不是块级）
+        if (true) {
+            var message = '可以从if外面访问';
+        }
+        console.log('var无视块级作用域:', message); // ✅ 能访问
+
+        // 对比：let 是块级的
+        if (true) {
+            let letMsg = '只能在块内';
+        }
+        // console.log(letMsg);  // ❌ 报错
+
+        // 2. 重复声明
+        var count = 1;
+        var count = 2;  // ✅ 不报错
+        console.log('var可以重复声明:', count);
+
+        // 3. 变量提升
+        console.log('hoistedVar:', hoistedVar); // undefined（不报错！）
+        var hoistedVar = '我提升了';
+
+        // 4. 循环中的 var 问题
+        var funcs = [];
+        for (var i = 0; i < 3; i++) {
+            funcs.push(function() { return i; });
+        }
+        console.log('var循环结果:', funcs[0](), funcs[1](), funcs[2]()); // 3, 3, 3
+
+        // 用 let 修复
+        var funcs2 = [];
+        for (let j = 0; j < 3; j++) {
+            funcs2.push(function() { return j; });
+        }
+        console.log('let循环结果:', funcs2[0](), funcs2[1](), funcs2[2]()); // 0, 1, 2
+
+        // 输出到页面
+        document.getElementById('output').textContent =
+            `var 无视块级作用域: ${message}\n` +
+            `var 可以重复声明: ${count}\n` +
+            `hoistedVar: ${hoistedVar}\n` +
+            `var 循环产生问题: ${funcs[0]()}, ${funcs[1]()}, ${funcs[2]()}\n` +
+            `let 修复后: ${funcs2[0]()}, ${funcs2[1]()}, ${funcs2[2]()}\n` +
+            `✅ var 演示完成！`;
+
+        // === 最佳实践 ===
+        // 在新代码中，不要使用 var
+        // 用 const 代替所有不会重新赋值的变量
+        // 用 let 代替需要重新赋值的变量
+    </script>
+</body>
+</html>

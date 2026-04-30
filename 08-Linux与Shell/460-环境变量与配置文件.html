@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>环境变量与配置文件</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🌍 环境变量与配置文件</h2><p>env/export、PATH、Shell 加载顺序、变量持久化、env-file 管理。</p></div>
+    <div class="card">
+        <h2>环境变量基础</h2>
+        <div class="code">// ========== 环境变量 vs Shell 变量 ==========
+// Shell 变量: 只在当前 Shell 有效
+// 环境变量: 被 export,子进程继承
+
+// Shell 变量:
+MYVAR="hello"
+echo $MYVAR          # hello
+bash -c 'echo $MYVAR'  # 空 (子进程不继承)
+
+// 环境变量:
+export MYVAR="hello"
+bash -c 'echo $MYVAR'  # hello (子进程继承)
+
+// 一步完成:
+export MYVAR="hello"
+
+// ========== 常用环境变量 ==========
+// PATH      命令搜索路径
+// HOME      用户家目录
+// USER      当前用户名
+// SHELL     当前 Shell
+// PWD       当前工作目录
+// LANG      系统语言
+// EDITOR    默认编辑器
+// TERM      终端类型
+// DISPLAY   X 显示
+// LD_LIBRARY_PATH  动态库搜索路径
+// PS1       Shell 提示符格式
+
+// 查看:
+echo $PATH
+echo $HOME
+env                    # 查看所有环境变量
+printenv               # 同上
+printenv PATH          # 查看指定变量
+
+// ========== PATH 管理 ==========
+// PATH 用冒号分隔多个目录
+// echo $PATH
+// /usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
+
+// 添加 PATH:
+export PATH=$PATH:/usr/local/go/bin    # 追加
+export PATH=/opt/node/bin:$PATH        # 前置 (优先级高)
+
+// 去重 PATH:
+export PATH=$(echo "$PATH" | tr ':' '\n' | awk '!seen[$0]++' | tr '\n' ':')</div>
+    </div>
+    <div class="card">
+        <h2>Shell 启动文件加载顺序</h2>
+        <div class="code">// ========== Shell 类型 ==========
+// 登录 Shell:    通过 login 或 ssh 启动
+// 非登录 Shell:  在桌面终端或 bash 启动
+// 交互式:        有终端输入 (默认)
+// 非交互式:      脚本执行
+
+// ========== Bash 启动文件 ==========
+// 登录 Shell 加载顺序:
+// 1. /etc/profile              (系统级)
+// 2. ~/.bash_profile           (用户级,优先于以下)
+//    ~/.bash_login
+//    ~/.profile
+// 3. ~/.bash_logout            (退出时)
+
+// 非登录 Shell:
+// ~/.bashrc                    (用户级)
+// (通常不加载 /etc/profile!)
+
+// 非交互 Shell (脚本):
+// $BASH_ENV                    (如设置)
+
+// ========== 推荐配置方式 ==========
+// ~/.bash_profile:
+if [ -f ~/.bashrc ]; then
+    . ~/.bashrc
+fi
+
+// ~/.bashrc:
+# 在此添加别名、函数、提示符等
+
+// 这样登录 Shell 会通过 .bash_profile 加载 .bashrc
+// 非登录 Shell 直接加载 .bashrc
+// 所有配置集中在 .bashrc 中
+
+// ========== 配置示例 ==========
+// ~/.bashrc:
+# 别名
+alias ll='ls -alF'
+alias la='ls -A'
+alias l='ls -CF'
+alias gs='git status'
+alias gc='git commit'
+alias ..='cd ..'
+alias ..2='cd ../..'
+
+# 提示符
+export PS1='\u@\h:\w\$ '
+
+# 环境变量
+export EDITOR=vim
+export HISTSIZE=10000
+export HISTFILESIZE=20000
+export HISTCONTROL=ignoredups:erasedups
+
+# PATH
+export PATH=$HOME/bin:$PATH
+export PATH=$HOME/.local/bin:$PATH
+
+# 函数
+mkcd() { mkdir -p "$1" && cd "$1"; }
+
+# 自动补全
+if [ -f /usr/share/bash-completion/bash_completion ]; then
+    . /usr/share/bash-completion/bash_completion
+fi</div>
+    </div>
+    <div class="card">
+        <h2>环境变量持久化</h2>
+        <div class="code">// ========== 系统级环境变量 ==========
+// /etc/environment          # 所有进程生效 (键=值 格式)
+// /etc/profile              # 登录 Shell
+// /etc/profile.d/*.sh       # 模块化配置 (推荐)
+
+// 在 /etc/profile.d/ 下创建自定义配置:
+cat > /etc/profile.d/myapp.sh << 'EOF'
+export MYAPP_HOME=/opt/myapp
+export MYAPP_ENV=production
+export PATH=$PATH:$MYAPP_HOME/bin
+EOF
+
+chmod +x /etc/profile.d/myapp.sh
+
+// ========== 用户级环境变量 ==========
+// ~/.bashrc                 # 推荐位置
+// ~/.bash_profile
+// ~/.profile
+// ~/.pam_environment        # PAM 方式
+
+// ========== 加载验证 ==========
+// 重新加载配置:
+source ~/.bashrc
+. ~/.bashrc                  # 同上
+
+// 测试:
+echo $MYAPP_HOME
+env | grep MYAPP
+
+// ========== systemd 服务环境变量 ==========
+// 方法 1: Environment=
+[Service]
+Environment=NODE_ENV=production
+Environment=DATABASE_URL=postgres://...
+
+// 方法 2: EnvironmentFile=
+[Service]
+EnvironmentFile=/etc/myapp/env.conf
+# env.conf 内容:
+# NODE_ENV=production
+# DATABASE_URL=postgres://...
+
+// ========== 容器中的环境变量 ==========
+docker run -e NODE_ENV=production myapp
+docker run --env-file .env myapp
+
+# docker-compose.yml:
+services:
+  app:
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+    env_file:
+      - .env</div>
+        <div class="note">💡 环境变量的最佳实践: .env 文件用于开发,系统级配置用 /etc/profile.d/,生产环境用 systemd EnvironmentFile 或容器 env_file。敏感信息 (密码/密钥) 永远不要提交到 Git,使用 secret 管理方案。</div>
+    </div>
+    <div class="card">
+        <h2>.env 文件管理</h2>
+        <div class="code">// ========== .env 文件格式 ==========
+// # 注释
+// KEY=VALUE
+// KEY="VALUE WITH SPACES"
+// 多行: KEY="line1\nline2"
+// 引用: KEY=${ANOTHER_KEY}
+
+// 示例 .env:
+APP_NAME=MyApp
+NODE_ENV=development
+PORT=3000
+DATABASE_URL=postgres://user:pass@localhost:5432/myapp
+REDIS_URL=redis://localhost:6379
+LOG_LEVEL=debug
+
+// ========== 加载 .env 的 Shell 函数 ==========
+loadenv() {
+    if [ -f .env ]; then
+        export $(grep -v '^#' .env | xargs)
+        echo "Loaded .env"
+    fi
+}
+
+// ========== 安全注意事项 ==========
+// .env 不要提交到 Git!
+// .gitignore 添加:
+.env
+*.env
+.env.local
+.env.production
+
+// .env.example 作为模板:
+// PORT=3000
+// DATABASE_URL=postgres://...
+// 不包含真实密码
+
+// ========== 优先级 ==========
+// 多个来源的优先级 (高→低):
+// 1. 命令行传入 (export KEY=val)
+// 2. .env.local (本地覆盖)
+// 3. .env (项目默认)
+// 4. 系统环境变量
+// 5. 配置文件默认值</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoEnv()">环境变量演示</button>
+        <button onclick="demoProfile()">配置文件演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoEnv() {
+            result.innerHTML = '';
+            log('# 环境变量演示');
+            log('');
+            log('$ export APP_ENV=production');
+            log('$ export APP_PORT=3000');
+            log('$ echo $APP_ENV');
+            log('  production');
+            log('');
+            log('$ env | grep APP');
+            log('  APP_ENV=production');
+            log('  APP_PORT=3000');
+            log('');
+            log('$ printenv PATH');
+            log('  /usr/local/bin:/usr/bin:/bin:...');
+            log('');
+            log('# PATH 添加:');
+            log('export PATH=$PATH:/opt/go/bin');
+            log('export PATH=$HOME/.local/bin:$PATH');
+        }
+
+        function demoProfile() {
+            result.innerHTML = '';
+            log('# Shell 配置文件演示');
+            log('');
+            log('启动文件加载顺序:');
+            log('  登录 Shell:');
+            log('    /etc/profile');
+            log('    ├── /etc/profile.d/*.sh');
+            log('    └── ~/.bash_profile');
+            log('        └── ~/.bashrc (通常从 .bash_profile 加载)');
+            log('');
+            log('  非登录 Shell:');
+            log('    ~/.bashrc');
+            log('');
+            log('--- .bashrc 配置示例 ---');
+            log('  alias ll="ls -alF"');
+            log('  export PATH=$PATH:~/.local/bin');
+            log('  export EDITOR=vim');
+            log('  export HISTSIZE=10000');
+            log('  export PS1="\\u@\\h:\\w\\$ "');
+            log('');
+            log('  mkcd() { mkdir -p "$1" && cd "$1"; }');
+        }
+    </script>
+</body>
+</html>

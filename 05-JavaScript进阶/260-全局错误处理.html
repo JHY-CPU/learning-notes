@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全局错误处理</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #error-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>全局错误处理</h2><p>window.onerror、unhandledrejection、错误边界、上报策略。</p></div>
+    <div class="card">
+        <h2>全局错误处理 API</h2>
+        <div class="code">// ========== window.onerror (运行时错误) ==========
+window.onerror = function(message, source, lineno, colno, error) {
+    console.error('全局错误:', message, source, lineno, colno);
+    // 返回 true 阻止默认错误处理
+    return true;
+};
+
+// 或者用 addEventListener
+window.addEventListener('error', (event) => {
+    console.error('捕获错误:', event.error);
+    // event.preventDefault() 阻止默认行为
+});
+
+// ========== 未处理的 Promise 拒绝 ==========
+window.onunhandledrejection = function(event) {
+    console.error('未处理的 Promise 拒绝:', event.reason);
+    event.preventDefault(); // 阻止控制台警告
+};
+
+window.addEventListener('unhandledrejection', (event) => {
+    console.error('未处理拒绝:', event.reason);
+    event.preventDefault();
+});
+
+// ========== 资源加载错误 ==========
+window.addEventListener('error', (event) => {
+    // 区分资源错误和运行时错误
+    if (event.target !== window) {
+        console.error('资源加载失败:', event.target.src || event.target.href);
+    }
+}, true); // 捕获阶段
+
+// ========== 手动上报 ==========
+function reportError(error, context = {}) {
+    const body = {
+        message: error.message,
+        stack: error.stack,
+        url: window.location.href,
+        userAgent: navigator.userAgent,
+        timestamp: Date.now(),
+        ...context,
+    };
+    // 使用 sendBeacon 上报 (页面卸载时也能发送)
+    navigator.sendBeacon?.('/api/error', JSON.stringify(body));
+    // 或 fetch
+    fetch('/api/error', { method: 'POST', body: JSON.stringify(body) });
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：全局错误捕获</h2>
+        <p>⚠️ 以下演示会在控制台产生错误（已被捕获处理）。</p>
+        <button onclick="throwRuntimeError()">触发运行时错误</button>
+        <button onclick="throwPromiseError()">触发未处理 Promise</button>
+        <div id="error-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const errorResult = document.getElementById('error-result');
+
+        function log(msg) {
+            errorResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // ========== 全局错误捕获设置 ==========
+        // 运行时错误
+        window.addEventListener('error', (event) => {
+            // 过滤资源错误
+            if (event.target !== window) return;
+            log(`🌐 [全局错误] ${event.message}`);
+            log(`   at ${event.filename}:${event.lineno}:${event.colno}`);
+            event.preventDefault();
+        });
+
+        // 未处理 Promise 拒绝
+        window.addEventListener('unhandledrejection', (event) => {
+            log(`🌐 [未处理拒绝] ${event.reason}`);
+            event.preventDefault();
+        });
+
+        // 模拟错误上报
+        function simulateReport(error, context = {}) {
+            log(`📤 [错误上报] ${error.message}`);
+            log(`   stack: ${error.stack?.split('\n')[1]?.trim() || 'N/A'}`);
+            log(`   context: ${JSON.stringify(context)}`);
+            log(`   time: ${new Date().toLocaleTimeString()}`);
+        }
+
+        function throwRuntimeError() {
+            errorResult.innerHTML = '';
+            log('⚠️ 触发运行时错误:');
+            log('');
+
+            try {
+                // 故意制造错误
+                const obj = null;
+                log('执行: null.toString()');
+                obj.toString(); // TypeError
+            } catch (err) {
+                log(`✅ try/catch 捕获: ${err.message}`);
+                log('');
+
+                // 未被 try/catch 包裹的错误会被 window.onerror 捕获
+                log('💡 如果没有 try/catch，这个错误会被 window.onerror 捕获');
+                log('💡 window.onerror 可捕获所有运行时错误');
+            }
+        }
+
+        function throwPromiseError() {
+            errorResult.innerHTML = '';
+            log('⚠️ 触发未处理 Promise 拒绝:');
+            log('');
+
+            // 创建一个无 .catch() 的 Promise
+            const p = new Promise((_, reject) => {
+                reject(new Error('这是一个未处理的 Promise 错误'));
+            });
+
+            // 稍后添加 catch (演示 unhandledrejection)
+            setTimeout(() => {
+                p.catch(err => {
+                    log(`✅ 延迟 catch 捕获: ${err.message}`);
+                    log('');
+                    log('💡 unhandledrejection 捕获未添加 catch 的 Promise');
+                    log('💡 最佳实践: 始终为 Promise 添加 catch');
+                });
+            }, 100);
+
+            log('🕐 已创建未处理拒绝的 Promise');
+            log('🕐 100ms 后添加 catch...');
+        }
+
+        log('🟢 全局错误处理已就绪');
+        log('📌 支持的全局错误:');
+        log('   • window.onerror — 运行时错误');
+        log('   • unhandledrejection — Promise 拒绝');
+        log('   • error (捕获阶段) — 资源加载失败');
+
+        console.log('=== 全局错误处理 ===');
+
+        document.getElementById('output').textContent =
+            `全局错误处理: window.onerror / unhandledrejection / 资源错误\n` +
+            `上报策略: sendBeacon / fetch / 错误采样 / 去重\n` +
+            `✅ 全局错误处理演示完成！`;
+    </script>
+</body>
+</html>

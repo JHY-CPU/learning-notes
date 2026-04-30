@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拖放DragDrop</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        .drag-item { display: inline-block; padding: 8px 16px; margin: 4px; background: #3498db; color: white; border-radius: 4px; cursor: grab; user-select: none; }
+        .drag-item:active { cursor: grabbing; opacity: 0.7; }
+        .drop-zone { min-height: 100px; border: 3px dashed #bdc3c7; border-radius: 8px; padding: 15px; margin: 10px 0; background: #f8f9fa; transition: all 0.3s; }
+        .drop-zone.dragover { border-color: #3498db; background: #eaf2f8; }
+        #file-drop { min-height: 80px; border: 3px dashed #27ae60; border-radius: 8px; padding: 15px; display: flex; align-items: center; justify-content: center; color: #7f8c8d; margin: 10px 0; }
+        #file-drop.dragover { border-color: #2ecc71; background: #d5f5e3; color: #27ae60; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>拖放 Drag & Drop</h2><p>拖放 API：元素拖拽排序、文件拖放上传。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 可拖拽元素（设置 draggable）
+element.setAttribute('draggable', 'true');
+
+// 拖拽元素的事件
+element.addEventListener('dragstart', (e) => {
+    e.dataTransfer.setData('text/plain', '数据');
+    e.dataTransfer.effectAllowed = 'move'; // 'move' | 'copy' | 'link' | 'none'
+    e.dataTransfer.setDragImage(img, x, y); // 自定义拖拽图标
+});
+element.addEventListener('drag', (e) => {});    // 拖拽中
+element.addEventListener('dragend', (e) => {});  // 拖拽结束
+
+// 放置目标的事件
+target.addEventListener('dragenter', (e) => {}); // 进入目标
+target.addEventListener('dragover', (e) => {
+    e.preventDefault(); // 必须阻止默认行为才能 drop
+    e.dataTransfer.dropEffect = 'move';
+});
+target.addEventListener('dragleave', (e) => {}); // 离开目标
+target.addEventListener('drop', (e) => {
+    e.preventDefault();
+    const data = e.dataTransfer.getData('text/plain');
+    const files = e.dataTransfer.files; // 拖拽的文件
+    // 处理放置
+});
+
+// DataTransfer 属性和方法
+e.dataTransfer.files;          // 拖拽的文件列表（File API）
+e.dataTransfer.items;          // 拖拽的数据项列表（DataTransferItem）
+e.dataTransfer.types;          // 数据类型列表（['text/plain', 'Files']）
+e.dataTransfer.setData(type, data);
+e.dataTransfer.getData(type);
+e.dataTransfer.clearData();</div>
+        <div class="note">⚠️ dragover 必须 e.preventDefault() 才能触发 drop 事件。<br>
+        ⚠️ dragenter/dragover 在子元素上也会频繁触发，需注意判断。<br>
+        💡 文件拖放不需要 draggable 属性，从系统文件管理器拖入即可。</div>
+    </div>
+    <div class="card">
+        <h2>演示：元素拖拽排序</h2>
+        <div class="drop-zone" id="sort-zone">
+            <div class="drag-item" draggable="true" data-id="1">项目 1</div>
+            <div class="drag-item" draggable="true" data-id="2">项目 2</div>
+            <div class="drag-item" draggable="true" data-id="3">项目 3</div>
+            <div class="drag-item" draggable="true" data-id="4">项目 4</div>
+            <div class="drag-item" draggable="true" data-id="5">项目 5</div>
+        </div>
+    </div>
+    <div class="card">
+        <h2>演示：文件拖放</h2>
+        <div id="file-drop">📁 拖放文件到此处</div>
+        <div id="file-info" style="font-size:13px;color:#7f8c8d;margin-top:5px;"></div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        // 元素拖拽排序
+        const sortZone = document.getElementById('sort-zone');
+        let draggedItem = null;
+
+        sortZone.querySelectorAll('.drag-item').forEach(item => {
+            item.addEventListener('dragstart', (e) => {
+                draggedItem = item;
+                e.dataTransfer.effectAllowed = 'move';
+                item.style.opacity = '0.4';
+                console.log('开始拖拽:', item.textContent);
+            });
+            item.addEventListener('dragend', (e) => {
+                item.style.opacity = '1';
+                draggedItem = null;
+            });
+        });
+
+        sortZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+            sortZone.classList.add('dragover');
+        });
+        sortZone.addEventListener('dragleave', () => {
+            sortZone.classList.remove('dragover');
+        });
+        sortZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            sortZone.classList.remove('dragover');
+            if (draggedItem) {
+                // 插入到鼠标位置
+                const target = e.target.closest('.drag-item');
+                if (target && target !== draggedItem) {
+                    const rect = target.getBoundingClientRect();
+                    const midY = rect.top + rect.height / 2;
+                    if (e.clientY < midY) {
+                        sortZone.insertBefore(draggedItem, target);
+                    } else {
+                        sortZone.insertBefore(draggedItem, target.nextSibling);
+                    }
+                    console.log('拖拽排序完成');
+                }
+            }
+        });
+
+        // 文件拖放
+        const fileDrop = document.getElementById('file-drop');
+        const fileInfo = document.getElementById('file-info');
+
+        fileDrop.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            fileDrop.classList.add('dragover');
+        });
+        fileDrop.addEventListener('dragleave', () => {
+            fileDrop.classList.remove('dragover');
+        });
+        fileDrop.addEventListener('drop', (e) => {
+            e.preventDefault();
+            fileDrop.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length) {
+                const info = Array.from(files).map(f =>
+                    `${f.name} (${(f.size / 1024).toFixed(1)}KB)`
+                ).join(', ');
+                fileInfo.textContent = `已拖放: ${info}`;
+                fileDrop.textContent = `✅ 已拖放 ${files.length} 个文件`;
+                console.log('拖放文件:', files);
+            }
+        });
+
+        console.log('=== Drag & Drop ===');
+        console.log('元素拖拽排序 + 文件拖放');
+
+        document.getElementById('output').textContent =
+            `Drag & Drop: 拖放 API\n` +
+            `draggable/dataTransfer/dragstart/dragover/drop/dragend\n` +
+            `DataTransfer: setData/getData/files/effectAllowed\n` +
+            `✅ 拖放演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数组乱序与取样</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>数组乱序与取样</h2><p>Fisher-Yates 洗牌、随机取样、加权随机、抽奖算法。</p></div>
+    <div class="card">
+        <h2>乱序与取样方法</h2>
+        <div class="code">// ========== Fisher-Yates 洗牌 (最优) ==========
+function shuffle(arr) {
+    const a = [...arr];
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
+
+// ========== sort 乱序 (有偏) ==========
+[1, 2, 3, 4, 5].sort(() => Math.random() - 0.5);
+// ⚠️ 不均匀, 不推荐
+
+// ========== 随机取样 ==========
+function sample(arr, n = 1) {
+    const shuffled = shuffle(arr);
+    return shuffled.slice(0, n);
+}
+
+// ========== 加权随机 ==========
+function weightedRandom(items, weights) {
+    const total = weights.reduce((a, b) => a + b, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < items.length; i++) {
+        r -= weights[i];
+        if (r <= 0) return items[i];
+    }
+    return items[items.length - 1];
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：乱序与取样</h2>
+        <button onclick="demoShuffle()">Fisher-Yates 洗牌</button>
+        <button onclick="demoSortBias()">sort 乱序偏差</button>
+        <button onclick="demoSample()">随机取样</button>
+        <button onclick="demoWeighted()">加权随机</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoShuffle() {
+            result.innerHTML = '';
+            log('🃏 Fisher-Yates 洗牌:');
+            log('');
+
+            function fisherYates(arr) {
+                const a = [...arr];
+                for (let i = a.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [a[i], a[j]] = [a[j], a[i]];
+                }
+                return a;
+            }
+
+            const cards = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+            log(`原始牌组: [${cards.join(', ')}]`);
+            log('');
+            log('洗牌 3 次:');
+            for (let i = 0; i < 3; i++) {
+                log(`   ${i + 1}: [${fisherYates(cards).join(', ')}]`);
+            }
+            log('');
+
+            // 均匀性验证
+            log('均匀性测试 (10000 次洗牌):');
+            const stats = { 0: 0, 1: 0, 2: 0, 3: 0 };
+            const testArr = [0, 1, 2, 3];
+            const N = 10000;
+            for (let i = 0; i < N; i++) {
+                const shuffled = fisherYates(testArr);
+                // 统计元素 0 在各个位置的次数
+                stats[shuffled.indexOf(0)]++;
+            }
+            Object.entries(stats).forEach(([pos, count]) => {
+                log(`   位置 ${pos}: ${count} 次 (${(count / N * 100).toFixed(1)}%)`);
+            });
+            log('期望: 每个位置约 25% (均匀分布)');
+        }
+
+        function demoSortBias() {
+            result.innerHTML = '';
+            log('⚠️ sort 乱序的偏差:');
+            log('');
+
+            function sortShuffle(arr) {
+                return [...arr].sort(() => Math.random() - 0.5);
+            }
+
+            const items = [1, 2, 3];
+            const counts = {};
+            const N = 10000;
+
+            for (let i = 0; i < N; i++) {
+                const key = sortShuffle(items).join(',');
+                counts[key] = (counts[key] || 0) + 1;
+            }
+
+            log('sort(Math.random() - 0.5) 测试 (10000 次):');
+            log('');
+
+            const expected = N / 6;
+            Object.entries(counts)
+                .sort((a, b) => b[1] - a[1])
+                .forEach(([order, count]) => {
+                    const bias = ((count - expected) / expected * 100).toFixed(1);
+                    log(`   [${order}] → ${count} 次 (偏差: ${bias}%)`);
+                });
+
+            log('');
+            log('Fisher-Yates 对比:');
+            const fyCounts = {};
+            function fisherYates(arr) {
+                const a = [...arr];
+                for (let i = a.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [a[i], a[j]] = [a[j], a[i]];
+                }
+                return a;
+            }
+            for (let i = 0; i < N; i++) {
+                const key = fisherYates(items).join(',');
+                fyCounts[key] = (fyCounts[key] || 0) + 1;
+            }
+            log('Fisher-Yates 结果:');
+            Object.entries(fyCounts)
+                .sort((a, b) => b[1] - a[1])
+                .forEach(([order, count]) => {
+                    const bias = ((count - expected) / expected * 100).toFixed(1);
+                    log(`   [${order}] → ${count} 次 (偏差: ${bias}%)`);
+                });
+
+            log('');
+            log('📌 结论: sort 乱序不均匀, 使用 Fisher-Yates');
+        }
+
+        function demoSample() {
+            result.innerHTML = '';
+            log('🎯 随机取样:');
+            log('');
+
+            function shuffle(arr) {
+                const a = [...arr];
+                for (let i = a.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [a[i], a[j]] = [a[j], a[i]];
+                }
+                return a;
+            }
+
+            function sample(arr, n = 1) {
+                if (n >= arr.length) return shuffle(arr);
+                return shuffle(arr).slice(0, n);
+            }
+
+            const pool = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+            log(`样本池: [${pool.join(', ')}]`);
+            log('');
+
+            log('取样 1 个:');
+            for (let i = 0; i < 5; i++) log(`   抽到: ${sample(pool, 1)[0]}`);
+
+            log('');
+            log('取样 3 个:');
+            for (let i = 0; i < 5; i++) log(`   抽到: [${sample(pool, 3).join(', ')}]`);
+
+            log('');
+            log('不放回取样 (Fisher-Yates + slice):');
+            log('   每次取出的元素不会重复');
+            log('');
+
+            log('放回取样 (可重复):');
+            function sampleWithReplace(arr, n) {
+                return Array.from({ length: n }, () => arr[Math.floor(Math.random() * arr.length)]);
+            }
+            log(`   放回取样 5 次: [${sampleWithReplace(pool, 5).join(', ')}]`);
+        }
+
+        function demoWeighted() {
+            result.innerHTML = '';
+            log('⚖️ 加权随机:');
+            log('');
+
+            function weightedRandom(items, weights) {
+                const total = weights.reduce((a, b) => a + b, 0);
+                let r = Math.random() * total;
+                for (let i = 0; i < items.length; i++) {
+                    r -= weights[i];
+                    if (r <= 0) return items[i];
+                }
+                return items[items.length - 1];
+            }
+
+            // 抽奖权重
+            const prizes = ['一等奖', '二等奖', '三等奖', '参与奖'];
+            const weights = [1, 5, 20, 74]; // 权重总和 100
+
+            log('抽奖奖品与权重:');
+            log('   一等奖  (权重 1)  — 1%');
+            log('   二等奖  (权重 5)  — 5%');
+            log('   三等奖  (权重 20) — 20%');
+            log('   参与奖  (权重 74) — 74%');
+            log('');
+
+            const stats = { 一等奖: 0, 二等奖: 0, 三等奖: 0, 参与奖: 0 };
+            const N = 10000;
+            for (let i = 0; i < N; i++) {
+                const prize = weightedRandom(prizes, weights);
+                stats[prize]++;
+            }
+
+            log(`模拟 ${N} 次抽奖:`);
+            Object.entries(stats).forEach(([prize, count]) => {
+                const pct = (count / N * 100).toFixed(1);
+                const expected = weights[prizes.indexOf(prize)];
+                log(`   ${prize}: ${count} 次 (${pct}%) 期望 ${expected}%`);
+            });
+
+            log('');
+            log('加权取样 (多个不重复):');
+            function weightedSample(arr, weights, n) {
+                const result = [];
+                const indices = arr.map((_, i) => i);
+                for (let k = 0; k < n && indices.length > 0; k++) {
+                    const ws = indices.map(i => weights[i]);
+                    const selected = weightedRandom(indices, ws);
+                    result.push(arr[selected]);
+                    indices.splice(indices.indexOf(selected), 1);
+                }
+                return result;
+            }
+            const selected = weightedSample(prizes, weights, 3);
+            log(`   加权取 3: [${selected.join(', ')}]`);
+        }
+
+        console.log('=== 数组乱序与取样 ===');
+        document.getElementById('output').textContent = `数组乱序: Fisher-Yates / sort偏差 / 取样 / 加权随机\n✅ 数组乱序与取样演示完成！`;
+    </script>
+</body>
+</html>

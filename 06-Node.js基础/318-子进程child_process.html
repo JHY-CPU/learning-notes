@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>子进程child_process</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #cp-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #3498db; color: white; }
+        tr:nth-child(even) { background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>子进程 child_process</h2><p>spawn/exec/execFile/fork、进程通信、stdin/stdout 管道。</p></div>
+    <div class="card">
+        <h2>child_process 模块</h2>
+        <div class="code">// ========== spawn ==========
+// 启动子进程执行命令 (流式输出)
+const { spawn } = require('child_process');
+const ls = spawn('ls', ['-lh', '/usr']);
+ls.stdout.on('data', (data) => console.log(data.toString()));
+ls.stderr.on('data', (data) => console.error(data.toString()));
+ls.on('close', (code) => console.log(`exit: ${code}`));
+
+// ========== exec ==========
+// 执行命令 (缓冲输出)
+const { exec } = require('child_process');
+exec('ls -lh /usr', (err, stdout, stderr) => {
+    if (err) return console.error(err);
+    console.log(stdout);
+});
+
+// ========== execFile ==========
+// 直接执行文件 (不经过shell)
+const { execFile } = require('child_process');
+execFile('node', ['--version'], (err, stdout) => {
+    console.log(stdout);
+});
+
+// ========== fork ==========
+// 创建 Node 子进程 (有IPC通信)
+const { fork } = require('child_process');
+const child = fork('./worker.js');
+child.send({ msg: 'hello' });
+child.on('message', (data) => console.log(data));
+
+// ========== 方法对比 ==========
+// spawn  — 流式, 大输出, 不创建shell
+// exec   — 缓冲, 小输出, 创建shell
+// execFile — 缓冲, 不创建shell
+// fork   — Node进程, IPC通信</div>
+    </div>
+    <div class="card">
+        <h2>演示：子进程</h2>
+        <button onclick="demoSpawn()">spawn 模拟</button>
+        <button onclick="demoExec()">exec 模拟</button>
+        <button onclick="demoFork()">fork IPC 模拟</button>
+        <button onclick="demoPipe()">管道链模拟</button>
+        <div id="cp-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const cpResult = document.getElementById('cp-result');
+
+        function log(msg) {
+            cpResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // ========== Mock Process ==========
+        class MockChildProcess {
+            constructor(name, cmd, args, opts = {}) {
+                this.name = name;
+                this.cmd = cmd;
+                this.args = args || [];
+                this.opts = opts;
+                this.stdout = { on: (e, cb) => { if (e === 'data') setTimeout(() => cb(Buffer.from(this._mockOutput())), 50); } };
+                this.stderr = { on: () => {} };
+                this.pid = Math.floor(Math.random() * 10000) + 1000;
+            }
+            _mockOutput() {
+                if (this.cmd === 'ls') return `total 128\ndrwxr-xr-x  2 root root  4096 Jan 15 10:30 bin\ndrwxr-xr-x  2 root root  4096 Jan 15 10:30 lib\ndrwxr-xr-x  2 root root  4096 Jan 15 10:30 share\n`;
+                if (this.cmd === 'node' && this.args[0] === '--version') return 'v20.11.0\n';
+                if (this.cmd === 'ps') return '  PID TTY          TIME CMD\n 1234 pts/0    00:00:01 bash\n 5678 pts/0    00:00:00 node\n';
+                return `模拟输出: ${this.cmd} ${this.args.join(' ')}\n`;
+            }
+            on(e, cb) { if (e === 'close') setTimeout(() => cb(0), 100); }
+            kill(signal) { log(`  [${this.name}] 收到信号: ${signal}`); }
+        }
+
+        function demoSpawn() {
+            cpResult.innerHTML = '';
+            log('🚀 spawn 模拟 (流式输出):');
+            log('');
+
+            log('1️⃣ 执行 ls 命令:');
+            const ls = new MockChildProcess('ls', 'ls', ['-lh', '/usr']);
+            log(`   PID: ${ls.pid}`);
+            log(`   命令: ${ls.cmd} ${ls.args.join(' ')}`);
+            ls.stdout.on('data', (chunk) => {
+                log('   输出:');
+                chunk.toString().split('\n').filter(Boolean).forEach(l => log(`      ${l}`));
+            });
+            ls.on('close', (code) => {
+                log(`   退出码: ${code}`);
+                log('');
+                log('2️⃣ spawn 选项:');
+                log('   { cwd: "/path", env: { NODE_ENV: "production" }, shell: true }');
+                log('   { stdio: "inherit", detached: true, uid: 1000 }');
+                log('');
+                log('📌 spawn 特点:');
+                log('   • 流式输出 (适合大文件/日志)');
+                log('   • 不创建 shell (更高效)');
+                log('   • 通过 stream 获取数据');
+                log('   • 适合长时间运行的进程');
+            });
+        }
+
+        function demoExec() {
+            cpResult.innerHTML = '';
+            log('📦 exec 模拟 (缓冲输出):');
+            log('');
+
+            function mockExec(cmd, cb) {
+                const outputs = {
+                    'ls -lh /usr': 'total 128\ndrwxr-xr-x  2 root root  4096 Jan 15 10:30 bin\ndrwxr-xr-x  2 root root  4096 Jan 15 10:30 lib\n',
+                    'node --version': 'v20.11.0\n',
+                    'cat package.json': '{\n  "name": "my-app",\n  "version": "1.0.0"\n}\n',
+                    'git --version': 'git version 2.43.0\n',
+                };
+                setTimeout(() => {
+                    if (outputs[cmd]) {
+                        cb(null, outputs[cmd], '');
+                    } else {
+                        cb(new Error(`Command failed: ${cmd}`), '', `sh: ${cmd}: not found`);
+                    }
+                }, 100);
+            }
+
+            log('1️⃣ exec("ls -lh /usr"):');
+            mockExec('ls -lh /usr', (err, stdout, stderr) => {
+                if (err) { log(`   错误: ${err.message}`); return; }
+                log('   成功:');
+                stdout.split('\n').filter(Boolean).forEach(l => log(`   ${l}`));
+            });
+
+            log('');
+            log('2️⃣ exec("node --version"):');
+            mockExec('node --version', (err, stdout) => {
+                if (!err) log(`   版本: ${stdout.trim()}`);
+            });
+
+            log('');
+            log('3️⃣ exec 选项:');
+            log('   { cwd, env, timeout, maxBuffer: 1024 * 1024 }');
+            log('   { shell: "/bin/bash", encoding: "utf8" }');
+            log('');
+
+            log('📌 spawn vs exec:');
+            log('   spawn — 流式, 适合大输出');
+            log('   exec  — 缓冲, 适合小输出 (有 maxBuffer 限制)');
+            log('   execFile — 直接执行文件, 不经过 shell');
+        }
+
+        function demoFork() {
+            cpResult.innerHTML = '';
+            log('🔗 fork IPC 通信模拟:');
+            log('');
+
+            // 模拟 worker 进程
+            class MockWorker {
+                constructor() {
+                    this.pid = Math.floor(Math.random() * 10000) + 1000;
+                    this.listeners = {};
+                    log(`   Worker PID: ${this.pid}`);
+                    log('');
+                }
+                on(e, cb) { this.listeners[e] = cb; }
+                send(msg) {
+                    log(`   [主进程 → Worker] 发送: ${JSON.stringify(msg)}`);
+                    setTimeout(() => {
+                        const response = this._handleMessage(msg);
+                        log(`   [Worker → 主进程] 回复: ${JSON.stringify(response)}`);
+                        if (this.listeners.message) this.listeners.message(response);
+                    }, 200);
+                }
+                _handleMessage(msg) {
+                    if (msg.task === 'compute') return { result: msg.data * 2, pid: this.pid };
+                    if (msg.task === 'fetch') return { data: { id: 1, name: 'Alice' }, pid: this.pid };
+                    if (msg.cmd === 'exit') return { status: 'ok' };
+                    return { echo: msg, pid: this.pid };
+                }
+            }
+
+            log('1️⃣ 创建 Worker 子进程:');
+            const worker = new MockWorker();
+
+            log('2️⃣ 发送计算任务:');
+            worker.send({ task: 'compute', data: 21 });
+
+            setTimeout(() => {
+                log('');
+                log('3️⃣ 发送数据请求:');
+                worker.send({ task: 'fetch', url: '/api/user' });
+            }, 300);
+
+            setTimeout(() => {
+                log('');
+                log('4️⃣ fork 使用场景:');
+                log('   • 计算密集型任务 (图片处理/数据分析)');
+                log('   • 独立服务进程');
+                log('   • 并行执行多个任务');
+                log('   • 隔离不稳定代码');
+                log('');
+                log('📌 fork 特点:');
+                log('   • 内置 IPC 通道 (send/on message)');
+                log('   • 共享内存 (可传 SharedArrayBuffer)');
+                log('   • 自动管理事件循环');
+            }, 600);
+        }
+
+        function demoPipe() {
+            cpResult.innerHTML = '';
+            log('🔧 管道链模拟 (进程组合):');
+            log('');
+
+            // 模拟 shell 管道: ps aux | grep node | wc -l
+            log('1️⃣ 管道示例: ps aux | grep node | wc -l');
+            log('');
+
+            const stages = [
+                { cmd: 'ps aux', output: 'root  1234  0.1  0.5  12345  6789 ?  Ss  10:00  0:01 node server.js\nroot  5678  0.2  0.8  54321  9876 ?  Sl  10:01  0:02 node worker.js\nroot  9012  0.0  0.3  11111  2222 ?  S+  10:02  0:00 nginx\n' },
+                { cmd: 'grep node', filter: (line) => line.includes('node') },
+                { cmd: 'wc -l', transform: (lines) => `${lines.length}\n` },
+            ];
+
+            let data = stages[0].output;
+            log(`   $ ${stages.map(s => s.cmd).join(' | ')}`);
+            log('');
+            log('   阶段1 — ps aux:');
+            data.split('\n').filter(Boolean).forEach(l => log(`      ${l}`));
+
+            setTimeout(() => {
+                const filtered = data.split('\n').filter(l => stages[1].filter(l));
+                log('');
+                log('   阶段2 — grep node:');
+                filtered.forEach(l => log(`      ${l}`));
+
+                setTimeout(() => {
+                    const count = stages[2].transform(filtered);
+                    log('');
+                    log(`   阶段3 — wc -l: ${count.trim()}`);
+                    log('');
+                    log('   结果: 2 个 Node.js 进程');
+
+                    log('');
+                    log('2️⃣ 常用进程组合:');
+                    log('   • find . -name "*.js" | xargs wc -l');
+                    log('   • cat access.log | grep "ERROR" | sort | uniq -c');
+                    log('   • node app.js | tee app.log');
+                    log('');
+
+                    log('📌 pipe 注意事项:');
+                    log('   • 背压处理 (防止内存溢出)');
+                    log('   • 错误传播 (任何一个环节出错)');
+                    log('   • 进程退出码检查');
+                }, 200);
+            }, 200);
+        }
+
+        console.log('=== 子进程 child_process ===');
+
+        document.getElementById('output').textContent =
+            `child_process: spawn / exec / execFile / fork / IPC / pipe\n` +
+            `进程创建 / 通信 / 管道组合 / 进程管理\n` +
+            `✅ 子进程演示完成！`;
+    </script>
+</body>
+</html>

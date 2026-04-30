@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proxy代理</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; max-height: 250px; overflow-y: auto; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #reactive-display { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; margin: 10px 0; }
+        .trap-log { color: #7f8c8d; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Proxy 代理</h2><p>Proxy 用于创建一个对象的代理，拦截并自定义底层操作。共支持 13 种处理器陷阱（handler traps）。</p></div>
+    <div class="card"><h2>处理器陷阱一览</h2><p><b>get/set</b> - 属性读写 · <b>has</b> - in 操作符 · <b>deleteProperty</b> - delete 操作 · <b>apply</b> - 函数调用 · <b>construct</b> - new 操作 · <b>ownKeys</b> - Object.keys/for...in · 等共 13 种。</p></div>
+    <div class="card"><h2>应用场景</h2><p>数据验证、日志记录、默认值、负数数组索引、响应式数据、缓存代理、权限控制等。</p></div>
+    <div id="reactive-display">等待交互...</div>
+    <div class="card"><h2>交互演示</h2><p>
+        <button onclick="demoValidation()">数据验证</button>
+        <button onclick="demoNegativeArray()">负数数组索引</button>
+        <button onclick="demoDefaults()">默认值</button>
+        <button onclick="demoReactive()">响应式数据</button>
+        <button onclick="demoApply()">函数调用拦截</button>
+    </p></div>
+    <pre id="output"></pre>
+    <script>
+        const output = document.getElementById('output');
+        const reactiveDisplay = document.getElementById('reactive-display');
+
+        function log(msg) {
+            output.textContent += msg + '\n';
+            console.log(msg);
+        }
+
+        function clearLog() {
+            output.textContent = '';
+        }
+
+        // ========== 1. 数据验证 ==========
+        function demoValidation() {
+            clearLog();
+            log('=== 数据验证 Proxy ===');
+
+            const validator = {
+                set(target, key, value) {
+                    if (key === 'age') {
+                        if (!Number.isInteger(value)) {
+                            throw new TypeError('年龄必须是整数');
+                        }
+                        if (value < 0 || value > 150) {
+                            throw new RangeError('年龄必须在 0-150 之间');
+                        }
+                    }
+                    if (key === 'email' && typeof value === 'string') {
+                        if (!value.includes('@')) {
+                            throw new Error('邮箱格式不正确');
+                        }
+                    }
+                    log(`[set] ${key} = ${value} (验证通过)`);
+                    target[key] = value;
+                    return true;
+                },
+                get(target, key) {
+                    log(`[get] ${key} = ${target[key]}`);
+                    return target[key];
+                }
+            };
+
+            const user = new Proxy({}, validator);
+            user.name = '张三';
+            user.age = 25;
+            log(`用户信息: ${user.name}, ${user.age} 岁`);
+            try { user.age = -5; } catch (e) { log(`错误: ${e.message}`); }
+            try { user.age = 200; } catch (e) { log(`错误: ${e.message}`); }
+            try { user.email = 'invalid'; } catch (e) { log(`错误: ${e.message}`); }
+            log('有效数据: name=' + user.name + ', age=' + user.age);
+        }
+
+        // ========== 2. 负数数组索引 ==========
+        function demoNegativeArray() {
+            clearLog();
+            log('=== 负数数组索引 ===');
+
+            function createNegativeArrayProxy(arr) {
+                return new Proxy(arr, {
+                    get(target, prop) {
+                        const index = Number(prop);
+                        if (!isNaN(index) && index < 0) {
+                            const realIndex = target.length + index;
+                            log(`[代理] 索引 ${index} → 实际索引 ${realIndex}`);
+                            return target[realIndex];
+                        }
+                        return target[prop];
+                    },
+                    set(target, prop, value) {
+                        const index = Number(prop);
+                        if (!isNaN(index) && index < 0) {
+                            const realIndex = target.length + index;
+                            log(`[代理] 设置索引 ${index} → 实际索引 ${realIndex} = ${value}`);
+                            target[realIndex] = value;
+                            return true;
+                        }
+                        target[prop] = value;
+                        return true;
+                    }
+                });
+            }
+
+            const arr = createNegativeArrayProxy(['a', 'b', 'c', 'd', 'e']);
+            log(`arr[-1] = ${arr[-1]}`);
+            log(`arr[-2] = ${arr[-2]}`);
+            log(`arr[-3] = ${arr[-3]}`);
+            arr[-1] = 'Z';
+            log(`修改 arr[-1] 后: [${arr.join(', ')}]`);
+        }
+
+        // ========== 3. 默认值/缺失属性 ==========
+        function demoDefaults() {
+            clearLog();
+            log('=== 默认值 Proxy ===');
+
+            function withDefaults(target, defaults) {
+                return new Proxy(target, {
+                    get(target, key) {
+                        if (!(key in target)) {
+                            log(`[默认值] ${String(key)} 不存在，返回默认值: ${defaults[key] ?? 'undefined'}`);
+                            return defaults[key];
+                        }
+                        return target[key];
+                    },
+                    has(target, key) {
+                        const exists = key in target;
+                        log(`[has] ${String(key)} ${exists ? '存在' : '不存在'}`);
+                        return exists || key in defaults;
+                    }
+                });
+            }
+
+            const settings = withDefaults({ theme: 'dark', lang: 'zh-CN' }, { fontSize: 14, showSidebar: true });
+            log(`settings.theme = ${settings.theme}`);
+            log(`settings.fontSize = ${settings.fontSize}`);
+            log(`settings.showSidebar = ${settings.showSidebar}`);
+            log(`'fontSize' in settings: ${'fontSize' in settings}`);
+        }
+
+        // ========== 4. 响应式数据（DOM 自动更新） ==========
+        function demoReactive() {
+            clearLog();
+            log('=== 响应式数据 Proxy ===');
+
+            const target = { count: 0, message: 'Hello' };
+            const reactive = new Proxy(target, {
+                get(t, key) {
+                    return t[key];
+                },
+                set(t, key, value) {
+                    t[key] = value;
+                    log(`[响应式] ${String(key)} = ${value}`);
+                    renderReactive();
+                    return true;
+                }
+            });
+
+            window.reactive = reactive;
+            renderReactive();
+
+            reactiveDisplay.innerHTML = `
+                <div>count = <span id="r-count">${reactive.count}</span></div>
+                <div>message = "<span id="r-msg">${reactive.message}</span>"</div>
+                <div style="margin-top:10px;">
+                    <button onclick="window.reactive.count++">count++</button>
+                    <button onclick="window.reactive.count--">count--</button>
+                    <button onclick="window.reactive.message = 'World'">message = World</button>
+                    <button onclick="window.reactive.message = 'Proxy'">message = Proxy</button>
+                </div>
+            `;
+        }
+
+        function renderReactive() {
+            const rc = document.getElementById('r-count');
+            const rm = document.getElementById('r-msg');
+            if (rc && rm && window.reactive) {
+                rc.textContent = window.reactive.count;
+                rm.textContent = window.reactive.message;
+            }
+        }
+
+        // ========== 5. 函数调用拦截 (apply) ==========
+        function demoApply() {
+            clearLog();
+            log('=== 函数调用拦截 ===');
+
+            function measureTime(fn) {
+                return new Proxy(fn, {
+                    apply(target, thisArg, args) {
+                        const start = performance.now();
+                        const result = Reflect.apply(target, thisArg, args);
+                        const elapsed = (performance.now() - start).toFixed(2);
+                        log(`[计时] ${target.name || '匿名函数'}(${args.join(',')}) = ${result}，耗时 ${elapsed}ms`);
+                        return result;
+                    }
+                });
+            }
+
+            function fibonacci(n) {
+                if (n <= 1) return n;
+                return fibonacci(n - 1) + fibonacci(n - 2);
+            }
+
+            const measuredFib = measureTime(fibonacci);
+            log('计算 fibonacci(10)，使用 Proxy 自动计时:');
+            measuredFib(10);
+        }
+
+        log('=== Proxy 代理 演示 ===\n点击上方按钮查看不同 Proxy 应用场景。');
+    </script>
+</body>
+</html>

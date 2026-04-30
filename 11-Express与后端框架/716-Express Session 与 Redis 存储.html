@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express Session 与 Redis 存储</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🍪 Express Session 与 Redis 存储</h2><p>express-session 配置、session 选项 (secret/resave/saveUninitialized/cookie)、connect-redis 存储、Session vs JWT 对比、session 中的用户状态管理、多实例 session 共享。</p></div>
+    <div class="card">
+        <h2>express-session 基础</h2>
+        <div class="code">// ========== express-session ==========
+// 服务端 Session 中间件
+// 基于 Cookie 的 session ID
+
+npm install express-session
+
+// ========== 基本配置 ==========
+const session = require('express-session');
+
+app.use(session({
+    secret: process.env.SESSION_SECRET || 'session-secret',
+    resave: false,                  // 不强制保存未修改的 session
+    saveUninitialized: false,       // 不保存新创建的 session
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',  // HTTPS only
+        httpOnly: true,                                  // 防 XSS
+        maxAge: 24 * 60 * 60 * 1000,                     // 1 天
+        sameSite: 'lax',
+    },
+}));
+
+// ========== Session 使用 ==========
+// 登录时:
+app.post('/login', async (req, res) => {
+    const user = await User.findOne({ email: req.body.email });
+    req.session.userId = user._id;
+    req.session.role = user.role;
+    req.session.createdAt = Date.now();
+    res.json({ message: 'Logged in' });
+});
+
+// 认证中间件:
+function sessionAuth(req, res, next) {
+    if (!req.session.userId) {
+        return res.status(401).json({ message: 'Not authenticated' });
+    }
+    next();
+}
+
+// Session 中取用户:
+app.get('/profile', sessionAuth, async (req, res) => {
+    const user = await User.findById(req.session.userId);
+    res.json(user);
+});
+
+// 退出:
+app.post('/logout', (req, res) => {
+    req.session.destroy((err) => {
+        if (err) return res.status(500).json({ message: 'Logout failed' });
+        res.clearCookie('connect.sid');
+        res.json({ message: 'Logged out' });
+    });
+});
+
+// ========== 配置选项详解 ==========
+app.use(session({
+    secret: ['current-secret', 'previous-secret'],  // 轮换密钥
+    name: 'myapp.sid',              // 自定义 cookie 名 (默认 connect.sid)
+    resave: false,
+    saveUninitialized: false,
+    rolling: true,                   // 每次请求刷新 cookie 过期时间
+    unset: 'destroy',                // 删除 req.session 时销毁
+    cookie: {
+        secure: true,                // HTTPS
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000,
+        path: '/',
+        domain: '.example.com',
+    },
+}));</div>
+    </div>
+    <div class="card">
+        <h2>Redis Session 存储</h2>
+        <div class="code">// ========== connect-redis ==========
+// 生产环境 Session 存 Redis (而不是默认内存)
+// 支持多实例共享 session
+
+npm install connect-redis ioredis
+
+// ========== Redis 存储配置 ==========
+const RedisStore = require('connect-redis').default;
+const Redis = require('ioredis');
+
+const redisClient = new Redis({
+    host: process.env.REDIS_HOST || 'localhost',
+    port: 6379,
+    password: process.env.REDIS_PASSWORD,
+    enableOfflineQueue: false,
+    maxRetriesPerRequest: null,
+});
+
+redisClient.on('error', (err) => {
+    console.error('Redis error:', err);
+});
+
+app.use(session({
+    store: new RedisStore({
+        client: redisClient,
+        prefix: 'session:',          // Redis key 前缀
+        ttl: 86400,                  // Session TTL (秒), 默认 cookie.maxAge
+        disableTouch: false,         // 是否禁用自动刷新 TTL
+    }),
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        secure: true,
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000,
+    },
+}));
+
+// ========== Session 数据查看 ==========
+// Redis CLI:
+// KEYS session:*
+// GET session:xxx
+// TTL session:xxx
+
+// ========== 多实例部署 ==========
+// ┌────────────────────────────────────────┐
+// │  Load Balancer                          │
+// │      ↓ (sticky session / 无)           │
+// │  App Instance 1 ──┐                    │
+// │  App Instance 2 ──┤── Redis (共享)     │
+// │  App Instance 3 ──┘                    │
+// └────────────────────────────────────────┘
+//
+// Redis 存储 session → 任何实例都能访问
+// 不需要 sticky session</div>
+    </div>
+    <div class="card">
+        <h2>Session vs JWT</h2>
+        <div class="code">// ========== Session vs JWT ==========
+// ┌──────────────┬───────────────────┬──────────────────┐
+// │ 特性          │ Session           │ JWT              │
+// ├──────────────┼───────────────────┼──────────────────┤
+// │ 状态          │ 有状态 (服务端)   │ 无状态 (客户端)  │
+// │ 存储          │ Redis/DB          │ 客户端存储       │
+// │ 扩展性        │ 需要共享存储      │ 天然支持         │
+// │ 退出          │ 立即 (删 session) │ 黑名单/短过期   │
+// │ 令牌失效      │ 即时              │ 等待过期         │
+// │ 移动端        │ 较差 (Cookie)     │ 良好 (Header)    │
+// │ API 友好      │ 一般              │ 优秀             │
+// │ 实现复杂度    │ 简单              │ 中等             │
+// ├──────────────┼───────────────────┼──────────────────┤
+// │ 推荐场景      │ 服务端渲染 SSR    │ REST API / 移动端│
+// └──────────────┴───────────────────┴──────────────────┘
+
+// ========== Session 适合的场景 ==========
+// - 传统服务端渲染 (EJS/Pug)
+// - 管理后台 (Cookie 方便)
+// - 同一域名下的应用
+// - 需要即时撤销访问
+
+// ========== JWT 适合的场景 ==========
+// - REST API (前后端分离)
+// - 移动 App (无 Cookie)
+// - 微服务 (无状态, 自包含)
+// - 第三方 API (授权)
+
+// ========== Session 安全 ==========
+// 1. secret 要足够复杂
+// 2. httpOnly + secure + sameSite
+// 3. Redis 加密码
+// 4. session TTL 不要过长
+// 5. 关键操作前验证 session
+// 6. 定期轮换 session secret
+// 7. 使用多个 secret (轮换)</div>
+        <div class="note">💡 Session 要点: express-session 管理服务端 session; 生产用 Redis 存储 (connect-redis); 多实例共享 session 需集中存储; Cookie 存 session ID (非数据); resave:false + saveUninitialized:false 推荐; Session 适合 SSR, JWT 适合 API; Session 可即时撤销; JWT 无状态扩展性好; 安全: httpOnly+secure+sameSite。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSession()">Session 配置</button>
+        <button onclick="demoRedis()">Redis 存储</button>
+        <button onclick="demoCompare()">Session vs JWT</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSession() {
+            result.innerHTML = '';
+            log('# express-session 配置');
+            log('');
+            log('app.use(session({');
+            log('  secret: "my-secret",');
+            log('  resave: false,');
+            log('  saveUninitialized: false,');
+            log('  cookie: {');
+            log('    httpOnly: true,');
+            log('    secure: true,');
+            log('    maxAge: 86400000');
+            log('  }');
+            log('}));');
+        }
+
+        function demoRedis() {
+            result.innerHTML = '';
+            log('# Redis Session 存储');
+            log('');
+            log('const RedisStore = require("connect-redis");');
+            log('const Redis = require("ioredis");');
+            log('');
+            log('const store = new RedisStore({');
+            log('  client: redisClient,');
+            log('  prefix: "session:",');
+            log('  ttl: 86400');
+            log('});');
+            log('');
+            log('多实例 → 共享 Redis');
+            log('不需要 sticky session');
+        }
+
+        function demoCompare() {
+            result.innerHTML = '';
+            log('# Session vs JWT');
+            log('');
+            log('Session:');
+            log('  ✓ 即时撤销');
+            log('  ✓ SSR 友好');
+            log('  ✗ 需共享存储');
+            log('');
+            log('JWT:');
+            log('  ✓ 无状态');
+            log('  ✓ 移动端友好');
+            log('  ✗ 不能即时撤销');
+            log('');
+            log('SSR → Session');
+            log('API / 移动 → JWT');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>暂存区与提交</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📝 暂存区与提交</h2><p>git add/git commit、暂存区操作、提交信息规范、git status/git diff。</p></div>
+    <div class="card">
+        <h2>git status — 查看状态</h2>
+        <div class="code">// ========== git status ==========
+// 最常用的 Git 命令之一
+// 显示工作区和暂存区的状态
+
+git status                    # 详细状态
+git status -s                 # 简短格式
+git status --short            # 同上
+
+// 输出解读:
+// ?? untracked.txt           未跟踪
+//  M modified.txt            工作区修改 (未暂存)
+// M  staged.txt              暂存区修改
+// MM staged_and_modified     暂存后又修改
+// D  deleted.txt             暂存删除
+//  D deleted_working         工作区删除</div>
+    </div>
+    <div class="card">
+        <h2>git add — 添加到暂存区</h2>
+        <div class="code">// ========== git add 用法 ==========
+git add file.txt                     # 暂存单个文件
+git add *.js                         # 通配符匹配
+git add src/                         # 暂存整个目录
+git add .                            # 暂存所有变更 (包括新增)
+git add -A                           # 同上 (all)
+git add --all                        # 同上
+
+// 交互式暂存:
+git add -p file.txt                  # 交互式逐块暂存 (patch mode)
+// Git 会显示每个变更块,让你选择:
+// y - 暂存此块
+// n - 不暂存此块
+// s - 分割成更小块
+// e - 手动编辑
+
+// ========== 撤销暂存 ==========
+git reset HEAD file.txt              # 从暂存区移出 (不删除修改)
+git reset HEAD .                     # 撤销所有暂存
+git restore --staged file.txt        # 新式语法 (Git 2.23+)
+
+// ========== 忽略跟踪 ==========
+// 取消跟踪已加入版本控制的文件 (保留文件)
+git rm --cached file.txt
+
+// 取消跟踪并删除文件
+git rm file.txt
+
+// 移动/重命名
+git mv old.txt new.txt               # 相当于 mv + git add</div>
+    </div>
+    <div class="card">
+        <h2>git commit — 提交</h2>
+        <div class="code">// ========== commit 基础 ==========
+git commit -m "feat: add user login"  # 直接写信息
+git commit                            # 打开编辑器写信息
+
+// 暂存区已有变更时提交
+// 常用流程:
+git add -A
+git commit -m "feat: add user login"
+
+// 快捷方式 (跳过 git add):
+git commit -a -m "fix: typo"          # 只跟踪已跟踪的文件
+git commit -am "fix: typo"            # 同上 (简写)
+
+// ========== 修改最近的提交 ==========
+git commit --amend                    # 修改最近 commit 的信息
+git commit --amend -m "new message"   # 修改信息
+
+// 添加遗漏的文件到最近提交:
+git add forgotten_file.txt
+git commit --amend --no-edit          # 保留原来提交信息
+
+// ⚠️ --amend 会改变 commit hash!
+// 已推送的 commit 不要 amend!
+
+// ========== 提交信息规范 ==========
+// 推荐 Conventional Commits 格式:
+
+// feat:    新功能
+// fix:     修复
+// docs:    文档
+// style:   格式 (不影响代码运行)
+// refactor:重构
+// perf:    性能优化
+// test:    测试
+// chore:   构建/工具
+// ci:      CI/CD
+
+// 格式:
+// <type>(<scope>): <subject>
+//
+// <body>
+//
+// <footer>
+
+// 示例:
+// feat(auth): add JWT token refresh
+//
+// Implement refresh token rotation and blacklist.
+// Closes #123
+
+// fix(db): fix connection pool leak
+//
+// Close idle connections after 30s timeout.
+// Fixes #456</div>
+    </div>
+    <div class="card">
+        <h2>git diff — 查看差异</h2>
+        <div class="code">// ========== git diff 用法 ==========
+git diff                          # 工作区 vs 暂存区 (未暂存的修改)
+git diff --staged                 # 暂存区 vs 仓库 (将要提交的)
+git diff --cached                 # 同上
+git diff HEAD                     # 工作区 vs 仓库 (所有修改)
+
+git diff file.txt                 # 只看某文件
+git diff src/                     # 只看某目录
+git diff --stat                   # 只统计改了几行
+
+// 比较分支:
+git diff main..feature            # main 与 feature 的差异
+git diff main...feature           # feature 与 main 分支点的差异
+
+// 比较 commit:
+git diff abc123..def456           # 两个 commit 之间
+git diff HEAD~2..HEAD             # 最近 2 个提交
+
+// ========== diff 输出解读 ==========
+// diff --git a/file.txt b/file.txt
+// --- a/file.txt      # 旧版本
+// +++ b/file.txt      # 新版本
+// @@ -1,5 +1,6 @@      # 旧文件 1-5 行,新文件 1-6 行
+//  context line        # 上下文
+// -deleted line        # 删除的行
+// +added line          # 添加的行
+
+// 可视化配置:
+git config --global diff.tool vimdiff
+git difftool                     # 使用外部 diff 工具</div>
+        <div class="note">💡 git add -p 是精细控制 git add 的利器,可以逐块决定是否暂存。git commit --amend 用于修复最近提交,但记住:已推送的 commit 不要 amend,否则 push 会冲突。提交信息遵循 Conventional Commits 格式,便于生成 changelog。</div>
+    </div>
+    <div class="card">
+        <h2>查看历史</h2>
+        <div class="code">// ========== git log ==========
+git log                          # 完整历史
+git log --oneline                # 一行显示
+git log --graph                  # 分支图
+git log --all                    # 所有分支
+git log -n 5                     # 最近 5 条
+
+// 格式化:
+git log --oneline --graph --all --decorate  # 常用组合
+git log --pretty=format:"%h - %an, %ar : %s"
+// %h    短 hash
+// %an   作者名
+// %ar   相对时间 (2 days ago)
+// %s    提交信息
+
+// 过滤:
+git log --author="Alice"         # 某人提交
+git log --since="2024-01-01"     # 某时间后
+git log --grep="fix"             # 提交信息中包含
+git log -- file.txt              # 仅影响某个文件的提交
+git log -S "function_name"       # 包含某字符串变更的提交
+
+// ========== git show ==========
+git show                         # 显示最近 commit 详情
+git show abc123                  # 显示指定 commit
+git show HEAD                    # HEAD 指向的 commit
+git show HEAD~2                  # 前 2 个 commit
+git show HEAD:file.txt           # 查看旧版本文件内容</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoAdd()">add/commit 演示</button>
+        <button onclick="demoDiff()">diff/log 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoAdd() {
+            result.innerHTML = '';
+            log('# git add/commit 演示');
+            log('');
+            log('$ echo "hello" > file1.txt');
+            log('$ echo "world" > file2.txt');
+            log('');
+            log('$ git status -s');
+            log('  ?? file1.txt');
+            log('  ?? file2.txt');
+            log('');
+            log('$ git add file1.txt');
+            log('$ git status -s');
+            log('  A  file1.txt   (已暂存)');
+            log('  ?? file2.txt   (未跟踪)');
+            log('');
+            log('$ git commit -m "feat: add file1"');
+            log('  [main abc123] feat: add file1');
+            log('   1 file changed, 1 insertion(+)');
+            log('');
+            log('$ git log --oneline');
+            log('  abc123 feat: add file1');
+            log('  def456 initial commit');
+        }
+
+        function demoDiff() {
+            result.innerHTML = '';
+            log('# git diff/log 演示');
+            log('');
+            log('$ echo "line2" >> file1.txt');
+            log('$ git diff');
+            log('  diff --git a/file1.txt b/file1.txt');
+            log('  --- a/file1.txt');
+            log('  +++ b/file1.txt');
+            log('  @@ -1 +1,2 @@');
+            log('   hello');
+            log('  +line2');
+            log('');
+            log('$ git log --oneline --graph --all');
+            log('  * abc123 feat: add file1');
+            log('  * def456 initial commit');
+            log('');
+            log('$ git show --stat');
+            log('  commit abc123...');
+            log('  feat: add file1');
+            log('  file1.txt | 1 +');
+            log('  1 file changed, 1 insertion(+)');
+        }
+    </script>
+</body>
+</html>

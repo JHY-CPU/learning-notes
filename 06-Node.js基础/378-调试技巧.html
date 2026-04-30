@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>调试技巧</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>调试技巧</h2><p>Console 高级(assert/table/group/time/trace)、Source Map、断点调试。</p></div>
+    <div class="card">
+        <h2>调试 API</h2>
+        <div class="code">// ========== Console 高级 ==========
+console.assert(condition, msg);   // 条件断言
+console.table(data);              // 表格展示
+console.group('Label');           // 分组
+console.time('label');            // 计时开始
+console.timeEnd('label');         // 计时结束
+console.trace();                  // 堆栈跟踪
+console.count('label');           // 计数
+console.dir(obj);                 // 对象展开
+console.dirxml(element);          // DOM 展开
+
+// ========== 断点 ==========
+// 1. 代码断点: debugger;
+// 2. 条件断点: 右键添加条件
+// 3. DOM 断点: 元素 → Break on
+// 4. XHR 断点: Sources → XHR Breakpoints</div>
+    </div>
+    <div class="card">
+        <h2>演示：调试技巧</h2>
+        <button onclick="demoConsole()">Console 高级</button>
+        <button onclick="demoBreakpoint()">断点调试</button>
+        <button onclick="demoNetwork()">网络调试</button>
+        <button onclick="demoPerformanceDebug()">性能调试</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoConsole() {
+            result.innerHTML = '';
+            log('🖥️ Console 高级用法:');
+            log('');
+
+            log('1️⃣ console.assert:');
+            log('   console.assert(x > 0, "x must be positive");');
+            log('   只在条件为 false 时输出 (不会 throw)');
+            log('');
+
+            log('2️⃣ console.table:');
+            log('   const users = [');
+            log('     { id: 1, name: "Alice", role: "admin" },');
+            log('     { id: 2, name: "Bob", role: "user" }');
+            log('   ];');
+            log('   console.table(users);');
+            log('');
+
+            log('3️⃣ console.group:');
+            log('   console.group("用户信息");');
+            log('   console.log("姓名: Alice");');
+            log('   console.log("年龄: 25");');
+            log('   console.groupEnd();');
+            log('');
+
+            log('4️⃣ console.time / timeEnd:');
+            log('   console.time("loop");');
+            log('   for (let i = 0; i < 1000000; i++) {}');
+            log('   console.timeEnd("loop");  // loop: 1.23ms');
+            log('');
+
+            log('5️⃣ console.trace:');
+            log('   function foo() { bar(); }');
+            log('   function bar() { console.trace(); }');
+            log('   // 打印调用堆栈');
+            log('');
+
+            log('6️⃣ console.count:');
+            log('   function greet() {');
+            log('     console.count("greet called");');
+            log('   }');
+            log('   greet(); // greet called: 1');
+            log('   greet(); // greet called: 2');
+            log('');
+
+            log('7️⃣ 样式化输出:');
+            log('   console.log("%c红色大字", "color:red;font-size:20px");');
+            log('   console.log("%c%s", "background:yellow", "高亮文字");');
+        }
+
+        function demoBreakpoint() {
+            result.innerHTML = '';
+            log('🔍 断点调试:');
+            log('');
+
+            log('1️⃣ debugger 语句:');
+            log('   function calculateTotal(items) {');
+            log('     let total = 0;');
+            log('     debugger;  // 执行到这里暂停');
+            log('     for (const item of items) {');
+            log('       total += item.price;');
+            log('     }');
+            log('     return total;');
+            log('   }');
+            log('');
+
+            log('2️⃣ 条件断点:');
+            log('   // 在 DevTools Sources 面板:');
+            log('   // 右键行号 → Add conditional breakpoint');
+            log('   // 条件: item.price > 100');
+            log('   // 只有满足条件时才暂停');
+            log('');
+
+            log('3️⃣ DOM 断点:');
+            log('   Elements 面板 → 右键元素 → Break on:');
+            log('   • Subtree modifications — 子节点变化');
+            log('   • Attribute modifications — 属性变化');
+            log('   • Node removal — 节点删除');
+            log('');
+
+            log('4️⃣ XHR/Fetch 断点:');
+            log('   Sources → XHR Breakpoints → +');
+            log('   • 输入 URL 关键字');
+            log('   • 匹配的请求会被断点暂停');
+            log('   • 查看请求参数和响应');
+            log('');
+
+            log('5️⃣ 事件监听断点:');
+            log('   Sources → Event Listener Breakpoints');
+            log('   • Mouse/Keyboard/Touch 等分类');
+            log('   • 勾选后对应事件触发时暂停');
+            log('');
+
+            log('6️⃣ 调试快捷键:');
+            log('   F8     — 继续 (Continue)');
+            log('   F10    — 单步跳过 (Step over)');
+            log('   F11    — 单步进入 (Step into)');
+            log('   ⇧F11   — 单步跳出 (Step out)');
+            log('   ⌘/Ctrl+⇧F8 — 禁用所有断点');
+        }
+
+        function demoNetwork() {
+            result.innerHTML = '';
+            log('🌐 网络调试:');
+            log('');
+
+            log('1️⃣ Network 面板:');
+            log('   • 查看所有网络请求');
+            log('   • 过滤 (JS/CSS/IMG/XHR/Fetch)');
+            log('   • 查看请求/响应头');
+            log('   • 预览响应数据');
+            log('');
+
+            log('2️⃣ 模拟网络条件:');
+            log('   Network → Throttling:');
+            log('   • 在线 (Online)');
+            log('   • 快速 3G (Fast 3G)');
+            log('   • 慢速 3G (Slow 3G)');
+            log('   • 离线 (Offline)');
+            log('   • 自定义 (Add)');
+            log('');
+
+            log('3️⃣ 拦截请求 (Override):');
+            log('   Network → 右键 → Override content');
+            log('   • 修改服务器返回数据');
+            log('   • 调试不同响应状态');
+            log('   • 本地模拟 API 响应');
+            log('');
+
+            log('4️⃣ Replay XHR:');
+            log('   Network → 右键 XHR → Replay XHR');
+            log('   • 重复发送请求');
+            log('   • 对比多次响应');
+            log('');
+
+            log('5️⃣ HAR 导出:');
+            log('   Network → 右键 → Save all as HAR');
+            log('   • 导出所有请求数据');
+            log('   • 分享给他人分析');
+            log('   • 用于性能分析');
+            log('');
+
+            log('6️⃣ WebSocket 调试:');
+            log('   Network → WS → Messages');
+            log('   • 查看 WebSocket 帧');
+            log('   • 查看发送和接收的消息');
+            log('   • 过滤特定消息');
+        }
+
+        function demoPerformanceDebug() {
+            result.innerHTML = '';
+            log('⚡ 性能调试:');
+            log('');
+
+            log('1️⃣ Performance 面板:');
+            log('  录制 → 分析 → 定位瓶颈');
+            log('  关键数据:');
+            log('   • FPS (帧率) — 绿条越高越流畅');
+            log('   • CPU — 占用率');
+            log('   • 网络 — 请求时间线');
+            log('');
+
+            log('2️⃣ 性能分析步骤:');
+            log('   ① 打开 Performance 面板');
+            log('   ② 点击录制 (⚫)');
+            log('   ③ 操作你要分析的页面');
+            log('   ④ 停止录制 (⚫)');
+            log('   ⑤ 分析火焰图 (Flame Chart)');
+            log('   ⑥ 找长任务 (红色标记)');
+            log('');
+
+            log('3️⃣ 火焰图解读:');
+            log('   • 主线程 (Main) — JS 执行时间线');
+            log('   • 任务 (Task) — 每个任务块');
+            log('   • 长任务 (Long task) — >50ms 红色标');
+            log('   • 布局 (Layout) — 紫色');
+            log('   • 绘制 (Paint) — 绿色');
+            log('');
+
+            log('4️⃣ Lighthouse:');
+            log('   Performance 面板 → 或单独运行');
+            log('   评分: 0-100');
+            log('   指标: LCP/FID/CLS/TBT/SI');
+            log('   建议: 给出具体的优化建议');
+            log('');
+
+            log('5️⃣ Coverage (代码覆盖率):');
+            log('   Ctrl+⇧P → Show Coverage');
+            log('   • 查看哪些代码未执行');
+            log('   • 识别未使用的 JS/CSS');
+            log('   • 优化代码分割策略');
+            log('');
+
+            log('6️⃣ Layers (图层):');
+            log('   DevTools → Layers (需开启)');
+            log('   • 查看页面图层 (合成)');
+            log('   • 检查层爆炸 (过多独立层)');
+            log('   • 分析滚动/动画性能');
+        }
+
+        console.log('=== 调试技巧 ===');
+        document.getElementById('output').textContent =
+            `调试技巧: Console高级 / 断点调试 / 网络调试 / Performance / Lighthouse\n` +
+            `✅ 调试技巧演示完成！`;
+    </script>
+</body>
+</html>

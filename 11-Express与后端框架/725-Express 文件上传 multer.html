@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express 文件上传 multer</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📤 Express 文件上传 multer</h2><p>multer 中间件配置、diskStorage vs memoryStorage、单文件/多文件上传、文件类型与大小验证、错误处理、自定义文件名、前端上传配合。</p></div>
+    <div class="card">
+        <h2>multer 基础</h2>
+        <div class="code">// ========== multer 文件上传 ==========
+// HTTP 文件上传通过 multipart/form-data
+// multer 是 Express 最流行的上传中间件
+
+// 安装:
+// npm install multer
+
+const multer = require('multer');
+const path = require('path');
+
+// ========== 磁盘存储 (diskStorage) ==========
+const storage = multer.diskStorage({
+    // 保存目录
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/');
+    },
+    // 文件名 (防止重名)
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, uniqueSuffix + path.extname(file.originalname));
+    },
+});
+
+const upload = multer({
+    storage,
+    limits: {
+        fileSize: 5 * 1024 * 1024,  // 5MB
+    },
+    fileFilter: (req, file, cb) => {
+        const allowed = /jpeg|jpg|png|gif|webp/;
+        const extOk = allowed.test(path.extname(file.originalname).toLowerCase());
+        const mimeOk = allowed.test(file.mimetype);
+
+        if (extOk && mimeOk) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only image files are allowed'));
+        }
+    },
+});
+
+// ========== 单文件上传 ==========
+// 表单字段名: avatar
+app.post('/upload/avatar', upload.single('avatar'), (req, res) => {
+    // req.file 包含上传的文件信息
+    res.success({
+        filename: req.file.filename,
+        url: `/uploads/${req.file.filename}`,
+        size: req.file.size,
+    });
+});
+
+// ========== 多文件上传 ==========
+// 多个相同字段:
+app.post('/upload/photos', upload.array('photos', 10), (req, res) => {
+    // req.files 是文件数组
+    const files = req.files.map(f => ({
+        url: `/uploads/${f.filename}`,
+        size: f.size,
+    }));
+    res.success({ files, count: files.length });
+});
+
+// 多个不同字段:
+app.post('/upload/documents', upload.fields([
+    { name: 'avatar', maxCount: 1 },
+    { name: 'gallery', maxCount: 8 },
+    { name: 'attachment', maxCount: 3 },
+]), (req, res) => {
+    // req.files['avatar'], req.files['gallery'], req.files['attachment']
+    res.success({
+        avatar: req.files['avatar']?.[0]?.filename,
+        gallery: req.files['gallery']?.map(f => f.filename),
+    });
+});
+
+// ========== multer 返回的文件信息 ==========
+// req.file = {
+//   fieldname: 'avatar',
+//   originalname: 'profile.jpg',
+//   encoding: '7bit',
+//   mimetype: 'image/jpeg',
+//   destination: 'uploads/',
+//   filename: '1712345678901-123456789.jpg',
+//   path: 'uploads/1712345678901-123456789.jpg',
+//   size: 102400
+// }</div>
+    </div>
+    <div class="card">
+        <h2>内存存储与 Buffer</h2>
+        <div class="code">// ========== 内存存储 (memoryStorage) ==========
+// 文件不保存到磁盘, 直接操作 Buffer
+// 适用于: 云存储上传 (S3)、图片处理、校验
+
+const memoryUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+// ========== 上传到 S3 (内存流式) ==========
+const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+
+const s3 = new S3Client({
+    region: process.env.AWS_REGION,
+    credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY,
+        secretAccessKey: process.env.AWS_SECRET_KEY,
+    },
+});
+
+app.post('/upload/s3', memoryUpload.single('file'), async (req, res) => {
+    const ext = path.extname(req.file.originalname);
+    const key = `uploads/${Date.now()}${ext}`;
+
+    await s3.send(new PutObjectCommand({
+        Bucket: process.env.S3_BUCKET,
+        Key: key,
+        Body: req.file.buffer,
+        ContentType: req.file.mimetype,
+        ACL: 'public-read',
+    }));
+
+    const url = `https://${process.env.S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
+
+    res.success({
+        url,
+        key,
+        size: req.file.size,
+    });
+});
+
+// ========== Base64 转换 ==========
+app.post('/upload/base64', memoryUpload.single('file'), (req, res) => {
+    const base64 = req.file.buffer.toString('base64');
+    const dataUrl = `data:${req.file.mimetype};base64,${base64}`;
+
+    res.success({
+        dataUrl,
+        size: req.file.size,
+    });
+});
+
+// ========== 文件信息校验 (上传前检查) ==========
+function validateFile(req, file, cb) {
+    // 检查文件签名 (Magic Bytes)
+    // 更安全的文件类型检测
+
+    const allowedMimes = [
+        'image/jpeg',
+        'image/png',
+        'image/gif',
+        'image/webp',
+        'application/pdf',
+        'application/zip',
+    ];
+
+    if (!allowedMimes.includes(file.mimetype)) {
+        return cb(new Error(`File type ${file.mimetype} not allowed`));
+    }
+
+    // 自定义: 通过 buffer 检查魔数
+    // (memoryStorage 配合 fileFilter 可提前读 buffer)
+    cb(null, true);
+}</div>
+    </div>
+    <div class="card">
+        <h2>错误处理</h2>
+        <div class="code">// ========== multer 错误处理 ==========
+// multer 错误需要特殊处理 (不是普通 Express 错误)
+
+// ========== MulterError 类 ==========
+// const MulterError = require('multer').MulterError;
+
+// 错误类型:
+// LIMIT_FILE_SIZE     — 文件太大
+// LIMIT_FILE_COUNT    — 文件数量超限
+// LIMIT_UNEXPECTED_FILE — 字段名不匹配
+// LIMIT_FIELD_KEY     — 字段 key 太长
+// LIMIT_FIELD_VALUE   — 字段值太长
+// LIMIT_FIELD_COUNT   — 字段太多
+// LIMIT_PART_COUNT    — 表单部分太多
+
+// ========== 错误处理中间件 ==========
+app.post('/upload/avatar', (req, res, next) => {
+    upload.single('avatar')(req, res, (err) => {
+        if (err) {
+            if (err instanceof multer.MulterError) {
+                // multer 内部错误
+                switch (err.code) {
+                    case 'LIMIT_FILE_SIZE':
+                        return res.status(413).fail({
+                            message: 'File too large (max 5MB)',
+                            code: 'FILE_TOO_LARGE',
+                        });
+                    case 'LIMIT_FILE_COUNT':
+                        return res.status(400).fail({
+                            message: 'Too many files',
+                            code: 'TOO_MANY_FILES',
+                        });
+                    case 'LIMIT_UNEXPECTED_FILE':
+                        return res.status(400).fail({
+                            message: `Unexpected field: ${err.field}`,
+                            code: 'UNEXPECTED_FIELD',
+                        });
+                    default:
+                        return res.status(400).fail({
+                            message: err.message,
+                            code: 'UPLOAD_ERROR',
+                        });
+                }
+            }
+
+            // 自定义错误 (fileFilter 抛出的)
+            return res.status(400).fail({
+                message: err.message,
+                code: 'VALIDATION_ERROR',
+            });
+        }
+
+        // 上传成功
+        res.success({ url: `/uploads/${req.file.filename}` });
+    });
+});
+
+// ========== 全局上传错误处理 ==========
+// 也可以封装为中间件:
+function uploadHandler(uploadMiddleware) {
+    return (req, res, next) => {
+        uploadMiddleware(req, res, (err) => {
+            if (err) {
+                if (err instanceof multer.MulterError) {
+                    return res.status(413).fail({ message: `Upload error: ${err.message}` });
+                }
+                return res.status(400).fail({ message: err.message });
+            }
+            next();
+        });
+    };
+}
+
+// 使用:
+app.post('/upload/avatar', uploadHandler(upload.single('avatar')), (req, res) => {
+    res.success({ url: `/uploads/${req.file.filename}` });
+});</div>
+    </div>
+    <div class="card">
+        <h2>前端配合</h2>
+        <div class="code">// ========== 前端文件上传 ==========
+
+// ========== 1. HTML Form ==========
+// <form action="/upload/avatar" method="POST" enctype="multipart/form-data">
+//     <input type="file" name="avatar" accept="image/*">
+//     <button type="submit">Upload</button>
+// </form>
+
+// ========== 2. Fetch API (FormData) ==========
+async function uploadFile(file) {
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    const res = await fetch('/upload/avatar', {
+        method: 'POST',
+        body: formData,
+        // 不要设置 Content-Type!
+        // 浏览器会自动设置 multipart/form-data + boundary
+    });
+
+    return res.json();
+}
+
+// ========== 3. 拖拽上传 ==========
+// <div id="dropzone" style="border: 2px dashed #ccc; padding: 40px;">
+//   Drag & drop files here
+// </div>
+
+document.getElementById('dropzone').addEventListener('drop', (e) => {
+    e.preventDefault();
+    const files = e.dataTransfer.files;
+    for (const file of files) {
+        uploadFile(file);
+    }
+});
+
+document.getElementById('dropzone').addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.currentTarget.style.borderColor = '#3498db';
+});
+
+// ========== 4. 上传进度 ==========
+function uploadWithProgress(file, onProgress) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        const formData = new FormData();
+        formData.append('file', file);
+
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const percent = Math.round((e.loaded / e.total) * 100);
+                onProgress(percent);
+            }
+        };
+
+        xhr.onload = () => {
+            if (xhr.status === 200) resolve(JSON.parse(xhr.responseText));
+            else reject(new Error('Upload failed'));
+        };
+
+        xhr.onerror = () => reject(new Error('Network error'));
+
+        xhr.open('POST', '/upload/file');
+        xhr.send(formData);
+    });
+}
+
+// 使用:
+// uploadWithProgress(file, (pct) => {
+//     document.getElementById('progress').style.width = pct + '%';
+// });
+
+// ========== 5. 多文件预览 ==========
+// document.getElementById('file-input').addEventListener('change', (e) => {
+//     const preview = document.getElementById('preview');
+//     preview.innerHTML = '';
+//
+//     for (const file of e.target.files) {
+//         if (file.type.startsWith('image/')) {
+//             const img = document.createElement('img');
+//             img.src = URL.createObjectURL(file);
+//             img.style.maxWidth = '200px';
+//             img.style.margin = '5px';
+//             preview.appendChild(img);
+//         }
+//     }
+// });</div>
+        <div class="note">💡 multer 要点: diskStorage 保存到磁盘; memoryStorage 操作 Buffer (S3/处理); single/array/fields 对应不同上传场景; limits.fileSize 限制大小; fileFilter 过滤类型; MulterError 需单独捕获; 前端用 FormData + fetch 或 XHR 进度; 拖拽上传 (drop/dragover); 图片预览 URL.createObjectURL。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoDisk()">磁盘存储</button>
+        <button onclick="demoMemory()">内存存储</button>
+        <button onclick="demoError()">错误处理</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoDisk() {
+            result.innerHTML = '';
+            log('# multer 磁盘存储');
+            log('');
+            log('const storage = multer.diskStorage({');
+            log('  destination: (req, file, cb) => cb(null, "uploads/"),');
+            log('  filename: (req, file, cb) => {');
+            log('    const name = Date.now() + "-" + Math.random();');
+            log('    cb(null, name + path.extname(file.originalname));');
+            log('  }');
+            log('});');
+            log('');
+            log('upload.single("avatar")   → 单文件');
+            log('upload.array("photos", 10) → 多文件同字段');
+            log('upload.fields([...])       → 多文件异字段');
+        }
+
+        function demoMemory() {
+            result.innerHTML = '';
+            log('# multer 内存存储');
+            log('');
+            log('const upload = multer({');
+            log('  storage: multer.memoryStorage(),');
+            log('  limits: { fileSize: 10 * 1024 * 1024 },');
+            log('});');
+            log('');
+            log('// req.file.buffer 可直接使用');
+            log('// 适用: S3 上传、图片处理、Base64');
+            log('');
+            log('S3 上传:');
+            log('const cmd = new PutObjectCommand({');
+            log('  Bucket, Key,');
+            log('  Body: req.file.buffer,');
+            log('  ContentType: req.file.mimetype,');
+            log('});');
+        }
+
+        function demoError() {
+            result.innerHTML = '';
+            log('# multer 错误处理');
+            log('');
+            log('LIMIT_FILE_SIZE     - 文件太大 (413)');
+            log('LIMIT_FILE_COUNT    - 文件太多 (400)');
+            log('LIMIT_UNEXPECTED_FILE - 字段名错误 (400)');
+            log('');
+            log('模式:');
+            log('upload.single("avatar")(req, res, (err) => {');
+            log('  if (err instanceof multer.MulterError) {');
+            log('    // 处理 multer 内部错误');
+            log('  }');
+            log('  if (err) {');
+            log('    // 处理 fileFilter 自定义错误');
+            log('  }');
+            log('  // 成功处理');
+            log('});');
+        }
+    </script>
+</body>
+</html>

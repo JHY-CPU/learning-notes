@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 并发泄漏检测与调试</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔍 Go 并发泄漏检测与调试</h2><p>goroutine 泄漏模式与检测、pprof 分析、race detector 数据竞争、trace 追踪、debug 工具链、生产环境监控。</p></div>
+    <div class="card">
+        <h2>goroutine 泄漏检测</h2>
+        <div class="code">// ========== goroutine 泄漏模式速查 ==========
+// 1. channel 无人接收 (发送阻塞)
+// 2. channel 无人发送 (接收阻塞)
+// 3. select 全阻塞 (无 default)
+// 4. range channel 未 close
+// 5. ticker 未 Stop
+// 6. goroutine 卡在死循环 (无退出条件)
+// 7. sync.WaitGroup 计数不匹配
+
+// ========== 测试中检测泄漏 ==========
+func TestLeakDetection(t *testing.T) {
+    // 记录开始时的 goroutine 数
+    before := runtime.NumGoroutine()
+
+    // 执行被测代码
+    result := processItems([]int{1, 2, 3})
+    _ = result
+
+    // 等待 goroutine 稳定
+    time.Sleep(100 * time.Millisecond)
+
+    // 检查泄漏
+    after := runtime.NumGoroutine()
+    if after > before {
+        t.Errorf("goroutine 泄漏: %d → %d (+%d)", before, after, after-before)
+    }
+}
+
+// ========== 泄漏检测辅助 ==========
+func AssertNoGoroutineLeak(t *testing.T) func() {
+    before := runtime.NumGoroutine()
+    return func() {
+        t.Helper()
+        // 给 goroutine 时间退出
+        for i := 0; i < 10; i++ {
+            after := runtime.NumGoroutine()
+            if after <= before {
+                return
+            }
+            time.Sleep(100 * time.Millisecond)
+        }
+        after := runtime.NumGoroutine()
+        if after > before {
+            t.Errorf("goroutine 泄漏: %d → %d (+%d)",
+                before, after, after-before)
+        }
+    }
+}
+
+// 使用:
+// func TestXxx(t *testing.T) {
+//     defer AssertNoGoroutineLeak(t)()
+//     // ... 测试代码
+// }
+
+// ========== goroutine 栈信息 ==========
+func dumpGoroutines() {
+    // 获取所有 goroutine 的栈信息
+    buf := make([]byte, 1<<20)  // 1MB
+    n := runtime.Stack(buf, true)  // true = all
+    fmt.Printf("=== goroutine dump ===\n%s\n", buf[:n])
+}
+
+// 生产环境: 通过信号触发 dump
+func init() {
+    go func() {
+        c := make(chan os.Signal, 1)
+        signal.Notify(c, syscall.SIGQUIT)  // Ctrl+\
+        <-c
+        dumpGoroutines()
+        os.Exit(1)
+    }()
+}
+
+// ========== goleak 第三方库 ==========
+// go get go.uber.org/goleak
+
+// func TestWithGoleak(t *testing.T) {
+//     defer goleak.VerifyNone(t)  // 自动检测泄漏
+//     // ... 测试代码
+// }
+
+// 高级用法:
+// func TestIgnoreSpecific(t *testing.T) {
+//     options := []goleak.Option{
+//         goleak.IgnoreTopFunction("main.ignoreMe"),
+//     }
+//     defer goleak.VerifyNone(t, options...)
+// }</div>
+    </div>
+    <div class="card">
+        <h2>race detector 竞态检测</h2>
+        <div class="code">// ========== -race 标志 ==========
+// 编译时插入竞态检测代码
+// 使用:
+// go run -race main.go
+// go build -race -o app
+// go test -race ./...
+// go test -race -count=1 ./...
+
+// ========== 数据竞争示例 ==========
+var shared int
+
+// ❌ 竞态
+func raceExample() {
+    go func() { shared++ }()
+    go func() { shared++ }()
+}
+
+// 输出: WARNING: DATA RACE
+// Write at 0x... by goroutine X:
+//   main.raceExample.func1()
+//
+// Previous write at 0x... by goroutine Y:
+//   main.raceExample.func2()
+
+// ========== 竞态检测的最佳实践 ==========
+// 1. CI 中必加 -race
+// 2. 测试覆盖并发场景
+// 3. -race 会显著降低性能 (5-20x)
+// 4. 生产环境不要用 -race
+
+// CI 配置:
+// go test -race -count=1 -timeout=60s ./...
+
+// ========== 常见竞态修复 ==========
+// 1. 加 Mutex
+var safe int
+var mu sync.Mutex
+
+func safeExample() {
+    go func() {
+        mu.Lock()
+        safe++
+        mu.Unlock()
+    }()
+    go func() {
+        mu.Lock()
+        safe++
+        mu.Unlock()
+    }()
+}
+
+// 2. 用 atomic
+var atomicCounter atomic.Int64
+func atomicExample() {
+    atomicCounter.Add(1)
+}
+
+// 3. 用 channel 通信
+func channelExample() {
+    ch := make(chan int)
+    go func() { ch <- 1 }()
+    go func() { ch <- 2 }()
+    <-ch
+    <-ch
+}
+
+// ========== go tool trace ==========
+// 运行时追踪 goroutine 调度
+
+// 使用:
+// import "runtime/trace"
+// f, _ := os.Create("trace.out")
+// trace.Start(f)
+// defer trace.Stop()
+
+// 分析: go tool trace trace.out
+// 可查看: goroutine 创建/阻塞/网络等待/GC/系统调用
+
+func traceExample() {
+    f, _ := os.Create("trace.out")
+    defer f.Close()
+
+    trace.Start(f)
+    defer trace.Stop()
+
+    // ... 要分析的代码
+}</div>
+    </div>
+    <div class="card">
+        <h2>pprof 性能分析</h2>
+        <div class="code">// ========== net/http/pprof ==========
+// 最常用的性能分析方式
+
+import _ "net/http/pprof"
+
+func pprofServer() {
+    // 在单独的端口暴露 pprof
+    go func() {
+        log.Println(http.ListenAndServe("localhost:6060", nil))
+    }()
+}
+
+// 可查看:
+// /debug/pprof/              — 首页
+// /debug/pprof/goroutine     — goroutine 栈
+// /debug/pprof/heap          — 堆内存
+// /debug/pprof/profile       — CPU 采样 (30s)
+// /debug/pprof/block         — 阻塞分析
+// /debug/pprof/mutex         — 锁竞争
+
+// 命令行分析:
+// go tool pprof http://localhost:6060/debug/pprof/goroutine
+// go tool pprof http://localhost:6060/debug/pprof/heap
+// go tool pprof http://localhost:6060/debug/pprof/profile
+
+// ========== pprof 常用命令 ==========
+// 1. 查看 goroutine:
+// go tool pprof -http=:8080 http://localhost:6060/debug/pprof/goroutine
+// top: 显示最多的 N 个
+// list: 查看函数详情
+// web: 浏览器可视化
+
+// 2. 堆内存分析:
+// go tool pprof -http=:8080 http://localhost:6060/debug/pprof/heap
+
+// 3. CPU 分析:
+// curl -o cpu.pprof http://localhost:6060/debug/pprof/profile?seconds=30
+// go tool pprof -http=:8080 cpu.pprof
+
+// 4. 追踪:
+// curl -o trace.out http://localhost:6060/debug/pprof/trace?seconds=5
+// go tool trace trace.out
+
+// ========== 编程方式使用 pprof ==========
+// runtime/pprof
+
+func cpuProfile() {
+    f, _ := os.Create("cpu.pprof")
+    pprof.StartCPUProfile(f)
+    defer pprof.StopCPUProfile()
+
+    // 需要分析的代码...
+    time.Sleep(30 * time.Second)
+}
+
+func memProfile() {
+    f, _ := os.Create("mem.pprof")
+    runtime.GC()  // 先 GC 再采样
+    pprof.WriteHeapProfile(f)
+    defer f.Close()
+}
+
+// ========== 阻塞与锁分析 ==========
+// 需要先设置采样率:
+func init() {
+    runtime.SetBlockProfileRate(1)    // 所有阻塞事件
+    runtime.SetMutexProfileFraction(1) // 所有锁事件
+}
+
+// 然后通过 pprof 查看:
+// /debug/pprof/block  — 阻塞分析
+// /debug/pprof/mutex  — 锁竞争
+
+// ========== 生产环境注意 ==========
+// 1. pprof 端点不要暴露到外网
+// 2. 用独立端口或认证保护
+// 3. profile 对性能有轻微影响
+// 4. 生产推荐使用 prometheus + grafana</div>
+    </div>
+    <div class="card">
+        <h2>调试技巧</h2>
+        <div class="code">// ========== 调试技巧集合 ==========
+
+// 1. runtime.NumGoroutine() 快速检查
+func quickCheck() {
+    n := runtime.NumGoroutine()
+    if n > 100 {
+        log.Printf("⚠ 大量 goroutine: %d", n)
+    }
+}
+
+// 2. GODEBUG 环境变量
+// GODEBUG=schedtrace=1000 ./app  输出调度器日志
+// GODEBUG=scheddetail=1,schedtrace=1000 ./app 详细调度
+
+// 3. dlv 调试器
+// go install github.com/go-delve/delve/cmd/dlv@latest
+// dlv debug main.go
+// (dlv) break main.go:42
+// (dlv) continue
+// (dlv) goroutines    — 查看所有 goroutine
+// (dlv) goroutine 2  — 切换到 goroutine 2
+// (dlv) bt           — 查看调用栈
+
+// 4. 死锁检测
+// 死锁: 所有 goroutine 都阻塞, 不可恢复
+// Go 运行时自动检测死锁:
+// fatal error: all goroutines are asleep - deadlock!
+
+// 常见死锁场景:
+func deadlockExample() {
+    ch := make(chan int)
+    <-ch  // 阻塞! 没有其他 goroutine 发送
+    // 运行: fatal error: all goroutines are asleep
+}
+
+// 5. 检测长时间运行操作
+func detectSlowOps() {
+    go func() {
+        for {
+            time.Sleep(time.Second)
+            if runtime.NumGoroutine() > 1000 {
+                buf := make([]byte, 1<<16)
+                n := runtime.Stack(buf, true)
+                log.Printf("大量 goroutine:\n%s", buf[:n])
+            }
+        }
+    }()
+}
+
+// ========== 并发调试清单 ==========
+// [ ] go test -race 通过
+// [ ] goroutine 泄漏测试
+// [ ] pprof goroutine 分析 (合理数量)
+// [ ] 超时/取消路径测试
+// [ ] 高并发下的稳定性
+// [ ] 资源释放 (channel close, goroutine exit)
+// [ ] context 传递到所有调用链</div>
+        <div class="note">💡 并发调试要点: go test -race 检测竞态; runtime.NumGoroutine() 检测泄漏; pprof goroutine/heap/profile 分析性能; go tool trace 追踪调度; net/http/pprof (local:6060) 端点; GODEBUG=schedtrace 调度日志; dlv debug goroutine 断点; 死锁 Go 自动检测; 阻塞分析 runtime.SetBlockProfileRate; 生产环境 pprof 端点需保护; CI 必加 -race。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoLeak()">泄漏检测</button>
+        <button onclick="demoRace()">竞态检测</button>
+        <button onclick="demoPprof()">pprof</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoLeak() {
+            result.innerHTML = '';
+            log('# goroutine 泄漏检测');
+            log('');
+            log('泄漏模式:');
+            log('  1. chan 发送/接收阻塞');
+            log('  2. select 全阻塞');
+            log('  3. range chan 未 close');
+            log('  4. ticker 未 Stop');
+            log('  5. WaitGroup 计数不匹配');
+            log('');
+            log('检测:');
+            log('  runtime.NumGoroutine() 前后对比');
+            log('  goleak.VerifyNone(t)');
+            log('  SIGQUIT 触发栈 dump');
+        }
+
+        function demoRace() {
+            result.innerHTML = '';
+            log('# race 竞态检测');
+            log('');
+            log('go test -race ./...');
+            log('');
+            log('输出:');
+            log('  WARNING: DATA RACE');
+            log('  Write at 0x... by goroutine X');
+            log('  Previous write at 0x... by goroutine Y');
+            log('');
+            log('修复:');
+            log('  sync.Mutex, atomic, channel');
+            log('');
+            log('注意:');
+            log('  -race 性能降 5-20x');
+            log('  生产环境不用');
+            log('  CI 中必加!');
+        }
+
+        function demoPprof() {
+            result.innerHTML = '';
+            log('# pprof 性能分析');
+            log('');
+            log('端点 (端口 6060):');
+            log('  /debug/pprof/goroutine');
+            log('  /debug/pprof/heap');
+            log('  /debug/pprof/profile?seconds=30');
+            log('  /debug/pprof/block');
+            log('  /debug/pprof/mutex');
+            log('');
+            log('分析:');
+            log('  go tool pprof url');
+            log('  top, list, web');
+            log('  go tool pprof -http=:8080');
+        }
+    </script>
+</body>
+</html>

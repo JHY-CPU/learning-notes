@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Data JPA 事务与锁</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔒 Spring Data JPA 事务与锁</h2><p>@Transactional 传播行为/隔离级别、悲观锁 @Lock(PESSIMISTIC_WRITE)、乐观锁 @Version、锁异常处理、事务回滚规则。</p></div>
+    <div class="card">
+        <h2>@Transactional 详解</h2>
+        <div class="code">// ========== @Transactional ==========
+// 声明式事务管理
+// 可加在类或方法上
+
+// ========== 核心属性 ==========
+@Service
+@Transactional(readOnly = true)             // 类级别: 所有方法只读
+public class UserService {
+
+    private final UserRepository userRepository;
+
+    // 写操作覆盖为读写事务
+    @Transactional(readOnly = false)
+    public User createUser(User user) {
+        return userRepository.save(user);
+    }
+
+    // ========== propagation (传播行为) ==========
+    @Transactional(propagation = Propagation.REQUIRED)
+    // REQUIRED:     默认, 加入当前事务, 没有则新建 (最常用)
+    // REQUIRES_NEW: 新建事务, 暂停当前事务 (独立提交)
+    // NESTED:       嵌套事务 (Savepoint, 可部分回滚)
+    // MANDATORY:    必须在事务中, 没有则抛异常
+    // SUPPORTS:     有则加入, 没有则非事务执行
+    // NOT_SUPPORTED:非事务执行, 暂停当前事务
+    // NEVER:        不能在事务中, 否则抛异常
+    public void createWithLog() { ... }
+
+    // ========== isolation (隔离级别) ==========
+    @Transactional(isolation = Isolation.READ_COMMITTED)
+    // READ_UNCOMMITTED: 读未提交 (脏读/不可重复读/幻读)
+    // READ_COMMITTED:   读已提交 (不可重复读/幻读) — PostgreSQL 默认
+    // REPEATABLE_READ:  可重复读 (幻读) — MySQL 默认
+    // SERIALIZABLE:     串行化 (最安全/最慢)
+    public void processPayment() { ... }
+
+    // ========== timeout ==========
+    @Transactional(timeout = 30)             // 超时 30 秒
+    public void slowOperation() { ... }
+
+    // ========== rollbackFor ==========
+    @Transactional(rollbackFor = Exception.class)  // 所有异常回滚
+    // 默认: 运行时异常 (RuntimeException) + Error 回滚
+    // 受检异常 (Exception) 默认不回滚!
+    public void transfer() { ... }
+
+    // ========== noRollbackFor ==========
+    @Transactional(noRollbackFor = BusinessWarningException.class)  // 不回滚
+    public void notifyUser() { ... }
+}
+
+// ========== 事务传播示例 ==========
+@Service
+public class OrderService {
+
+    @Transactional
+    public void createOrder(Order order) {
+        orderRepository.save(order);
+        logService.log("创建订单");   // 同一事务
+    }
+}
+
+@Service
+public class LogService {
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    // 独立事务, 即使外层回滚, 日志也会保存
+    public void log(String message) {
+        logRepository.save(new LogEntry(message));
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>悲观锁 @Lock</h2>
+        <div class="code">// ========== 悲观锁 ==========
+// 数据库层面加锁, 防止并发修改
+// 适用: 高竞争, 数据一致性要求极高
+
+// ========== @Lock 注解 ==========
+public interface ProductRepository extends JpaRepository&lt;Product, Long&gt; {
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)  // 排他锁 (SELECT ... FOR UPDATE)
+    @Query("SELECT p FROM Product p WHERE p.id = :id")
+    Optional&lt;Product&gt; findByIdWithLock(@Param("id") Long id);
+
+    @Lock(LockModeType.PESSIMISTIC_READ)   // 共享锁 (SELECT ... LOCK IN SHARE MODE)
+    @Query("SELECT p FROM Product p WHERE p.id = :id")
+    Optional&lt;Product&gt; findByIdWithSharedLock(@Param("id") Long id);
+}
+
+// ========== 使用 ==========
+@Service
+@Transactional                              // 锁需要在事务中
+public class InventoryService {
+
+    private final ProductRepository productRepository;
+
+    // 扣减库存 (防超卖)
+    public void deductStock(Long productId, int quantity) {
+        Product product = productRepository.findByIdWithLock(productId)
+            .orElseThrow(() -> new RuntimeException("商品不存在"));
+
+        if (product.getStock() < quantity) {
+            throw new RuntimeException("库存不足");
+        }
+
+        product.setStock(product.getStock() - quantity);
+        productRepository.save(product);
+        // 事务提交后释放锁
+    }
+}
+
+// ========== 锁模式 ==========
+// PESSIMISTIC_WRITE    — 排他锁 (FOR UPDATE)
+// PESSIMISTIC_READ     — 共享锁 (FOR SHARE / LOCK IN SHARE MODE)
+// OPTIMISTIC           — 乐观锁 (在提交时检查版本)
+// OPTIMISTIC_FORCE_INCREMENT — 乐观锁 + 强制增加版本号
+
+// ========== 超时 ==========
+@Lock(LockModeType.PESSIMISTIC_WRITE)
+@QueryHints({@QueryHint(name = "jakarta.persistence.lock.timeout", value = "3000")})
+// 等待锁超时 3 秒, 超时抛 LockTimeoutException
+Optional&lt;Product&gt; findByIdWithLockTimeout(@Param("id") Long id);
+
+// ========== 注意 ==========
+// 1. 必须运行在 @Transactional 中
+// 2. 锁住的行其他事务无法修改
+// 3. 可能死锁: 确保按固定顺序访问
+// 4. 影响性能: 降低并发</div>
+    </div>
+    <div class="card">
+        <h2>乐观锁 @Version</h2>
+        <div class="code">// ========== 乐观锁 ==========
+// 通过版本号机制, 更新时检查版本
+// 适用: 低竞争, 追求高并发
+
+// ========== @Version 字段 ==========
+@Entity
+public class Product {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+    private Integer stock;
+
+    @Version                                    // 乐观锁版本字段
+    private Long version;                       // int/Integer/long/Long/Date/Timestamp
+}
+
+// 生成的 SQL:
+// UPDATE product SET stock = ?, version = version + 1
+// WHERE id = ? AND version = ?
+// 如果 version 不匹配, 更新 0 行 → 抛 OptimisticLockException
+
+// ========== 冲突处理 ==========
+@Service
+@Transactional
+public class OptimisticInventoryService {
+
+    public void deductStock(Long productId, int quantity) {
+        Product product = productRepository.findById(productId).orElseThrow();
+
+        if (product.getStock() < quantity) {
+            throw new RuntimeException("库存不足");
+        }
+
+        product.setStock(product.getStock() - quantity);
+        // 提交时自动检查 version
+        // 如果被其他事务修改了, 抛 OptimisticLockException
+    }
+
+    // 重试机制
+    public void deductStockWithRetry(Long productId, int quantity) {
+        int retries = 3;
+        while (retries > 0) {
+            try {
+                deductStock(productId, quantity);
+                return;                      // 成功退出
+            } catch (OptimisticLockException e) {
+                retries--;
+                if (retries == 0) throw e;
+                // 重新读取最新数据重试
+                productRepository.clear();   // 清空缓存
+            }
+        }
+    }
+}
+
+// ========== 悲观锁 vs 乐观锁 ==========
+// ┌──────────┬──────────────────┬─────────────────────┐
+// │          │ 悲观锁           │ 乐观锁               │
+// ├──────────┼──────────────────┼─────────────────────┤
+// │ 原理     │ 数据库行锁       │ 版本号检测           │
+// │ 冲突     │ 等待/死锁         │ 抛异常+重试          │
+// │ 并发度   │ 低               │ 高                   │
+// │ 适用场景 │ 高竞争 + 短事务  │ 低竞争 + 长事务      │
+// │ 性能     │ 锁开销           │ 重试开销             │
+// │ 实现     │ @Lock(PESSIMISTIC)│ @Version             │
+// │ 数据库   │ 所有             │ 所有                 │
+// └──────────┴──────────────────┴─────────────────────┘</div>
+    </div>
+    <div class="card">
+        <h2>事务隔离级别与问题</h2>
+        <div class="code">// ========== 事务并发问题 ==========
+
+// ========== 1. 脏读 (Dirty Read) ==========
+// 事务 A 读到事务 B 未提交的数据
+// 如果 B 回滚, A 读到无效数据
+// → READ_COMMITTED 可避免
+
+// ========== 2. 不可重复读 (Non-Repeatable Read) ==========
+// 事务 A 两次读取同一条记录, 结果不同
+// 因为事务 B 在中间修改了数据
+// → REPEATABLE_READ 可避免
+
+// ========== 3. 幻读 (Phantom Read) ==========
+// 事务 A 两次查询同一范围, 行数不同
+// 因为事务 B 在中间插入/删除了数据
+// → SERIALIZABLE 可避免 (MySQL REPEATABLE_READ 用 MVCC 避免)
+
+// ========== 隔离级别对照 ==========
+// ┌──────────────────┬──────┬──────────┬───────┐
+// │ 隔离级别         │ 脏读 │ 不可重复 │ 幻读  │
+// ├──────────────────┼──────┼──────────┼───────┤
+// │ READ_UNCOMMITTED │ 可能 │ 可能     │ 可能  │
+// │ READ_COMMITTED   │  -   │ 可能     │ 可能  │
+// │ REPEATABLE_READ  │  -   │  -       │ 可能  │
+// │ SERIALIZABLE     │  -   │  -       │  -    │
+// └──────────────────┴──────┴──────────┴───────┘
+
+// ========== 数据库默认隔离级别 ==========
+// MySQL:  REPEATABLE_READ
+// PostgreSQL: READ_COMMITTED
+// Oracle: READ_COMMITTED
+
+// ========== @Transactional 隔离级别配置 ==========
+@Transactional(isolation = Isolation.READ_COMMITTED)
+public void safeOperation() { ... }
+
+// ========== 只读事务优化 ==========
+@Transactional(readOnly = true)
+// 数据库可优化查询 (如 PostgreSQL 省略锁)
+// Hibernate 可省略脏检查 (性能提升)
+public List&lt;User&gt; findAll() { ... }</div>
+    </div>
+    <div class="card">
+        <h2>最佳实践</h2>
+        <div class="code">// ========== 事务最佳实践 ==========
+
+// ========== 1. 事务尽量小 ==========
+// 只在写操作处加事务
+// 不要在事务中执行耗时操作 (HTTP 请求, 文件读写)
+
+// ❌ 错误:
+@Transactional
+public void process() {
+    callExternalApi();      // 耗时, 占用数据库连接
+    saveToDatabase();
+}
+
+// ✅ 正确:
+public void process() {
+    String data = callExternalApi();    // 非事务
+    saveToDatabase(data);               // 事务
+}
+
+// ========== 2. 只读事务 ==========
+// 查询方法加 @Transactional(readOnly = true)
+// 部分数据库可优化
+
+// ========== 3. REQUIRES_NEW 谨慎使用 ==========
+// 创建独立事务, 消耗连接
+// 频繁使用可能导致连接池耗尽
+
+// ========== 4. 锁的选择 ==========
+// 低竞争 → 乐观锁 (@Version + 重试)
+// 高竞争 → 悲观锁 (@Lock)
+// 库存/余额 → 悲观锁 (准确 > 性能)
+
+// ========== 5. 锁超时 ==========
+// 设置合理的锁超时时间
+// 避免长时间等待锁
+
+// ========== 6. 事务不回滚 ==========
+// 受检异常默认不回滚!
+@Transactional(rollbackFor = Exception.class)
+
+// ========== 7. 事务 + 缓存 ==========
+// 事务提交后再清除缓存 (避免读取脏数据)
+@Transactional
+public void updateUser(User user) {
+    userRepository.save(user);
+    cacheManager.evict("users", user.getId());  // 事务提交后清理缓存
+}
+
+// ========== 8. 自调用问题 ==========
+// 类内部 @Transactional 方法调用不会生效 (不走代理)
+// 需要注入自身或使用 TransactionTemplate</div>
+        <div class="note">💡 事务与锁要点: @Transactional propagation+isolation+rollbackFor; 悲观锁 @Lock PESSIMISTIC_WRITE (FOR UPDATE); 乐观锁 @Version 字段; READ_COMMITTED 大多数场景; 事务尽量短小; 只读事务用 readOnly=true; 受检异常不回滚需显式指定; 锁超时避免死锁。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoTx()">事务属性</button>
+        <button onclick="demoPessimistic()">悲观锁</button>
+        <button onclick="demoOptimistic()">乐观锁</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoTx() {
+            result.innerHTML = '';
+            log('# @Transactional');
+            log('');
+            log('propagation (传播):');
+            log('  REQUIRED — 加入/新建 (默认)');
+            log('  REQUIRES_NEW — 独立事务');
+            log('');
+            log('isolation (隔离):');
+            log('  READ_COMMITTED — 常用');
+            log('  REPEATABLE_READ — MySQL 默认');
+            log('');
+            log('rollbackFor:');
+            log('  默认只回滚 RuntimeException');
+        }
+
+        function demoPessimistic() {
+            result.innerHTML = '';
+            log('# 悲观锁 @Lock');
+            log('');
+            log('@Lock(PESSIMISTIC_WRITE)');
+            log('  SELECT ... FOR UPDATE');
+            log('  适合: 高竞争, 库存/余额');
+            log('');
+            log('注意:');
+            log('  必须事务中');
+            log('  可能死锁');
+            log('  影响并发性能');
+        }
+
+        function demoOptimistic() {
+            result.innerHTML = '';
+            log('# 乐观锁 @Version');
+            log('');
+            log('字段: @Version private Long version;');
+            log('');
+            log('原理:');
+            log('  UPDATE ... WHERE id=? AND version=?');
+            log('  version 不匹配 → OptimisticLockException');
+            log('');
+            log('适合: 低竞争, 高并发');
+            log('冲突时: 重试 (re-read + retry)');
+        }
+    </script>
+</body>
+</html>

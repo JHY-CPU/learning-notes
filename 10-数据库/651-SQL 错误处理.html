@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 错误处理</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚠️ SQL 错误处理</h2><p>MySQL 错误码、SIGNAL/RESIGNAL 自定义错误、DECLARE HANDLER 异常处理、GET DIAGNOSTICS、存储过程错误处理、事务回滚策略、应用层错误处理。</p></div>
+    <div class="card">
+        <h2>MySQL 错误码</h2>
+        <div class="code">// ========== 常见错误码 ==========
+-- MySQL 使用 SQLSTATE (5位) + 错误号
+
+-- 常见错误:
+-- 1045: 拒绝访问 (Access denied)
+-- 1046: 没有选择数据库
+-- 1048: 列不能为 NULL
+-- 1054: 未知列
+-- 1062: 唯一键冲突 (Duplicate entry)
+-- 1146: 表不存在
+-- 1205: 锁等待超时 (Lock wait timeout)
+-- 1213: 死锁 (Deadlock)
+-- 1451: 外键约束失败
+-- 2002: 连接拒绝
+
+-- 查看错误:
+SHOW ERRORS;
+SHOW WARNINGS;
+GET DIAGNOSTICS;  -- MySQL 5.6+
+
+-- ========== 错误处理语法 ==========
+
+-- DECLARE ... HANDLER 语法:
+-- DECLARE action HANDLER FOR condition_value statement;
+
+-- action: CONTINUE | EXIT | UNDO
+-- condition_value: SQLSTATE | MySQL error code | condition name
+
+-- 1. CONTINUE: 继续执行
+-- 2. EXIT: 退出当前程序块
+-- 3. UNDO: 不支持
+
+-- ========== 基本错误处理 ==========
+
+DELIMITER $$
+
+CREATE PROCEDURE insert_user(IN p_name VARCHAR(50), IN p_email VARCHAR(100))
+BEGIN
+    DECLARE EXIT HANDLER FOR 1062  -- 唯一键冲突
+    BEGIN
+        SELECT CONCAT('Duplicate email: ', p_email) AS error;
+        ROLLBACK;
+    END;
+
+    DECLARE EXIT HANDLER FOR 1048  -- NOT NULL 违例
+    BEGIN
+        SELECT 'Name or email cannot be NULL' AS error;
+        ROLLBACK;
+    END;
+
+    START TRANSACTION;
+    INSERT INTO users (name, email) VALUES (p_name, p_email);
+    COMMIT;
+    SELECT 'User inserted successfully' AS result;
+END$$
+
+DELIMITER ;</div>
+    </div>
+    <div class="card">
+        <h2>SIGNAL / RESIGNAL</h2>
+        <div class="code">// ========== SIGNAL ==========
+-- SIGNAL: 主动抛出错误
+-- 可用于存储过程中验证数据
+
+-- 1. 基本 SIGNAL
+DELIMITER $$
+
+CREATE PROCEDURE update_price(IN p_id INT, IN p_price DECIMAL(10,2))
+BEGIN
+    IF p_price < 0 THEN
+        SIGNAL SQLSTATE '45000'
+            SET MESSAGE_TEXT = 'Price cannot be negative';
+    END IF;
+
+    IF p_price > 100000 THEN
+        SIGNAL SQLSTATE '45001'
+            SET MESSAGE_TEXT = 'Price exceeds maximum allowed';
+    END IF;
+
+    UPDATE products SET price = p_price WHERE id = p_id;
+END$$
+
+DELIMITER ;
+
+-- 2. SIGNAL 带多个属性
+SIGNAL SQLSTATE '45000'
+    SET MESSAGE_TEXT = 'Validation error',
+        MYSQL_ERRNO = 1001,
+        TABLE_NAME = 'products';
+
+-- 3. RESIGNAL: 重新抛出错误 (在 handler 中)
+DELIMITER $$
+
+CREATE PROCEDURE process_order(IN p_order_id INT)
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        -- 记录日志
+        INSERT INTO error_log (message, occurred_at)
+        VALUES ('Error processing order', NOW());
+
+        -- 重新抛出
+        RESIGNAL;
+    END;
+
+    -- 业务逻辑...
+    UPDATE orders SET status = 'processed' WHERE id = p_order_id;
+END$$
+
+DELIMITER ;
+
+-- ========== 自定义错误码 ==========
+-- SQLSTATE: 5 位编码
+-- 以 '45' 开头的 SQLSTATE 是应用程序错误
+-- '45000' - '45999': 自定义错误范围
+
+-- IF condition THEN
+--     SIGNAL SQLSTATE '45000'
+--         SET MESSAGE_TEXT = 'Custom error message';
+-- END IF;</div>
+    </div>
+    <div class="card">
+        <h2>GET DIAGNOSTICS</h2>
+        <div class="code">// ========== GET DIAGNOSTICS ==========
+-- 获取错误详细信息
+
+-- 1. 获取影响行数
+GET DIAGNOSTICS @rows = ROW_COUNT;
+SELECT @rows AS affected_rows;
+
+-- 2. 获取错误信息
+DELIMITER $$
+
+CREATE PROCEDURE safe_insert(IN p_name VARCHAR(50))
+BEGIN
+    DECLARE EXIT HANDLER FOR SQLEXCEPTION
+    BEGIN
+        GET DIAGNOSTICS CONDITION 1
+            @errno = MYSQL_ERRNO,
+            @sqlstate = RETURNED_SQLSTATE,
+            @message = MESSAGE_TEXT;
+
+        SELECT
+            @errno AS error_number,
+            @sqlstate AS sql_state,
+            @message AS error_message;
+
+        ROLLBACK;
+    END;
+
+    START TRANSACTION;
+    INSERT INTO users (name) VALUES (p_name);
+    COMMIT;
+END$$
+
+DELIMITER ;
+
+-- ========== 应用层错误处理 (Python) ==========
+-- import mysql.connector
+-- from mysql.connector import Error
+--
+-- try:
+--     connection = mysql.connector.connect(...)
+--     cursor = connection.cursor()
+--
+--     cursor.execute("INSERT INTO users (name) VALUES (%s)", ("Alice",))
+--     connection.commit()
+--
+-- except mysql.connector.Error as err:
+--     print(f"Error: {err}")
+--     print(f"Error Code: {err.errno}")
+--     print(f"SQLSTATE: {err.sqlstate}")
+--     connection.rollback()
+--
+-- finally:
+--     if connection.is_connected():
+--         cursor.close()
+--         connection.close()
+
+-- ========== 事务回滚策略 ==========
+-- 1. 出现错误 → 回滚整个事务
+-- 2. 使用 SAVEPOINT → 部分回滚
+-- 3. 应用层死锁重试 (最多 3 次)</div>
+        <div class="note">💡 错误处理: DECLARE HANDLER 捕获错误; SIGNAL 主动抛错; RESIGNAL 重新抛出; GET DIAGNOSTICS 获取详情; 错误码: 1062 唯一冲突, 1213 死锁, 1451 外键; 应用层捕获并处理错误。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoHandler()">错误处理演示</button>
+        <button onclick="demoSignal()">SIGNAL 演示</button>
+        <button onclick="demoApp()">应用层处理</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoHandler() {
+            result.innerHTML = '';
+            log('# DECLARE HANDLER');
+            log('');
+            log("DECLARE EXIT HANDLER FOR 1062  -- 唯一冲突");
+            log("BEGIN");
+            log("    SELECT 'Duplicate entry' AS error;");
+            log("    ROLLBACK;");
+            log("END;");
+            log('');
+            log("DECLARE CONTINUE HANDLER FOR NOT FOUND");
+            log("    SET done = TRUE;");
+        }
+
+        function demoSignal() {
+            result.innerHTML = '';
+            log('# SIGNAL / RESIGNAL');
+            log('');
+            log("IF price < 0 THEN");
+            log("    SIGNAL SQLSTATE '45000'");
+            log("    SET MESSAGE_TEXT = 'Price must be >= 0';");
+            log("END IF;");
+            log('');
+            log('SQLSTATE 45000 = 自定义错误');
+            log('RESIGNAL = 在 handler 中重抛');
+        }
+
+        function demoApp() {
+            result.innerHTML = '';
+            log('# 应用层错误处理');
+            log('');
+            log('try:');
+            log('    cursor.execute("INSERT ...")');
+            log('    connection.commit()');
+            log('except Error as err:');
+            log('    if err.errno == 1062:');
+            log("        print('Duplicate entry')");
+            log('    elif err.errno == 1213:');
+            log("        print('Deadlock, retrying...')");
+            log('    connection.rollback()');
+        }
+    </script>
+</body>
+</html>

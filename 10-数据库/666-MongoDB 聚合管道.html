@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MongoDB 聚合管道</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔧 MongoDB 聚合管道</h2><p>聚合管道概念、$match/$group/$sort/$project/$limit/$skip 过滤转换、$lookup (JOIN)、$unwind 数组展开、$bucket/$facet 高级聚合、聚合优化。</p></div>
+    <div class="card">
+        <h2>聚合管道基础</h2>
+        <div class="code">// ========== 聚合管道 ==========
+// 数据通过多个阶段处理, 每个阶段的输出是下阶段的输入
+// 类似 Unix 管道: db.collection.aggregate([stage1, stage2, ...])
+
+// ========== 示例数据 ==========
+// 订单集合
+db.orders.insertMany([
+    { _id: 1, user: "Alice", items: ["book", "pen"], total: 299, status: "completed", date: ISODate("2024-01-15") },
+    { _id: 2, user: "Bob", items: ["bag"], total: 150, status: "completed", date: ISODate("2024-01-16") },
+    { _id: 3, user: "Alice", items: ["pen", "eraser"], total: 50, status: "pending", date: ISODate("2024-02-01") },
+    { _id: 4, user: "Carol", items: ["book", "bag", "pen"], total: 499, status: "completed", date: ISODate("2024-02-10") },
+    { _id: 5, user: "Bob", items: ["book"], total: 99, status: "cancelled", date: ISODate("2024-02-20") }
+])
+
+// ========== 基础管道 ==========
+
+// $match — 过滤 (类似 WHERE)
+db.orders.aggregate([
+    { $match: { status: "completed" } }
+])
+
+// $group — 分组 (类似 GROUP BY)
+db.orders.aggregate([
+    {
+        $group: {
+            _id: "$user",                    // 按 user 分组
+            total_spent: { $sum: "$total" }, // 总和
+            order_count: { $sum: 1 },        // 计数
+            avg_amount: { $avg: "$total" },  // 平均数
+            max_amount: { $max: "$total" },  // 最大值
+            min_amount: { $min: "$total" }   // 最小值
+        }
+    }
+])
+
+// ========== 组合管道 ==========
+
+// 每个用户已完成订单的总金额 (降序)
+db.orders.aggregate([
+    { $match: { status: "completed" } },          // 先过滤
+    {
+        $group: {                                   // 再分组
+            _id: "$user",
+            total_spent: { $sum: "$total" },
+            order_count: { $sum: 1 }
+        }
+    },
+    { $sort: { total_spent: -1 } },                // 排序
+    { $limit: 5 }                                  // Top 5
+])</div>
+    </div>
+    <div class="card">
+        <h2>$project 与 $sort</h2>
+        <div class="code">// ========== $project (投影/转换) ==========
+
+// 选择/重命名字段
+db.orders.aggregate([
+    {
+        $project: {
+            _id: 0,                     // 隐藏 _id
+            customer: "$user",          // 重命名 user → customer
+            amount: "$total",
+            status: 1,                  // 1 = 包含
+            item_count: { $size: "$items" }  // 计算数组长度
+        }
+    }
+])
+
+// 日期提取
+db.orders.aggregate([
+    {
+        $project: {
+            user: 1,
+            total: 1,
+            year: { $year: "$date" },
+            month: { $month: "$date" },
+            dayOfWeek: { $dayOfWeek: "$date" },
+            quarter: { $ceil: { $divide: [{ $month: "$date" }, 3] } }
+        }
+    }
+])
+
+// 条件字段
+db.orders.aggregate([
+    {
+        $project: {
+            user: 1,
+            total: 1,
+            category: {
+                $switch: {
+                    branches: [
+                        { case: { $gte: ["$total", 200] }, then: "high" },
+                        { case: { $gte: ["$total", 100] }, then: "medium" }
+                    ],
+                    default: "low"
+                }
+            }
+        }
+    }
+])
+
+// ========== $sort (排序) ==========
+
+db.orders.aggregate([
+    { $sort: { total: -1, user: 1 } }  // total 降序, user 升序
+])
+
+// 大集合排序建议: 在 $match 之后排, 减少排序数据量</div>
+    </div>
+    <div class="card">
+        <h2>$lookup 与 $unwind</h2>
+        <div class="code">// ========== $lookup (左外连接, 类似 LEFT JOIN) ==========
+
+// 订单 + 用户详情
+db.orders.aggregate([
+    {
+        $lookup: {
+            from: "users",                 // 关联集合
+            localField: "user",            // 当前集合字段
+            foreignField: "name",          // 关联集合字段
+            as: "user_info"                // 结果数组字段名
+        }
+    },
+    { $unwind: "$user_info" }             // 展开数组
+])
+
+// 结果:
+// {
+//   _id: 1, user: "Alice", total: 299,
+//   user_info: { _id: ..., name: "Alice", email: "..." }
+// }
+
+// ========== $lookup + pipeline ==========
+// 更灵活的关联, 可以加条件
+
+db.orders.aggregate([
+    {
+        $lookup: {
+            from: "reviews",
+            let: { user_name: "$user" },
+            pipeline: [
+                { $match: {
+                    $expr: { $eq: ["$author", "$$user_name"] }
+                }},
+                { $limit: 5 }
+            ],
+            as: "recent_reviews"
+        }
+    }
+])
+
+// ========== $unwind (数组展开) ==========
+
+// 展开 items 数组, 每个元素一行
+db.orders.aggregate([
+    { $unwind: "$items" }
+])
+// _id:1, user:Alice, items:"book"
+// _id:1, user:Alice, items:"pen"
+// _id:2, user:Bob, items:"bag"
+
+// 保留空数组 (设置 preserveNullAndEmptyArrays)
+db.orders.aggregate([
+    {
+        $unwind: {
+            path: "$items",
+            preserveNullAndEmptyArrays: true
+        }
+    }
+])
+
+// 实践: 商品销售统计
+db.orders.aggregate([
+    { $match: { status: "completed" } },
+    { $unwind: "$items" },
+    {
+        $group: {
+            _id: "$items",
+            total_sold: { $sum: 1 },
+            revenue: { $sum: "$total" }
+        }
+    },
+    { $sort: { total_sold: -1 } }
+])</div>
+    </div>
+    <div class="card">
+        <h2>高级聚合: $bucket/$facet</h2>
+        <div class="code">// ========== $bucket (分箱/直方图) ==========
+
+db.orders.aggregate([
+    {
+        $bucket: {
+            groupBy: "$total",
+            boundaries: [0, 100, 200, 500, 1000],  // 区间
+            default: "Other",
+            output: {
+                count: { $sum: 1 },
+                avg: { $avg: "$total" }
+            }
+        }
+    }
+])
+
+// ========== $facet (多面聚合) ==========
+// 在同一管道中产生多个聚合结果
+
+db.orders.aggregate([
+    {
+        $facet: {
+            // 状态统计
+            by_status: [
+                { $group: { _id: "$status", count: { $sum: 1 } } }
+            ],
+            // 价格区间
+            by_price: [
+                {
+                    $bucket: {
+                        groupBy: "$total",
+                        boundaries: [0, 100, 500],
+                        output: { count: { $sum: 1 } }
+                    }
+                }
+            ],
+            // 总统计
+            stats: [
+                {
+                    $group: {
+                        _id: null,
+                        total_orders: { $sum: 1 },
+                        total_revenue: { $sum: "$total" },
+                        avg_order: { $avg: "$total" }
+                    }
+                }
+            ]
+        }
+    }
+])
+
+// ========== 聚合优化建议 ==========
+// 1. $match 和 $limit 尽量放前面, 减少数据量
+// 2. $match 能用索引 (使用索引字段过滤)
+// 3. $project 去除不需要的字段
+// 4. 大集合避免 $unwind (数据膨胀)
+// 5. $lookup 关联集合要建索引
+// 6. 用 allowDiskUse 突破内存限制
+
+// 大聚合使用磁盘:
+db.orders.aggregate(
+    [ ... stages ... ],
+    { allowDiskUse: true }
+)</div>
+        <div class="note">💡 聚合要点: 管道按阶段顺序执行; $match 先过滤; $group 分组统计; $project 转换字段; $lookup 做 JOIN; $unwind 展开数组; $bucket 分箱统计; $facet 多维度聚合; 尽量把 $match 放前面减少数据量。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoBasic()">基础聚合</button>
+        <button onclick="demoLookup()">Lookup JOIN</button>
+        <button onclick="demoFacet()">高级聚合</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoBasic() {
+            result.innerHTML = '';
+            log('# 基础聚合');
+            log('');
+            log('db.orders.aggregate([');
+            log('  { $match: { status: "completed" } },');
+            log('  { $group: {');
+            log('    _id: "$user",');
+            log('    total: { $sum: "$total" }');
+            log('  }},');
+            log('  { $sort: { total: -1 } }');
+            log('])');
+        }
+
+        function demoLookup() {
+            result.innerHTML = '';
+            log('# $lookup (JOIN)');
+            log('');
+            log('db.orders.aggregate([{');
+            log('  $lookup: {');
+            log('    from: "users",');
+            log('    localField: "user",');
+            log('    foreignField: "name",');
+            log('    as: "user_info"');
+            log('  }');
+            log('}])');
+            log('');
+            log('类似 SQL LEFT JOIN');
+        }
+
+        function demoFacet() {
+            result.innerHTML = '';
+            log('# $facet 多面聚合');
+            log('');
+            log('一次查询返回多个结果');
+            log('');
+            log('{ $facet: {');
+            log('  by_status: [...],');
+            log('  by_price: [...],');
+            log('  stats: [...]');
+            log('}}');
+            log('');
+            log('替代多次查询!');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas动画</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        canvas { border: 1px solid #ddd; margin: 10px 0; background: white; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Canvas 动画</h2><p>rAF 循环、粒子系统、运动轨迹、碰撞检测、性能优化。</p></div>
+    <div class="card">
+        <h2>Canvas 动画模式</h2>
+        <div class="code">// ========== requestAnimationFrame 循环 ==========
+function animate() {
+    ctx.clearRect(0, 0, width, height);
+    // 更新状态
+    // 绘制
+    requestAnimationFrame(animate);
+}
+animate();
+
+// ========== FPS 控制 ==========
+let lastTime = 0;
+const FPS = 60;
+const interval = 1000 / FPS;
+
+function animate(time) {
+    const delta = time - lastTime;
+    if (delta >= interval) {
+        // 更新和绘制
+        lastTime = time - (delta % interval);
+    }
+    requestAnimationFrame(animate);
+}
+
+// ========== 动画对象 ==========
+class Particle {
+    constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 4;
+        this.vy = (Math.random() - 0.5) * 4;
+        this.size = Math.random() * 5 + 2;
+        this.color = `hsl(${Math.random() * 360}, 80%, 60%)`;
+    }
+    update() { this.x += this.vx; this.y += this.vy; }
+    draw(ctx) { ctx.fillRect(this.x, this.y, this.size, this.size); }
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：Canvas 动画</h2>
+        <button onclick="demoBounce()">弹跳球</button>
+        <button onclick="demoClock()">时钟动画</button>
+        <button onclick="demoParticles()">粒子系统</button>
+        <button onclick="demoPerformance()">性能优化</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <canvas id="canvas" width="400" height="300"></canvas>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        let animId = null;
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function stopAnim() { if (animId) { cancelAnimationFrame(animId); animId = null; } }
+
+        // ========== 弹跳球 ==========
+        function demoBounce() {
+            stopAnim();
+            result.innerHTML = '';
+            log('🏀 弹跳球动画:');
+            log('');
+
+            const ball = {
+                x: 50, y: 50, r: 15,
+                vx: 3, vy: 2,
+                color: '#3498db'
+            };
+
+            log('1️⃣ 更新逻辑:');
+            log('   x += vx; y += vy;');
+            log('   碰撞边界时反转速度');
+            log('');
+
+            let frameCount = 0;
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // 更新
+                ball.x += ball.vx;
+                ball.y += ball.vy;
+                if (ball.x + ball.r > canvas.width || ball.x - ball.r < 0) ball.vx *= -1;
+                if (ball.y + ball.r > canvas.height || ball.y - ball.r < 0) ball.vy *= -1;
+
+                // 绘制
+                ctx.beginPath();
+                ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+                ctx.fillStyle = ball.color;
+                ctx.fill();
+                ctx.strokeStyle = '#2c3e50';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                frameCount++;
+                if (frameCount <= 3) {
+                    log(`   帧 ${frameCount}: 位置 (${Math.round(ball.x)}, ${Math.round(ball.y)})`);
+                }
+
+                animId = requestAnimationFrame(animate);
+            }
+            animate();
+
+            setTimeout(() => log('   ✅ 动画正在运行...'), 100);
+        }
+
+        // ========== 时钟动画 ==========
+        function demoClock() {
+            stopAnim();
+            result.innerHTML = '';
+            log('🕐 时钟动画:');
+            log('');
+
+            function drawClock() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#f8f9fa';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                const centerX = 200, centerY = 150, radius = 100;
+
+                // 表盘
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+                ctx.fillStyle = 'white';
+                ctx.fill();
+                ctx.strokeStyle = '#333';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                // 刻度
+                for (let i = 0; i < 12; i++) {
+                    const angle = (i * 30 - 90) * Math.PI / 180;
+                    const outer = radius - 10;
+                    const inner = i % 3 === 0 ? radius - 20 : radius - 15;
+                    ctx.beginPath();
+                    ctx.moveTo(centerX + outer * Math.cos(angle), centerY + outer * Math.sin(angle));
+                    ctx.lineTo(centerX + inner * Math.cos(angle), centerY + inner * Math.sin(angle));
+                    ctx.lineWidth = i % 3 === 0 ? 3 : 1;
+                    ctx.stroke();
+                }
+
+                // 指针
+                const now = new Date();
+                const hours = now.getHours() % 12;
+                const mins = now.getMinutes();
+                const secs = now.getSeconds();
+
+                // 时针
+                const hourAngle = (hours * 30 + mins * 0.5 - 90) * Math.PI / 180;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(centerX + 50 * Math.cos(hourAngle), centerY + 50 * Math.sin(hourAngle));
+                ctx.lineWidth = 5;
+                ctx.stroke();
+
+                // 分针
+                const minAngle = (mins * 6 - 90) * Math.PI / 180;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(centerX + 70 * Math.cos(minAngle), centerY + 70 * Math.sin(minAngle));
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                // 秒针
+                const secAngle = (secs * 6 - 90) * Math.PI / 180;
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.lineTo(centerX + 80 * Math.cos(secAngle), centerY + 80 * Math.sin(secAngle));
+                ctx.lineWidth = 1;
+                ctx.strokeStyle = '#e74c3c';
+                ctx.stroke();
+                ctx.strokeStyle = '#333';
+
+                // 中心点
+                ctx.beginPath();
+                ctx.arc(centerX, centerY, 4, 0, Math.PI * 2);
+                ctx.fillStyle = '#333';
+                ctx.fill();
+
+                animId = requestAnimationFrame(drawClock);
+            }
+
+            drawClock();
+            log('   当前时间: ' + new Date().toLocaleTimeString());
+            log('   时针/分针/秒针实时更新');
+        }
+
+        // ========== 粒子系统 ==========
+        function demoParticles() {
+            stopAnim();
+            result.innerHTML = '';
+            log('✨ 粒子系统:');
+            log('');
+
+            const particles = [];
+            const particleCount = 60;
+
+            for (let i = 0; i < particleCount; i++) {
+                particles.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    vx: (Math.random() - 0.5) * 2,
+                    vy: (Math.random() - 0.5) * 2,
+                    r: Math.random() * 4 + 2,
+                    color: `hsl(${Math.random() * 360}, 80%, 60%)`,
+                    alpha: Math.random() * 0.5 + 0.5,
+                });
+            }
+
+            log(`   创建 ${particleCount} 个粒子`);
+            log('   每个粒子: 位置/速度/大小/颜色/透明度');
+            log('');
+
+            let fe = 0;
+            function animate() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = '#0a0a1a';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                for (const p of particles) {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    if (p.x < 0 || p.x > canvas.width) p.vx *= -1;
+                    if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = p.color;
+                    ctx.globalAlpha = p.alpha;
+                    ctx.fill();
+                }
+                ctx.globalAlpha = 1;
+
+                // 连线 (距离近的粒子之间)
+                for (let i = 0; i < particles.length; i++) {
+                    for (let j = i + 1; j < particles.length; j++) {
+                        const dx = particles[i].x - particles[j].x;
+                        const dy = particles[i].y - particles[j].y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        if (dist < 80) {
+                            ctx.beginPath();
+                            ctx.moveTo(particles[i].x, particles[i].y);
+                            ctx.lineTo(particles[j].x, particles[j].y);
+                            ctx.strokeStyle = `rgba(255,255,255,${0.2 * (1 - dist / 80)})`;
+                            ctx.lineWidth = 0.5;
+                            ctx.stroke();
+                        }
+                    }
+                }
+
+                fe++;
+                if (fe <= 2) log('   粒子在运动并相互连线');
+
+                animId = requestAnimationFrame(animate);
+            }
+            animate();
+        }
+
+        // ========== 性能优化 ==========
+        function demoPerformance() {
+            stopAnim();
+            result.innerHTML = '';
+            log('⚡ Canvas 性能优化:');
+            log('');
+
+            log('1️⃣ requestAnimationFrame:');
+            log('   • 浏览器自动优化 (与 VSync 同步)');
+            log('   • 标签页不可用时暂停');
+            log('   • 比 setInterval 更平滑');
+            log('');
+
+            log('2️⃣ 离屏 Canvas (OffscreenCanvas):');
+            log('   const offscreen = new OffscreenCanvas(w, h);');
+            log('   const offCtx = offscreen.getContext("2d");');
+            log('   // 在离屏 Canvas 上绘制');
+            log('   ctx.drawImage(offscreen, 0, 0);');
+            log('');
+
+            log('3️⃣ 脏矩形 (只重绘变化区域):');
+            log('   ctx.clearRect(x, y, w, h);  // 只清除变化区域');
+            log('   避免 clearRect(0, 0, W, H) 全屏清除');
+            log('');
+
+            log('4️⃣ 避免频繁状态切换:');
+            log('   ❌ 每个粒子设置 fillStyle');
+            log('   ✅ 相同样式一起绘制 (批处理)');
+            log('');
+
+            log('5️⃣ 分层 Canvas:');
+            log('   // 静态层 (只绘制一次)');
+            log('   // 动态层 (每帧重绘)');
+            log('   // 两层叠加');
+            log('');
+
+            log('6️⃣ 性能对比:');
+            log('   优化前: 60 FPS, CPU 80%');
+            log('   优化后: 60 FPS, CPU 20%');
+            log('   关键: 减少 drawImage/getImageData 调用');
+        }
+
+        console.log('=== Canvas 动画 ===');
+        // 初始状态
+        ctx.fillStyle = '#f8f9fa';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#7f8c8d';
+        ctx.font = '16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('点击按钮查看 Canvas 动画', 200, 150);
+        ctx.textAlign = 'left';
+        document.getElementById('output').textContent =
+            `Canvas 动画: rAF / 弹跳球 / 时钟 / 粒子系统 / 性能优化\n` +
+            `✅ Canvas 动画演示完成！`;
+    </script>
+</body>
+</html>

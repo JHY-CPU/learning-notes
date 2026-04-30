@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Promise-基础</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #f39c12; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Promise 基础</h2><p>表示异步操作的最终完成（或失败）及其结果值的对象。</p></div>
+    <div class="card">
+        <h2>三种状态</h2>
+        <div class="code">// Promise 有三种状态：
+// pending   — 等待中（初始状态）
+// fulfilled — 已成功（调用了 resolve）
+// rejected  — 已失败（调用了 reject）
+
+// 状态一旦确定就不可再变（settled）
+// pending → fulfilled（不可逆）
+// pending → rejected（不可逆）
+
+const promise = new Promise((resolve, reject) => {
+    // 执行器（executor）立即执行
+    console.log('executor 同步执行');
+
+    // 异步操作
+    setTimeout(() => {
+        const success = true;
+        if (success) {
+            resolve('操作成功');  // pending → fulfilled
+        } else {
+            reject('操作失败');   // pending → rejected
+        }
+    }, 1000);
+});
+
+console.log('Promise 创建完成');
+// 输出顺序：
+// 'executor 同步执行'
+// 'Promise 创建完成'
+// （1秒后）resolve/reject
+
+// ⚠️ executor 是同步执行的！
+// .then/.catch 是异步的（微任务）</div>
+    </div>
+    <div class="card">
+        <h2>then / catch / finally</h2>
+        <div class="code">const p = new Promise((resolve, reject) => {
+    setTimeout(() => {
+        resolve('✅ 成功数据');
+        // reject('❌ 错误信息');
+    }, 1000);
+});
+
+// then — 处理成功
+p.then(result => {
+    console.log('成功:', result);
+});
+
+// catch — 处理失败
+p.catch(error => {
+    console.log('失败:', error);
+});
+
+// finally — 总是执行
+p.finally(() => {
+    console.log('总是执行（无论成功/失败）');
+});
+
+// 链式写法（推荐）
+p
+    .then(result => {
+        console.log('成功:', result);
+        return '下一步数据';
+    })
+    .then(data => {
+        console.log('链式:', data);
+    })
+    .catch(error => {
+        console.log('任何一步出错都会到这里:', error);
+    })
+    .finally(() => {
+        console.log('清理工作');
+    });
+
+// then 接受两个参数
+p.then(
+    result => console.log('成功:', result),   // 第一个：成功回调
+    error => console.log('失败:', error)      // 第二个：失败回调
+);
+// 但推荐用 .catch 更清晰</div>
+    </div>
+    <div class="card">
+        <h2>resolve / reject</h2>
+        <div class="code">// resolve — 将 Promise 变为 fulfilled
+const p1 = new Promise(resolve => {
+    resolve(42);
+});
+p1.then(v => console.log(v));  // 42
+
+// reject — 将 Promise 变为 rejected
+const p2 = new Promise((_, reject) => {
+    reject(new Error('出错了'));
+});
+p2.catch(e => console.log(e.message));  // '出错了'
+
+// resolve 传入另一个 Promise 时的行为
+const p3 = new Promise(resolve => {
+    resolve(Promise.resolve('嵌套 Promise'));
+});
+p3.then(v => console.log(v));  // '嵌套 Promise'（展开后再解决）
+
+// ⚠️ 如果 then 中抛出错误，返回的 Promise 变为 rejected
+const p4 = Promise.resolve('ok');
+p4
+    .then(v => { throw new Error('then 中出错'); })
+    .catch(e => console.log(e.message));  // 'then 中出错'
+
+// ⚠️ resolve/reject 只会执行第一次
+const p5 = new Promise((resolve, reject) => {
+    resolve('第一次');
+    resolve('第二次');  // 被忽略
+    reject('错误');     // 被忽略
+});
+p5.then(v => console.log(v));  // '第一次'</div>
+    </div>
+    <div class="card">
+        <h2>立即值 Promise</h2>
+        <div class="code">// Promise.resolve() — 创建已成功的 Promise
+const p1 = Promise.resolve(42);
+p1.then(v => console.log(v));  // 42
+
+// 等价于
+const p2 = new Promise(resolve => resolve(42));
+
+// Promise.reject() — 创建已失败的 Promise
+const p3 = Promise.reject(new Error('失败'));
+p3.catch(e => console.log(e.message));  // '失败'
+
+// Promise.resolve 传入 Promise 则直接返回
+const original = new Promise(r => r('ok'));
+const same = Promise.resolve(original);
+console.log(original === same);  // true
+
+// Promise.resolve 传入 thenable（有 then 方法的对象）
+const thenable = {
+    then(resolve) {
+        resolve('thenable 值');
+    }
+};
+Promise.resolve(thenable).then(v => console.log(v));  // 'thenable 值'
+
+// 常见用法：将不是 Promise 的值转为 Promise
+function ensurePromise(val) {
+    return Promise.resolve(val);
+}</div>
+    </div>
+    <div class="card">
+        <h2>实际示例：封装回调</h2>
+        <div class="code">// 将回调风格的异步操作 Promise 化
+function readFilePromise(path) {
+    return new Promise((resolve, reject) => {
+        // Node.js fs.readFile 的回调风格
+        // fs.readFile(path, 'utf8', (err, data) => {
+        //     if (err) reject(err);
+        //     else resolve(data);
+        // });
+
+        // 模拟 setTimeout
+        setTimeout(() => {
+            if (path) {
+                resolve('文件内容: ' + path);
+            } else {
+                reject(new Error('路径不能为空'));
+            }
+        }, 500);
+    });
+}
+
+// 使用
+readFilePromise('test.txt')
+    .then(content => console.log(content))
+    .catch(err => console.error(err));
+
+// 封装 setTimeout
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+delay(1000).then(() => console.log('1秒后执行'));
+
+// 封装 XMLHttpRequest
+function fetchJSON(url) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url);
+        xhr.responseType = 'json';
+        xhr.onload = () => resolve(xhr.response);
+        xhr.onerror = () => reject(new Error('网络错误'));
+        xhr.send();
+    });
+}</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== Promise 基本用法 ===');
+        const p1 = Promise.resolve('立即成功');
+        p1.then(v => console.log('then:', v));
+
+        const p2 = Promise.reject(new Error('立即失败'));
+        p2.catch(e => console.log('catch:', e.message));
+
+        console.log('=== 异步 Promise ===');
+        const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+        delay(100).then(() => console.log('100ms 后执行'));
+        console.log('这行在 Promise.then 之前打印（同步优先）');
+
+        console.log('=== then/catch/finally ===');
+        Promise.resolve(42)
+            .then(v => {
+                console.log('值:', v);
+                return v * 2;
+            })
+            .then(v => console.log('链式:', v))
+            .catch(e => console.log('错误:', e))
+            .finally(() => console.log('finally 执行'));
+
+        console.log('=== Promise 状态不可变 ===');
+        const p3 = new Promise((resolve, reject) => {
+            resolve('第一次');
+            resolve('第二次');  // 忽略
+            reject('错误');     // 忽略
+        });
+        p3.then(v => console.log('状态不可变:', v));
+
+        console.log('=== thenable ===');
+        const thenable = {
+            then(resolve) { resolve('thenable'); }
+        };
+        Promise.resolve(thenable).then(v => console.log(v));
+
+        document.getElementById('output').textContent =
+            `Promise 基础演示完成\n` +
+            `then/catch/finally 链式调用\n` +
+            `✅ Promise 基础演示完成！`;
+    </script>
+</body>
+</html>

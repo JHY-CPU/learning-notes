@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>20-链表反转 (Linked List Reversal)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card"><h2>20-链表反转 (Linked List Reversal)</h2><p>链表反转是一类核心操作，包括全反转、区间反转、K个一组反转等变体。</p></div>
+
+<div class="card"><h2>反转整个链表</h2>
+<div class="code">
+// 迭代法（三指针）
+function reverseList(head) {
+  let prev = null;
+  let curr = head;
+
+  while (curr) {
+    let next = curr.next; // 保存下一个节点
+    curr.next = prev;     // 指向前一个节点
+    prev = curr;          // 前移 prev
+    curr = next;          // 前移 curr
+  }
+
+  return prev; // 新头节点
+}
+
+// 递归法
+function reverseListRecursive(head) {
+  if (!head || !head.next) return head;
+
+  let newHead = reverseListRecursive(head.next);
+  head.next.next = head;
+  head.next = null;
+
+  return newHead;
+}
+</div></div>
+
+<div class="card"><h2>区间反转</h2>
+<div class="code">
+// 反转链表中从 left 到 right 的部分（1-based）
+function reverseBetween(head, left, right) {
+  let dummy = new ListNode(null);
+  dummy.next = head;
+  let prev = dummy;
+
+  // prev 移动到 left 前一个节点
+  for (let i = 1; i < left; i++) {
+    prev = prev.next;
+  }
+
+  // 开始反转：头插法
+  let curr = prev.next;
+  for (let i = 0; i < right - left; i++) {
+    let next = curr.next;
+    curr.next = next.next;
+    next.next = prev.next;
+    prev.next = next;
+  }
+
+  return dummy.next;
+}
+
+// K个一组反转
+function reverseKGroup(head, k) {
+  let dummy = new ListNode(null);
+  dummy.next = head;
+  let prev = dummy;
+
+  while (true) {
+    // 检查剩余节点是否够 k 个
+    let end = prev;
+    for (let i = 0; i < k && end; i++) end = end.next;
+    if (!end) break;
+
+    // 头插法反转 k 个节点
+    let curr = prev.next;
+    for (let i = 0; i < k - 1; i++) {
+      let next = curr.next;
+      curr.next = next.next;
+      next.next = prev.next;
+      prev.next = next;
+    }
+
+    prev = curr; // 移动 prev 到下一组的前一个节点
+  }
+
+  return dummy.next;
+}
+</div></div>
+
+<div class="card"><h2>交互演示</h2>
+<button onclick="demoReverse()">运行链表反转演示</button>
+<div id="result"></div>
+</div>
+
+<script>
+function demoReverse() {
+  let output = '';
+
+  class ListNode {
+    constructor(val, next = null) { this.val = val; this.next = next; }
+  }
+
+  function arrToList(arr) {
+    let dummy = new ListNode(null);
+    let curr = dummy;
+    for (let v of arr) { curr.next = new ListNode(v); curr = curr.next; }
+    return dummy.next;
+  }
+
+  function listToArr(head) {
+    let result = [];
+    while (head) { result.push(head.val); head = head.next; }
+    return result;
+  }
+
+  function reverseList(head) {
+    let prev = null, curr = head;
+    while (curr) {
+      let next = curr.next;
+      curr.next = prev;
+      prev = curr;
+      curr = next;
+    }
+    return prev;
+  }
+
+  function reverseBetween(head, left, right) {
+    let dummy = new ListNode(null);
+    dummy.next = head;
+    let prev = dummy;
+    for (let i = 1; i < left; i++) prev = prev.next;
+    let curr = prev.next;
+    for (let i = 0; i < right - left; i++) {
+      let next = curr.next;
+      curr.next = next.next;
+      next.next = prev.next;
+      prev.next = next;
+    }
+    return dummy.next;
+  }
+
+  function reverseKGroup(head, k) {
+    let dummy = new ListNode(null);
+    dummy.next = head;
+    let prev = dummy;
+    while (true) {
+      let end = prev;
+      for (let i = 0; i < k && end; i++) end = end.next;
+      if (!end) break;
+      let curr = prev.next;
+      for (let i = 0; i < k - 1; i++) {
+        let next = curr.next;
+        curr.next = next.next;
+        next.next = prev.next;
+        prev.next = next;
+      }
+      prev = curr;
+    }
+    return dummy.next;
+  }
+
+  output += '=== 链表反转演示 ===\n\n';
+
+  // 1. 全反转
+  output += '1. 反转整个链表:\n';
+  let list1 = arrToList([1, 2, 3, 4, 5]);
+  output += '   原始: [' + listToArr(list1) + ']\n';
+  let r1 = reverseList(list1);
+  output += '   反转: [' + listToArr(r1) + ']\n\n';
+
+  // 2. 区间反转
+  output += '2. 反转区间 [2, 4]:\n';
+  let list2 = arrToList([1, 2, 3, 4, 5]);
+  output += '   原始: [' + listToArr(list2) + ']\n';
+  let r2 = reverseBetween(list2, 2, 4);
+  output += '   反转: [' + listToArr(r2) + ']\n\n';
+
+  // 3. K个一组反转
+  output += '3. K个一组反转 (k=2):\n';
+  let list3 = arrToList([1, 2, 3, 4, 5]);
+  output += '   原始: [' + listToArr(list3) + ']\n';
+  let r3 = reverseKGroup(list3, 2);
+  output += '   反转: [' + listToArr(r3) + ']\n\n';
+
+  output += '4. K个一组反转 (k=3):\n';
+  let list4 = arrToList([1, 2, 3, 4, 5, 6, 7]);
+  output += '   原始: [' + listToArr(list4) + ']\n';
+  let r4 = reverseKGroup(list4, 3);
+  output += '   反转: [' + listToArr(r4) + ']\n';
+
+  document.getElementById('result').textContent = output;
+}
+</script>
+</body></html>

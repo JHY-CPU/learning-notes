@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Components</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Web Components</h2><p>customElements.define、生命周期(connected/disconnected)、attributeChanged。</p></div>
+    <div class="card">
+        <h2>Web Components API</h2>
+        <div class="code">// ========== 自定义元素 ==========
+class MyElement extends HTMLElement {
+    constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+    }
+
+    // 观察属性
+    static get observedAttributes() {
+        return ['name', 'count'];
+    }
+
+    // 生命周期
+    connectedCallback() { /* 挂载到 DOM */ }
+    disconnectedCallback() { /* 从 DOM 移除 */ }
+    attributeChangedCallback(name, old, val) { /* 属性变化 */ }
+    adoptedCallback() { /* 被移动到新文档 */ }
+}
+
+customElements.define('my-element', MyElement);
+
+// ========== 使用 ==========
+// <my-element name="World" count="5"></my-element>
+
+// ========== Shadow DOM ==========
+// 样式隔离: :host, ::slotted
+// mode: 'open' (外部可访问), 'closed' (外部不可访问)
+
+// ========== HTML Templates ==========
+// <template id="tpl">
+//   <style>/* 隔离样式 */</style>
+//   <div>内容</div>
+// </template></div>
+    </div>
+    <div class="card">
+        <h2>演示：Web Components</h2>
+        <button onclick="demoDefine()">自定义元素</button>
+        <button onclick="demoLifecycle()">生命周期</button>
+        <button onclick="demoAttribute()">属性与观察</button>
+        <button onclick="demoComposition()">组合使用</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoDefine() {
+            result.innerHTML = '';
+            log('🧩 自定义元素:');
+            log('');
+
+            log('1️⃣ 定义自定义元素:');
+            log('   class MyButton extends HTMLElement {');
+            log('     constructor() {');
+            log('       super();');
+            log('       this.shadow = this.attachShadow({ mode: "open" });');
+            log('     }');
+            log('   }');
+            log('   customElements.define("my-button", MyButton);');
+            log('');
+
+            log('2️⃣ 元素命名规则:');
+            log('   ✅ my-button, user-card, app-header');
+            log('   ✅ x-greeting, tool-tip');
+            log('   ❌ myButton (必须包含连字符 -)');
+            log('   ❌ button (不能是内置标签名)');
+            log('');
+
+            log('3️⃣ 两种类型:');
+            log('   自主元素: class extends HTMLElement');
+            log('   定制内置元素: class extends HTMLButtonElement');
+            log('   extends 时用: customElements.define("my-btn", MyBtn, { extends: "button" })');
+            log('');
+
+            // 模拟组件
+            class MockComponent {
+                constructor(name, template) {
+                    this.name = name;
+                    this.template = template;
+                    this.instances = 0;
+                }
+                create(props = {}) {
+                    this.instances++;
+                    log(`   创建 <${this.name}> (实例 #${this.instances})`);
+                    log(`   属性: ${JSON.stringify(props)}`);
+                    log(`   渲染: ${this.template}`);
+                    return this;
+                }
+            }
+
+            const myBtn = new MockComponent('my-button', '<button>点击我</button>');
+            const userCard = new MockComponent('user-card', '<div class="card">用户信息</div>');
+
+            log('注册组件:');
+            myBtn.create({ label: '提交', variant: 'primary' });
+            userCard.create({ user: 'Alice' });
+        }
+
+        function demoLifecycle() {
+            result.innerHTML = '';
+            log('🔄 生命周期回调:');
+            log('');
+
+            const lifecycle = [
+                {
+                    name: 'constructor',
+                    called: 'new 元素时',
+                    use: '初始化状态, 创建 Shadow DOM',
+                },
+                {
+                    name: 'connectedCallback',
+                    called: '元素挂载到 DOM',
+                    use: '设置事件监听, 获取数据',
+                },
+                {
+                    name: 'disconnectedCallback',
+                    called: '元素从 DOM 移除',
+                    use: '清理资源, 移除事件监听',
+                },
+                {
+                    name: 'attributeChangedCallback',
+                    called: 'observedAttributes 变化时',
+                    use: '响应属性变化, 重新渲染',
+                },
+                {
+                    name: 'adoptedCallback',
+                    called: '元素被移动到新文档 (iframe)',
+                    use: '适应新文档环境',
+                },
+            ];
+
+            log('生命周期顺序:');
+            log('');
+            lifecycle.forEach(({ name, called, use }) => {
+                log(`   ${name}:`);
+                log(`       触发: ${called}`);
+                log(`       用途: ${use}`);
+                log('');
+            });
+
+            // 模拟生命周期
+            class MockElement {
+                constructor(name) {
+                    log(`   [${name}] constructor()`);
+                    this._listeners = new Map();
+                }
+
+                connected() {
+                    log(`   [${name}] connectedCallback()`);
+                    log(`     设置事件监听, 开始渲染`);
+                }
+
+                disconnected() {
+                    log(`   [${name}] disconnectedCallback()`);
+                    log(`     清理事件监听, 释放资源`);
+                }
+
+                attributeChanged(name, oldVal, newVal) {
+                    log(`   [${name}] attributeChangedCallback()`);
+                    log(`     ${oldVal} → ${newVal}`);
+                }
+            }
+
+            log('');
+            log('模拟生命周期执行:');
+            const el = new MockElement('my-card');
+            el.connected();
+            el.attributeChanged('name', 'Alice', 'Bob');
+            el.disconnected();
+        }
+
+        function demoAttribute() {
+            result.innerHTML = '';
+            log('🏷️ 属性与观察:');
+            log('');
+
+            class MockAttributeElement {
+                static observedAttributes = ['name', 'count', 'disabled'];
+
+                constructor(name) {
+                    this.name = name;
+                    this._attrs = {};
+                    log(`   创建 <${name}>`);
+                    log(`   观察属性: [${MockAttributeElement.observedAttributes.join(', ')}]`);
+                }
+
+                setAttribute(attr, value) {
+                    const old = this._attrs[attr];
+                    this._attrs[attr] = value;
+                    log(`   设置属性 ${attr}="${value}"`);
+                    if (old !== undefined) {
+                        log(`   attributeChangedCallback: "${old}" → "${value}"`);
+                    }
+                    this.render();
+                }
+
+                render() {
+                    const { name = 'World', count = 0, disabled = false } = this._attrs;
+                    const html = `<div ${disabled ? 'class="disabled"' : ''}>
+                        <h3>Hello, ${name}!</h3>
+                        <p>Count: ${count}</p>
+                    </div>`;
+                    log(`   重新渲染: ${html}`);
+                }
+            }
+
+            log('1️⃣ 定义观察属性:');
+            log('   static get observedAttributes() {');
+            log('     return ["name", "count", "disabled"];');
+            log('   }');
+            log('');
+
+            log('2️⃣ 设置属性:');
+            const el = new MockAttributeElement('my-greeting');
+            log('');
+            el.setAttribute('name', 'Alice');
+            log('');
+            el.setAttribute('count', '5');
+            log('');
+            el.setAttribute('name', 'Bob');
+            log('');
+            el.setAttribute('disabled', 'true');
+            log('');
+
+            log('3️⃣ 属性反射:');
+            log('   get name() { return this.getAttribute("name"); }');
+            log('   set name(val) { this.setAttribute("name", val); }');
+            log('   属性反射使 JS 属性与 HTML 属性同步');
+        }
+
+        function demoComposition() {
+            result.innerHTML = '';
+            log('🔧 Web Components 组合:');
+            log('');
+
+            log('1️⃣ Shadow DOM 样式隔离:');
+            log('   const shadow = this.attachShadow({ mode: "open" });');
+            log('   shadow.innerHTML = `<style>:host { display: block; }</style>...`;');
+            log('');
+
+            log('2️⃣ :host 伪类:');
+            const hostStyles = [
+                ':host { display: block; }',
+                ':host(.active) { border-color: blue; }',
+                ':host([disabled]) { opacity: 0.5; }',
+                ':host-context(.dark-theme) { color: white; }',
+            ];
+            hostStyles.forEach(s => log(`   ${s}`));
+            log('');
+
+            log('3️⃣ ::slotted 插槽样式:');
+            log('   ::slotted(*) { color: inherit; }');
+            log('   ::slotted(.highlight) { font-weight: bold; }');
+            log('');
+
+            log('4️⃣ Slot (插槽) 使用:');
+            log('   <my-card>');
+            log('     <span slot="title">标题</span>');
+            log('     <p>正文内容</p>');
+            log('   </my-card>');
+            log('');
+
+            log('5️⃣ 完整的自定义元素模板:');
+            const fullExample = `
+            class UserCard extends HTMLElement {
+                constructor() {
+                    super();
+                    this.attachShadow({ mode: 'open' });
+                    this.shadowRoot.innerHTML = \`
+                        <style>
+                            :host { display: block; padding: 16px; border: 1px solid #ddd; border-radius: 8px; }
+                            .name { font-size: 18px; font-weight: bold; }
+                            ::slotted(.role) { color: #666; }
+                        </style>
+                        <div class="name" id="name"></div>
+                        <slot name="role">未指定角色</slot>
+                        <slot></slot>
+                    \`;
+                }
+                static get observedAttributes() { return ['name']; }
+                attributeChangedCallback(name, old, val) {
+                    if (name === 'name') this.shadowRoot.getElementById('name').textContent = val;
+                }
+                connectedCallback() { console.log('组件已挂载'); }
+                disconnectedCallback() { console.log('组件已卸载'); }
+            }
+            customElements.define('user-card', UserCard);`;
+            log(fullExample);
+        }
+
+        console.log('=== Web Components ===');
+        document.getElementById('output').textContent =
+            `Web Components: customElements / Shadow DOM / 生命周期 / Slot / 模板\n` +
+            `✅ Web Components 演示完成！`;
+    </script>
+</body>
+</html>

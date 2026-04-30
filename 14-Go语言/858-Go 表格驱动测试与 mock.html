@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 表格驱动测试与 Mock</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🎯 Go 表格驱动测试与 Mock</h2><p>testify mock 框架、接口模拟模式、依赖注入测试、monkey patch、gomock 代码生成、测试替身对比。</p></div>
+    <div class="card">
+        <h2>testify Mock 基础</h2>
+        <div class="code">// ========== testify mock ==========
+// go get github.com/stretchr/testify
+
+// 定义接口
+type UserRepository interface {
+    GetByID(id int) (*User, error)
+    Create(user *User) error
+    List(page, limit int) ([]User, error)
+}
+
+// ========== 创建 Mock ==========
+type MockUserRepository struct {
+    mock.Mock
+}
+
+func (m *MockUserRepository) GetByID(id int) (*User, error) {
+    args := m.Called(id)
+    if args.Get(0) == nil {
+        return nil, args.Error(1)
+    }
+    return args.Get(0).(*User), args.Error(1)
+}
+
+func (m *MockUserRepository) Create(user *User) error {
+    args := m.Called(user)
+    return args.Error(0)
+}
+
+func (m *MockUserRepository) List(page, limit int) ([]User, error) {
+    args := m.Called(page, limit)
+    return args.Get(0).([]User), args.Error(1)
+}
+
+// ========== 使用 Mock 测试 Service ==========
+type UserService struct {
+    repo UserRepository
+}
+
+func NewUserService(repo UserRepository) *UserService {
+    return &UserService{repo: repo}
+}
+
+func (s *UserService) GetUser(id int) (*User, error) {
+    return s.repo.GetByID(id)
+}
+
+func TestGetUser(t *testing.T) {
+    mockRepo := new(MockUserRepository)
+
+    // 设置期望: 当调用 GetByID(1) 时返回指定值
+    mockRepo.On("GetByID", 1).Return(&User{ID: 1, Name: "John"}, nil)
+
+    svc := NewUserService(mockRepo)
+    user, err := svc.GetUser(1)
+
+    assert.NoError(t, err)
+    assert.Equal(t, "John", user.Name)
+    mockRepo.AssertExpectations(t)  // 验证所有期望被调用
+}
+
+func TestGetUserNotFound(t *testing.T) {
+    mockRepo := new(MockUserRepository)
+    mockRepo.On("GetByID", 999).Return(nil, fmt.Errorf("not found"))
+
+    svc := NewUserService(mockRepo)
+    _, err := svc.GetUser(999)
+
+    assert.Error(t, err)
+    assert.Contains(t, err.Error(), "not found")
+    mockRepo.AssertExpectations(t)
+}
+
+// ========== 匹配任意参数 ==========
+func TestMockAnyArguments(t *testing.T) {
+    mockRepo := new(MockUserRepository)
+
+    // 匹配任意 ID
+    mockRepo.On("GetByID", mock.AnythingOfType("int")).Return(&User{Name: "John"}, nil)
+    // mockRepo.On("GetByID", mock.Anything).Return(&User{Name: "John"}, nil)
+
+    svc := NewUserService(mockRepo)
+    user, _ := svc.GetUser(42)
+    assert.Equal(t, "John", user.Name)
+}
+
+// ========== 调用次数验证 ==========
+func TestMockCallCount(t *testing.T) {
+    mockRepo := new(MockUserRepository)
+
+    // 精确调用次数
+    mockRepo.On("GetByID", 1).Return(&User{ID: 1}, nil).Times(1)
+
+    // 至少调用一次
+    // mockRepo.On("GetByID", 1).Return(&User{ID: 1}, nil).Once()
+    // mockRepo.On("GetByID", 1).Return(&User{ID: 1}, nil).Twice()
+    // mockRepo.On("GetByID", 1).Return(&User{ID: 1}, nil).Times(3)
+
+    svc := NewUserService(mockRepo)
+    svc.GetUser(1)
+    mockRepo.AssertExpectations(t)
+}</div>
+    </div>
+    <div class="card">
+        <h2>高级 Mock 模式</h2>
+        <div class="code">// ========== 链式 Mock ==========
+type MockOrderService struct {
+    mock.Mock
+}
+
+func (m *MockOrderService) CreateOrder(userID int, items []Item) (*Order, error) {
+    args := m.Called(userID, items)
+    return args.Get(0).(*Order), args.Error(1)
+}
+
+func (m *MockOrderService) ProcessPayment(orderID int) error {
+    args := m.Called(orderID)
+    return args.Error(0)
+}
+
+// 测试完整下单流程
+func TestPlaceOrder(t *testing.T) {
+    mockUser := new(MockUserRepository)
+    mockOrder := new(MockOrderService)
+
+    // 设置链式调用
+    mockUser.On("GetByID", 1).Return(&User{ID: 1, Name: "John", Balance: 100.0}, nil)
+    mockOrder.On("CreateOrder", 1, mock.Anything).Return(&Order{ID: 100, Total: 50.0}, nil)
+    mockOrder.On("ProcessPayment", 100).Return(nil)
+
+    svc := NewCheckoutService(mockUser, mockOrder)
+    err := svc.PlaceOrder(1, []Item{{ProductID: 1, Quantity: 2}})
+
+    assert.NoError(t, err)
+    mockUser.AssertExpectations(t)
+    mockOrder.AssertExpectations(t)
+}
+
+// ========== Mock 回调 (Run) ==========
+func TestMockWithCallback(t *testing.T) {
+    mockRepo := new(MockUserRepository)
+
+    var capturedUser *User
+    mockRepo.On("Create", mock.AnythingOfType("*User")).
+        Return(nil).
+        Run(func(args mock.Arguments) {
+            capturedUser = args.Get(0).(*User)
+            capturedUser.ID = 100  // 模拟数据库生成 ID
+        })
+
+    svc := NewUserService(mockRepo)
+    user := &User{Name: "Jane", Email: "jane@test.com"}
+    err := svc.CreateUser(user)
+
+    assert.NoError(t, err)
+    assert.Equal(t, 100, capturedUser.ID)
+    assert.Equal(t, "Jane", capturedUser.Name)
+}
+
+// ========== Mock 序列 (不同调用不同返回值) ==========
+func TestMockSequence(t *testing.T) {
+    mockRepo := new(MockUserRepository)
+
+    // 第一次返回用户1, 第二次返回用户2, 第三次返回错误
+    mockRepo.On("GetByID", 1).Return(&User{ID: 1, Name: "User1"}, nil)
+    mockRepo.On("GetByID", 2).Return(&User{ID: 2, Name: "User2"}, nil)
+    mockRepo.On("GetByID", 3).Return(nil, fmt.Errorf("not found"))
+
+    svc := NewUserService(mockRepo)
+
+    u1, _ := svc.GetUser(1)
+    assert.Equal(t, "User1", u1.Name)
+
+    u2, _ := svc.GetUser(2)
+    assert.Equal(t, "User2", u2.Name)
+
+    _, err := svc.GetUser(3)
+    assert.Error(t, err)
+}
+
+// ========== 表格驱动 + Mock ==========
+func TestGetUserTableDriven(t *testing.T) {
+    tests := []struct {
+        name      string
+        userID    int
+        mockUser  *User
+        mockErr   error
+        wantName  string
+        wantErr   bool
+    }{
+        {"用户存在", 1, &User{ID: 1, Name: "John"}, nil, "John", false},
+        {"用户不存在", 999, nil, fmt.Errorf("not found"), "", true},
+        {"ID 为 0", 0, nil, fmt.Errorf("invalid id"), "", true},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            mockRepo := new(MockUserRepository)
+            mockRepo.On("GetByID", tt.userID).Return(tt.mockUser, tt.mockErr)
+
+            svc := NewUserService(mockRepo)
+            user, err := svc.GetUser(tt.userID)
+
+            if tt.wantErr {
+                assert.Error(t, err)
+            } else {
+                assert.NoError(t, err)
+                assert.Equal(t, tt.wantName, user.Name)
+            }
+            mockRepo.AssertExpectations(t)
+        })
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>接口模拟模式</h2>
+        <div class="code">// ========== 模式 1: 手写 Mock 结构体 ==========
+// 简单场景不需要 testify
+
+type MockEmailSender struct {
+    SendFunc func(to, subject, body string) error
+    calls    []string
+}
+
+func (m *MockEmailSender) Send(to, subject, body string) error {
+    m.calls = append(m.calls, to)
+    if m.SendFunc != nil {
+        return m.SendFunc(to, subject, body)
+    }
+    return nil
+}
+
+func TestWithManualMock(t *testing.T) {
+    sender := &MockEmailSender{
+        SendFunc: func(to, subject, body string) error {
+            assert.Equal(t, "user@test.com", to)
+            return nil
+        },
+    }
+
+    svc := NewNotificationService(sender)
+    svc.SendWelcomeEmail("user@test.com")
+
+    assert.Len(t, sender.calls, 1)
+}
+
+// ========== 模式 2: gomock 代码生成 ==========
+// go install go.uber.org/mock/mockgen@latest
+//
+// mockgen -source=interface.go -destination=mock_interface.go -package=mocks
+//
+// 使用 gomock:
+// func TestWithGomock(t *testing.T) {
+//     ctrl := gomock.NewController(t)
+//     defer ctrl.Finish()
+//
+//     mockRepo := mocks.NewMockUserRepository(ctrl)
+//     mockRepo.EXPECT().GetByID(1).Return(&User{ID: 1}, nil)
+//
+//     svc := NewUserService(mockRepo)
+//     svc.GetUser(1)
+// }
+
+// ========== 模式 3: 猴子补丁 (monkey patch) ==========
+// bou.ke/monkey (不推荐, 不安全)
+// 仅用于无法修改接口的遗留代码
+
+// func TestMonkeyPatch(t *testing.T) {
+//     patch := monkey.Patch(time.Now, func() time.Time {
+//         return time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
+//     })
+//     defer patch.Unpatch()
+//
+//     now := time.Now()
+//     assert.Equal(t, 2024, now.Year())
+// }
+
+// ========== 模式 4: 接口替身模式 ==========
+// 用真实但不依赖外部服务的实现
+
+type InMemoryUserRepo struct {
+    users map[int]*User
+    nextID int
+}
+
+func NewInMemoryUserRepo() *InMemoryUserRepo {
+    return &InMemoryUserRepo{
+        users:  make(map[int]*User),
+        nextID: 1,
+    }
+}
+
+func (r *InMemoryUserRepo) GetByID(id int) (*User, error) {
+    u, ok := r.users[id]
+    if !ok {
+        return nil, fmt.Errorf("user %d not found", id)
+    }
+    return u, nil
+}
+
+func (r *InMemoryUserRepo) Create(user *User) error {
+    user.ID = r.nextID
+    r.nextID++
+    r.users[user.ID] = user
+    return nil
+}
+
+func TestWithInMemoryRepo(t *testing.T) {
+    repo := NewInMemoryUserRepo()
+    svc := NewUserService(repo)
+
+    svc.CreateUser(&User{Name: "John"})
+    user, _ := svc.GetUser(1)
+    assert.Equal(t, "John", user.Name)
+}</div>
+    </div>
+    <div class="card">
+        <h2>测试替身对比</h2>
+        <div class="code">// ========== 测试替身类型 ==========
+// 1. Dummy       — 只传参, 从不使用
+// 2. Stub        — 返回固定值
+// 3. Spy         — 记录调用信息
+// 4. Mock        — 预设期望 + 验证行为
+// 5. Fake        — 轻量级实现 (如内存数据库)
+// 6. Golden      — 快照测试
+
+// ========== Dummy ==========
+type DummyLogger struct{}
+func (l *DummyLogger) Info(msg string)    {}
+func (l *DummyLogger) Error(msg string)   {}
+
+// ========== Stub ==========
+type StubConfig struct{}
+func (c *StubConfig) Get(key string) string {
+    if key == "db_host" {
+        return "localhost"
+    }
+    return ""
+}
+
+// ========== Spy ==========
+type SpyEmailSender struct {
+    SentEmails []Email
+}
+
+func (s *SpyEmailSender) Send(to, subject, body string) error {
+    s.SentEmails = append(s.SentEmails, Email{To: to, Subject: subject})
+    return nil
+}
+
+func TestWithSpy(t *testing.T) {
+    spy := &SpyEmailSender{}
+    svc := NewNotificationService(spy)
+
+    svc.SendWelcomeEmail("user@test.com")
+    svc.SendPasswordReset("user@test.com")
+
+    assert.Len(t, spy.SentEmails, 2)
+    assert.Equal(t, "Welcome", spy.SentEmails[0].Subject)
+    assert.Equal(t, "Password Reset", spy.SentEmails[1].Subject)
+}
+
+// ========== 选择指南 ==========
+// 简单返回值 → Stub
+// 记录调用 → Spy
+// 复杂行为验证 → Mock (testify/gomock)
+// 完整实现 → Fake (InMemory)
+// 不可修改的代码 → Monkey Patch (谨慎)
+// 不需要的对象 → Dummy
+
+// ========== 表格驱动测试最佳实践 ==========
+func TestCalculateTotal(t *testing.T) {
+    tests := []struct {
+        name    string
+        items   []Item
+        coupon  string
+        want    float64
+        wantErr bool
+    }{
+        {"空购物车", []Item{}, "", 0, true},
+        {"单个商品", []Item{{Price: 100, Quantity: 1}}, "", 100, false},
+        {"多个商品", []Item{{Price: 50, Quantity: 2}, {Price: 30, Quantity: 1}}, "", 130, false},
+        {"优惠券折扣", []Item{{Price: 200, Quantity: 1}}, "SAVE10", 180, false},
+        {"超过优惠券限额", []Item{{Price: 10, Quantity: 1}}, "SAVE10", 10, false},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            got, err := CalculateTotal(tt.items, tt.coupon)
+            if tt.wantErr {
+                assert.Error(t, err)
+                return
+            }
+            assert.NoError(t, err)
+            assert.InDelta(t, tt.want, got, 0.01)
+        })
+    }
+}</div>
+        <div class="note">💡 Mock 要点: testify mock (On/Return/AssertExpectations); mock.Anything/AnythingOfType 匹配任意参数; Times/Once/Twice 调用次数; Run 回调捕获参数; 表格驱动 + Mock 组合; 手写 Mock 函数字段; gomock 代码生成 mockgen; 测试替身 Dummy/Stub/Spy/Mock/Fake; 接口依赖注入可测试; 内存 Fake 比 Mock 更接近真实。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoMock()">Mock 基础</button>
+        <button onclick="demoPattern()">Mock 模式</button>
+        <button onclick="demoCompare()">替身对比</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoMock() {
+            result.innerHTML = '';
+            log('# testify Mock');
+            log('');
+            log('基本:');
+            log('  mockRepo.On("方法", 参数).Return(返回值)');
+            log('  mockRepo.AssertExpectations(t)');
+            log('');
+            log('匹配:');
+            log('  mock.Anything');
+            log('  mock.AnythingOfType("int")');
+            log('  mock.AnythingOfType("*User")');
+            log('');
+            log('次数:');
+            log('  .Once() / .Twice() / .Times(n)');
+        }
+
+        function demoPattern() {
+            result.innerHTML = '';
+            log('# Mock 模式');
+            log('');
+            log('回调:');
+            log('  .Run(func(args mock.Arguments) {');
+            log('    u := args.Get(0).(*User)');
+            log('  })');
+            log('');
+            log('序列:');
+            log('  mock.On("Get", 1).Return(u1, nil)');
+            log('  mock.On("Get", 2).Return(u2, nil)');
+            log('');
+            log('手写 Mock:');
+            log('  type MockX struct {');
+            log('    SendFunc func(...) error');
+            log('    calls []string');
+            log('  }');
+        }
+
+        function demoCompare() {
+            result.innerHTML = '';
+            log('# 测试替身对比');
+            log('');
+            log('Dummy: 只传参, 不使用');
+            log('Stub: 返回固定值');
+            log('Spy: 记录调用信息');
+            log('Mock: 预设期望 + 验证');
+            log('Fake: 轻量实现 (内存DB)');
+            log('');
+            log('选择:');
+            log('  简单返回值 → Stub');
+            log('  记录调用 → Spy');
+            log('  行为验证 → Mock');
+            log('  完整逻辑 → Fake');
+        }
+    </script>
+</body>
+</html>

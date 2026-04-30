@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>queueMicrotask</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #micro-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>queueMicrotask</h2><p>微任务调度、与 Promise.resolve().then() 区别、应用场景。</p></div>
+    <div class="card">
+        <h2>queueMicrotask 语法</h2>
+        <div class="code">// ========== queueMicrotask ==========
+// 将一个函数加入微任务队列
+queueMicrotask(() => {
+    console.log('在渲染前执行');
+});
+
+// ========== 与 Promise.resolve().then() 区别 ==========
+// 功能相同，但 queueMicrotask 更语义化
+Promise.resolve().then(() => console.log('等价'));
+// queueMicrotask(fn) 约等于 Promise.resolve().then(fn)
+
+// 区别:
+// 1. queueMicrotask 直接传入回调，没有 Promise 包装
+// 2. queueMicrotask 没有返回值
+// 3. queueMicrotask 不能链式调用
+// 4. queueMicrotask 在未处理 rejection 时更友好
+
+// ========== 执行顺序 ==========
+console.log(1);
+queueMicrotask(() => console.log(2));
+Promise.resolve().then(() => console.log(3));
+setTimeout(() => console.log(4), 0);
+console.log(5);
+// 输出: 1, 5, 2, 3, 4 (2 和 3 都是微任务，按入队顺序)
+
+// ========== 应用场景 ==========
+// 1. 批量 DOM 更新
+queueMicrotask(() => {
+    // 所有同步 DOM 操作完成后执行
+});
+
+// 2. 避免栈溢出（递归展开）
+function process(arr) {
+    if (arr.length === 0) return;
+    const item = arr.shift();
+    queueMicrotask(() => process(arr)); // 异步递归
+}
+
+// 3. 异步状态批量更新
+let pending = false;
+function scheduleUpdate() {
+    if (!pending) {
+        pending = true;
+        queueMicrotask(() => {
+            pending = false;
+            // 批量处理
+        });
+    }
+}</div>
+        <div class="note">⚠️ queueMicrotask 可能延迟渲染，过度使用会造成阻塞。<br>
+        💡 适合需要"尽快执行但不在同步代码中"的场景。<br>
+        💡 微任务队列在每轮宏任务后被清空。</div>
+    </div>
+    <div class="card">
+        <h2>演示：queueMicrotask</h2>
+        <button onclick="demoMicrotask()">queueMicrotask 演示</button>
+        <button onclick="demoBatchUpdate()">批量更新模式</button>
+        <div id="micro-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const microResult = document.getElementById('micro-result');
+
+        function log(msg) {
+            microResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoMicrotask() {
+            microResult.innerHTML = '';
+            log('🔄 queueMicrotask 执行顺序演示:');
+            log('');
+
+            log('同步: 开始');
+
+            queueMicrotask(() => log('微任务: queueMicrotask #1'));
+            queueMicrotask(() => log('微任务: queueMicrotask #2'));
+
+            Promise.resolve().then(() => log('微任务: Promise.then #1'));
+            Promise.resolve().then(() => log('微任务: Promise.then #2'));
+
+            setTimeout(() => log('宏任务: setTimeout'), 0);
+
+            log('同步: 结束');
+
+            setTimeout(() => {
+                log('');
+                log('📌 queueMicrotask vs Promise.then:');
+                log('   • 两者都是微任务');
+                log('   • 按入队顺序执行');
+                log('   • queueMicrotask 更语义化');
+                log('   • queueMicrotask 无返回值');
+            }, 50);
+        }
+
+        function demoBatchUpdate() {
+            microResult.innerHTML = '';
+
+            // 模拟批量更新模式
+            let updateQueue = [];
+            let scheduled = false;
+
+            function addUpdate(item) {
+                updateQueue.push(item);
+                if (!scheduled) {
+                    scheduled = true;
+                    queueMicrotask(flushUpdates);
+                }
+                log(`📝 添加更新: "${item}"`);
+            }
+
+            function flushUpdates() {
+                log('');
+                log(`🔄 批量处理 ${updateQueue.length} 个更新:`);
+                const items = [...updateQueue];
+                updateQueue = [];
+                scheduled = false;
+                items.forEach((item, i) => {
+                    log(`   [${i + 1}] 处理: "${item}"`);
+                });
+                log('✅ 批量处理完成');
+            }
+
+            microResult.innerHTML = '';
+            log('📦 批量更新模式 (queueMicrotask):');
+            log('');
+
+            // 同步添加多个更新
+            addUpdate('更新 A');
+            addUpdate('更新 B');
+            addUpdate('更新 C');
+
+            log('');
+            log('💡 queueMicrotask 将多次更新合并为一次处理');
+
+            setTimeout(() => {
+                log('');
+                log('📌 优势:');
+                log('   • 避免重复计算');
+                log('   • 批量 DOM 操作减少重排');
+                log('   • 比 setTimeout 更早执行');
+            }, 50);
+        }
+
+        console.log('=== queueMicrotask ===');
+
+        document.getElementById('output').textContent =
+            `queueMicrotask: 微任务调度 / 批量更新 / 异步递归\n` +
+            `与 Promise.resolve().then() 等价但更语义化\n` +
+            `✅ queueMicrotask 演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot 缓存</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚡ Spring Boot 缓存</h2><p>@Cacheable/@CacheEvict/@CachePut 声明式缓存、CacheManager 配置、Caffeine/Redis 缓存集成、多级缓存、缓存最佳实践。</p></div>
+    <div class="card">
+        <h2>缓存注解</h2>
+        <div class="code">// ========== 启用缓存 ==========
+@SpringBootApplication
+@EnableCaching                          // 启用声明式缓存
+public class Application { ... }
+
+// ========== @Cacheable ==========
+// 方法执行前先查缓存, 命中直接返回, 未命中执行方法并缓存结果
+
+@Service
+public class UserService {
+
+    // 基本用法: cacheNames + key
+    @Cacheable(cacheNames = "users", key = "#id")
+    public User getUserById(Long id) {
+        // 缓存未命中时执行
+        return userRepository.findById(id).orElseThrow();
+    }
+
+    // SpEL key: 支持 #paramName, #root.args, #root.methodName
+    @Cacheable(cacheNames = "users", key = "#username")
+    public User getUserByUsername(String username) {
+        return userRepository.findByUsername(username).orElseThrow();
+    }
+
+    // 复杂 key: SpEL 拼接
+    @Cacheable(cacheNames = "users", key = "#username + ':' + #email")
+    public User findUser(String username, String email) { ... }
+
+    // 条件缓存: 满足条件才缓存
+    @Cacheable(cacheNames = "users", condition = "#id > 1000")
+    public User getUserConditional(Long id) { ... }
+
+    // 除非: 满足条件时不缓存
+    @Cacheable(cacheNames = "users", unless = "#result == null")
+    public User getUserUnless(Long id) { ... }
+
+    // 同步: 防止缓存击穿 (并发时只一个线程执行方法)
+    @Cacheable(cacheNames = "users", sync = true)
+    public User getUserSync(Long id) { ... }
+}
+
+// ========== @CachePut ==========
+// 总是执行方法, 并把结果更新到缓存
+// 用于更新操作: 修改数据后刷新缓存
+
+@Service
+public class UserService {
+
+    @CachePut(cacheNames = "users", key = "#result.id")
+    public User updateUser(Long id, UpdateUserRequest request) {
+        User user = userRepository.findById(id).orElseThrow();
+        user.setUsername(request.getUsername());
+        user.setEmail(request.getEmail());
+        return userRepository.save(user);
+    }
+}
+
+// ========== @CacheEvict ==========
+// 从缓存中移除数据
+
+@Service
+public class UserService {
+
+    // 清除单个缓存
+    @CacheEvict(cacheNames = "users", key = "#id")
+    public void deleteUser(Long id) {
+        userRepository.deleteById(id);
+    }
+
+    // 清除所有 users 缓存
+    @CacheEvict(cacheNames = "users", allEntries = true)
+    public void clearUserCache() { ... }
+
+    // 方法执行前清除 (默认执行后)
+    @CacheEvict(cacheNames = "users", key = "#id", beforeInvocation = true)
+    public void evictBefore(Long id) { ... }
+}
+
+// ========== @Caching ==========
+// 组合多个缓存操作
+
+@Caching(
+    cacheable = @Cacheable(cacheNames = "users", key = "#username"),
+    put = @CachePut(cacheNames = "users", key = "#result.id"),
+    evict = @CacheEvict(cacheNames = "user-lists", allEntries = true)
+)
+public User findOrCreateUser(String username) { ... }
+
+// ========== 类级别 ==========
+@CacheConfig(cacheNames = "users")      // 类级别默认 cacheNames
+@Service
+public class UserService {
+
+    // 继承类级别的 cacheNames
+    @Cacheable(key = "#id")
+    public User getUser(Long id) { ... }
+
+    @CacheEvict(allEntries = true)
+    public void clearCache() { ... }
+}</div>
+    </div>
+    <div class="card">
+        <h2>CacheManager 配置</h2>
+        <div class="code">// ========== CacheManager 抽象 ==========
+// Spring 提供多种 CacheManager 实现:
+// ConcurrentMapCacheManager  — 本地 ConcurrentHashMap (开发用)
+// CaffeineCacheManager     — Caffeine 高性能本地缓存
+// RedisCacheManager        — Redis 分布式缓存
+// JCacheCacheManager       — JSR-107 标准
+// CompositeCacheManager    — 多级缓存组合
+
+// ========== 1. 默认: ConcurrentMapCacheManager ==========
+// 自动配置 (无外部依赖时):
+// SimpleCacheConfiguration 创建 ConcurrentMapCacheManager
+// 不适用于生产: 无过期/TTL/大小限制
+
+// ========== 2. Caffeine ==========
+// 高性能本地缓存, 支持过期/大小/统计
+
+// 依赖:
+// &lt;dependency&gt;
+//     &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+//     &lt;artifactId&gt;spring-boot-starter-cache&lt;/artifactId&gt;
+// &lt;/dependency&gt;
+// &lt;dependency&gt;
+//     &lt;groupId&gt;com.github.ben-manes.caffeine&lt;/groupId&gt;
+//     &lt;artifactId&gt;caffeine&lt;/artifactId&gt;
+// &lt;/dependency&gt;
+
+@Configuration
+public class CacheConfig {
+
+    @Bean
+    public CacheManager cacheManager() {
+        CaffeineCacheManager manager = new CaffeineCacheManager();
+        manager.setCaffeine(Caffeine.newBuilder()
+            .initialCapacity(100)           // 初始大小
+            .maximumSize(500)               // 最大条目
+            .expireAfterWrite(10, TimeUnit.MINUTES)  // 写后过期
+            .expireAfterAccess(30, TimeUnit.MINUTES) // 访问后过期
+            .recordStats()                  // 开启统计
+        );
+        return manager;
+    }
+}
+
+// 或配置文件:
+// spring.cache.type=caffeine
+// spring.cache.caffeine.spec=initialCapacity=100,maximumSize=500,expireAfterWrite=10m
+
+// ========== 3. Redis ==========
+// 分布式缓存, 适合多实例部署
+
+// 依赖:
+// &lt;dependency&gt;
+//     &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+//     &lt;artifactId&gt;spring-boot-starter-data-redis&lt;/artifactId&gt;
+// &lt;/dependency&gt;
+
+@Configuration
+public class RedisCacheConfig {
+
+    @Bean
+    public RedisCacheManager redisCacheManager(RedisConnectionFactory factory) {
+        RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
+            .entryTtl(Duration.ofMinutes(10))           // 默认 TTL
+            .disableCachingNullValues()                  // 不缓存 null
+            .computePrefixWith(cacheName -> cacheName + ":")  // key 前缀
+            .serializeKeysWith(
+                RedisSerializationContext.SerializationPair.fromSerializer(
+                    new StringRedisSerializer()))
+            .serializeValuesWith(
+                RedisSerializationContext.SerializationPair.fromSerializer(
+                    new GenericJackson2JsonRedisSerializer()));
+
+        // 按缓存名定制 TTL
+        Map&lt;String, RedisCacheConfiguration&gt; configMap = new HashMap&lt;&gt;();
+        configMap.put("users", config.entryTtl(Duration.ofMinutes(30)));
+        configMap.put("sessions", config.entryTtl(Duration.ofHours(2)));
+        configMap.put("blacklist", config.entryTtl(Duration.ofDays(1)));
+
+        return RedisCacheManager.builder(factory)
+            .cacheDefaults(config)                      // 默认配置
+            .withInitialCacheConfigurations(configMap)  // 按缓存定制
+            .transactionAware()                          // 事务感知
+            .build();
+    }
+}
+
+// application.yml:
+// spring:
+//   cache:
+//     type: redis
+//   redis:
+//     host: localhost
+//     port: 6379
+//     timeout: 2000ms
+
+// ========== 4. 多级缓存 (Caffeine + Redis) ==========
+// 本地缓存快, 分布式缓存共享
+// CompositeCacheManager 按顺序查找
+
+@Configuration
+public class MultiLevelCacheConfig {
+
+    @Bean
+    public CacheManager cacheManager() {
+        // 一级: Caffeine (本地)
+        CaffeineCacheManager caffeine = new CaffeineCacheManager();
+        caffeine.setCaffeine(Caffeine.newBuilder()
+            .maximumSize(500)
+            .expireAfterWrite(5, TimeUnit.MINUTES));
+
+        // 二级: Redis (分布式)
+        RedisCacheManager redis = redisCacheManager(redisConnectionFactory());
+
+        // 组合: 先查 Caffeine, 未命中查 Redis
+        CompositeCacheManager composite = new CompositeCacheManager(caffeine, redis);
+        composite.setFallbackToNoOpCache(true);  // 无匹配时返回 NoOp
+        return composite;
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>缓存实战</h2>
+        <div class="code">// ========== 用户服务完整缓存示例 ==========
+
+@Service
+@CacheConfig(cacheNames = "users")
+@RequiredArgsConstructor
+public class UserCacheService {
+
+    private final UserRepository userRepository;
+
+    // 查询: 缓存存在则直接返回
+    @Cacheable(key = "#id", unless = "#result == null")
+    public User findById(Long id) {
+        log.info("查询数据库: {}", id);
+        return userRepository.findById(id).orElse(null);
+    }
+
+    // 查询列表: 缓存整个列表 (注意失效策略)
+    @Cacheable(key = "'list:' + #status.name()")
+    public List&lt;User&gt; findByStatus(UserStatus status) {
+        log.info("查询用户列表: {}", status);
+        return userRepository.findByStatus(status);
+    }
+
+    // 创建: 更新缓存
+    @CachePut(key = "#result.id")
+    @CacheEvict(key = "'list:' + #result.status.name()")
+    public User createUser(CreateUserRequest request) {
+        User user = new User();
+        user.setUsername(request.getUsername());
+        user.setEmail(request.getEmail());
+        return userRepository.save(user);
+    }
+
+    // 更新: 更新缓存 + 清除列表缓存
+    @CachePut(key = "#id")
+    @CacheEvict(allEntries = true)  // 清除所有 users 列表缓存
+    public User updateUser(Long id, UpdateUserRequest request) {
+        User user = userRepository.findById(id).orElseThrow();
+        if (request.getUsername() != null) user.setUsername(request.getUsername());
+        if (request.getEmail() != null) user.setEmail(request.getEmail());
+        return userRepository.save(user);
+    }
+
+    // 删除: 清除缓存
+    @CacheEvict(key = "#id")
+    @CacheEvict(allEntries = true)
+    public void deleteUser(Long id) {
+        userRepository.deleteById(id);
+    }
+}
+
+// ========== 自定义 key 生成器 ==========
+// 默认: SimpleKeyGenerator (所有参数)
+// 自定义: 类名 + 方法名 + 参数
+
+@Component("customKeyGenerator")
+public class CustomKeyGenerator implements KeyGenerator {
+
+    @Override
+    public Object generate(Object target, Method method, Object... params) {
+        return target.getClass().getSimpleName() + "_"
+            + method.getName() + "_"
+            + Arrays.stream(params).map(String::valueOf)
+                .collect(Collectors.joining("_"));
+    }
+}
+
+// 使用:
+@Cacheable(cacheNames = "users", keyGenerator = "customKeyGenerator")
+public User findUser(Long id, String name) { ... }
+
+// ========== 缓存穿透防护 ==========
+@Cacheable(cacheNames = "users", key = "#id", unless = "#result == null")
+public User findByIdSafe(Long id) {
+    // 缓存 null 值防止穿透 (配置 disableCachingNullValues = false)
+    // 或用特殊标记缓存空结果
+    return userRepository.findById(id).orElse(null);
+}
+
+// ========== 缓存失效时间自动更新 ==========
+// 缓存更新时重置 TTL:
+// Caffeine: expireAfterWrite 在 @CachePut 时自动重置
+// Redis: @CachePut 会覆盖, 但 TTL 需要重新设置
+// RedisCacheManager 默认 PUT 操作不重置 TTL
+// 解决方案: 配置 RedisCacheManager 的 PUT 行为
+
+@Bean
+public RedisCacheManager redisCacheManager(RedisConnectionFactory factory) {
+    RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
+        .entryTtl(Duration.ofMinutes(30))
+        .disableCachingNullValues();
+
+    return RedisCacheManager.builder(factory)
+        .cacheDefaults(config)
+        .transactionAware()
+        .build();
+    // 默认 @CachePut 会重新创建缓存, 重置 TTL
+}</div>
+    </div>
+    <div class="card">
+        <h2>缓存问题与解决方案</h2>
+        <div class="code">// ========== 缓存三大问题 ==========
+
+// ========== 1. 缓存穿透 ==========
+// 问题: 查询不存在的数据, 每次都查 DB
+// 解决:
+//   ① 缓存 null 值 (unless = "#result == null")
+//   ② 布隆过滤器 (Bloom Filter) 预判断
+
+@Component
+public class BloomFilterService {
+
+    private final BloomFilter&lt;Long&gt; bloomFilter = BloomFilter.create(
+        Funnels.longFunnel(), 1000000, 0.01);
+
+    @PostConstruct
+    public void init() {
+        // 加载所有存在的 ID 到布隆过滤器
+        List&lt;Long&gt; ids = userRepository.findAllIds();
+        ids.forEach(bloomFilter::put);
+    }
+
+    public boolean mightContain(Long id) {
+        return bloomFilter.mightContain(id);
+    }
+}
+
+// 使用:
+@Cacheable(cacheNames = "users", key = "#id", unless = "#result == null")
+public User findByIdSafe(Long id) {
+    if (!bloomFilterService.mightContain(id)) {
+        return null;  // 肯定不存在
+    }
+    return userRepository.findById(id).orElse(null);
+}
+
+// ========== 2. 缓存击穿 ==========
+// 问题: 热点 key 过期瞬间, 大量并发请求打到 DB
+// 解决:
+//   ① sync = true (只允许一个线程查 DB, 其他等待)
+//   ② 分布式锁 (Redisson)
+//   ③ 永不过期 + 后台异步刷新
+
+@Cacheable(cacheNames = "hotData", key = "#id", sync = true)
+public HotData getHotData(Long id) {
+    return hotDataRepository.findById(id).orElseThrow();
+}
+
+// ========== 3. 缓存雪崩 ==========
+// 问题: 大量缓存同时过期, 流量全部打到 DB
+// 解决:
+//   ① 随机 TTL: 设置不同过期时间
+//   ② 多级缓存: 本地 + 分布式
+//   ③ 限流/降级: 保护 DB
+
+// 随机 TTL:
+@Configuration
+public class RandomTtlConfig {
+
+    @Bean
+    public CacheManager cacheManager(RedisConnectionFactory factory) {
+        RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
+            .entryTtl(Duration.ofSeconds(300 + ThreadLocalRandom.current().nextInt(60)));
+            // 基础 5 分钟 + 随机 0-60 秒
+        return RedisCacheManager.builder(factory)
+            .cacheDefaults(config)
+            .build();
+    }
+}
+
+// ========== 缓存与数据库一致性 ==========
+// 策略:
+//   ① 先更新 DB, 再删缓存 (推荐)
+//   ② 先删缓存, 再更新 DB (有并发问题)
+//   ③ 延迟双删: 删缓存 → 更新 DB → 延迟再删
+
+// 推荐: Cache Aside 模式
+// 读: 先读缓存 → 未命中读 DB → 写缓存
+// 写: 更新 DB → 删除缓存 (下次读时重建)
+
+@Transactional
+@CacheEvict(key = "#id")
+public User updateUser(Long id, UpdateUserRequest request) {
+    // 先更新 DB
+    User user = userRepository.findById(id).orElseThrow();
+    // ... 更新字段
+    userRepository.save(user);
+    // 事务提交后自动删除缓存
+    return user;
+}
+
+// ========== 缓存命中率监控 ==========
+// Caffeine 统计:
+@Bean
+public CacheManager cacheManager() {
+    CaffeineCacheManager manager = new CaffeineCacheManager();
+    manager.setCaffeine(Caffeine.newBuilder()
+        .maximumSize(500)
+        .expireAfterWrite(10, TimeUnit.MINUTES)
+        .recordStats());                // 开启统计
+    return manager;
+}
+
+// 获取统计:
+@RestController
+public class CacheMonitorController {
+
+    private final CacheManager cacheManager;
+
+    @GetMapping("/actuator/cache-stats")
+    public Map&lt;String, Object&gt; getCacheStats() {
+        Map&lt;String, Object&gt; stats = new HashMap&lt;&gt;();
+        Cache cache = cacheManager.getCache("users");
+        if (cache instanceof CaffeineCache) {
+            CaffeineCache caffeineCache = (CaffeineCache) cache;
+            com.github.benmanes.caffeine.cache.Cache nativeCache =
+                caffeineCache.getNativeCache();
+            stats.put("hitRate", nativeCache.stats().hitRate());
+            stats.put("missRate", nativeCache.stats().missRate());
+            stats.put("evictionCount", nativeCache.stats().evictionCount());
+        }
+        return stats;
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>分布式锁与缓存</h2>
+        <div class="code">// ========== Redisson 分布式锁 ==========
+// 用于分布式环境下的缓存同步
+
+// 依赖:
+// &lt;dependency&gt;
+//     &lt;groupId&gt;org.redisson&lt;/groupId&gt;
+//     &lt;artifactId&gt;redisson-spring-boot-starter&lt;/artifactId&gt;
+//     &lt;version&gt;3.24.3&lt;/version&gt;
+// &lt;/dependency&gt;
+
+@Configuration
+public class RedissonConfig {
+
+    @Bean
+    public RedissonClient redissonClient() {
+        Config config = new Config();
+        config.useSingleServer()
+            .setAddress("redis://localhost:6379")
+            .setConnectionPoolSize(10);
+        return Redisson.create(config);
+    }
+}
+
+// ========== 分布式缓存 + 锁示例 ==========
+@Service
+public class InventoryService {
+
+    private final RedissonClient redissonClient;
+    private final ProductRepository productRepository;
+
+    // 扣减库存 (防超卖)
+    public boolean deductStock(Long productId, int quantity) {
+        String lockKey = "lock:product:" + productId;
+        RLock lock = redissonClient.getLock(lockKey);
+
+        try {
+            // 尝试加锁, 最多等 3 秒, 锁 10 秒自动释放
+            if (!lock.tryLock(3, 10, TimeUnit.SECONDS)) {
+                throw new RuntimeException("获取锁失败");
+            }
+
+            Product product = productRepository.findById(productId).orElseThrow();
+            if (product.getStock() < quantity) {
+                return false;
+            }
+            product.setStock(product.getStock() - quantity);
+            productRepository.save(product);
+
+            // 使缓存失效
+            // cacheManager.getCache("products").evict(productId);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new RuntimeException("锁中断", e);
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+    }
+}
+
+// ========== 缓存 + 分布式锁整合 ==========
+@Service
+public class UserCacheService {
+
+    @Cacheable(cacheNames = "users", key = "#id", sync = true)
+    public User findById(Long id) {
+        // sync = true 在单机有效
+        // 分布式需要外部锁
+        return userRepository.findById(id).orElseThrow();
+    }
+
+    // 手动实现分布式缓存防击穿
+    public User findByIdDistributed(Long id) {
+        // 1. 先查缓存
+        ValueOperations&lt;String, Object&gt; ops = redisTemplate.opsForValue();
+        String key = "users:" + id;
+        User user = (User) ops.get(key);
+        if (user != null) return user;
+
+        // 2. 缓存未命中, 尝试获取锁
+        String lockKey = "lock:" + key;
+        RLock lock = redissonClient.getLock(lockKey);
+
+        try {
+            // 3. 双重检查: 获取锁后再查一次缓存
+            if (lock.tryLock(1, 5, TimeUnit.SECONDS)) {
+                user = (User) ops.get(key);
+                if (user != null) return user;
+
+                // 4. 查数据库
+                user = userRepository.findById(id).orElseThrow();
+                ops.set(key, user, 30, TimeUnit.MINUTES);
+                return user;
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } finally {
+            if (lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+        // 获取锁失败, 直接查 DB (降级)
+        return userRepository.findById(id).orElseThrow();
+    }
+}
+
+// ========== Spring Cache + Redisson ==========
+// 自定义 CacheManager 整合 Redisson
+// 或使用 RedissonSpringCacheManager
+
+@Bean
+public CacheManager cacheManager(RedissonClient redissonClient) {
+    Map&lt;String, CacheConfig&gt; config = new HashMap&lt;&gt;();
+    config.put("users", new CacheConfig(24 * 60 * 1000, 12 * 60 * 1000));
+    // 参数: ttl, maxIdleTime (毫秒)
+    return new RedissonSpringCacheManager(redissonClient, config);
+}</div>
+    </div>
+    <div class="card">
+        <h2>最佳实践</h2>
+        <div class="code">// ========== 缓存最佳实践 ==========
+
+// ========== 1. 选择合适的缓存类型 ==========
+// 单实例: Caffeine (本地缓存, 快)
+// 多实例: Redis (分布式, 共享)
+// 都想要: 多级缓存 (Caffeine + Redis)
+
+// ========== 2. 合理设置 TTL ==========
+// 根据数据更新频率设置
+// 静态数据: 1 小时
+// 动态数据: 5-10 分钟
+// 热点数据: 可续期
+
+// ========== 3. 防止缓存穿透 ==========
+// 缓存 null 值 (短期)
+// 布隆过滤器 (静态数据)
+// 参数校验 (如 ID 格式)
+
+// ========== 4. sync = true ==========
+// 高并发热点 key 开启 sync
+// 防止缓存击穿
+
+// ========== 5. 缓存粒度 ==========
+// 细粒度: 单个对象 @Cacheable(key="#id")
+// 粗粒度: 列表缓存, 注意失效策略
+// 避免大 key, 避免大 value
+
+// ========== 6. 监控 ==========
+// Caffeine: recordStats() + 查询 hitRate
+// Redis: INFO commandstats, RedisInsight
+// Actuator: /actuator/caches
+
+// ========== 7. 缓存名称规范 ==========
+// 统一后缀: _cache
+// 集合名: users, users:list
+// 按业务分: user:profile, user:permission
+
+// ========== 8. @CacheEvict 清除列表缓存 ==========
+// 增删改时清除列表缓存
+// 或用 @Caching 组合操作
+
+// ========== 9. 避免缓存与数据库不一致 ==========
+// 先更新 DB, 后删除缓存 (Cache Aside)
+// 事务提交后 @CacheEvict 生效
+// 最终一致性可接受
+
+// ========== 10. 分布式环境注意事项 ==========
+// 序列化: 用 JSON/Protobuf, 不要用 JDK 序列化
+// 缓存 key 带业务前缀, 加命名空间
+// 注意大 key 问题 (如缓存整个表)</div>
+        <div class="note">💡 缓存要点: @EnableCaching 启用; @Cacheable 查询缓存; @CachePut 更新缓存; @CacheEvict 清除缓存; Caffeine 本地高性能; RedisCacheManager 分布式; sync=true 防击穿; unless 防穿透; CompositeCacheManager 多级; 先更新 DB 后删缓存保一致性; 随机 TTL 防雪崩。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCacheable()">@Cacheable</button>
+        <button onclick="demoEvict()">@CacheEvict</button>
+        <button onclick="demoProblem()">缓存问题</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCacheable() {
+            result.innerHTML = '';
+            log('# @Cacheable 缓存注解');
+            log('');
+            log('@Cacheable(cacheNames="users", key="#id")');
+            log('  先查缓存 → 命中返回 → 未命中查 DB');
+            log('');
+            log('key 支持 SpEL:');
+            log('  #id, #username');
+            log('  #root.methodName');
+            log('  #result (方法返回值)');
+            log('');
+            log('属性:');
+            log('  sync=true — 防击穿');
+            log('  unless   — 条件不缓存');
+            log('  condition — 条件才缓存');
+        }
+
+        function demoEvict() {
+            result.innerHTML = '';
+            log('# @CacheEvict / @CachePut');
+            log('');
+            log('@CacheEvict(cacheNames="users", key="#id")');
+            log('  删除缓存');
+            log('  allEntries=true — 清空所有');
+            log('  beforeInvocation — 方法执行前清除');
+            log('');
+            log('@CachePut(cacheNames="users", key="#result.id")');
+            log('  始终执行方法, 更新缓存');
+            log('  用于 update 操作');
+            log('');
+            log('@Caching — 组合多个缓存操作');
+        }
+
+        function demoProblem() {
+            result.innerHTML = '';
+            log('# 缓存三大问题');
+            log('');
+            log('🔴 穿透: 查不存在的数据');
+            log('  解决: 缓存 null / 布隆过滤器');
+            log('');
+            log('🔴 击穿: 热点 key 过期瞬间高并发');
+            log('  解决: sync=true / 分布式锁');
+            log('');
+            log('🔴 雪崩: 大量 key 同时过期');
+            log('  解决: 随机 TTL / 多级缓存');
+            log('');
+            log('✅ 一致性: 先更新 DB, 后删缓存');
+        }
+    </script>
+</body>
+</html>

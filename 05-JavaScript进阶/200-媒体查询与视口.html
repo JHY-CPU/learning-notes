@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>媒体查询与视口</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #16a085; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        .viewport-info { background: #f8f9fa; padding: 15px; border-radius: 4px; font-size: 14px; }
+        .viewport-info .row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #eee; }
+        .viewport-info .label { color: #7f8c8d; }
+        .viewport-info .value { font-family: monospace; font-weight: bold; color: #2c3e50; }
+        .mq-indicator { padding: 10px 15px; border-radius: 8px; text-align: center; font-weight: bold; margin: 10px 0; transition: all 0.3s; }
+        .mq-indicator.wide { background: #3498db; color: white; }
+        .mq-indicator.medium { background: #2ecc71; color: white; }
+        .mq-indicator.narrow { background: #e67e22; color: white; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>媒体查询与视口</h2><p>matchMedia API、resize 事件、视口宽高获取。</p></div>
+    <div class="card">
+        <h2>视口（Viewport）</h2>
+        <div class="code">// 获取视口尺寸
+window.innerWidth    // 视口宽度（含滚动条）
+window.innerHeight   // 视口高度（含滚动条）
+
+document.documentElement.clientWidth   // 视口宽度（不含滚动条）
+document.documentElement.clientHeight  // 视口高度（不含滚动条）
+
+// ⚠️ innerWidth/Height 包含滚动条
+// ⚠️ clientWidth/Height 不包含滚动条
+
+// HTML viewport meta
+// &lt;meta name="viewport" content="width=device-width, initial-scale=1.0"&gt;
+// width=device-width — 视口宽度=设备宽度
+// initial-scale=1.0 — 初始缩放比例
+// minimum-scale / maximum-scale — 最小/最大缩放
+// user-scalable=yes/no — 是否允许缩放</div>
+    </div>
+    <div class="card">
+        <h2>matchMedia — CSS 媒体查询的 JS API</h2>
+        <div class="code">// window.matchMedia(mediaQueryString)
+// 返回 MediaQueryList 对象
+
+const mq = window.matchMedia('(max-width: 768px)');
+
+// matches — 是否匹配
+if (mq.matches) {
+    console.log('视口宽度 ≤ 768px（移动端）');
+} else {
+    console.log('视口宽度 > 768px（桌面端）');
+}
+
+// 常见媒体查询：
+matchMedia('(max-width: 767px)')        // 手机
+matchMedia('(min-width: 768px) and (max-width: 1023px)')  // 平板
+matchMedia('(min-width: 1024px)')       // 桌面
+matchMedia('(prefers-color-scheme: dark)')  // 深色模式
+matchMedia('(prefers-reduced-motion: reduce)')  // 减少动画
+matchMedia('(orientation: portrait)')   // 竖屏
+matchMedia('(orientation: landscape)')  // 横屏
+matchMedia('(min-resolution: 2dppx)')   // Retina 屏
+matchMedia('(hover: hover)')            // 支持 hover
+matchMedia('(pointer: coarse)')         // 触摸设备
+
+// 监听变化
+mq.addEventListener('change', function(e) {
+    if (e.matches) {
+        console.log('现在匹配了');
+    } else {
+        console.log('不再匹配');
+    }
+});
+
+// 旧方式（已弃用）
+// mq.addListener(handler)
+// mq.removeListener(handler)</div>
+    </div>
+    <div class="card">
+        <h2>resize 事件</h2>
+        <div class="code">// resize 事件 — 窗口大小变化时触发
+
+window.addEventListener('resize', function() {
+    console.log('窗口大小变化:', window.innerWidth, 'x', window.innerHeight);
+});
+
+// ⚠️ resize 触发非常频繁！
+// ⚠️ 必须防抖或节流！
+
+// 防抖 resize
+let resizeTimer;
+window.addEventListener('resize', function() {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+        console.log('resize 结束（防抖后）');
+    }, 200);
+});
+
+// 节流 resize
+let lastResizeTime = 0;
+window.addEventListener('resize', function() {
+    const now = Date.now();
+    if (now - lastResizeTime >= 200) {
+        lastResizeTime = now;
+        console.log('resize 节流:', window.innerWidth);
+    }
+});
+
+// 注意：移动端 resize 事件可能不触发
+// 推荐用 matchMedia 检测视口变化</div>
+    </div>
+    <div class="card">
+        <h2>设备像素比与缩放</h2>
+        <div class="code">// devicePixelRatio — 物理像素 / CSS 像素
+window.devicePixelRatio;
+
+// 1x 屏幕（普通屏）— 1
+// 2x 屏幕（Retina）— 2
+// 3x 屏幕（iPhone 等）— 3
+
+// 应用场景：提供高清图片
+function getImageUrl(base) {
+    const dpr = window.devicePixelRatio;
+    return dpr >= 2 ? `${base}@2x.png` : `${base}.png`;
+}
+
+// 根据像素比渲染 Canvas
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const dpr = window.devicePixelRatio || 1;
+canvas.width = displayWidth * dpr;
+canvas.height = displayHeight * dpr;
+canvas.style.width = displayWidth + 'px';
+canvas.style.height = displayHeight + 'px';
+ctx.scale(dpr, dpr);</div>
+    </div>
+    <div class="viewport-info" id="viewport-display">
+        <div class="row"><span class="label">视口宽度 (innerWidth):</span><span class="value" id="v-width">-</span></div>
+        <div class="row"><span class="label">视口高度 (innerHeight):</span><span class="value" id="v-height">-</span></div>
+        <div class="row"><span class="label">clientWidth (不含滚动条):</span><span class="value" id="c-width">-</span></div>
+        <div class="row"><span class="label">devicePixelRatio:</span><span class="value" id="dpr">-</span></div>
+        <div class="row"><span class="label">屏幕方向:</span><span class="value" id="orientation">-</span></div>
+        <div class="row"><span class="label">深色模式:</span><span class="value" id="dark-mode">-</span></div>
+    </div>
+    <div class="mq-indicator wide" id="mq-indicator">当前断点: 桌面 (≥ 1024px)</div>
+    <pre id="output"></pre>
+    <script>
+        const output = document.getElementById('output');
+
+        function updateViewportInfo() {
+            document.getElementById('v-width').textContent = window.innerWidth + 'px';
+            document.getElementById('v-height').textContent = window.innerHeight + 'px';
+            document.getElementById('c-width').textContent = document.documentElement.clientWidth + 'px';
+            document.getElementById('dpr').textContent = window.devicePixelRatio;
+            document.getElementById('orientation').textContent = screen.orientation?.type || 'N/A';
+            document.getElementById('dark-mode').textContent =
+                window.matchMedia('(prefers-color-scheme: dark)').matches ? '🌙 深色' : '☀️ 浅色';
+
+            // 断点判断
+            const indicator = document.getElementById('mq-indicator');
+            if (window.matchMedia('(max-width: 767px)').matches) {
+                indicator.className = 'mq-indicator narrow';
+                indicator.textContent = `📱 窄屏 (≤ 767px) — width: ${window.innerWidth}px`;
+            } else if (window.matchMedia('(min-width: 768px) and (max-width: 1023px)').matches) {
+                indicator.className = 'mq-indicator medium';
+                indicator.textContent = `📟 中屏 (768-1023px) — width: ${window.innerWidth}px`;
+            } else {
+                indicator.className = 'mq-indicator wide';
+                indicator.textContent = `💻 宽屏 (≥ 1024px) — width: ${window.innerWidth}px`;
+            }
+        }
+
+        // 更新
+        updateViewportInfo();
+
+        // resize 事件（防抖）
+        let resizeTimer;
+        window.addEventListener('resize', function() {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(() => {
+                updateViewportInfo();
+                console.log('resize:', window.innerWidth, 'x', window.innerHeight);
+            }, 150);
+        });
+
+        // matchMedia 监听
+        console.log('=== matchMedia 演示 ===');
+
+        // 深色模式变化监听
+        const darkModeMq = window.matchMedia('(prefers-color-scheme: dark)');
+        darkModeMq.addEventListener('change', function(e) {
+            console.log('深色模式:', e.matches ? '开启' : '关闭');
+            updateViewportInfo();
+        });
+
+        // 断点变化监听
+        const breakpoints = [
+            { query: '(max-width: 767px)', name: '窄屏 (≤767px)' },
+            { query: '(min-width: 768px) and (max-width: 1023px)', name: '中屏 (768-1023px)' },
+            { query: '(min-width: 1024px)', name: '宽屏 (≥1024px)' },
+        ];
+
+        breakpoints.forEach(bp => {
+            const mq = window.matchMedia(bp.query);
+            mq.addEventListener('change', function(e) {
+                if (e.matches) {
+                    console.log(`断点变化 → ${bp.name}`);
+                    updateViewportInfo();
+                }
+            });
+        });
+
+        console.log('=== 视口信息 ===');
+        console.log('innerWidth:', window.innerWidth);
+        console.log('innerHeight:', window.innerHeight);
+        console.log('clientWidth:', document.documentElement.clientWidth);
+        console.log('clientHeight:', document.documentElement.clientHeight);
+        console.log('devicePixelRatio:', window.devicePixelRatio);
+        console.log('orientation:', screen.orientation?.type);
+
+        console.log('=== matchMedia 查询 ===');
+        const queries = [
+            '(max-width: 767px)',
+            '(min-width: 768px) and (max-width: 1023px)',
+            '(min-width: 1024px)',
+            '(prefers-color-scheme: dark)',
+            '(prefers-reduced-motion: reduce)',
+            '(orientation: portrait)',
+            '(orientation: landscape)',
+            '(hover: hover)',
+            '(pointer: coarse)',
+            '(min-resolution: 2dppx)',
+        ];
+        queries.forEach(q => {
+            const result = window.matchMedia(q);
+            console.log(`  ${q}: ${result.matches}`);
+        });
+
+        document.getElementById('output').textContent =
+            `视口: ${window.innerWidth}x${window.innerHeight}\n` +
+            `dpr: ${window.devicePixelRatio}\n` +
+            `断点: ${window.matchMedia('(max-width: 767px)').matches ? '移动端' :
+                   window.matchMedia('(min-width: 1024px)').matches ? '桌面端' : '平板'}\n` +
+            `✅ 媒体查询与视口演示完成！`;
+    </script>
+</body>
+</html>

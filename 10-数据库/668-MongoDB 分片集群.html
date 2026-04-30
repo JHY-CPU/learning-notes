@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MongoDB 分片集群</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔀 MongoDB 分片集群</h2><p>分片架构 (mongos/config/shard)、分片键选择策略 (范围/哈希/分区)、块迁移、分片与副本集结合、何时需要分片、分片管理。</p></div>
+    <div class="card">
+        <h2>分片架构</h2>
+        <div class="code">// ========== 分片集群 (Sharded Cluster) ==========
+// 将数据分布到多个服务器, 实现水平扩展
+
+// ========== 三个组件 ==========
+// ┌──────────────────────────────────────────────┐
+// │                分片集群                       │
+// ├──────────────────────────────────────────────┤
+// │  mongos (路由)                                │
+// │  ├── 客户端入口, 像普通 mongod                │
+// │  ├── 路由查询到正确的分片                     │
+// │  └── 可部署多个 (无状态)                     │
+// ├──────────────────────────────────────────────┤
+// │  Config Server (配置服务器)                   │
+// │  ├── 存储元数据: 分片键范围 → 分片映射        │
+// │  ├── 是副本集 (至少 3 节点)                   │
+// │  └── 集群的核心信息                          │
+// ├──────────────────────────────────────────────┤
+// │  Shard (数据分片)                             │
+// │  ├── 存储实际数据                            │
+// │  ├── 每个分片是独立的副本集                  │
+// │  └── 数据按分片键分布到不同分片              │
+// └──────────────────────────────────────────────┘
+
+// ========== 数据分布 ==========
+// 数据按分片键分割成块 (chunk)
+// 默认块大小: 64MB
+// 块分布在各个分片上 (自动平衡)
+
+// ┌─────────┐  ┌─────────┐  ┌─────────┐
+// │ Shard A │  │ Shard B │  │ Shard C │
+// ├─────────┤  ├─────────┤  ├─────────┤
+// │ key: 1-100│  │ key: 101-200│  │ key: 201-...│
+// └─────────┘  └─────────┘  └─────────┘
+
+// ========== 何时需要分片 ==========
+// 1. 数据量 > 单机存储容量
+// 2. 写入吞吐超过单机处理能力
+// 3. 工作集 (内存) 超过物理内存
+// 4. 需要水平扩展而非垂直扩展</div>
+    </div>
+    <div class="card">
+        <h2>分片键选择</h2>
+        <div class="code">// ========== 分片键 (Shard Key) ==========
+// 最重要的设计决策!
+
+// ========== 分片策略 ==========
+
+// 1. 范围分片 (Ranged Sharding)
+//    按值范围分配到不同分片
+sh.shardCollection("shop.orders", { user_id: 1 })
+
+//    特点:
+//    - 支持范围查询 (高效)
+//    - 可能数据倾斜 (热点)
+//    - `_id` 作为范围分片键: 写入集中在最新分片
+
+// 2. 哈希分片 (Hashed Sharding)
+//    对分片键哈希后分配
+sh.shardCollection("shop.orders", { user_id: "hashed" })
+
+//    特点:
+//    - 数据均匀分布
+//    - 不支持范围查询 (必须精确匹配)
+//    - 写入均匀 (无热点)
+
+// ========== 分片键设计原则 ==========
+// 1. 高基数 (cardinality high)
+//    分片键应有大量不同值
+//    好: user_id, order_id
+//    差: status (只有几个值)
+
+// 2. 高频查询条件
+//    大部分查询应包含分片键
+//    命中分片键 → 只查一个分片 (targeted query)
+//    不命中 → 广播到所有分片 (scatter gather)
+
+// 3. 写入均匀
+//    避免热点分片
+//    哈希通常比范围更均匀
+
+// 4. 单调递增键 (如 ObjectId)
+//    哈希分片避免单点写入热点</div>
+    </div>
+    <div class="card">
+        <h2>块迁移与平衡</h2>
+        <div class="code">// ========== 块 (Chunk) ==========
+// 数据按分片键范围分割成块
+
+// 块操作:
+sh.status()                     // 查看分片状态和块分布
+
+sh.splitAt("shop.orders",       // 手动分割块
+    { user_id: 5000 })
+
+sh.splitFind("shop.orders",     // 按找到的文档分割
+    { user_id: 3000 })
+
+sh.moveChunk("shop.orders",     // 手动移动块到分片
+    { user_id: 1000 },
+    "shard2")
+
+// ========== 自动平衡 ==========
+// mongos 后台 balancer 自动平衡块数量
+
+// 查看 balancer 状态:
+sh.getBalancerState()
+
+// 关闭 balancer (维护时):
+sh.stopBalancer()
+sh.startBalancer()
+
+// 平衡窗口 (只在指定时间平衡):
+db.settings.updateOne(
+    { _id: "balancer" },
+    { $set: {
+        activeWindow: {
+            start: "02:00",   // 凌晨 2 点
+            stop: "06:00"     // 到 6 点
+        }
+    }},
+    { upsert: true }
+)
+
+// ========== 分片与副本集 ==========
+// 生产每个分片是副本集!
+// ┌──────────────────────────────┐
+// │  mongos (路由)                │
+// ├──────────────────────────────┤
+// │  Shard 1 (副本集 rs1)         │
+// │  ├── rs1-primary:27017       │
+// │  ├── rs1-secondary1:27018    │
+// │  └── rs1-secondary2:27019    │
+// ├──────────────────────────────┤
+// │  Shard 2 (副本集 rs2)         │
+// │  ├── rs2-primary:27020       │
+// │  ├── rs2-secondary1:27021    │
+// │  └── rs2-secondary2:27022    │
+// └──────────────────────────────┘</div>
+    </div>
+    <div class="card">
+        <h2>部署与管理</h2>
+        <div class="code">// ========== 部署分片集群步骤 ==========
+
+// 1. 启动 Config Server 副本集
+// mongod --configsvr --replSet configRS --port 27019
+
+// 2. 初始化 Config Server
+// rs.initiate({_id:"configRS", members:[...]})
+
+// 3. 启动各分片副本集
+// mongod --shardsvr --replSet shard1 --port 27017
+// mongod --shardsvr --replSet shard2 --port 27018
+
+// 4. 启动 mongos 路由
+// mongos --configdb configRS/host1:27019,host2:27019 --port 27000
+
+// 5. 连接到 mongos, 添加分片
+sh.addShard("shard1/host1:27017,host2:27017")
+sh.addShard("shard2/host1:27018,host2:27018")
+
+// 6. 启用分片
+sh.enableSharding("shop")
+
+// 7. 对集合分片
+sh.shardCollection("shop.orders", { user_id: "hashed" })
+
+// ========== 管理命令 ==========
+sh.status()                              // 集群状态
+db.printShardingStatus()                 // 分片状态详情
+
+// 查看块分布:
+db.orders.getShardDistribution()
+
+// 移除分片:
+db.adminCommand({ removeShard: "shard2" })
+
+// ========== 分片注意事项 ==========
+// 1. 分片键一旦选定不能修改!
+// 2. 分片键有上限: 512 bytes
+// 3. 不支持单个文档跨分片
+// 4. 分片后的集合不支持 $lookup 跨分片
+// 5. 分片增加运维复杂度
+// 6. 先垂直扩展, 不够再水平扩展</div>
+        <div class="note">💡 分片要点: 分片键选择最关键; 哈希分片均匀但无范围查询; 范围分片支持范围查询但有热点; 每个分片是副本集; 分片键不可修改; 先优化查询和索引, 再考虑分片; 分片增加运维复杂度, 不要过早分片。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoArch()">分片架构</button>
+        <button onclick="demoKey()">分片键选择</button>
+        <button onclick="demoDeploy()">部署步骤</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoArch() {
+            result.innerHTML = '';
+            log('# 分片集群组件');
+            log('');
+            log('mongos — 路由 (无状态)');
+            log('Config Server — 元数据 (副本集)');
+            log('Shard — 数据分片 (副本集)');
+            log('');
+            log('每个分片是独立副本集');
+            log('mongos 自动路由到正确分片');
+        }
+
+        function demoKey() {
+            result.innerHTML = '';
+            log('# 分片键选择');
+            log('');
+            log('要求:');
+            log('  高基数, 高频查询, 写入均匀');
+            log('');
+            log('范围分片: 支持范围查询');
+            log('  但可能有热点');
+            log('');
+            log('哈希分片: 写入均匀');
+            log('  不支持范围查询');
+            log('');
+            log('分片键一旦选定不能修改!');
+        }
+
+        function demoDeploy() {
+            result.innerHTML = '';
+            log('# 部署步骤');
+            log('');
+            log('1. Config Server 副本集');
+            log('2. 各分片副本集');
+            log('3. mongos 路由');
+            log('4. sh.addShard()');
+            log('5. sh.enableSharding()');
+            log('6. sh.shardCollection()');
+        }
+    </script>
+</body>
+</html>

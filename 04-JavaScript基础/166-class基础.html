@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>class基础</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #9b59b6; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>class 基础</h2><p>ES6 引入的 class 语法糖，本质还是基于原型的继承。</p></div>
+    <div class="card">
+        <h2>class 声明与基本语法</h2>
+        <div class="code">// class 声明
+class Person {
+    // 构造函数
+    constructor(name, age) {
+        this.name = name;
+        this.age = age;
+    }
+
+    // 实例方法（在 prototype 上）
+    sayHi() {
+        console.log('Hi, 我是' + this.name);
+    }
+
+    // getter
+    get info() {
+        return `${this.name}(${this.age}岁)`;
+    }
+
+    // setter
+    set info(val) {
+        [this.name, this.age] = val.split(' ');
+    }
+}
+
+const p = new Person('Alice', 25);
+p.sayHi();         // 'Hi, 我是Alice'
+console.log(p.info);  // 'Alice(25岁)'
+
+// class 本质是函数
+typeof Person;  // 'function'
+Person.prototype.sayHi;  // 方法在 prototype 上
+Person.prototype.constructor === Person;  // true
+
+// ⚠️ class 不会提升（hoisting）
+// new Foo();  // ❌ ReferenceError
+// class Foo {}
+
+// ⚠️ class 中的代码自动是严格模式</div>
+    </div>
+    <div class="card">
+        <h2>class 与构造函数的对比</h2>
+        <div class="code">// 构造函数方式（ES5）
+function Person5(name) {
+    this.name = name;
+}
+Person5.prototype.sayHi = function() {
+    console.log('Hi, 我是' + this.name);
+};
+
+// class 方式（ES6，语法糖）
+class Person6 {
+    constructor(name) {
+        this.name = name;
+    }
+    sayHi() {
+        console.log('Hi, 我是' + this.name);
+    }
+}
+
+// 本质上是一样的
+const p5 = new Person5('Alice');
+const p6 = new Person6('Bob');
+console.log(typeof Person5);  // 'function'
+console.log(typeof Person6);  // 'function'
+console.log(p6 instanceof Person6);  // true
+
+// class 特有的限制：
+// 1. 必须用 new 调用
+// Person6();  // ❌ TypeError: Class constructor Person6 cannot be invoked without 'new'
+
+// 2. class 不可枚举
+Object.keys(Person.prototype);  // []
+Object.keys(Person5.prototype); // ['sayHi']</div>
+        <div class="note">💡 class 只是语法糖，让原型继承的写法更像传统面向对象语言。</div>
+    </div>
+    <div class="card">
+        <h2>class 表达式</h2>
+        <div class="code">// 匿名 class 表达式
+const Person = class {
+    constructor(name) {
+        this.name = name;
+    }
+};
+
+// 具名 class 表达式
+const Person2 = class MyClass {
+    constructor(name) {
+        this.name = name;
+    }
+    // MyClass 只在 class 内部可用
+    getClassName() {
+        return MyClass.name;
+    }
+};
+
+const p = new Person2('Alice');
+p.getClassName();  // 'MyClass'
+// MyClass.name;  // ❌ ReferenceError（外部不可访问）
+
+// 立即执行的 class
+const singleton = new class {
+    constructor() {
+        this.name = '单例';
+    }
+}();
+console.log(singleton.name);  // '单例'</div>
+    </div>
+    <div class="card">
+        <h2>实例属性与访问器</h2>
+        <div class="code">// 实例属性可以写在 constructor 里
+// 也可以直接写在类体中（ES2022+）
+class Person {
+    // 公有实例属性（ES2022）
+    name = '匿名';
+    age = 0;
+    city = '未知';
+
+    constructor(name, age) {
+        if (name) this.name = name;
+        if (age) this.age = age;
+    }
+
+    // 访问器（getter/setter）
+    get birthYear() {
+        return new Date().getFullYear() - this.age;
+    }
+
+    // 计算属性名
+    ['say_' + 'hello']() {
+        console.log('Hello!');
+    }
+}
+
+const p = new Person('Alice', 25);
+console.log(p.name);       // 'Alice'
+console.log(p.birthYear);  // 2001
+
+// 访问器优点：可以加验证逻辑
+class User {
+    constructor(email) { this._email = email; }
+
+    get email() { return this._email; }
+
+    set email(val) {
+        if (!val.includes('@')) throw '无效邮箱';
+        this._email = val;
+    }
+}</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== class 声明 ===');
+        class Person {
+            constructor(name, age) {
+                this.name = name;
+                this.age = age;
+            }
+            sayHi() {
+                return 'Hi, 我是' + this.name;
+            }
+        }
+        const p = new Person('Alice', 25);
+        console.log(p.sayHi());
+
+        console.log('=== class 本质 ===');
+        console.log('typeof Person:', typeof Person);
+        console.log('Person.prototype.sayHi:', typeof Person.prototype.sayHi);
+        console.log('p instanceof Person:', p instanceof Person);
+        console.log('p.constructor === Person:', p.constructor === Person);
+
+        console.log('=== class vs 构造函数 ===');
+        console.log('class 必须 new:');
+        try {
+            Person('test');
+        } catch(e) {
+            console.log('  直接调用报错:', e.message);
+        }
+
+        console.log('=== 实例属性 ===');
+        class User {
+            role = 'user';
+            constructor(name) {
+                this.name = name;
+            }
+        }
+        const u = new User('Bob');
+        console.log('name:', u.name, 'role:', u.role);
+
+        console.log('=== 访问器 ===');
+        class Temperature {
+            constructor(celsius) { this._celsius = celsius; }
+            get fahrenheit() {
+                return this._celsius * 9/5 + 32;
+            }
+            set fahrenheit(val) {
+                this._celsius = (val - 32) * 5/9;
+            }
+        }
+        const t = new Temperature(25);
+        console.log('25°C =', t.fahrenheit, '°F');
+        t.fahrenheit = 100;
+        console.log('100°F =', t._celsius, '°C');
+
+        document.getElementById('output').textContent =
+            `p.sayHi(): ${p.sayHi()}\n` +
+            `class本质: typeof=${typeof Person}\n` +
+            `✅ class 基础演示完成！`;
+    </script>
+</body>
+</html>

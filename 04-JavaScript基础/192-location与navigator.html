@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>location与navigator</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #2980b9; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 15px; font-size: 13px; }
+        .info-grid .key { color: #7f8c8d; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>location 与 navigator</h2><p>URL 信息与浏览器信息。</p></div>
+    <div class="card">
+        <h2>location — URL 信息</h2>
+        <div class="code">// location 包含当前 URL 的所有信息
+
+// 完整 URL：https://user:pass@example.com:8080/path/page?q=hello#section
+
+location.href      // 'https://user:pass@example.com:8080/path/page?q=hello#section'
+location.protocol  // 'https:'
+location.host      // 'example.com:8080'（域名 + 端口）
+location.hostname  // 'example.com'（域名）
+location.port      // '8080'（端口）
+location.pathname  // '/path/page'（路径）
+location.search    // '?q=hello'（查询参数）
+location.hash      // '#section'（锚点）
+location.origin    // 'https://example.com:8080'（协议 + 域名 + 端口）
+
+// location 方法：
+location.assign(url)   // 跳转到新 URL（可后退）
+location.replace(url)  // 替换当前 URL（不可后退）
+location.reload()      // 重新加载当前页面
+location.reload(true)  // 强制刷新（从服务器，不是缓存）
+
+// ⚠️ location.href = url 等价于 location.assign(url)
+// ⚠️ location.replace 不会在历史记录中保留</div>
+    </div>
+    <div class="card">
+        <h2>解析 URL 参数</h2>
+        <div class="code">// 传统方式（手动解析）
+function getParams() {
+    const search = location.search.substring(1);  // 去掉 ?
+    if (!search) return {};
+    return Object.fromEntries(
+        search.split('&').map(pair => {
+            const [key, val] = pair.split('=');
+            return [decodeURIComponent(key), decodeURIComponent(val || '')];
+        })
+    );
+}
+
+// 现代方式：URLSearchParams（推荐）
+const params = new URLSearchParams(location.search);
+
+params.get('key')        // 获取参数值（单个）
+params.getAll('key')     // 获取所有同名参数值
+params.has('key')        // 是否存在
+params.keys()            // 所有参数名
+params.values()          // 所有参数值
+params.entries()         // 所有 [key, value]
+params.append('key', 'value')  // 追加
+params.set('key', 'value')     // 设置（覆盖）
+params.delete('key')     // 删除
+
+// 将 params 转回字符串
+params.toString();  // 'key=value&key2=value2'
+
+// 操作 URL 而不跳转
+const url = new URL('https://example.com?q=hello');
+url.searchParams.set('q', 'world');
+url.searchParams.append('page', '2');
+console.log(url.href);  // 'https://example.com?q=world&page=2'
+
+// hashchange 事件
+window.addEventListener('hashchange', () => {
+    console.log('hash 变为:', location.hash);
+});</div>
+    </div>
+    <div class="card">
+        <h2>navigator — 浏览器信息</h2>
+        <div class="code">// navigator 包含浏览器本身的信息
+
+navigator.userAgent      // 用户代理字符串（旧式浏览器检测）
+navigator.platform       // 操作系统平台（'Win32', 'MacIntel' 等）
+navigator.language       // 浏览器语言（'zh-CN', 'en-US'）
+navigator.languages      // 用户偏好语言列表
+navigator.onLine         // 是否在线（true/false）
+navigator.cookieEnabled  // 是否启用 Cookie
+
+// ⚠️ userAgent 不建议用于特性检测（可能被伪造）
+// 推荐用功能检测替代
+
+// 现代 API（部分浏览器支持）：
+navigator.clipboard      // 剪贴板 API
+navigator.geolocation    // 地理位置
+navigator.mediaDevices   // 媒体设备（摄像头/麦克风）
+navigator.serviceWorker  // Service Worker
+navigator.storage        // 存储管理
+navigator.connection     // 网络信息
+
+// 检测浏览器特性（推荐方式）
+function supportsWebP() {
+    const elem = document.createElement('canvas');
+    return elem.toDataURL('image/webp').indexOf('data:image/webp') === 0;
+}
+
+function supportsTouch() {
+    return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+}</div>
+    </div>
+    <div class="card">
+        <h2>当前页面信息</h2>
+        <div id="location-info" class="info-grid" style="background:#f8f9fa;padding:15px;border-radius:4px;"></div>
+    </div>
+    <div class="card">
+        <h2>浏览器信息</h2>
+        <div id="nav-info" class="info-grid" style="background:#f8f9fa;padding:15px;border-radius:4px;"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin:10px 0;flex-wrap:wrap;">
+        <button onclick="reloadLocationInfo()">刷新信息</button>
+        <button onclick="testHash()">设置 hash</button>
+        <button onclick="testSearchParams()">URLSearchParams</button>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== location 属性 ===');
+        console.log('href:', location.href);
+        console.log('protocol:', location.protocol);
+        console.log('host:', location.host);
+        console.log('hostname:', location.hostname);
+        console.log('pathname:', location.pathname);
+        console.log('search:', location.search);
+        console.log('hash:', location.hash);
+        console.log('origin:', location.origin);
+
+        console.log('=== navigator 属性 ===');
+        console.log('userAgent:', navigator.userAgent);
+        console.log('platform:', navigator.platform);
+        console.log('language:', navigator.language);
+        console.log('languages:', navigator.languages);
+        console.log('onLine:', navigator.onLine);
+        console.log('cookieEnabled:', navigator.cookieEnabled);
+
+        // 显示 location 信息
+        function reloadLocationInfo() {
+            const info = document.getElementById('location-info');
+            info.innerHTML = `
+                <span class="key">href:</span><span>${location.href}</span>
+                <span class="key">protocol:</span><span>${location.protocol}</span>
+                <span class="key">host:</span><span>${location.host}</span>
+                <span class="key">hostname:</span><span>${location.hostname}</span>
+                <span class="key">pathname:</span><span>${location.pathname}</span>
+                <span class="key">search:</span><span>${location.search || '(空)'}</span>
+                <span class="key">hash:</span><span>${location.hash || '(空)'}</span>
+                <span class="key">origin:</span><span>${location.origin}</span>
+            `;
+
+            const navInfo = document.getElementById('nav-info');
+            navInfo.innerHTML = `
+                <span class="key">userAgent:</span><span style="font-size:11px;word-break:break-all;">${navigator.userAgent}</span>
+                <span class="key">platform:</span><span>${navigator.platform}</span>
+                <span class="key">language:</span><span>${navigator.language}</span>
+                <span class="key">onLine:</span><span>${navigator.onLine}</span>
+                <span class="key">cookieEnabled:</span><span>${navigator.cookieEnabled}</span>
+                <span class="key">设备像素比:</span><span>${window.devicePixelRatio}</span>
+                <span class="key">屏幕:</span><span>${screen.width}x${screen.height}</span>
+            `;
+        }
+        reloadLocationInfo();
+
+        function testHash() {
+            location.hash = '#test-' + Date.now();
+            document.getElementById('output').textContent = 'hash 已设置为: ' + location.hash;
+        }
+
+        function testSearchParams() {
+            const params = new URLSearchParams(location.search);
+            params.set('demo', 'true');
+            params.set('ts', Date.now());
+            const out = document.getElementById('output');
+            out.textContent = 'URLSearchParams: ' + params.toString() + '\n' +
+                '(当前 URL 未改变，仅在控制台演示)';
+            console.log('URLSearchParams:', Object.fromEntries(params));
+        }
+
+        // hashchange 事件
+        window.addEventListener('hashchange', () => {
+            console.log('hashchange:', location.hash);
+            reloadLocationInfo();
+        });
+
+        // online/offline 事件
+        window.addEventListener('online', () => {
+            console.log('网络已连接');
+            reloadLocationInfo();
+        });
+        window.addEventListener('offline', () => {
+            console.log('网络已断开');
+            reloadLocationInfo();
+        });
+
+        console.log('=== URL 操作 ===');
+        const url = new URL('https://example.com/path?q=hello#section');
+        console.log('new URL:', url.href);
+        console.log('pathname:', url.pathname);
+        url.searchParams.set('q', 'world');
+        url.searchParams.append('page', '2');
+        console.log('修改后:', url.href);
+
+        document.getElementById('output').textContent += '✅ location 与 navigator 演示完成！';
+    </script>
+</body>
+</html>

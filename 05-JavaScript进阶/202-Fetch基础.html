@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fetch基础</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #fetch-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; max-height: 200px; overflow-y: auto; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Fetch 基础</h2><p>现代浏览器 HTTP 请求 API，基于 Promise。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 基本 GET 请求
+fetch('https://api.example.com/data')
+    .then(response => {
+        // Response 对象
+        response.ok;          // true if status 200-299
+        response.status;      // HTTP 状态码（200, 404, 500...）
+        response.statusText;  // 状态文本（'OK', 'Not Found'）
+        response.url;         // 请求的 URL
+        response.headers;     // Headers 对象
+        response.type;        // 'basic' | 'cors' | 'error'
+        response.redirected;  // 是否被重定向
+    });
+
+// 解析响应体
+response.json();          // 解析为 JSON（最常用）
+response.text();          // 解析为纯文本
+response.blob();          // 解析为 Blob（二进制）
+response.arrayBuffer();   // 解析为 ArrayBuffer
+response.formData();      // 解析为 FormData
+
+// 完整示例
+fetch('https://jsonplaceholder.typicode.com/todos/1')
+    .then(res => {
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return res.json();
+    })
+    .then(data => console.log(data))
+    .catch(err => console.error('请求失败:', err));
+
+// ⚠️ fetch 只在网络错误时 reject（4xx/5xx 不会 reject！）
+// ⚠️ 必须手动检查 response.ok 来处理 HTTP 错误</div>
+        <div class="note">💡 fetch 默认不携带 Cookie（需要 credentials: 'include'）。<br>
+        ⚠️ 跨域请求需要服务器支持 CORS。<br>
+        💡 res.json() 只能调用一次，body 只能被读取一次。</div>
+    </div>
+    <div class="card">
+        <h2>Headers API</h2>
+        <div class="code">// Headers 操作
+const headers = new Headers();
+headers.append('Content-Type', 'application/json');
+headers.set('Authorization', 'Bearer token');
+headers.get('Content-Type');     // 'application/json'
+headers.has('Authorization');    // true
+headers.delete('Authorization');
+headers.forEach((v, k) => console.log(k, v));
+
+// 常见请求头
+// 'Content-Type': 'application/json'
+// 'Accept': 'application/json'
+// 'Authorization': 'Bearer <token>'
+// 'Cache-Control': 'no-cache'</div>
+    </div>
+    <div class="card">
+        <h2>演示：Fetch 请求</h2>
+        <button onclick="fetchGet()">GET 请求</button>
+        <button onclick="fetchError()">触发 404 错误</button>
+        <div id="fetch-result">点击按钮发送请求</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const fetchResult = document.getElementById('fetch-result');
+
+        function log(msg) {
+            const div = document.createElement('div');
+            div.textContent = msg;
+            fetchResult.appendChild(div);
+            console.log(msg);
+        }
+
+        function fetchGet() {
+            fetchResult.innerHTML = '';
+            log('🔄 发送请求...');
+
+            fetch('https://jsonplaceholder.typicode.com/todos/1')
+                .then(res => {
+                    log(`状态: ${res.status} ${res.statusText}`);
+                    log(`ok: ${res.ok}`);
+                    log(`URL: ${res.url}`);
+                    log(`类型: ${res.type}`);
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res.json();
+                })
+                .then(data => {
+                    log(`✅ 数据: userId=${data.userId}, title="${data.title}"`);
+                    log(`完整响应: ${JSON.stringify(data)}`);
+                })
+                .catch(err => {
+                    log(`❌ 错误: ${err.message}`);
+                });
+        }
+
+        function fetchError() {
+            fetchResult.innerHTML = '';
+            log('🔄 请求不存在的资源...');
+
+            fetch('https://jsonplaceholder.typicode.com/nonexistent')
+                .then(res => {
+                    log(`状态: ${res.status} — 注意 fetch 不会 reject 4xx`);
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    return res.json();
+                })
+                .then(data => log(`✅ 数据: ${JSON.stringify(data)}`))
+                .catch(err => log(`❌ 捕获错误: ${err.message}`));
+        }
+
+        // Headers 演示
+        const headers = new Headers();
+        headers.append('Content-Type', 'application/json');
+        headers.append('Accept', 'application/json');
+        log('\n📋 Headers 演示:');
+        headers.forEach((v, k) => log(`  ${k}: ${v}`));
+
+        console.log('=== Fetch 基础 ===');
+        console.log('fetch 支持:', typeof fetch === 'function');
+
+        document.getElementById('output').textContent =
+            `Fetch API: fetch(url) → Promise<Response>\n` +
+            `Response: ok/status/statusText/headers/json()/text()\n` +
+            `⚠️ 4xx/5xx 不会 reject，需检查 response.ok\n` +
+            `✅ Fetch 基础演示完成！`;
+    </script>
+</body>
+</html>

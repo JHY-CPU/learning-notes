@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>this-默认与隐式</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #c0392b; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>this — 默认绑定与隐式绑定</h2><p>this 的值取决于函数的调用方式（而不是定义位置）。</p></div>
+    <div class="card">
+        <h2>默认绑定（单独调用函数）</h2>
+        <div class="code">// 非严格模式：this → window（全局对象）
+function showThis() {
+    console.log(this);  // window（浏览器）/ global（Node）
+}
+showThis();
+
+// 严格模式：this → undefined
+function showThisStrict() {
+    'use strict';
+    console.log(this);  // undefined
+}
+showThisStrict();
+
+// 函数表达式同理
+const fn = function() {
+    console.log(this);  // window（非严格）
+};
+fn();
+
+// ⚠️ 嵌套函数中的 this
+const obj = {
+    name: 'Alice',
+    say() {
+        function inner() {
+            console.log(this);  // window（不是 obj！）
+        }
+        inner();
+    }
+};</div>
+        <div class="note">💡 默认绑定规则：函数独立调用时，非严格模式 this 指向全局对象，严格模式指向 undefined。</div>
+    </div>
+    <div class="card">
+        <h2>隐式绑定（作为对象方法调用）</h2>
+        <div class="code">const user = {
+    name: 'Alice',
+    greet() {
+        console.log(this.name);
+    }
+};
+
+user.greet();  // 'Alice'（this → user）
+
+// 方法中的 this 指向调用者
+const user2 = { name: 'Bob' };
+user2.greet = user.greet;
+user2.greet();  // 'Bob'（this → user2）
+
+// ⚠️ 隐式丢失
+const greet = user.greet;
+greet();  // undefined（this → window，window.name 不存在）
+
+// ⚠️ 回调函数中的 this
+setTimeout(user.greet, 100);  // undefined（作为独立函数调用）
+
+// ⚠️ 链式调用
+const objChain = {
+    name: 'outer',
+    inner: {
+        name: 'inner',
+        greet() {
+            console.log(this.name);
+        }
+    }
+};
+objChain.inner.greet();  // 'inner'（this 指向最近的调用者 .inner）</div>
+    </div>
+    <div class="card">
+        <h2>this 绑定优先级</h2>
+        <div class="code">// 优先级：new > 显式绑定 > 隐式绑定 > 默认绑定
+
+// 1. 默认绑定（最低）
+function show() { console.log(this); }
+show();  // window
+
+// 2. 隐式绑定
+const obj = { name: 'obj', show };
+obj.show();  // obj
+
+// 3. 显式绑定（call/apply/bind）
+obj.show.call({ name: 'explicit' });  // { name: 'explicit' }
+
+// 4. new 绑定（最高）
+function Person(name) {
+    this.name = name;
+}
+const p = new Person('Alice');  // this → 新创建的对象
+
+// 箭头函数不绑定 this（穿透作用域）</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== 默认绑定 ===');
+        function showDefault() {
+            console.log('默认绑定 this === window:', this === window);
+        }
+        showDefault();
+
+        console.log('=== 隐式绑定 ===');
+        const user = {
+            name: 'Alice',
+            greet() {
+                console.log('隐式绑定 this.name:', this.name);
+            }
+        };
+        user.greet();
+
+        const user2 = { name: 'Bob' };
+        user2.greet = user.greet;
+        user2.greet();
+
+        console.log('=== 隐式丢失 ===');
+        const greetFn = user.greet;
+        greetFn.call(null);  // 用 call 避免 undefined 报错
+
+        console.log('=== 嵌套函数 this ===');
+        const obj = {
+            name: 'outer',
+            say() {
+                console.log('外层 this.name:', this.name);
+                function inner() {
+                    console.log('内层 this === window:', this === window);
+                }
+                inner();
+            }
+        };
+        obj.say();
+
+        document.getElementById('output').textContent =
+            `user.greet(): ${user.name}\n` +
+            `user2.greet(): ${user2.name}\n` +
+            `✅ this 默认与隐式演示完成！`;
+    </script>
+</body>
+</html>

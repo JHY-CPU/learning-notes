@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python文件I/O与异常综合</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔧 Python 文件 I/O 与异常综合</h2><p>文件 I/O 知识全景、异常处理全览、综合实战: 数据导入器 (CSV 读取/JSON 导出/异常处理/日志记录)、上下文管理器文件处理、最佳实践总结。</p></div>
+    <div class="card">
+        <h2>文件 I/O 知识全景</h2>
+        <div class="code">// ========== 文件 I/O 全景图 ==========
+// 打开文件:
+//   open(filename, mode, encoding)
+//
+// 读取模式:
+//   f.read()          — 全部 (小心大文件)
+//   f.read(n)         — n 个字符/字节
+//   f.readline()      — 一行
+//   f.readlines()     — 所有行到列表
+//   for line in f     — 逐行迭代 (推荐)
+//
+// 写入模式:
+//   f.write(str)      — 写入字符串
+//   f.writelines(lst) — 写入多行
+//
+// 文件指针:
+//   f.tell()          — 当前位置
+//   f.seek(offset)    — 移动指针
+//
+// 文件模式:
+//   r, w, a, x        — 文本模式
+//   rb, wb, ab        — 二进制模式
+//   r+, w+, a+        — 读写模式
+//
+// 模块支持:
+//   csv — CSV 文件
+//   json — JSON 文件
+//   pickle — Python 对象序列化
+//   os — 文件系统操作
+//   pathlib — 面向对象路径
+
+// ========== 异常处理全览 ==========
+// try/except/else/finally — 完整异常处理
+// raise — 抛出异常
+// raise ... from — 异常链
+// assert — 调试断言
+//
+// 自定义异常:
+//   class MyError(Exception):
+//       def __init__(self, msg, data=None):
+//           ...
+//
+// 日志记录:
+//   logging.exception("消息")  # 记录异常+堆栈
+//
+// 上下文管理器:
+//   with open(...) as f:  # 自动关闭
+//   @contextmanager       # 生成器版上下文
+//
+// EAFP 原则:
+//   先尝试,出错再处理</div>
+    </div>
+    <div class="card">
+        <h2>综合实战: 数据导入器</h2>
+        <div class="code">// ========== CSV → JSON 导入器 ==========
+// 综合运用: 文件 I/O + CSV + JSON + 异常 + 日志 + 上下文管理器
+
+import csv
+import json
+import logging
+from dataclasses import dataclass, field, asdict
+from pathlib import Path
+from typing import List, Optional, Dict
+
+# 配置日志
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    handlers=[
+        logging.FileHandler("importer.log", encoding="utf-8"),
+        logging.StreamHandler(),
+    ]
+)
+logger = logging.getLogger("importer")
+
+# ---------- 异常体系 ----------
+class ImportError(Exception):
+    """导入基础异常"""
+    pass
+
+class FileReadError(ImportError):
+    """文件读取错误"""
+    pass
+
+class DataValidationError(ImportError):
+    """数据验证错误"""
+    def __init__(self, message, row=None, errors=None):
+        super().__init__(message)
+        self.row = row
+        self.errors = errors or []
+
+class SchemaError(ImportError):
+    """数据结构错误"""
+    pass
+
+# ---------- 数据模型 ----------
+@dataclass
+class User:
+    """用户数据模型"""
+    name: str
+    email: str
+    age: int
+    city: str = ""
+    active: bool = True
+
+    def validate(self):
+        """验证数据"""
+        errors = []
+        if not self.name or not self.name.strip():
+            errors.append("名字不能为空")
+        if not self.email or "@" not in self.email:
+            errors.append("邮箱格式无效")
+        if not (0 < self.age < 150):
+            errors.append("年龄超出范围")
+        return errors
+
+# ---------- 导入器 ----------
+class CSVImporter:
+    """CSV 数据导入器"""
+    def __init__(self, filename: str):
+        self.filename = Path(filename)
+        self.stats = {
+            "total": 0,
+            "success": 0,
+            "failed": 0,
+            "errors": [],
+        }
+
+    def validate_schema(self, headers: List[str]):
+        """验证 CSV 表头"""
+        required = {"name", "email", "age"}
+        headers_set = {h.strip().lower() for h in headers}
+        missing = required - headers_set
+        if missing:
+            raise SchemaError(f"缺少必要列: {missing}")
+
+    def parse_row(self, row: Dict) -> User:
+        """解析单行数据"""
+        try:
+            return User(
+                name=row.get("name", "").strip(),
+                email=row.get("email", "").strip(),
+                age=int(row.get("age", 0)),
+                city=row.get("city", "").strip(),
+                active=row.get("active", "true").lower() == "true",
+            )
+        except (ValueError, TypeError) as e:
+            raise DataValidationError(f"解析行失败", row=row, errors=[str(e)])
+
+    def import_data(self) -> List[User]:
+        """执行导入"""
+        logger.info(f"开始导入: {self.filename}")
+        users = []
+
+        try:
+            with open(self.filename, "r", encoding="utf-8-sig") as f:
+                reader = csv.DictReader(f)
+                self.validate_schema(reader.fieldnames or [])
+
+                for row_num, row in enumerate(reader, start=2):
+                    self.stats["total"] += 1
+                    try:
+                        user = self.parse_row(row)
+                        errors = user.validate()
+                        if errors:
+                            raise DataValidationError(
+                                f"第{row_num}行验证失败",
+                                row=row,
+                                errors=errors
+                            )
+                        users.append(user)
+                        self.stats["success"] += 1
+                    except DataValidationError as e:
+                        self.stats["failed"] += 1
+                        self.stats["errors"].append({
+                            "row": row_num,
+                            "message": str(e),
+                            "errors": e.errors,
+                        })
+                        logger.warning(f"第{row_num}行跳过: {e}")
+
+        except FileNotFoundError:
+            raise FileReadError(f"文件不存在: {self.filename}")
+        except csv.Error as e:
+            raise FileReadError(f"CSV 解析错误: {e}")
+
+        logger.info(f"导入完成: 成功{self.stats['success']}/总计{self.stats['total']}")
+        return users
+
+# ---------- 使用 ----------
+def export_to_json(users: List[User], output: str):
+    """导出到 JSON"""
+    data = [asdict(u) for u in users]
+    with open(output, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+    logger.info(f"导出 {len(users)} 条到 {output}")
+
+# 执行导入
+try:
+    importer = CSVImporter("users.csv")
+    users = importer.import_data()
+    export_to_json(users, "users_export.json")
+    print(f"导入报告: {importer.stats}")
+except ImportError as e:
+    logger.error(f"导入失败: {e}")</div>
+    </div>
+    <div class="card">
+        <h2>上下文管理文件模式总结</h2>
+        <div class="code">// ========== with 管理资源模式 ==========
+// 模式 1: 文件自动关闭
+with open("file.txt", encoding="utf-8") as f:
+    data = f.read()
+# 自动 close
+
+// 模式 2: 多个文件
+with open("src.txt") as src, open("dst.txt", "w") as dst:
+    dst.write(src.read())
+
+// 模式 3: 异常安全写入
+@contextmanager
+def safe_write(filename):
+    """写入文件: 异常时保留原文件"""
+    import tempfile, os, shutil
+    backup = filename + ".bak"
+    if os.path.exists(filename):
+        shutil.copy2(filename, backup)
+    try:
+        with open(filename, "w", encoding="utf-8") as f:
+            yield f
+    except Exception:
+        # 恢复备份
+        if os.path.exists(backup):
+            shutil.copy2(backup, filename)
+        raise
+    finally:
+        if os.path.exists(backup):
+            os.remove(backup)
+
+with safe_write("important.json") as f:
+    f.write('{"key": "value"}')
+
+// ========== 文件 I/O 最佳实践 ==========
+// 1. 始终用 with 管理文件
+// 2. 大文件用 for line in f 逐行迭代
+// 3. 编码永远指定 encoding="utf-8"
+// 4. CSV 用 newline="" 避免空行
+// 5. 未知编码用 errors="replace" 或 utf-8-sig
+// 6. 用 pathlib.Path 而非 os.path
+// 7. 写日志用 logging 而非 print
+// 8. 自定义异常体系,用 raise ... from e</div>
+        <div class="note">💡 综合要点: (1) 文件 + 异常 + 日志 是数据处理的铁三角; (2) CSV DictReader 简化字段访问; (3) 自定义异常 + logging 让错误可追踪; (4) dataclass + asdict() 简化 JSON 导出; (5) with 始终确保资源正确释放。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoImporter()">导入器演示</button>
+        <button onclick="demoBest()">最佳实践总结</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoImporter() {
+            result.innerHTML = '';
+            log('# 数据导入器演示');
+            log('');
+            log('CSVImporter:');
+            log('  1. 打开 CSV 文件');
+            log('  2. 验证表头 (name, email, age)');
+            log('  3. 逐行解析 User');
+            log('  4. 验证用户数据');
+            log('  5. 记录成功/失败统计');
+            log('');
+            log('异常体系:');
+            log('  ImportError');
+            log('    ├─ FileReadError  (文件)');
+            log('    ├─ SchemaError    (结构)');
+            log('    └─ DataValidationError (数据)');
+            log('');
+            log('输出: users_export.json');
+        }
+
+        function demoBest() {
+            result.innerHTML = '';
+            log('# 文件 I/O 最佳实践');
+            log('');
+            log('✅ 始终用 with open');
+            log('✅ 指定 encoding="utf-8"');
+            log('✅ 大文件逐行迭代');
+            log('✅ CSV 用 newline=""');
+            log('✅ BOM 用 utf-8-sig');
+            log('✅ 用 logging 记录操作');
+            log('✅ 自定义异常 + raise from');
+            log('✅ 用 pathlib 替代 os.path');
+            log('');
+            log('❌ 不要用 read() 读大文件');
+            log('❌ 不要用 except: pass');
+            log('❌ 不要用 print 代替 logging');
+            log('❌ 不要手动 close 文件');
+        }
+    </script>
+</body>
+</html>

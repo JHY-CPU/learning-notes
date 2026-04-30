@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>match与matchAll</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #match-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; margin: 5px 0; width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>match 与 matchAll</h2><p>String.match 全局匹配、String.matchAll 迭代器、捕获组获取。</p></div>
+    <div class="card">
+        <h2>match vs matchAll</h2>
+        <div class="code">// ========== String.prototype.match() ==========
+// 无 g flag: 返回第一个完整匹配 + 捕获组
+'2024-01-15'.match(/(\d{4})-(\d{2})-(\d{2})/);
+// ['2024-01-15', '2024', '01', '15', index: 0, groups: undefined]
+
+// 有 g flag: 返回所有完整匹配（无捕获组）
+'2024-01-15, 2024-06-20'.match(/\d{4}-\d{2}-\d{2}/g);
+// ['2024-01-15', '2024-06-20']
+
+// ⚠️ g flag 时不返回捕获组
+'2024-01-15'.match(/(\d{4})-\d{2}-\d{2}/g);
+// ['2024-01-15'] (没有捕获组!)
+
+// ========== String.prototype.matchAll() (ES2020) ==========
+// 始终返回迭代器，包含捕获组
+// 必须使用 g flag
+const matches = '2024-01-15, 2024-06-20'.matchAll(/(\d{4})-(\d{2})-(\d{2})/g);
+
+for (const m of matches) {
+    console.log(m[0]);   // 完整匹配
+    console.log(m[1]);   // 年
+    console.log(m.index); // 索引
+}
+
+// 转为数组
+const arr = [...'2024-01-15'.matchAll(/(\d{4})-(\d{2})-(\d{2})/g)];
+
+// ========== 对比总结 ==========
+// match (无 g) — 返回第一个匹配 + 捕获组 (类数组)
+// match (有 g) — 返回所有完整匹配 (数组，无捕获组)
+// matchAll     — 返回迭代器，每个元素包含捕获组
+// matchAll     — 需要 g flag，否则抛 TypeError</div>
+    </div>
+    <div class="card">
+        <h2>演示：match vs matchAll</h2>
+        <input id="matchInput" value="ID: 2024-01-15, 到期: 2025-06-20, 创建: 2023-12-01" placeholder="输入日期文本">
+        <button onclick="demoMatch()">match 演示</button>
+        <button onclick="demoMatchAll()">matchAll 演示</button>
+        <div id="match-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const matchResult = document.getElementById('match-result');
+
+        function log(msg) {
+            matchResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoMatch() {
+            matchResult.innerHTML = '';
+            const text = document.getElementById('matchInput').value;
+            log(`📋 文本: "${text}"`);
+            log('');
+
+            const pattern = /(\d{4})-(\d{2})-(\d{2})/;
+            const patternG = /(\d{4})-(\d{2})-(\d{2})/g;
+
+            log('1️⃣ match() 无 g flag:');
+            const m1 = text.match(pattern);
+            if (m1) {
+                log(`   完整匹配: ${m1[0]}`);
+                log(`   年: ${m1[1]}`);
+                log(`   月: ${m1[2]}`);
+                log(`   日: ${m1[3]}`);
+                log(`   index: ${m1.index}`);
+                log(`   input: ${m1.input.substring(0, 30)}...`);
+            }
+            log('');
+
+            log('2️⃣ match() 有 g flag:');
+            const m2 = text.match(patternG);
+            if (m2) {
+                log(`   匹配项数: ${m2.length}`);
+                m2.forEach((m, i) => log(`   [${i}] ${m}`));
+                log('   ⚠️ 无捕获组信息');
+            }
+            log('');
+
+            log('📌 match(g) 的问题:');
+            log('   • 返回简单字符串数组');
+            log('   • 丢失捕获组信息');
+            log('   • 需要用 matchAll 替代');
+        }
+
+        function demoMatchAll() {
+            matchResult.innerHTML = '';
+            const text = document.getElementById('matchInput').value;
+            log(`📋 文本: "${text}"`);
+            log('');
+
+            const pattern = /(\d{4})-(\d{2})-(\d{2})/g;
+
+            log('1️⃣ matchAll() 迭代器:');
+            const matches = text.matchAll(pattern);
+            let count = 0;
+            for (const m of matches) {
+                log(`\n   匹配 #${++count}:`);
+                log(`   完整: ${m[0]}`);
+                log(`   年: ${m[1]}`);
+                log(`   月: ${m[2]}`);
+                log(`   日: ${m[3]}`);
+                log(`   index: ${m.index}`);
+            }
+            log('');
+
+            if (count > 0) {
+                log('2️⃣ 转为数组操作:');
+                // 重置 (matchAll 迭代器只能用一次)
+                const arr = [...text.matchAll(pattern)];
+                log(`   数组长度: ${arr.length}`);
+                log(`   第一组: ${arr[0][1]}-${arr[0][2]}-${arr[0][3]}`);
+            }
+
+            log('');
+            log('📌 matchAll 优势:');
+            log('   • 返回迭代器 (惰性)');
+            log('   • 每个元素包含捕获组');
+            log('   • 可用 for...of / ... 展开');
+            log('   • 需要 g flag');
+        }
+
+        console.log('=== match 与 matchAll ===');
+
+        document.getElementById('output').textContent =
+            `match vs matchAll: match(无g)返回首匹配+捕获 / match(g)返回全匹配无捕获\n` +
+            `matchAll: 迭代器+捕获组 / 需要 g flag\n` +
+            `✅ match 与 matchAll 演示完成！`;
+    </script>
+</body>
+</html>

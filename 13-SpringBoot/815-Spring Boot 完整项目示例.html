@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot 完整项目示例</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🏗️ Spring Boot 完整项目示例 — 博客系统</h2><p>综合应用 Spring Boot/Spring Security/JPA/Redis/RabbitMQ 等全套技术栈构建博客后端 API。</p></div>
+    <div class="card">
+        <h2>项目概览</h2>
+        <div class="code">// ========== 博客系统完整项目 ==========
+// 功能: 用户注册登录、文章 CRUD、标签分类、评论、搜索、通知
+
+// ========== 技术栈 ==========
+// Spring Boot 3.2        — 框架基础
+// Spring Data JPA         — ORM
+// Spring Security + JWT   — 认证授权
+// Spring Data Redis       — 缓存 + 分布式锁
+// RabbitMQ                — 异步通知
+// Flyway                  — 数据库迁移
+// MapStruct               — DTO 映射
+// SpringDoc OpenAPI       — API 文档
+// JUnit 5 + Mockito       — 测试
+// MySQL                   — 主数据库
+// Docker                  — 容器化
+
+// ========== 模块结构 ==========
+// com.example.blog/
+// ├── BlogApplication.java
+// ├── config/          — Security/Redis/RabbitMQ/Swagger
+// ├── common/          — ApiResponse/ErrorCode/BusinessException/BaseEntity
+// ├── auth/            — JwtUtils/AuthController/AuthService
+// ├── user/            — User/UserService/UserController/UserMapper
+// ├── article/         — Article/Tag/Category/ArticleService
+// ├── comment/         — Comment/CommentService
+// └── notification/    — Notification/NotifyService/RabbitMQ
+
+// ========== pom.xml 核心依赖 ==========
+// &lt;parent&gt;
+//     &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+//     &lt;artifactId&gt;spring-boot-starter-parent&lt;/artifactId&gt;
+//     &lt;version&gt;3.2.0&lt;/version&gt;
+// &lt;/parent&gt;
+//
+// &lt;dependencies&gt;
+//     &lt;!-- Web --&gt;
+//     &lt;dependency&gt;spring-boot-starter-web&lt;/dependency&gt;
+//     &lt;dependency&gt;spring-boot-starter-validation&lt;/dependency&gt;
+//
+//     &lt;!-- Database --&gt;
+//     &lt;dependency&gt;spring-boot-starter-data-jpa&lt;/dependency&gt;
+//     &lt;dependency&gt;mysql-connector-j&lt;/dependency&gt;
+//     &lt;dependency&gt;flyway-core&lt;/dependency&gt;
+//     &lt;dependency&gt;flyway-mysql&lt;/dependency&gt;
+//
+//     &lt;!-- Security --&gt;
+//     &lt;dependency&gt;spring-boot-starter-security&lt;/dependency&gt;
+//     &lt;dependency&gt;jjwt-api, jjwt-impl, jjwt-jackson&lt;/dependency&gt;
+//
+//     &lt;!-- Cache &amp; MQ --&gt;
+//     &lt;dependency&gt;spring-boot-starter-data-redis&lt;/dependency&gt;
+//     &lt;dependency&gt;spring-boot-starter-amqp&lt;/dependency&gt;
+//
+//     &lt;!-- Tools --&gt;
+//     &lt;dependency&gt;mapstruct&lt;/dependency&gt;
+//     &lt;dependency&gt;lombok&lt;/dependency&gt;
+//     &lt;dependency&gt;springdoc-openapi-starter-webmvc-ui&lt;/dependency&gt;
+//     &lt;dependency&gt;spring-boot-starter-actuator&lt;/dependency&gt;
+//
+//     &lt;!-- Test --&gt;
+//     &lt;dependency&gt;spring-boot-starter-test&lt;/dependency&gt;
+//     &lt;dependency&gt;spring-security-test&lt;/dependency&gt;
+//     &lt;dependency&gt;testcontainers&lt;/dependency&gt;
+// &lt;/dependencies&gt;</div>
+    </div>
+    <div class="card">
+        <h2>用户与认证模块</h2>
+        <div class="code">// ========== 用户实体 ==========
+@Entity
+@Table(name = "users")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class User extends BaseEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(unique = true, nullable = false, length = 50)
+    private String username;
+
+    @Column(unique = true, nullable = false)
+    private String email;
+
+    @Column(nullable = false)
+    private String password;           // BCrypt 哈希
+
+    private String nickname;
+    private String avatar;
+
+    @Enumerated(EnumType.STRING)
+    private UserStatus status;         // ACTIVE, INACTIVE, BANNED
+
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(name = "user_roles",
+        joinColumns = @JoinColumn(name = "user_id"),
+        inverseJoinColumns = @JoinColumn(name = "role_id"))
+    private Set&lt;Role&gt; roles = new HashSet&lt;&gt;();
+
+    @Column(columnDefinition = "int default 0")
+    private Integer articleCount;
+
+    private LocalDateTime lastLoginAt;
+}
+
+// ========== DTO ==========
+@Data
+public class RegisterRequest {
+    @NotBlank @Size(min = 3, max = 50)
+    private String username;
+    @NotBlank @Email
+    private String email;
+    @NotBlank @Size(min = 6, max = 100)
+    private String password;
+}
+
+@Data
+public class LoginRequest {
+    @NotBlank
+    private String username;
+    @NotBlank
+    private String password;
+}
+
+@Data
+@AllArgsConstructor
+public class AuthResponse {
+    private String accessToken;
+    private String refreshToken;
+    private String tokenType = "Bearer";
+    private long expiresIn;
+}
+
+// ========== 认证服务 ==========
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class AuthService {
+
+    private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtUtils jwtUtils;
+    private final AuthenticationManager authenticationManager;
+
+    public AuthResponse register(RegisterRequest request) {
+        if (userRepository.existsByUsername(request.getUsername())) {
+            throw new BusinessException(ErrorCode.USER_EXISTS);
+        }
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new BusinessException(ErrorCode.CONFLICT, "邮箱已被注册");
+        }
+
+        User user = User.builder()
+            .username(request.getUsername())
+            .email(request.getEmail())
+            .password(passwordEncoder.encode(request.getPassword()))
+            .nickname(request.getUsername())
+            .status(UserStatus.ACTIVE)
+            .roles(Set.of(roleRepository.findByName("ROLE_USER")
+                .orElseThrow(() -> new RuntimeException("默认角色不存在"))))
+            .build();
+        userRepository.save(user);
+
+        String accessToken = jwtUtils.generateAccessToken(user);
+        String refreshToken = jwtUtils.generateRefreshToken(user);
+        return new AuthResponse(accessToken, refreshToken, "Bearer", jwtUtils.getExpirationMs());
+    }
+
+    public AuthResponse login(LoginRequest request) {
+        Authentication authentication = authenticationManager.authenticate(
+            new UsernamePasswordAuthenticationToken(request.getUsername(), request.getPassword()));
+
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        User user = userRepository.findByUsername(userDetails.getUsername())
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+        user.setLastLoginAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        String accessToken = jwtUtils.generateAccessToken(user);
+        String refreshToken = jwtUtils.generateRefreshToken(user);
+        return new AuthResponse(accessToken, refreshToken, "Bearer", jwtUtils.getExpirationMs());
+    }
+}
+
+// ========== UserDetailsService ==========
+@Service
+@RequiredArgsConstructor
+public class BlogUserDetailsService implements UserDetailsService {
+    private final UserRepository userRepository;
+
+    @Override
+    public UserDetails loadUserByUsername(String username) {
+        User user = userRepository.findByUsername(username)
+            .orElseThrow(() -> new UsernameNotFoundException("用户不存在"));
+        return new org.springframework.security.core.userdetails.User(
+            user.getUsername(), user.getPassword(), user.getStatus() == UserStatus.ACTIVE,
+            true, true, true,
+            user.getRoles().stream()
+                .map(r -> new SimpleGrantedAuthority(r.getName()))
+                .collect(Collectors.toSet()));
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>文章模块</h2>
+        <div class="code">// ========== 文章实体 ==========
+@Entity
+@Table(name = "articles")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Article extends BaseEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, length = 200)
+    private String title;
+
+    @Lob
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
+    private String content;
+
+    @Column(length = 500)
+    private String summary;
+
+    @Enumerated(EnumType.STRING)
+    private ArticleStatus status;       // DRAFT, PUBLISHED, ARCHIVED
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "author_id", nullable = false)
+    @ToString.Exclude
+    private User author;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_id")
+    @ToString.Exclude
+    private Category category;
+
+    @ManyToMany
+    @JoinTable(name = "article_tags",
+        joinColumns = @JoinColumn(name = "article_id"),
+        inverseJoinColumns = @JoinColumn(name = "tag_id"))
+    private Set&lt;Tag&gt; tags = new HashSet&lt;&gt;();
+
+    @Column(columnDefinition = "int default 0")
+    private Integer viewCount;
+
+    @Column(columnDefinition = "int default 0")
+    private Integer commentCount;
+
+    @Column(columnDefinition = "boolean default false")
+    private boolean featured;
+
+    private LocalDateTime publishedAt;
+}
+
+// ========== 文章 DTO ==========
+@Data
+public class CreateArticleRequest {
+    @NotBlank @Size(max = 200)
+    private String title;
+    @NotBlank
+    private String content;
+    @Size(max = 500)
+    private String summary;
+    private Long categoryId;
+    private Set&lt;Long&gt; tagIds;
+    private ArticleStatus status;
+}
+
+@Data
+public class ArticleVO {
+    private Long id;
+    private String title;
+    private String summary;
+    private String content;
+    private ArticleStatus status;
+    private String authorName;
+    private String authorAvatar;
+    private String categoryName;
+    private Set&lt;String&gt; tags;
+    private int viewCount;
+    private int commentCount;
+    private boolean featured;
+    private LocalDateTime publishedAt;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+}
+
+// ========== 文章 Mapper ==========
+@Mapper(componentModel = "spring", uses = {TagMapper.class, CategoryMapper.class})
+public interface ArticleMapper {
+
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "author", ignore = true)
+    @Mapping(target = "category", ignore = true)
+    @Mapping(target = "tags", ignore = true)
+    @Mapping(target = "viewCount", constant = "0")
+    @Mapping(target = "commentCount", constant = "0")
+    @Mapping(target = "featured", constant = "false")
+    @Mapping(target = "publishedAt", expression = "java(java.time.LocalDateTime.now())")
+    Article toEntity(CreateArticleRequest request);
+
+    @Mapping(source = "author.username", target = "authorName")
+    @Mapping(source = "author.avatar", target = "authorAvatar")
+    @Mapping(source = "category.name", target = "categoryName")
+    @Mapping(target = "tags", expression = "java(article.getTags().stream().map(Tag::getName).collect(java.util.stream.Collectors.toSet()))")
+    ArticleVO toVO(Article article);
+
+    List&lt;ArticleVO&gt; toVOList(List&lt;Article&gt; articles);
+}
+
+// ========== 文章服务 ==========
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class ArticleService {
+
+    private final ArticleRepository articleRepository;
+    private final ArticleMapper articleMapper;
+    private final UserRepository userRepository;
+    private final CategoryRepository categoryRepository;
+    private final TagRepository tagRepository;
+
+    @CacheEvict(cacheNames = "articles:list", allEntries = true)
+    public ArticleVO createArticle(CreateArticleRequest request, String username) {
+        User author = userRepository.findByUsername(username)
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        Article article = articleMapper.toEntity(request);
+        article.setAuthor(author);
+
+        if (request.getCategoryId() != null) {
+            article.setCategory(categoryRepository.findById(request.getCategoryId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "分类不存在")));
+        }
+        if (request.getTagIds() != null) {
+            article.setTags(new HashSet&lt;&gt;(tagRepository.findAllById(request.getTagIds())));
+        }
+
+        Article saved = articleRepository.save(article);
+
+        // 异步发送通知
+        // notificationService.notifyNewArticle(saved);
+        return articleMapper.toVO(saved);
+    }
+
+    @Cacheable(cacheNames = "articles:list", key = "#pageable")
+    @Transactional(readOnly = true)
+    public Page&lt;ArticleVO&gt; getPublishedArticles(Pageable pageable) {
+        return articleRepository.findByStatus(ArticleStatus.PUBLISHED, pageable)
+            .map(articleMapper::toVO);
+    }
+
+    @Cacheable(cacheNames = "articles:detail", key = "#id")
+    @Transactional(readOnly = true)
+    public ArticleVO getArticleById(Long id) {
+        Article article = articleRepository.findById(id)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "文章不存在"));
+        // 浏览量 +1 (不需要强一致性)
+        articleRepository.incrementViewCount(id);
+        return articleMapper.toVO(article);
+    }
+
+    @CacheEvict(cacheNames = {"articles:detail", "articles:list"}, allEntries = true)
+    public ArticleVO updateArticle(Long id, CreateArticleRequest request, String username) {
+        Article article = articleRepository.findById(id)
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "文章不存在"));
+        if (!article.getAuthor().getUsername().equals(username)) {
+            throw new BusinessException(ErrorCode.FORBIDDEN, "只能编辑自己的文章");
+        }
+        article.setTitle(request.getTitle());
+        article.setContent(request.getContent());
+        article.setSummary(request.getSummary());
+        article.setStatus(request.getStatus());
+        return articleMapper.toVO(articleRepository.save(article));
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>评论与通知</h2>
+        <div class="code">// ========== 评论实体 ==========
+@Entity
+@Table(name = "comments")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Comment extends BaseEntity {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Lob
+    @Column(nullable = false)
+    private String content;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "article_id", nullable = false)
+    @ToString.Exclude
+    private Article article;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "author_id", nullable = false)
+    @ToString.Exclude
+    private User author;
+
+    // 回复评论 (自关联)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_id")
+    @ToString.Exclude
+    private Comment parent;
+
+    @Column(columnDefinition = "boolean default false")
+    private boolean approved;
+}
+
+// ========== 评论服务 ==========
+@Service
+@RequiredArgsConstructor
+@Transactional
+public class CommentService {
+
+    private final CommentRepository commentRepository;
+    private final ArticleRepository articleRepository;
+    private final RabbitTemplate rabbitTemplate;
+
+    public CommentVO createComment(CreateCommentRequest request, String username) {
+        Article article = articleRepository.findById(request.getArticleId())
+            .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "文章不存在"));
+        User author = userRepository.findByUsername(username)
+            .orElseThrow(() -> new BusinessException(ErrorCode.USER_NOT_FOUND));
+
+        Comment comment = Comment.builder()
+            .content(request.getContent())
+            .article(article)
+            .author(author)
+            .approved(true)
+            .build();
+
+        if (request.getParentId() != null) {
+            comment.setParent(commentRepository.findById(request.getParentId())
+                .orElseThrow(() -> new BusinessException(ErrorCode.NOT_FOUND, "父评论不存在")));
+        }
+
+        Comment saved = commentRepository.save(comment);
+
+        // 更新文章评论数
+        articleRepository.incrementCommentCount(article.getId());
+
+        // 发送异步通知 (RabbitMQ)
+        CommentNotification notification = new CommentNotification(
+            article.getAuthor().getId(), author.getUsername(),
+            article.getId(), article.getTitle(), saved.getId());
+        rabbitTemplate.convertAndSend("exchange.topic", "notification.comment", notification);
+
+        return toVO(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public Page&lt;CommentVO&gt; getArticleComments(Long articleId, Pageable pageable) {
+        return commentRepository.findByArticleIdAndParentIsNull(articleId, pageable)
+            .map(this::toVO);
+    }
+
+    private CommentVO toVO(Comment comment) {
+        CommentVO vo = new CommentVO();
+        vo.setId(comment.getId());
+        vo.setContent(comment.getContent());
+        vo.setAuthorName(comment.getAuthor().getUsername());
+        vo.setAuthorAvatar(comment.getAuthor().getAvatar());
+        vo.setCreatedAt(comment.getCreatedAt());
+        if (comment.getParent() != null) {
+            vo.setParentId(comment.getParent().getId());
+        }
+        // 加载回复
+        vo.setReplies(commentRepository.findByParentId(comment.getId())
+            .stream().map(this::toVO).collect(Collectors.toList()));
+        return vo;
+    }
+}
+
+// ========== RabbitMQ 通知消费者 ==========
+@Component
+@Slf4j
+public class NotificationConsumer {
+
+    @RabbitListener(queues = "queue.notification")
+    public void handleCommentNotification(CommentNotification notification) {
+        log.info("评论通知: 用户{} 评论了文章 {}", notification.getCommenter(),
+            notification.getArticleTitle());
+        // 发送站内信/邮件/推送
+    }
+
+    @RabbitListener(queues = "queue.notification")
+    public void handleSystemNotification(SystemNotification notification) {
+        log.info("系统通知: {}", notification.getMessage());
+    }
+}
+
+// ========== 搜索服务 ==========
+@Service
+@RequiredArgsConstructor
+public class SearchService {
+
+    private final ArticleRepository articleRepository;
+
+    @Cacheable(cacheNames = "search", key = "#keyword + ':' + #pageable")
+    @Transactional(readOnly = true)
+    public Page&lt;ArticleVO&gt; searchArticles(String keyword, Pageable pageable) {
+        return articleRepository
+            .findByTitleContainingOrContentContaining(keyword, keyword, pageable)
+            .map(articleMapper::toVO);
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>安全配置与 API 文档</h2>
+        <div class="code">// ========== Security 配置 ==========
+@Configuration
+@EnableWebSecurity
+@EnableMethodSecurity
+@RequiredArgsConstructor
+public class BlogSecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthFilter;
+    private final BlogUserDetailsService userDetailsService;
+    private final JwtAuthenticationEntryPoint authEntryPoint;
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(AbstractHttpConfigurer::disable)
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/public/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/articles/**").permitAll()
+                .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                .requestMatchers("/actuator/health").permitAll()
+                .anyRequest().authenticated()
+            )
+            .sessionManagement(session ->
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(ex -> ex.authenticationEntryPoint(authEntryPoint))
+            .authenticationProvider(authenticationProvider())
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+        return http.build();
+    }
+
+    @Bean
+    public AuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setUserDetailsService(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder());
+        return provider;
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration config = new CorsConfiguration();
+        config.setAllowedOriginPatterns(List.of("*"));
+        config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
+        config.setAllowedHeaders(List.of("*"));
+        config.setAllowCredentials(true);
+        config.setMaxAge(3600L);
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/**", config);
+        return source;
+    }
+}
+
+// ========== SpringDoc 配置 ==========
+@Configuration
+public class OpenApiConfig {
+
+    @Bean
+    public OpenAPI blogOpenAPI() {
+        return new OpenAPI()
+            .info(new Info()
+                .title("博客系统 API")
+                .description("Spring Boot 博客后端接口文档")
+                .version("1.0.0")
+                .contact(new Contact().name("开发者").email("dev@example.com")))
+            .addSecurityItem(new SecurityRequirement().addList("BearerAuth"))
+            .components(new Components()
+                .addSecuritySchemes("BearerAuth",
+                    new SecurityScheme()
+                        .type(SecurityScheme.Type.HTTP)
+                        .scheme("bearer")
+                        .bearerFormat("JWT")));
+    }
+}
+
+// ========== 缓存配置 ==========
+@Configuration
+@EnableCaching
+public class BlogCacheConfig {
+
+    @Bean
+    public CacheManager cacheManager(RedisConnectionFactory factory) {
+        RedisCacheConfiguration defaultConfig = RedisCacheConfiguration.defaultCacheConfig()
+            .entryTtl(Duration.ofMinutes(10))
+            .disableCachingNullValues()
+            .serializeValuesWith(
+                RedisSerializationContext.SerializationPair.fromSerializer(
+                    new GenericJackson2JsonRedisSerializer()));
+
+        Map&lt;String, RedisCacheConfiguration&gt; configs = new HashMap&lt;&gt;();
+        configs.put("articles:list", defaultConfig.entryTtl(Duration.ofMinutes(5)));
+        configs.put("articles:detail", defaultConfig.entryTtl(Duration.ofMinutes(30)));
+        configs.put("search", defaultConfig.entryTtl(Duration.ofMinutes(2)));
+
+        return RedisCacheManager.builder(factory)
+            .cacheDefaults(defaultConfig)
+            .withInitialCacheConfigurations(configs)
+            .build();
+    }
+}
+
+// ========== application.yml ==========
+// spring:
+//   datasource:
+//     url: jdbc:mysql://localhost:3306/blog?useSSL=false&allowPublicKeyRetrieval=true
+//     username: root
+//     password: root
+//     hikari:
+//       maximum-pool-size: 20
+//       minimum-idle: 5
+//   jpa:
+//     hibernate:
+//       ddl-auto: validate
+//     show-sql: false
+//     properties:
+//       hibernate:
+//         format_sql: true
+//   flyway:
+//     enabled: true
+//     locations: classpath:db/migration
+//   data:
+//     redis:
+//       host: localhost
+//       port: 6379
+//       lettuce:
+//         pool:
+//           max-active: 16
+//   rabbitmq:
+//     host: localhost
+//     port: 5672
+//
+// jwt:
+//   secret: base64-encoded-256-bit-secret-key-here...
+//   access-token-expiration: 1800000       # 30 分钟
+//   refresh-token-expiration: 604800000    # 7 天</div>
+    </div>
+    <div class="card">
+        <h2>API 端点总览</h2>
+        <div class="code">// ========== 完整 API 路由 ==========
+
+// ========== 认证模块 ==========
+// POST   /api/auth/register      — 注册
+// POST   /api/auth/login         — 登录
+// POST   /api/auth/refresh       — 刷新 Token
+// POST   /api/auth/logout        — 登出
+
+// ========== 用户模块 ==========
+// GET    /api/users/me           — 获取当前用户信息
+// PUT    /api/users/me           — 更新个人信息
+// GET    /api/users/{id}         — 查看用户公开信息
+// GET    /api/users/{id}/articles — 用户的文章列表
+
+// ========== 文章模块 ==========
+// GET    /api/articles           — 文章列表 (分页/排序/筛选)
+// GET    /api/articles/{id}      — 文章详情
+// POST   /api/articles           — 创建文章 [认证]
+// PUT    /api/articles/{id}      — 更新文章 [作者]
+// DELETE /api/articles/{id}      — 删除文章 [作者]
+// PUT    /api/articles/{id}/publish  — 发布 [作者]
+
+// ========== 分类与标签 ==========
+// GET    /api/categories         — 分类列表
+// GET    /api/tags               — 标签列表
+// GET    /api/articles/search?keyword=xxx — 搜索
+
+// ========== 评论模块 ==========
+// GET    /api/articles/{id}/comments    — 文章评论
+// POST   /api/articles/{id}/comments    — 发表评论 [认证]
+// DELETE /api/comments/{id}             — 删除评论 [作者/管理员]
+
+// ========== Admin 管理 ==========
+// GET    /api/admin/users         — 用户管理 [ADMIN]
+// PUT    /api/admin/users/{id}/status — 修改用户状态 [ADMIN]
+// DELETE /api/admin/articles/{id} — 强制删除文章 [ADMIN]
+
+// ========== 健康与监控 ==========
+// GET    /actuator/health         — 健康检查
+// GET    /actuator/info           — 应用信息
+// GET    /actuator/metrics        — 指标
+// GET    /swagger-ui.html         — API 文档
+
+// ========== 完整请求/响应示例 ==========
+// 请求: POST /api/articles
+// Authorization: Bearer eyJhbGci...
+// Content-Type: application/json
+//
+// {
+//   "title": "Spring Boot 最佳实践",
+//   "content": "# 介绍\n在本文中...",
+//   "summary": "Spring Boot 开发中的最佳实践总结",
+//   "categoryId": 1,
+//   "tagIds": [1, 2, 3],
+//   "status": "PUBLISHED"
+// }
+//
+// 响应: 201 Created
+// {
+//   "code": 0,
+//   "message": "success",
+//   "data": {
+//     "id": 42,
+//     "title": "Spring Boot 最佳实践",
+//     "summary": "Spring Boot 开发中的最佳实践总结",
+//     "status": "PUBLISHED",
+//     "authorName": "admin",
+//     "categoryName": "后端开发",
+//     "tags": ["Java", "Spring Boot", "最佳实践"],
+//     "viewCount": 0,
+//     "publishedAt": "2024-01-15T10:30:00"
+//   },
+//   "requestId": "req-abc123",
+//   "timestamp": 1705300000000
+// }</div>
+        <div class="note">💡 博客项目综合要点: 按业务分包 (user/article/comment/notification); JWT 认证 + 方法安全; Redis 缓存文章; RabbitMQ 异步通知; Flyway 数据库迁移; MapStruct DTO 映射; 统一异常处理; 分页/搜索/排序; Docker 容器化; 完整 API 文档。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoModules()">项目模块</button>
+        <button onclick="demoFlow()">请求流程</button>
+        <button onclick="demoDeploy()">部署架构</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoModules() {
+            result.innerHTML = '';
+            log('# 博客系统模块');
+            log('');
+            log('🔐 auth     — 注册/登录/JWT');
+            log('👤 user     — 用户信息');
+            log('📝 article  — 文章 CRUD');
+            log('🏷️ category — 分类管理');
+            log('🏷️ tag      — 标签管理');
+            log('💬 comment  — 评论系统');
+            log('📢 notification — 通知 (RabbitMQ)');
+            log('🔍 search   — 搜索');
+            log('');
+            log('⚙️ config — Security/Redis/MQ/Doc');
+            log('📦 common — 异常/响应/工具');
+        }
+
+        function demoFlow() {
+            result.innerHTML = '';
+            log('# 一次完整请求流程');
+            log('');
+            log('① 客户端 → HTTP 请求');
+            log('   Authorization: Bearer &lt;JWT&gt;');
+            log('');
+            log('② SecurityFilterChain');
+            log('   JwtAuthenticationFilter');
+            log('   解析 Token → 设置 SecurityContext');
+            log('');
+            log('③ Controller');
+            log('   @Valid 参数校验');
+            log('   调用 Service');
+            log('');
+            log('④ Service');
+            log('   @Cacheable 读缓存');
+            log('   @Transactional 事务');
+            log('   @PreAuthorize 权限检查');
+            log('');
+            log('⑤ Repository');
+            log('   JPA 查询 → MySQL');
+            log('');
+            log('⑥ 响应');
+            log('   ApiResponse&lt;T&gt; → JSON');
+        }
+
+        function demoDeploy() {
+            result.innerHTML = '';
+            log('# 部署架构');
+            log('');
+            log('┌─────────────┐');
+            log('│   Nginx     │ ← 反向代理/SSL/静态资源');
+            log('└──────┬──────┘');
+            log('       │');
+            log('┌──────▼──────┐');
+            log('│ Spring Boot │ × N (水平扩展)');
+            log('└──────┬──────┘');
+            log('       │');
+            log('  ┌────┴────┐');
+            log('  │         │');
+            log('  ▼         ▼');
+            log(' MySQL    Redis');
+            log('  │         │');
+            log('  ▼         ▼');
+            log(' RabbitMQ  Elasticsearch');
+            log('');
+            log('CI/CD: GitHub Actions → Docker → K8s');
+            log('监控: Prometheus + Grafana');
+        }
+    </script>
+</body>
+</html>

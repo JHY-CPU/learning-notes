@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java 集合框架概述</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🗂️ Java 集合框架概述</h2><p>集合框架体系、Iterable/Collection/Map 接口层次、List/Set/Map 特性对比、泛型与集合、集合 vs 数组、Collections 工具类。</p></div>
+    <div class="card">
+        <h2>集合框架结构</h2>
+        <div class="code">// ========== Java 集合框架 ==========
+// 一组接口、实现类、算法, 用于存储和操作对象集合
+// java.util 包核心
+
+// ========== 接口层次 ==========
+//
+// Iterable (可迭代, 支持 foreach)
+//   └─ Collection (集合根接口)
+//        ├─ List (有序, 可重复, 有索引)
+//        │    ├─ ArrayList (数组实现)
+//        │    ├─ LinkedList (双向链表)
+//        │    └─ Vector (线程安全, 已过时)
+//        │       └─ Stack (栈, 已过时)
+//        │
+//        ├─ Set (无序/有序, 不重复)
+//        │    ├─ HashSet (哈希表, 最快)
+//        │    ├─ LinkedHashSet (插入顺序)
+//        │    └─ TreeSet (排序, 红黑树)
+//        │
+//        └─ Queue (队列, FIFO)
+//             ├─ LinkedList (也可作队列)
+//             ├─ PriorityQueue (优先级队列)
+//             └─ ArrayDeque (双端队列)
+//
+// Map (键值对, 不属于 Collection)
+//   ├─ HashMap (哈希表, 最快)
+//   ├─ LinkedHashMap (插入/访问顺序)
+//   ├─ TreeMap (排序, 红黑树)
+//   └─ ConcurrentHashMap (线程安全)
+
+import java.util.*;
+
+public class CollectionOverview {
+    public static void main(String[] args) {
+        // ========== List: 有序可重复 ==========
+        List<String> list = new ArrayList<>();
+        list.add("Apple");
+        list.add("Banana");
+        list.add("Apple");         // ✅ 可重复
+        list.get(1);               // ✅ 有索引
+
+        // ========== Set: 不可重复 ==========
+        Set<String> set = new HashSet<>();
+        set.add("Apple");
+        set.add("Banana");
+        set.add("Apple");          // ❌ 不会添加 (已存在)
+        System.out.println(set.size());  // 2
+
+        // ========== Queue: 队列 ==========
+        Queue<String> queue = new LinkedList<>();
+        queue.offer("First");
+        queue.offer("Second");
+        String head = queue.poll();  // "First" (FIFO)
+
+        // ========== Map: 键值对 ==========
+        Map<String, Integer> map = new HashMap<>();
+        map.put("Alice", 25);
+        map.put("Bob", 30);
+        System.out.println(map.get("Alice"));  // 25
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>Iterable 与 Collection</h2>
+        <div class="code">// ========== Iterable<T> ==========
+// 可迭代: 支持增强 for 循环
+// 核心方法: Iterator<T> iterator()
+
+public class IterableDemo {
+    public static void main(String[] args) {
+        List<String> list = Arrays.asList("A", "B", "C");
+
+        // ========== 增强 for (foreach) ==========
+        for (String s : list) {
+            System.out.println(s);
+        }
+
+        // ========== 迭代器 Iterator ==========
+        Iterator<String> it = list.iterator();
+        while (it.hasNext()) {
+            String s = it.next();
+            System.out.println(s);
+        }
+
+        // ========== forEach + Lambda (Java 8+) ==========
+        list.forEach(System.out::println);
+
+        // ========== Iterator 的 remove ==========
+        List<Integer> nums = new ArrayList<>(Arrays.asList(1, 2, 3, 4, 5));
+        Iterator<Integer> iter = nums.iterator();
+        while (iter.hasNext()) {
+            if (iter.next() % 2 == 0) {
+                iter.remove();  // ✅ 安全移除
+            }
+        }
+        System.out.println(nums);  // [1, 3, 5]
+
+        // ❌ 不要在 foreach 中修改集合!
+        // for (int n : nums) {
+        //     nums.remove(n);  // ConcurrentModificationException!
+        // }
+    }
+}
+
+// ========== Collection 接口核心方法 ==========
+// boolean add(E e)
+// boolean remove(Object o)
+// boolean contains(Object o)
+// int size()
+// boolean isEmpty()
+// void clear()
+// Iterator<E> iterator()
+// Object[] toArray()
+// <T> T[] toArray(T[] a)
+// boolean addAll(Collection<? extends E> c)
+// boolean removeAll(Collection<?> c)
+// boolean retainAll(Collection<?> c)  // 保留交集
+// boolean containsAll(Collection<?> c)
+
+// ========== Collections 工具类 ==========
+class CollectionsUtil {
+    public static void main(String[] args) {
+        List<Integer> list = new ArrayList<>();
+
+        // 空集合
+        List<String> empty = Collections.emptyList();
+        Set<String> single = Collections.singleton("only");
+
+        // 排序
+        Collections.sort(list);
+        Collections.reverse(list);
+        Collections.shuffle(list);  // 打乱
+        Collections.rotate(list, 2);  // 旋转
+
+        // 查找
+        Collections.max(list);
+        Collections.min(list);
+        Collections.binarySearch(list, 5);
+
+        // 包装
+        Collections.unmodifiableList(list);   // 不可变视图
+        Collections.synchronizedList(list);   // 线程安全
+        Collections.checkedList(list, Integer.class);  // 类型检查
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>集合特性对比</h2>
+        <div class="code">// ========== List vs Set vs Map vs Queue ==========
+//
+// ┌────────────┬──────────┬──────────┬──────────┬──────────┐
+// │ 特性       │ List     │ Set      │ Map      │ Queue    │
+// ├────────────┼──────────┼──────────┼──────────┼──────────┤
+// │ 重复       │ ✅       │ ❌       │ ❌ (key) │ ✅       │
+// │ 顺序       │ 有序     │ 不一定   │ 不一定   │ FIFO     │
+// │ 索引       │ ✅ (int) │ ❌       │ ✅ (key) │ ❌       │
+// │ null       │ ✅       │ ✅ (1个) │ ✅ (1key)│ ❌ (某些)│
+// │ 主要实现   │ ArrayList│ HashSet  │ HashMap  │ ArrayDeq │
+// └────────────┴──────────┴──────────┴──────────┴──────────┘
+
+// ========== 数组 vs 集合 ==========
+// 数组: 固定长度, 基本类型, 性能好
+// 集合: 可变大小, 只能存对象 (自动装箱), 功能丰富
+
+// 数组:
+int[] arr = new int[10];           // 固定
+arr[0] = 42;
+int len = arr.length;               // 属性
+
+// 集合:
+List<Integer> nums = new ArrayList<>();  // 可变
+nums.add(42);
+int size = nums.size();                   // 方法
+
+// ========== 集合初始化 ==========
+// 传统:
+List<String> list1 = new ArrayList<>();
+list1.add("a");
+list1.add("b");
+list1.add("c");
+
+// Arrays.asList (固定大小, 不能 add/remove)
+List<String> list2 = Arrays.asList("a", "b", "c");
+
+// List.of (Java 9+, 不可变)
+List<String> list3 = List.of("a", "b", "c");
+
+// Set.of / Map.of (Java 9+)
+Set<String> set1 = Set.of("a", "b", "c");
+Map<String, Integer> map1 = Map.of("a", 1, "b", 2);
+
+// ========== 集合选择指南 ==========
+// 需要索引访问       → ArrayList
+// 频繁插入/删除中间   → LinkedList
+// 不重复             → HashSet (无序) / TreeSet (排序)
+// 键值对             → HashMap (无序) / TreeMap (排序)
+// 线程安全           → ConcurrentHashMap / CopyOnWriteArrayList
+// FIFO 队列          → ArrayDeque / LinkedList
+// 优先级队列         → PriorityQueue
+// 不可变             → List.of / Set.of / Map.of</div>
+        <div class="note">💡 集合总览: 4 大接口 (List/Set/Map/Queue); Collection 根接口继承 Iterable; 数组固定 vs 集合可变; Arrays.asList 固定大小, List.of 不可变; 集合只存对象 (基本类型自动装箱); Iterator 迭代, 不能在 foreach 中修改; Collections 工具类排序/查找/同步/不可变包装; 遍历方式: for/foreach/Iterator/forEach。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoHierarchy()">体系结构</button>
+        <button onclick="demoIterator()">迭代方式</button>
+        <button onclick="demoChoose()">选型指南</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoHierarchy() {
+            result.innerHTML = '';
+            log('# 集合框架体系');
+            log('');
+            log('Iterable');
+            log('  └─ Collection');
+            log('       ├─ List   有序可重复');
+            log('       ├─ Set    不可重复');
+            log('       └─ Queue  FIFO');
+            log('Map (键值对, 独立体系)');
+            log('');
+            log('List: ArrayList / LinkedList');
+            log('Set:  HashSet / TreeSet');
+            log('Map:  HashMap / TreeMap');
+        }
+
+        function demoIterator() {
+            result.innerHTML = '';
+            log('# 4 种迭代方式');
+            log('');
+            log('1. 传统 for (List 有索引):');
+            log('  for (int i = 0; i < list.size(); i++)');
+            log('');
+            log('2. 增强 for:');
+            log('  for (String s : list)');
+            log('');
+            log('3. Iterator:');
+            log('  while (it.hasNext()) { it.next(); }');
+            log('');
+            log('4. forEach + Lambda:');
+            log('  list.forEach(System.out::println)');
+        }
+
+        function demoChoose() {
+            result.innerHTML = '';
+            log('# 如何选择集合');
+            log('');
+            log('需要索引 → ArrayList');
+            log('频繁插删 → LinkedList');
+            log('不重复   → HashSet');
+            log('排序去重 → TreeSet');
+            log('键值对   → HashMap');
+            log('排序键值 → TreeMap');
+            log('FIFO     → ArrayDeque');
+            log('优先级   → PriorityQueue');
+            log('线程安全 → ConcurrentHashMap');
+            log('不可变   → List.of()');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>70-跳表设计 (Skip List)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Skip List</h2>
+  <div class="code">跳表在有序链表上增加多层索引，实现 O(log n) 的平均查找复杂度。</div>
+  <pre>class SkipNode {
+  constructor(val, level) {
+    this.val = val;
+    this.next = new Array(level + 1).fill(null);
+  }
+}
+class SkipList {
+  constructor(maxLevel=16) { this.maxLevel = maxLevel; this.head = new SkipNode(-Infinity, maxLevel); this.level = 0; }
+  _randomLevel() { let l = 0; while (Math.random() < 0.5 && l < this.maxLevel) l++; return l; }
+  search(target) {
+    let cur = this.head;
+    for (let i = this.level; i >= 0; i--) {
+      while (cur.next[i] && cur.next[i].val < target) cur = cur.next[i];
+    }
+    cur = cur.next[0];
+    return cur && cur.val === target;
+  }
+  insert(num) {
+    const update = new Array(this.maxLevel + 1).fill(null);
+    let cur = this.head;
+    for (let i = this.level; i >= 0; i--) {
+      while (cur.next[i] && cur.next[i].val < num) cur = cur.next[i];
+      update[i] = cur;
+    }
+    const lvl = this._randomLevel();
+    if (lvl > this.level) {
+      for (let i = this.level + 1; i <= lvl; i++) update[i] = this.head;
+      this.level = lvl;
+    }
+    const newNode = new SkipNode(num, lvl);
+    for (let i = 0; i <= lvl; i++) {
+      newNode.next[i] = update[i].next[i];
+      update[i].next[i] = newNode;
+    }
+  }
+}</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  class SN{constructor(v,l){this.val=v;this.next=new Array(l+1).fill(null);}}
+  class SL{
+    constructor(m=16){this.ml=m;this.h=new SN(-Infinity,m);this.lv=0;}
+    _rl(){let l=0;while(Math.random()<0.5&&l<this.ml)l++;return l;}
+    insert(num){const up=new Array(this.ml+1).fill(null);let cur=this.h;for(let i=this.lv;i>=0;i--){while(cur.next[i]&&cur.next[i].val<num)cur=cur.next[i];up[i]=cur;}
+      const lvl=this._rl();if(lvl>this.lv){for(let i=this.lv+1;i<=lvl;i++)up[i]=this.h;this.lv=lvl;}
+      const nn=new SN(num,lvl);for(let i=0;i<=lvl;i++){nn.next[i]=up[i].next[i];up[i].next[i]=nn;}}
+  }
+  const sl=new SL();
+  sl.insert(3);sl.insert(1);sl.insert(4);sl.insert(2);
+  document.getElementById('result').textContent = '跳表已插入 3,1,4,2, 支持 O(log n) 搜索';
+}
+</script>
+</body>
+</html>

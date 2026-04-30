@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python re与collections与itertools模块</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔧 Python re / collections / itertools 模块</h2><p>正则表达式 re（模式匹配/搜索/替换）、collections（Counter/defaultdict/deque/OrderedDict/ChainMap）、itertools（无限迭代器/组合生成器/累积迭代器）。</p></div>
+    <div class="card">
+        <h2>re 模块: 正则表达式基础</h2>
+        <div class="code">// ========== 正则基础语法 ==========
+// 元字符:
+// .   — 匹配任意单个字符 (除换行)
+// ^   — 字符串开头
+// $   — 字符串结尾
+// *   — 0 次或多次
+// +   — 1 次或多次
+// ?   — 0 次或 1 次
+// {n} — 精确 n 次
+// {n,}— 至少 n 次
+// {n,m}— n 到 m 次
+// []  — 字符集 [a-z0-9]
+// |   — 或  cat|dog
+// ()  — 分组
+
+// 预定义字符类:
+// \d  — 数字 [0-9]
+// \D  — 非数字
+// \w  — 单词字符 [a-zA-Z0-9_]
+// \W  — 非单词字符
+// \s  — 空白 [ \t\n\r\f\v]
+// \S  — 非空白
+// \b  — 单词边界
+// \B  — 非单词边界</div>
+    </div>
+    <div class="card">
+        <h2>re 模块: 核心函数</h2>
+        <div class="code">// ========== re 核心函数 ==========
+import re
+
+text = "我的邮箱是 alice@example.com, 备用: bob@test.org"
+
+// ========== re.search() ==========
+# 搜索第一个匹配
+match = re.search(r"\w+@\w+\.\w+", text)
+if match:
+    print(match.group())         # alice@example.com
+    print(match.start())         # 6 (起始索引)
+    print(match.end())           # 22 (结束索引)
+
+// ========== re.findall() ==========
+# 找到所有匹配,返回列表
+emails = re.findall(r"\w+@\w+\.\w+", text)
+print(emails)                    # ['alice@example.com', 'bob@test.org']
+
+// ========== re.finditer() ==========
+# 返回迭代器 (大文本时节省内存)
+for match in re.finditer(r"\w+@\w+\.\w+", text):
+    print(match.group(), match.span())
+
+// ========== re.match() ==========
+# 从字符串开头匹配 (不同于 search!)
+m = re.match(r"\w+", text)
+print(m.group())                 # 我的邮箱 (如果开头是中文,匹配失败)
+
+// ========== re.fullmatch() ==========
+# 整个字符串完全匹配
+m = re.fullmatch(r"\w+@\w+\.\w+", "test@example.com")
+print(bool(m))                   # True</div>
+    </div>
+    <div class="card">
+        <h2>re 模块: 替换与分割</h2>
+        <div class="code">// ========== re.sub() / re.split() ==========
+import re
+
+// ========== re.sub() 替换 ==========
+text = "联系人: alice@example.com, bob@test.org"
+
+# 替换所有匹配:
+result = re.sub(r"\w+@\w+\.\w+", "[隐藏]", text)
+print(result)                    # 联系人: [隐藏], [隐藏]
+
+# 限制替换次数:
+result = re.sub(r"\w+@\w+\.\w+", "[隐藏]", text, count=1)
+print(result)                    # 联系人: [隐藏], bob@test.org
+
+# 用函数处理匹配:
+def mask_email(match):
+    email = match.group()
+    local, domain = email.split("@")
+    return f"{local[0]}***@{domain}"
+
+result = re.sub(r"[\w.]+@\w+\.\w+", mask_email, text)
+print(result)                    # 联系人: a***@example.com, b***@test.org
+
+// ========== re.split() 分割 ==========
+text = "苹果, 香蕉; 橘子  葡萄"
+parts = re.split(r"[,;]\s*|\s+", text)
+print(parts)                     # ['苹果', '香蕉', '橘子', '葡萄']
+
+// ========== re.escape() 转义 ==========
+# 自动转义特殊字符:
+pattern = re.escape("python.org")  # 'python\\.org'
+print(re.search(pattern, "访问 python.org"))  # 匹配</div>
+    </div>
+    <div class="card">
+        <h2>re 模块: 分组与编译</h2>
+        <div class="code">// ========== 分组 ==========
+import re
+
+text = "alice@example.com"
+
+match = re.search(r"(\w+)@(\w+)\.(\w+)", text)
+print(match.group(0))            # alice@example.com (完整匹配)
+print(match.group(1))            # alice
+print(match.group(2))            # example
+print(match.group(3))            # com
+print(match.groups())            # ('alice', 'example', 'com')
+
+// ========== 命名分组 ==========
+match = re.search(r"(?P<name>\w+)@(?P<domain>\w+)\.\w+", text)
+print(match.group("name"))       # alice
+print(match.group("domain"))     # example
+
+// ========== re.compile() 编译正则 ==========
+# 编译后复用,提高性能
+pattern = re.compile(r"\w+@\w+\.\w+")
+
+# 编译对象有相同的方法:
+emails = pattern.findall(text)
+match = pattern.search(text)
+result = pattern.sub("[隐藏]", text)
+
+// ========== 标志位 ==========
+# re.IGNORECASE (re.I) — 忽略大小写
+re.search(r"python", "Python", re.I)     # 匹配
+
+# re.MULTILINE (re.M) — 多行模式 ^/$ 匹配每行
+re.search(r"^\d+", "a\n123\nb", re.M)    # 匹配 123
+
+# re.DOTALL (re.S) — . 匹配换行
+re.search(r"hello.world", "hello\nworld", re.S)  # 匹配
+
+# re.VERBOSE (re.X) — 可读性好的正则
+pattern = re.compile(r"""
+    (\w+)@        # 用户名
+    (\w+)\.       # 域名
+    (\w+)         # 顶级域
+""", re.VERBOSE)
+
+// ========== 贪婪 vs 非贪婪 ==========
+text = "<div>内容1</div><div>内容2</div>"
+
+# 贪婪 (默认): 尽可能多匹配
+print(re.search(r"<div>.*</div>", text).group())
+# <div>内容1</div><div>内容2</div>
+
+# 非贪婪: 加 ? 尽可能少匹配
+print(re.search(r"<div>.*?</div>", text).group())
+# <div>内容1</div></div>
+    </div>
+    <div class="card">
+        <h2>collections 模块: Counter</h2>
+        <div class="code">// ========== Counter ==========
+from collections import Counter
+
+# 计数:
+words = ["a", "b", "a", "c", "a", "b"]
+counter = Counter(words)
+print(counter)                    # Counter({'a': 3, 'b': 2, 'c': 1})
+
+# 常用方法:
+print(counter.most_common(2))     # [('a', 3), ('b', 2)]
+print(counter["a"])               # 3
+print(counter["z"])               # 0 (不存在不会 KeyError)
+
+# 更新计数:
+counter.update(["a", "d"])
+print(counter["a"])               # 4
+
+# 算术运算:
+c1 = Counter(a=3, b=1)
+c2 = Counter(a=1, b=2)
+print(c1 + c2)                    # Counter({'a': 4, 'b': 3})
+print(c1 - c2)                    # Counter({'a': 2}) (只保留正数)
+
+# 其他:
+print(list(counter.elements()))   # ['a','a','a','a','b','b','c','d']
+print(counter.total())            # 8 (总数, 3.10+)
+
+# 字符串计数:
+char_count = Counter("hello world")
+print(char_count)                 # Counter({'l': 3, 'o': 2, 'h':1,...})</div>
+    </div>
+    <div class="card">
+        <h2>collections 模块: defaultdict / deque</h2>
+        <div class="code">// ========== defaultdict ==========
+from collections import defaultdict
+
+# 带默认值的字典,访问不存在的键不会 KeyError
+
+# 默认值工厂:
+dd = defaultdict(int)             # 默认 0
+dd["a"] += 1
+print(dd["a"])                    # 1
+print(dd["b"])                    # 0 (自动创建)
+
+dd_list = defaultdict(list)       # 默认 []
+dd_list["users"].append("Alice")
+dd_list["users"].append("Bob")
+print(dd_list["users"])           # ['Alice', 'Bob']
+
+dd_set = defaultdict(set)         # 默认 set()
+dd_set["tags"].add("python")
+print(dd_set["tags"])             # {'python'}
+
+# 实用示例: 分组
+data = [("水果", "苹果"), ("水果", "香蕉"), ("动物", "猫"), ("水果", "橘子")]
+groups = defaultdict(list)
+for category, item in data:
+    groups[category].append(item)
+print(dict(groups))
+# {'水果': ['苹果', '香蕉', '橘子'], '动物': ['猫']}
+
+// ========== deque (双端队列) ==========
+from collections import deque
+
+# 两端高效插入/删除
+dq = deque(["a", "b", "c"])
+
+dq.append("d")                    # 右端添加
+dq.appendleft("z")                # 左端添加
+print(dq)                         # deque(['z', 'a', 'b', 'c', 'd'])
+
+dq.pop()                          # 右端移除
+dq.popleft()                      # 左端移除
+print(dq)                         # deque(['a', 'b', 'c'])
+
+# 旋转:
+dq.rotate(1)                      # 右移一位
+print(dq)                         # deque(['c', 'a', 'b'])
+dq.rotate(-1)                     # 左移一位
+
+# 限制长度 (滑动窗口):
+recent = deque(maxlen=3)
+for i in range(10):
+    recent.append(i)
+print(recent)                     # deque([7, 8, 9], maxlen=3)</div>
+    </div>
+    <div class="card">
+        <h2>collections 模块: 其他</h2>
+        <div class="code">// ========== OrderedDict ==========
+from collections import OrderedDict
+
+# Python 3.7+ 普通 dict 已保持插入顺序
+# OrderedDict 提供额外方法:
+od = OrderedDict()
+od["a"] = 1
+od["b"] = 2
+od["c"] = 3
+
+# 移动到最后:
+od.move_to_end("a")
+print(list(od.keys()))            # ['b', 'c', 'a']
+
+# 移动到最后:
+od.move_to_end("c", last=False)
+print(list(od.keys()))            # ['c', 'b', 'a']
+
+// ========== ChainMap ==========
+from collections import ChainMap
+
+# 将多个字典合并为一个视图
+defaults = {"theme": "dark", "lang": "en"}
+user_settings = {"lang": "zh-CN"}
+
+config = ChainMap(user_settings, defaults)
+print(config["theme"])            # 'dark' (来自 defaults)
+print(config["lang"])             # 'zh-CN' (user_settings 优先)
+
+# 添加新字典:
+override = {"debug": "true"}
+config = config.new_child(override)
+print(config["debug"])            # 'true'
+
+// ========== namedtuple ==========
+from collections import namedtuple
+
+Point = namedtuple("Point", ["x", "y"])
+p = Point(10, 20)
+print(p.x, p.y)                   # 10 20
+print(p[0], p[1])                 # 10 20 (也支持索引)
+
+# 字典到 namedtuple:
+d = {"x": 1, "y": 2}
+p2 = Point(**d)
+
+# _replace (创建新实例):
+p3 = p._replace(x=100)
+print(p3)                         # Point(x=100, y=20)</div>
+    </div>
+    <div class="card">
+        <h2>itertools 模块: 无限与终止迭代</h2>
+        <div class="code">// ========== 无限迭代器 ==========
+from itertools import count, cycle, repeat
+
+# count(start, step): 从 start 开始无限计数
+for i in count(1):                # 1, 2, 3, 4, ...
+    if i > 5: break
+    print(i, end=" ")             # 1 2 3 4 5
+
+# cycle(iterable): 无限循环
+c = 0
+for item in cycle(["A", "B", "C"]):
+    if c >= 6: break
+    print(item, end=" ")          # A B C A B C
+    c += 1
+
+# repeat(object, times): 重复对象 n 次
+for x in repeat("嗨", 3):
+    print(x, end=" ")             # 嗨 嗨 嗨
+
+// ========== 终止迭代器 ==========
+from itertools import accumulate, chain, compress, dropwhile, takewhile
+
+# accumulate: 累积和/乘积
+print(list(accumulate([1,2,3,4])))          # [1, 3, 6, 10]
+import operator
+print(list(accumulate([1,2,3,4], operator.mul)))  # [1, 2, 6, 24]
+
+# chain: 连接多个可迭代对象
+print(list(chain([1,2], [3,4], [5,6])))    # [1,2,3,4,5,6]
+
+# chain.from_iterable: 展平嵌套
+nested = [[1,2], [3,4], [5,6]]
+print(list(chain.from_iterable(nested)))    # [1,2,3,4,5,6]
+
+# compress: 按选择器筛选
+data = "ABCDEF"
+selectors = [1,0,1,0,1,0]
+print(list(compress(data, selectors)))      # ['A', 'C', 'E']
+
+# dropwhile/takewhile: 条件跳过/获取
+print(list(dropwhile(lambda x: x < 3, [1,2,3,4,5])))  # [3,4,5]
+print(list(takewhile(lambda x: x < 3, [1,2,3,4,5])))  # [1,2]</div>
+    </div>
+    <div class="card">
+        <h2>itertools 模块: 组合生成器</h2>
+        <div class="code">// ========== 组合生成器 ==========
+from itertools import product, permutations, combinations, combinations_with_replacement
+
+# product: 笛卡尔积
+print(list(product("AB", "12")))
+# [('A','1'), ('A','2'), ('B','1'), ('B','2')]
+
+print(list(product("AB", repeat=2)))
+# [('A','A'), ('A','B'), ('B','A'), ('B','B')]
+
+# permutations: 排列 (有序, 不重复)
+print(list(permutations("ABC", 2)))
+# [('A','B'), ('A','C'), ('B','A'), ('B','C'), ('C','A'), ('C','B')]
+
+# combinations: 组合 (无序, 不重复)
+print(list(combinations("ABC", 2)))
+# [('A','B'), ('A','C'), ('B','C')]
+
+# combinations_with_replacement: 组合 (可重复)
+print(list(combinations_with_replacement("ABC", 2)))
+# [('A','A'), ('A','B'), ('A','C'), ('B','B'), ('B','C'), ('C','C')]
+
+// ========== 其他实用迭代器 ==========
+from itertools import zip_longest, groupby, islice, pairwise
+
+# zip_longest: 以最长为准填充
+print(list(zip_longest("AB", "1234", fillvalue="?")))
+# [('A','1'), ('B','2'), ('?','3'), ('?','4')]
+
+# groupby: 相邻分组 (需要排序!)
+data = [("A",1), ("A",2), ("B",3), ("B",4)]
+for key, group in groupby(data, key=lambda x: x[0]):
+    print(key, list(group))
+
+# islice: 切片迭代器
+print(list(islice(range(10), 5)))       # [0,1,2,3,4]
+print(list(islice(range(10), 2, 8, 2))) # [2,4,6]
+
+# pairwise (3.10+): 相邻配对
+print(list(pairwise("ABCD")))           # [('A','B'),('B','C'),('C','D')]
+
+# tee: 复制迭代器
+from itertools import tee
+it1, it2 = tee(range(5), 2)
+print(list(it1))                        # [0,1,2,3,4]
+print(list(it2))                        # [0,1,2,3,4]</div>
+        <div class="note">💡 re/collections/itertools 要点: (1) re.search/findall/sub/split/match 核心函数,compile 编译提高性能; (2) collections.Counter 计数、defaultdict 默认值字典、deque 双端队列; (3) itertools.product/permutations/combinations 组合生成、chain 连接、accumulate 累积; (4) 命名分组 (?P&lt;name&gt;) 提高可读性; (5) groupby 前需排序。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoRe()">re 演示</button>
+        <button onclick="demoCollections()">collections 演示</button>
+        <button onclick="demoItertools()">itertools 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoRe() {
+            result.innerHTML = '';
+            log('# re 正则表达式演示');
+            log('');
+            log('文本: "联系方式: alice@example.com"');
+            log('');
+            log('re.search:');
+            log('  pattern = r"\\w+@\\w+\\.\\w+"');
+            log('  → alice@example.com');
+            log('');
+            log('re.findall: 找所有匹配');
+            log('re.sub: 替换匹配内容');
+            log('re.split: 按正则分割');
+            log('');
+            log('常用模式:');
+            log('  \\d+ — 数字    \\w+ — 单词');
+            log('  [a-z] — 小写字母');
+            log('  ^开头 $结尾');
+        }
+
+        function demoCollections() {
+            result.innerHTML = '';
+            log('# collections 演示');
+            log('');
+            log('Counter:');
+            log('  Counter("hello") → l:3, o:2, h:1, e:1');
+            log('  most_common(2) → 出现最多的2个');
+            log('');
+            log('defaultdict:');
+            log('  defaultdict(list) → 默认空列表');
+            log('  defaultdict(int) → 默认0');
+            log('');
+            log('deque:');
+            log('  双端队列, O(1) 两端操作');
+            log('  maxlen 限制长度 → 滑动窗口');
+            log('');
+            log('ChainMap: 多层配置合并');
+        }
+
+        function demoItertools() {
+            result.innerHTML = '';
+            log('# itertools 演示');
+            log('');
+            log('无限迭代器:');
+            log('  count(1) → 1,2,3,4,...');
+            log('  cycle("AB") → A,B,A,B,...');
+            log('');
+            log('组合:');
+            log('  product("AB","12") → 笛卡尔积');
+            log('  permutations("ABC",2) → 排列');
+            log('  combinations("ABC",2) → 组合');
+            log('');
+            log('实用:');
+            log('  chain([1,2],[3,4]) → [1,2,3,4]');
+            log('  accumulate([1,2,3]) → [1,3,6]');
+            log('  groupby → 相邻分组');
+        }
+    </script>
+</body>
+</html>

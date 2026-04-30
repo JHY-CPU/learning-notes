@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intl-日期格式</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #dateFmt-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Intl 日期格式</h2><p>DateTimeFormat、dateStyle/timeStyle、时区、自定义格式。</p></div>
+    <div class="card">
+        <h2>DateTimeFormat 用法</h2>
+        <div class="code">// ========== DateTimeFormat 选项 ==========
+const options = {
+    // 日期样式 (优先级高于各字段)
+    dateStyle: 'full',    // 'full' / 'long' / 'medium' / 'short'
+
+    // 时间样式
+    timeStyle: 'medium',  // 'full' / 'long' / 'medium' / 'short'
+
+    // 各字段单独控制 (与 style 不同时使用)
+    weekday: 'long',      // 'narrow' / 'short' / 'long'
+    era: 'short',         // 'narrow' / 'short' / 'long'
+    year: 'numeric',      // 'numeric' / '2-digit'
+    month: 'long',        // 'numeric' / '2-digit' / 'narrow' / 'short' / 'long'
+    day: 'numeric',       // 'numeric' / '2-digit'
+    hour: '2-digit',      // 'numeric' / '2-digit'
+    minute: '2-digit',    // 'numeric' / '2-digit'
+    second: '2-digit',    // 'numeric' / '2-digit'
+
+    // 时区
+    timeZone: 'Asia/Shanghai',  // IANA 时区名
+    timeZoneName: 'short',      // 'short' / 'long'
+
+    // 12/24 小时制
+    hour12: true,         // true/false
+};
+
+// ========== 用法 ==========
+const df = new Intl.DateTimeFormat('zh-CN', {
+    dateStyle: 'full',
+    timeStyle: 'long',
+});
+df.format(new Date());
+// '2024年1月15日星期一 北京时间 14:30:00'
+
+// formatRange (两个日期之间)
+df.formatRange(startDate, endDate);
+
+// resolvedOptions() 查看实际使用的选项
+console.log(df.resolvedOptions());
+
+// ========== 常用时区 ==========
+// 'Asia/Shanghai' — 中国标准时间
+// 'America/New_York' — 美东时间
+// 'Europe/London' — 伦敦时间
+// 'UTC' — 协调世界时</div>
+    </div>
+    <div class="card">
+        <h2>演示：日期格式化</h2>
+        <button onclick="demoDateStyle()">日期样式对比</button>
+        <button onclick="demoTimeZone()">时区对比</button>
+        <div id="dateFmt-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const dateFmtResult = document.getElementById('dateFmt-result');
+
+        function log(msg) {
+            dateFmtResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoDateStyle() {
+            dateFmtResult.innerHTML = '';
+            const now = new Date();
+            log(`📅 当前时间: ${now.toISOString()}`);
+            log('');
+
+            log('1️⃣ dateStyle 样式对比:');
+            const styles = ['full', 'long', 'medium', 'short'];
+            styles.forEach(style => {
+                const df = new Intl.DateTimeFormat('zh-CN', { dateStyle: style });
+                log(`   ${style.padEnd(6)}: ${df.format(now)}`);
+            });
+            log('');
+
+            log('2️⃣ timeStyle 样式对比:');
+            const tStyles = ['full', 'long', 'medium', 'short'];
+            tStyles.forEach(style => {
+                try {
+                    const df = new Intl.DateTimeFormat('zh-CN', { timeStyle: style });
+                    log(`   ${style.padEnd(6)}: ${df.format(now)}`);
+                } catch (e) {
+                    log(`   ${style.padEnd(6)}: ⚠️ 不支持`);
+                }
+            });
+            log('');
+
+            log('3️⃣ 各字段自定义:');
+            const df = new Intl.DateTimeFormat('zh-CN', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit',
+            });
+            log(`   ${df.format(now)}`);
+            log('');
+
+            log('4️⃣ 各国日期格式:');
+            const locales = [
+                { code: 'zh-CN', name: '中国' },
+                { code: 'en-US', name: '美国' },
+                { code: 'en-GB', name: '英国' },
+                { code: 'ja-JP', name: '日本' },
+                { code: 'de-DE', name: '德国' },
+                { code: 'fr-FR', name: '法国' },
+            ];
+            locales.forEach(({ code, name }) => {
+                const df = new Intl.DateTimeFormat(code, { dateStyle: 'full' });
+                log(`   ${name} (${code}): ${df.format(now)}`);
+            });
+        }
+
+        function demoTimeZone() {
+            dateFmtResult.innerHTML = '';
+            const now = new Date();
+            log('🕐 时区对比演示:');
+            log('');
+
+            const zones = [
+                { zone: 'Asia/Shanghai', name: '中国标准时间' },
+                { zone: 'America/New_York', name: '美东时间' },
+                { zone: 'Europe/London', name: '伦敦时间' },
+                { zone: 'Asia/Tokyo', name: '日本时间' },
+                { zone: 'UTC', name: '协调世界时' },
+                { zone: 'Australia/Sydney', name: '悉尼时间' },
+            ];
+
+            zones.forEach(({ zone, name }) => {
+                const df = new Intl.DateTimeFormat('zh-CN', {
+                    dateStyle: 'full',
+                    timeStyle: 'medium',
+                    timeZone: zone,
+                    timeZoneName: 'short',
+                });
+                log(`   ${name.padEnd(10)} (${zone}):`);
+                log(`      ${df.format(now)}`);
+            });
+
+            log('');
+            log('📌 IANA 时区列表: moment.tz / Intl.supportedValuesOf("timeZone")');
+            try {
+                const supported = Intl.supportedValuesOf('timeZone');
+                log(`   浏览器支持 ${supported.length} 个时区`);
+                log(`   示例: ${supported.slice(0, 5).join(', ')}...`);
+            } catch (e) {
+                log('   supportedValuesOf API 不支持');
+            }
+        }
+
+        console.log('=== Intl 日期格式 ===');
+
+        document.getElementById('output').textContent =
+            `Intl DateTimeFormat: dateStyle / timeStyle / 字段 / 时区\n` +
+            `dateStyle: full/long/medium/short | timeZone: Asia/Shanghai\n` +
+            `✅ Intl 日期格式演示完成！`;
+    </script>
+</body>
+</html>

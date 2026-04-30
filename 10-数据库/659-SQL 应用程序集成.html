@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 应用程序集成</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔗 SQL 应用程序集成</h2><p>连接池 (Connection Pool)、ORM 模式 (Object-Relational Mapping)、数据库迁移工具、SQL 注入防御、连接字符串配置、多数据源事务、数据库驱动选择、应用层缓存。</p></div>
+    <div class="card">
+        <h2>连接池</h2>
+        <div class="code">// ========== 连接池 ==========
+-- 数据库连接建立昂贵 (TCP + 认证 + 上下文)
+-- 连接池: 复用现有连接, 避免频繁创建/销毁
+
+// ========== Python SQLAlchemy ==========
+from sqlalchemy import create_engine
+
+engine = create_engine(
+    'mysql+pymysql://user:pass@localhost:3306/mydb',
+    pool_size=10,           -- 池中连接数
+    max_overflow=20,        -- 超出 pool_size 的最大连接
+    pool_timeout=30,        -- 等待连接超时 (秒)
+    pool_recycle=1800,      -- 回收超过此秒数的连接
+    pool_pre_ping=True      -- 使用前检查连接有效性
+)
+
+// ========== Node.js mysql2 ==========
+const mysql = require('mysql2/promise');
+const pool = mysql.createPool({
+    host: 'localhost',
+    user: 'app_user',
+    password: 'secret',
+    database: 'mydb',
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0
+});
+
+// ========== Java HikariCP (Spring Boot 默认) ==========
+spring.datasource.hikari:
+  maximum-pool-size: 10
+  minimum-idle: 5
+  connection-timeout: 30000
+  idle-timeout: 600000
+  max-lifetime: 1800000
+
+// ========== Go database/sql ==========
+db, err := sql.Open("postgres", connStr)
+db.SetMaxOpenConns(25)
+db.SetMaxIdleConns(10)
+db.SetConnMaxLifetime(30 * time.Minute)
+db.SetConnMaxIdleTime(5 * time.Minute)
+
+// ========== 连接池注意事项 ==========
+// 1. 连接数不是越多越好 (上下文切换)
+//    推荐: (CPU核心数 × 2) + 有效磁盘数
+// 2. 一定要设置 max_lifetime < 数据库连接超时
+// 3. 监控连接池使用率 (活跃/空闲/等待)
+// 4. 事务结束后及时释放连接</div>
+    </div>
+    <div class="card">
+        <h2>ORM 框架对比</h2>
+        <div class="code">// ========== ORM (对象关系映射) ==========
+-- ORM: 将数据库表映射为编程语言对象
+
+// ========== Python ORM ==========
+-- SQLAlchemy (最强大)
+class User(Base):
+    __tablename__ = 'users'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(50), nullable=False)
+    email = Column(String(100), unique=True)
+
+-- Django ORM (Django 内置)
+class User(models.Model):
+    name = models.CharField(max_length=50)
+    email = models.EmailField(unique=True)
+
+-- Peewee (轻量)
+class User(Model):
+    name = CharField(max_length=50)
+    email = CharField(unique=True)
+
+// ========== Node.js ORM ==========
+-- Prisma (类型安全, 自动生成)
+-- model User {
+--   id    Int     @id @default(autoincrement())
+--   name  String
+--   email String  @unique
+-- }
+
+-- TypeORM (TypeScript, 装饰器)
+-- @Entity()
+-- class User {
+--   @PrimaryGeneratedColumn()
+--   id: number;
+--   @Column()
+--   name: string;
+-- }
+
+-- Sequelize (成熟稳定)
+-- Knex (查询构建器, 非全功能 ORM)
+
+// ========== Java ORM ==========
+-- JPA / Hibernate (标准)
+@Entity
+@Table(name = "users")
+public class User {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    @Column(nullable = false)
+    private String name;
+}
+
+// ========== Go ORM ==========
+-- GORM (最流行)
+type User struct {
+    gorm.Model
+    Name  string `gorm:"size:50"`
+    Email string `gorm:"uniqueIndex"`
+}
+
+// ========== ORM 优缺点 ==========
+// 优点:
+//   ✅ 开发效率高, 不用写 SQL
+//   ✅ 防止 SQL 注入 (参数化查询)
+//   ✅ 数据库迁移方便
+//   ✅ 对象关系自然
+//
+// 缺点:
+//   ❌ 性能开销 (N+1 查询问题)
+//   ❌ 复杂查询生成效率低
+//   ❌ 学习成本 (ORM 特有的概念)
+//   ❌ 隐藏 SQL, 不易优化</div>
+    </div>
+    <div class="card">
+        <h2>数据库迁移</h2>
+        <div class="code">// ========== 数据库迁移 ==========
+-- 迁移: 版本控制数据库 schema 变更
+
+// ========== Alembic (Python + SQLAlchemy) ==========
+# 初始化
+alembic init alembic
+
+# 创建迁移 (自动检测变更)
+alembic revision --autogenerate -m "add user table"
+
+# 应用迁移
+alembic upgrade head
+
+# 回滚
+alembic downgrade -1
+
+# 迁移文件示例:
+def upgrade():
+    op.create_table(
+        'users',
+        sa.Column('id', sa.Integer(), primary_key=True),
+        sa.Column('name', sa.String(50), nullable=False),
+        sa.Column('email', sa.String(100), unique=True)
+    )
+
+def downgrade():
+    op.drop_table('users')
+
+// ========== Prisma Migrate (Node.js) ==========
+# 创建迁移
+npx prisma migrate dev --name add_user_table
+
+# 部署到生产
+npx prisma migrate deploy
+
+# 重置数据库
+npx prisma migrate reset
+
+// ========== Flyway (Java) ==========
+-- src/main/resources/db/migration/V1__create_users.sql
+CREATE TABLE users (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(50) NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL
+);
+
+-- 运行: flyway migrate
+
+// ========== knex (Node.js) ==========
+exports.up = function(knex) {
+    return knex.schema.createTable('users', t => {
+        t.increments('id');
+        t.string('name', 50).notNullable();
+        t.string('email', 100).unique();
+    });
+};
+
+exports.down = function(knex) {
+    return knex.schema.dropTable('users');
+};
+
+// ========== 迁移最佳实践 ==========
+// 1. 迁移文件永不修改 (只增不减)
+// 2. 所有环境用相同迁移 (dev/staging/prod)
+// 3. 每个迁移尽量小 (单一职责)
+// 4. 先备份再运行迁移
+// 5. 生产环境迁移需 review</div>
+    </div>
+    <div class="card">
+        <h2>连接字符串与配置</h2>
+        <div class="code">// ========== 连接字符串格式 ==========
+
+// ========== MySQL ==========
+mysql://user:password@host:3306/dbname?charset=utf8mb4
+mysql://app_user:secret@localhost:3306/mydb?charset=utf8mb4&timezone=+08:00
+
+// ========== PostgreSQL ==========
+postgresql://user:password@host:5432/dbname?sslmode=require
+postgresql://app_user:secret@localhost:5432/mydb?sslmode=require
+
+// ========== SQLite ==========
+sqlite:///path/to/database.db
+sqlite:///data/app.db
+
+// ========== 环境变量配置 (12 Factor App) ==========
+# .env 文件
+DB_HOST=localhost
+DB_PORT=3306
+DB_USER=app_user
+DB_PASSWORD=secret
+DB_NAME=mydb
+DB_POOL_SIZE=10
+DB_SSL_MODE=require
+
+# 构建连接字符串
+DB_URL=mysql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
+
+// ========== 多环境配置 ==========
+// 开发环境: 本地数据库
+// 测试环境: 独立测试数据库 (CI)
+// 预发布: 同生产配置但数据脱敏
+// 生产: 高可用 + SSL + 连接池
+
+// ========== 敏感信息管理 ==========
+// ❌ 不要硬编码密码在代码中
+// ❌ 不要提交 .env 到版本控制
+// ✅ 使用环境变量
+// ✅ 使用密钥管理服务 (AWS Secrets Manager / Vault)
+// ✅ CI/CD 使用 secrets 注入</div>
+    </div>
+    <div class="card">
+        <h2>多数据源与事务集成</h2>
+        <div class="code">// ========== 多数据源 ==========
+-- 同一应用连接多个数据库
+
+// ========== Spring Boot ==========
+@Configuration
+public class DataSourceConfig {
+    @Bean
+    @Primary
+    @ConfigurationProperties("app.datasource.master")
+    public DataSource masterDataSource() { ... }
+
+    @Bean
+    @ConfigurationProperties("app.datasource.readonly")
+    public DataSource readOnlyDataSource() { ... }
+}
+
+// ========== SQLAlchemy 绑定 ==========
+engine_master = create_engine('mysql://...')
+engine_readonly = create_engine('mysql://...')
+SessionMaster = sessionmaker(bind=engine_master)
+SessionReadOnly = sessionmaker(bind=engine_readonly)
+
+// ========== 读写分离 ==========
+// 写: master (INSERT/UPDATE/DELETE)
+// 读: replica (SELECT)
+// 优点: 减轻主库压力
+// 注意: 主从延迟导致读不到刚写的数据
+
+// ========== 分布式事务 ==========
+// 两阶段提交 (XA):
+//   PREPARE → COMMIT/ROLLBACK
+//   性能开销大, 尽量少用
+
+// 替代方案:
+//   Saga 模式 (补偿事务)
+//   TCC (Try-Confirm-Cancel)
+//   最终一致性 + 补偿
+
+// ========== 应用层事务管理 ==========
+// Python SQLAlchemy:
+with engine.begin() as conn:    -- 自动 commit/rollback
+    conn.execute(text("UPDATE accounts SET balance = balance - 100 WHERE id = 1"))
+    conn.execute(text("UPDATE accounts SET balance = balance + 100 WHERE id = 2"))
+
+// Node.js:
+const conn = await pool.getConnection();
+try {
+    await conn.beginTransaction();
+    await conn.execute('UPDATE accounts SET balance = balance - 100 WHERE id = 1');
+    await conn.execute('UPDATE accounts SET balance = balance + 100 WHERE id = 2');
+    await conn.commit();
+} catch (err) {
+    await conn.rollback();
+} finally {
+    conn.release();  -- 归还到连接池
+}</div>
+    </div>
+    <div class="card">
+        <h2>数据库驱动选择</h2>
+        <div class="code">// ========== 语言 + 数据库驱动推荐 ==========
+
+// ========== Python ==========
+-- MySQL:      PyMySQL (纯Python), mysqlclient (C扩展, 快)
+-- PostgreSQL: psycopg2 (成熟), asyncpg (异步, 快)
+-- SQLite:     sqlite3 (内置)
+-- 通用:       SQLAlchemy (ORM + 驱动抽象)
+
+// ========== Node.js ==========
+-- MySQL:      mysql2 (支持 Promise, 推荐)
+-- PostgreSQL: pg (原生驱动), pg-pool (连接池)
+-- SQLite:     better-sqlite3 (同步, 快)
+-- 通用:       knex (查询构建器), Prisma (ORM)
+
+// ========== Java ==========
+-- MySQL:      mysql-connector-j
+-- PostgreSQL: postgresql (pgJDBC)
+-- 池:         HikariCP (最快连接池)
+-- 通用:       JDBC (底层), JPA/Hibernate (ORM)
+
+// ========== Go ==========
+-- MySQL:      github.com/go-sql-driver/mysql
+-- PostgreSQL: github.com/jackc/pgx (推荐)
+-- SQLite:     github.com/mattn/go-sqlite3
+-- 通用:       database/sql (标准), GORM (ORM)
+
+// ========== 选择标准 ==========
+// 1. 社区活跃度 (GitHub stars, 更新频率)
+// 2. 性能 (原生 vs 纯语言实现)
+// 3. 异步支持 (async/await 场景)
+// 4. 连接池内置
+// 5. 兼容性 (新版本数据库支持)
+// 6. API 设计 (易用性)</div>
+        <div class="note">💡 要点: 连接池避免频繁创建连接; ORM 提高效率但注意 N+1 问题; 数据库迁移应版本控制永不修改; 连接字符串用环境变量勿硬编码; 多数据源注意事务边界; 分布式事务尽量用最终一致性替代。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoPool()">连接池</button>
+        <button onclick="demoORM()">ORM 对比</button>
+        <button onclick="demoMigrate()">迁移流程</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoPool() {
+            result.innerHTML = '';
+            log('# 连接池配置');
+            log('');
+            log('连接池参数:');
+            log('  pool_size: 10   (核心连接数)');
+            log('  max_overflow: 20 (峰值连接数)');
+            log('  pool_timeout: 30 (等待超时)');
+            log('  pool_recycle: 1800 (连接回收)');
+            log('  pool_pre_ping: true (健康检查)');
+            log('');
+            log('最佳连接数 ≈ (CPU×2) + 磁盘数');
+        }
+
+        function demoORM() {
+            result.innerHTML = '';
+            log('# ORM 优缺点');
+            log('');
+            log('✅ 优点:');
+            log('  开发效率高, 防注入, 迁移方便');
+            log('');
+            log('❌ 缺点:');
+            log('  性能开销, N+1 查询问题');
+            log('  复杂查询生成效率低');
+            log('');
+            log('SQLAlchemy (Python)');
+            log('Prisma (Node.js)');
+            log('Hibernate (Java)');
+            log('GORM (Go)');
+        }
+
+        function demoMigrate() {
+            result.innerHTML = '';
+            log('# 迁移流程');
+            log('');
+            log('alembic init alembic');
+            log('alembic revision --autogenerate');
+            log('alembic upgrade head');
+            log('alembic downgrade -1');
+            log('');
+            log('注意事项:');
+            log('  迁移文件永不修改');
+            log('  每个环境统一迁移');
+            log('  先备份再执行');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python进阶函数综合</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🏗️ Python 进阶函数综合</h2><p>进阶函数知识图谱、闭包+装饰器+生成器+迭代器四件套总结、综合实战案例、最佳实践与模式选择、常见陷阱对照表。</p></div>
+    <div class="card">
+        <h2>进阶函数知识图谱</h2>
+        <div class="code">// ========== 进阶函数总览 ==========
+// ┌──────────────────────────────────┐
+// │           进阶函数               │
+// │  ┌──────┐ ┌──────┐ ┌──────┐    │
+// │  │闭  包│ │装饰器│ │生成器│    │
+// │  │__closure__│ │func→func│ │yield│    │
+// │  │nonlocal│ │@wraps  │ │惰性  │    │
+// │  └──────┘ └──────┘ └──────┘    │
+// │  ┌──────┐ ┌──────┐ ┌──────┐    │
+// │  │迭代器│ │协  程│ │itertools│  │
+// │  │__iter__│ │send() │ │组合工具│  │
+// │  │__next__│ │yield from│ │惰性   │    │
+// │  └──────┘ └──────┘ └──────┘    │
+// └──────────────────────────────────┘
+
+// ========== 四件套对比 ==========
+// 闭包:     函数+捕获的外部变量
+// 装饰器:   输入函数→输出增强函数
+// 生成器:   用 yield 暂停/恢复的函数
+// 迭代器:   实现 __iter__/__next__ 协议
+
+// ========== 关系图 ==========
+// 闭包 → 实现装饰器的底层机制
+// 生成器 → 是迭代器的一种 (自动实现迭代器协议)
+// 迭代器 → 装饰器可以包装迭代器
+// 协程 → 生成器的 send/throw 扩展
+
+// 一句话:
+// 闭包是"数据捕获",装饰器是"函数加工"
+// 迭代器是"逐个取",生成器是"惰性算"</div>
+    </div>
+    <div class="card">
+        <h2>综合案例: 缓存代理</h2>
+        <div class="code">// ========== 案例: 带过期时间的缓存装饰器 ==========
+// 综合运用: 闭包 + 装饰器 + 生成器 + 迭代器
+
+import time
+from functools import wraps
+
+def ttl_cache(expire=60):
+    """带过期时间的缓存装饰器"""
+    cache = {}               # 闭包变量: 缓存存储
+
+    def decorator(func):
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            # 生成缓存键
+            key = (args, tuple(sorted(kwargs.items())))
+
+            # 检查缓存是否有效
+            if key in cache:
+                value, timestamp = cache[key]
+                if time.time() - timestamp < expire:
+                    print(f"[缓存命中] {func.__name__}{args}")
+                    return value
+                else:
+                    print(f"[缓存过期] 删除 {func.__name__}{args}")
+                    del cache[key]
+
+            # 计算新值
+            result = func(*args, **kwargs)
+            cache[key] = (result, time.time())
+            print(f"[缓存设置] {func.__name__}{args} = {result}")
+            return result
+
+        # 添加缓存管理方法
+        def cache_clear():
+            cache.clear()
+            print("缓存已清空")
+
+        def cache_info():
+            return {
+                "size": len(cache),
+                "keys": list(cache.keys()),
+                "expire": expire,
+            }
+
+        wrapper.cache_clear = cache_clear
+        wrapper.cache_info = cache_info
+        return wrapper
+    return decorator
+
+@ttl_cache(expire=10)         # 缓存 10 秒
+def fetch_user(user_id):
+    print(f"  实际查询: 获取用户 {user_id}")
+    return {"id": user_id, "name": f"User_{user_id}"}
+
+// 第一次: 实际计算
+print(fetch_user(1))          # [缓存设置] 获取用户 → 查询...
+
+// 第二次: 缓存命中
+print(fetch_user(1))          # [缓存命中] 直接返回!
+
+// 查看缓存
+print(fetch_user.cache_info())  # {"size": 1, ...}</div>
+    </div>
+    <div class="card">
+        <h2>综合案例: 管道处理框架</h2>
+        <div class="code">// ========== 案例: 数据处理管道 ==========
+// 综合运用: 生成器 + 装饰器 + 迭代器
+
+from functools import wraps
+
+# ---------- 管道框架 ----------
+class Pipeline:
+    """数据管道: 串联多个处理步骤"""
+    def __init__(self, *steps):
+        self.steps = steps
+
+    def __iter__(self):
+        """Pipeline 本身是可迭代的"""
+        return self
+
+    def __next__(self):
+        raise NotImplementedError("请使用 process()")
+
+    def process(self, data):
+        """处理数据,返回生成器"""
+        result = data
+        for step in self.steps:
+            result = step(result)  # 每个步骤可以是生成器
+        return result
+
+# ---------- 步骤装饰器 ----------
+def step(func):
+    """标记为管道步骤"""
+    @wraps(func)
+    def wrapper(data):
+        return func(data)
+    return wrapper
+
+# ---------- 定义步骤 ----------
+@step
+def read(data):
+    """模拟数据读取"""
+    for item in data:
+        yield item
+
+@step
+def clean(data):
+    """数据清洗"""
+    for item in data:
+        yield item.strip().lower()
+
+@step
+def filter_valid(data):
+    """过滤空值"""
+    for item in data:
+        if item:
+            yield item
+
+@step
+def format_output(data):
+    """格式化"""
+    for item in data:
+        yield f"| {item} |"
+
+# ---------- 使用管道 ----------
+pipeline = Pipeline(read, clean, filter_valid, format_output)
+
+raw_data = ["  Alice  ", "BOB", "", "  CHARLIE  ", None, "  david  "]
+
+for result in pipeline.process(raw_data):
+    print(result)
+// | alice |
+// | bob |
+// | charlie |
+// | david |</div>
+    </div>
+    <div class="card">
+        <h2>进阶函数最佳实践</h2>
+        <div class="code">// ========== 模式选择指南 ==========
+// 需要做什么?          → 用什么?
+// 想在函数前后加逻辑    → 装饰器
+// 想延迟/惰性计算      → 生成器
+// 想自定义 for 循环     → 迭代器
+// 想捕获外部状态       → 闭包
+// 想数据流水线处理     → 生成器管道
+// 想缓存函数结果       → 装饰器 + 闭包
+// 想创建可复用工具     → 迭代器 + itertools
+
+// ========== 常见陷阱对照表 ==========
+// 陷阱                    → 修复
+// 装饰器丢失元信息        → @wraps(func)
+// 循环创建闭包变量共享     → lambda i=i: i 或工厂函数
+// 生成器只能消费一次       → 需要时重新创建
+// 装饰器参数可选          → 两层/三层参数检测
+// 生成器不执行            → 用 list() 或 for 消费
+// 迭代器不支持 len()      → 用 list() 转换 (会消耗)
+// 忘记推进协程到 yield     → 用协程装饰器自动 next()
+
+// ========== 性能考量 ==========
+// 装饰器: 每次调用有额外函数调用开销
+// 生成器: 减少内存,但单次访问略慢于列表
+// 闭包: 比全局变量快,比局部变量慢
+
+// 结论: 优先考虑正确性和可读性
+// 性能问题只在测量后优化
+
+// ========== 纯函数原则 ==========
+// 结合函数式编程:
+def compose(*funcs):
+    """函数组合: compose(f, g)(x) = f(g(x))"""
+    def composed(x):
+        result = x
+        for func in reversed(funcs):
+            result = func(result)
+        return result
+    return composed
+
+# 使用闭包+生成器做函数组合:
+def pipe(value, *funcs):
+    """数据流管道: pipe(x, f, g) = g(f(x))"""
+    result = value
+    for func in funcs:
+        result = func(result)
+    return result
+
+# 用生成器做惰性组合:
+def lazy_pipe(iterable, *funcs):
+    """惰性管道: 每个元素逐个经过所有函数"""
+    for item in iterable:
+        yield pipe(item, *funcs)</div>
+        <div class="note">💡 进阶函数总结: (1) 闭包+装饰器+生成器+迭代器是 Python 函数式编程四大核心; (2) 装饰器用 @wraps 保留元信息; (3) 生成器节省内存,适合大数据和管道; (4) 迭代器一次性消耗,需要注意; (5) 四种技术经常组合使用 (如缓存装饰器内部用闭包保存状态)。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSummary()">进阶函数总结</button>
+        <button onclick="demoPipeline()">管道框架演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSummary() {
+            result.innerHTML = '';
+            log('# 进阶函数知识总结');
+            log('');
+            log('四大核心概念:');
+            log('');
+            log('1. 闭包');
+            log('   函数 + 捕获的外部变量');
+            log('   用途: 工厂函数、状态保持');
+            log('');
+            log('2. 装饰器');
+            log('   func → wrapper func');
+            log('   用途: 日志/计时/缓存/权限');
+            log('');
+            log('3. 生成器');
+            log('   yield 暂停,惰性求值');
+            log('   用途: 大数据/无限序列/管道');
+            log('');
+            log('4. 迭代器');
+            log('   __iter__ + __next__');
+            log('   用途: 自定义 for 循环对象');
+            log('');
+            log('选择指南:');
+            log('  状态保持 → 闭包');
+            log('  增强函数 → 装饰器');
+            log('  节省内存 → 生成器');
+            log('  自定义遍历 → 迭代器');
+        }
+
+        function demoPipeline() {
+            result.innerHTML = '';
+            log('# 管道框架演示');
+            log('');
+            log('数据: ["  Alice  ", "BOB", "", None]');
+            log('');
+            log('步骤:');
+            log('  1. read       → 逐项读取');
+            log('  2. clean      → strip + lower');
+            log('  3. filter     → 去空值');
+            log('  4. format     → 加边框');
+            log('');
+            log('处理结果:');
+            const data = ["  Alice  ", "BOB", "", null, "  CHARLIE  "];
+            data.filter(x => x).forEach(x => {
+                log(`  | ${x.trim().toLowerCase()} |`);
+            });
+            log('');
+            log('特点: 惰性、链式、可组合');
+            log('像 Unix 管道一样优雅!');
+        }
+    </script>
+</body>
+</html>

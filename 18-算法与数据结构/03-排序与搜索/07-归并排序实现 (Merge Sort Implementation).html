@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>07-归并排序实现 (Merge Sort Implementation)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; white-space: pre-wrap; }
+.bar-container { display: flex; align-items: flex-end; height: 200px; gap: 4px; margin: 10px 0; }
+.bar { background: #3498db; width: 28px; text-align: center; color: white; font-size: 11px; transition: height 0.3s; border-radius: 3px 3px 0 0; }
+.bar-merging { background: #e67e22; }
+.bar-sorted { background: #27ae60; }
+</style></head>
+<body>
+<div class="card">
+  <h2>归并排序实现 (Merge Sort Implementation)</h2>
+  <p>归并排序的典型实现采用递归方式，包含两个核心函数：<code>mergeSort</code>（递归分治）和 <code>merge</code>（合并两个有序数组）。</p>
+  <div class="note">
+    <strong>实现要点：</strong>需要 O(n) 的辅助空间来存储合并结果，但可以通过优化减少空间使用。
+  </div>
+</div>
+
+<div class="card">
+  <h2>递归实现</h2>
+  <pre>function mergeSort(arr) {
+  if (arr.length <= 1) return arr;
+  const mid = Math.floor(arr.length / 2);
+  const left = mergeSort(arr.slice(0, mid));
+  const right = mergeSort(arr.slice(mid));
+  return merge(left, right);
+}
+
+function merge(left, right) {
+  const result = [];
+  let i = 0, j = 0;
+  while (i < left.length && j < right.length) {
+    if (left[i] <= right[j]) {
+      result.push(left[i++]);
+    } else {
+      result.push(right[j++]);
+    }
+  }
+  return result.concat(left.slice(i)).concat(right.slice(j));
+}</pre>
+</div>
+
+<div class="card">
+  <h2>原地归并（优化版）</h2>
+  <pre>function mergeSortInPlace(arr, left = 0, right = arr.length - 1) {
+  if (left >= right) return;
+  const mid = Math.floor((left + right) / 2);
+  mergeSortInPlace(arr, left, mid);
+  mergeSortInPlace(arr, mid + 1, right);
+  mergeInPlace(arr, left, mid, right);
+}
+
+function mergeInPlace(arr, left, mid, right) {
+  const temp = [];
+  let i = left, j = mid + 1;
+  while (i <= mid && j <= right) {
+    if (arr[i] <= arr[j]) temp.push(arr[i++]);
+    else temp.push(arr[j++]);
+  }
+  while (i <= mid) temp.push(arr[i++]);
+  while (j <= right) temp.push(arr[j++]);
+  for (let k = 0; k < temp.length; k++) {
+    arr[left + k] = temp[k];
+  }
+}</pre>
+</div>
+
+<div class="card">
+  <h2>交互演示</h2>
+  <button onclick="runMergeSort()">开始归并排序</button>
+  <button onclick="resetData()">重置数据</button>
+  <div id="bars" class="bar-container"></div>
+  <div id="result">点击按钮开始演示</div>
+</div>
+
+<script>
+let data = [];
+let sorting = false;
+
+function init() {
+  data = Array.from({length: 10}, () => Math.floor(Math.random() * 150) + 20);
+  render(data);
+}
+
+function render(arr, highlight = []) {
+  const c = document.getElementById('bars');
+  const m = Math.max(...arr);
+  c.innerHTML = arr.map((v, i) => {
+    let cls = 'bar' + (highlight.includes(i) ? ' bar-merging' : '');
+    return `<div class="${cls}" style="height:${(v/m)*180}px">${v}</div>`;
+  }).join('');
+}
+
+async function runMergeSort() {
+  if (sorting) return;
+  sorting = true;
+  const arr = [...data];
+  await doSort(arr, 0, arr.length - 1);
+  render(arr);
+  document.getElementById('result').textContent = '排序完成: [' + arr.join(', ') + ']';
+  data = arr;
+  sorting = false;
+}
+
+async function doSort(arr, l, r) {
+  if (l >= r) return;
+  const mid = Math.floor((l + r) / 2);
+  await doSort(arr, l, mid);
+  await doSort(arr, mid + 1, r);
+  await doMerge(arr, l, mid, r);
+}
+
+async function doMerge(arr, l, mid, r) {
+  const temp = [];
+  let i = l, j = mid + 1;
+  while (i <= mid && j <= r) {
+    if (arr[i] <= arr[j]) temp.push(arr[i++]);
+    else temp.push(arr[j++]);
+  }
+  while (i <= mid) temp.push(arr[i++]);
+  while (j <= r) temp.push(arr[j++]);
+  for (let k = 0; k < temp.length; k++) {
+    arr[l + k] = temp[k];
+  }
+  const indices = [];
+  for (let k = l; k <= r; k++) indices.push(k);
+  render(arr, indices);
+  document.getElementById('result').textContent =
+    `合并 [${l}-${mid}] 和 [${mid+1}-${r}]: [${arr.slice(l, r+1).join(', ')}]`;
+  await sleep(400);
+}
+
+function resetData() {
+  if (sorting) return;
+  init();
+  document.getElementById('result').textContent = '数据已重置';
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+init();
+</script>
+</body></html>

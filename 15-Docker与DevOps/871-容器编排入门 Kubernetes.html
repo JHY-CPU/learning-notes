@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>容器编排入门: Docker Swarm & Kubernetes</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>☸️ 容器编排入门: Docker Swarm & Kubernetes</h2><p>编排概念、Docker Swarm 模式、Kubernetes 核心概念 (Pod/Deployment/Service/Ingress)、k3s/minikube/kind 本地集群。</p></div>
+    <div class="card">
+        <h2>容器编排概述</h2>
+        <div class="code">// ========== 什么是容器编排 ==========
+// 管理多个容器的部署、扩展、网络、服务发现
+//
+// 解决的问题:
+// 1. 多个宿主机管理
+// 2. 容器自动调度
+// 3. 服务发现与负载均衡
+// 4. 滚动更新与回滚
+// 5. 健康检查与自愈
+// 6. 扩缩容
+// 7. 配置与密钥管理
+
+// ========== 主要编排工具 ==========
+// Docker Swarm   — Docker 原生, 简单易用
+// Kubernetes (K8s) — 业界标准, 功能强大
+// Nomad          — HashiCorp, 简单
+// Amazon ECS     — AWS 托管
+// Azure AKS      — Azure 托管
+// Google GKE     — Google 托管
+
+// ========== Docker Swarm vs Kubernetes ==========
+// Swarm:
+//   - 简单: 几分钟搭建
+//   - Docker 原生: Compose 文件可转换
+//   - 功能较少
+//   - 适合团队小/需求简单的场景
+//
+// K8s:
+//   - 复杂: 学习曲线陡峭
+//   - 功能丰富: 自动伸缩/服务网格/CSI/CRI
+//   - 生态强大: Helm/Prometheus/Istio
+//   - 适合中大型/复杂场景</div>
+    </div>
+    <div class="card">
+        <h2>Docker Swarm</h2>
+        <div class="code">// ========== Swarm 初始化 ==========
+// docker swarm init                    // 初始化集群 (当前节点为 manager)
+// docker swarm join --token <token>    // 工作节点加入
+
+// 查看:
+// docker node ls                        // 节点列表
+// docker node inspect <node>            // 节点详情
+
+// ========== Stack 部署 ==========
+// 基于 Compose 文件部署
+
+// docker stack deploy -c docker-compose.yml myapp
+// docker stack ls                        // 查看 stacks
+// docker stack services myapp            // 服务列表
+// docker stack ps myapp                  // 容器列表
+// docker stack rm myapp                  // 删除
+
+// ========== Service 管理 ==========
+// docker service create --name web --replicas 3 -p 80:80 nginx
+// docker service ls
+// docker service ps web
+// docker service scale web=5
+// docker service update --image nginx:alpine web
+// docker service logs web
+// docker service rm web
+
+// ========== Swarm 模式 Compose ==========
+// docker-compose.yml 部署到 Swarm
+
+// services:
+//   web:
+//     image: nginx:alpine
+//     ports:
+//       - "80:80"
+//     deploy:
+//       replicas: 3
+//       update_config:
+//         parallelism: 1      // 每批更新 1 个
+//         delay: 10s          // 批次间隔
+//       restart_policy:
+//         condition: any
+//       resources:
+//         limits:
+//           memory: 256M
+
+// ========== Swarm Secrets ==========
+// echo "my-password" | docker secret create db_password -
+// docker secret ls
+
+// services:
+//   db:
+//     image: postgres:16
+//     secrets:
+//       - db_password
+//     environment:
+//       POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+
+// secrets:
+//   db_password:
+//     external: true</div>
+    </div>
+    <div class="card">
+        <h2>Kubernetes 核心概念</h2>
+        <div class="code">// ========== K8s 架构 ==========
+// ┌──────────────────────────────────┐
+// │         Control Plane            │
+// │  API Server / Scheduler /        │
+// │  Controller Manager / etcd       │
+// └──────────────────────────────────┘
+//         │            │
+// ┌──────────────┐ ┌──────────────┐
+// │  Node 1      │ │  Node 2      │
+// │  ┌──┐ ┌──┐   │ │  ┌──┐ ┌──┐   │
+// │  │P1│ │P2│   │ │  │P3│ │P4│   │
+// │  └──┘ └──┘   │ │  └──┘ └──┘   │
+// │  kubelet     │ │  kubelet     │
+// └──────────────┘ └──────────────┘
+
+// ========== 核心资源 ==========
+// Pod:        最小部署单元 (一个或多个容器)
+// Deployment: 声明式更新 Pod (滚动更新/回滚)
+// Service:    网络抽象 (负载均衡/服务发现)
+// Ingress:    外部访问路由 (HTTP/HTTPS)
+// ConfigMap:  配置管理
+// Secret:     敏感信息管理
+// Volume:     存储卷
+// Namespace:  资源隔离
+
+// ========== Pod ==========
+// apiVersion: v1
+// kind: Pod
+// metadata:
+//   name: nginx
+//   labels:
+//     app: nginx
+// spec:
+//   containers:
+//   - name: nginx
+//     image: nginx:alpine
+//     ports:
+//     - containerPort: 80
+//     env:
+//     - name: ENV
+//       value: production
+
+// kubectl run nginx --image=nginx:alpine
+// kubectl get pods
+// kubectl describe pod nginx
+// kubectl logs nginx
+// kubectl exec -it nginx -- sh
+// kubectl delete pod nginx
+
+// ========== Deployment ==========
+// apiVersion: apps/v1
+// kind: Deployment
+// metadata:
+//   name: web
+// spec:
+//   replicas: 3
+//   selector:
+//     matchLabels:
+//       app: web
+//   template:
+//     metadata:
+//       labels:
+//         app: web
+//     spec:
+//       containers:
+//       - name: nginx
+//         image: nginx:alpine
+//         ports:
+//         - containerPort: 80
+//         resources:
+//           limits:
+//             memory: "256Mi"
+//             cpu: "500m"
+
+// kubectl apply -f deployment.yaml
+// kubectl get deployments
+// kubectl scale deployment web --replicas=5
+// kubectl set image deployment/web nginx=nginx:1.25
+// kubectl rollout undo deployment/web
+// kubectl rollout status deployment/web</div>
+    </div>
+    <div class="card">
+        <h2>Service & Ingress</h2>
+        <div class="code">// ========== Service ==========
+// apiVersion: v1
+// kind: Service
+// metadata:
+//   name: web-service
+// spec:
+//   selector:
+//     app: web          // 选择哪些 Pod
+//   ports:
+//   - port: 80
+//     targetPort: 80
+//   type: ClusterIP     // 默认, 集群内可达
+
+// Service 类型:
+// ClusterIP:   集群内部 IP (默认)
+// NodePort:    节点端口 (30000-32767)
+// LoadBalancer: 云厂商 LB
+// ExternalName: DNS CNAME
+
+// kubectl expose deployment web --port=80 --type=NodePort
+// kubectl get services
+// kubectl describe service web-service
+
+// ========== Ingress ==========
+// apiVersion: networking.k8s.io/v1
+// kind: Ingress
+// metadata:
+//   name: web-ingress
+// spec:
+//   ingressClassName: nginx
+//   rules:
+//   - host: api.example.com
+//     http:
+//       paths:
+//       - path: /v1
+//         pathType: Prefix
+//         backend:
+//           service:
+//             name: v1-service
+//             port:
+//               number: 80
+//       - path: /v2
+//         pathType: Prefix
+//         backend:
+//           service:
+//             name: v2-service
+//             port:
+//               number: 80
+//   tls:
+//   - hosts:
+//     - api.example.com
+//     secretName: api-tls
+
+// ========== ConfigMap & Secret ==========
+// ConfigMap (明文):
+// apiVersion: v1
+// kind: ConfigMap
+// metadata:
+//   name: app-config
+// data:
+//   APP_ENV: production
+//   LOG_LEVEL: info
+
+// Secret (Base64):
+// apiVersion: v1
+// kind: Secret
+// metadata:
+//   name: app-secret
+// type: Opaque
+// data:
+//   DB_PASSWORD: cGFzc3dvcmQ=  // base64
+
+// 使用:
+// envFrom:
+//   - configMapRef:
+//       name: app-config
+//   - secretRef:
+//       name: app-secret</div>
+    </div>
+    <div class="card">
+        <h2>本地集群工具</h2>
+        <div class="code">// ========== minikube ==========
+// 本地单节点 K8s 集群
+// 适合学习和小型开发
+
+// minikube start                           // 启动集群
+// minikube start --cpus=4 --memory=8g      // 指定资源
+// minikube stop
+// minikube delete
+// minikube dashboard                       // Web UI
+// minikube addons list
+// minikube addons enable ingress
+// minikube service web-service             // 暴露服务
+
+// ========== kind (Kubernetes in Docker) ==========
+// 在 Docker 容器中运行 K8s
+// 适合 CI 测试
+
+// kind create cluster                      // 创建集群
+// kind create cluster --config config.yaml // 自定义配置
+// kind get clusters
+// kind delete cluster
+
+// kind 配置文件:
+// kind: Cluster
+// apiVersion: kind.x-k8s.io/v1alpha4
+// nodes:
+// - role: control-plane
+// - role: worker
+// - role: worker
+
+// ========== k3s (轻量 K8s) ==========
+// 单二进制, <100MB, 适合边缘/ IoT
+
+// curl -sfL https://get.k3s.io | sh -
+// k3s kubectl get pods
+// k3s server &
+// k3s agent --server https://server:6443 --token <token>
+
+// ========== kubectl 常用命令 ==========
+// kubectl get pods -A                  // 所有 namespace
+// kubectl get pods -w                  // 监控变化
+// kubectl get all                      // 所有资源
+// kubectl logs -f deployment/web        // 日志
+// kubectl exec -it pod-name -- sh
+// kubectl port-forward pod 8080:80      // 端口转发
+// kubectl describe pod web-xxxx
+// kubectl top pods                     // 资源使用
+// kubectl get events --sort-by='.lastTimestamp'
+
+// ========== Helm 包管理 ==========
+// Helm = K8s 的 apt/yum
+
+// helm repo add bitnami https://charts.bitnami.com/bitnami
+// helm install my-release bitnami/nginx
+// helm list
+// helm upgrade my-release bitnami/nginx
+// helm rollback my-release 1
+// helm uninstall my-release</div>
+        <div class="note">💡 编排要点: Swarm 简单 (docker stack deploy), K8s 功能强大 (Pod/Deployment/Service/Ingress); Swarm service create/scale/update; K8s kubectl apply/scale/rollout; Service 类型 ClusterIP/NodePort/LoadBalancer; Ingress 路由 + TLS; ConfigMap/Secret 配置管理; 本地工具 minikube/kind/k3s; Helm 包管理; kubectl logs/exec/port-forward/top。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSwarm()">Swarm</button>
+        <button onclick="demoK8s()">K8s</button>
+        <button onclick="demoLocal()">本地集群</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSwarm() {
+            result.innerHTML = '';
+            log('# Docker Swarm');
+            log('');
+            log('初始化: docker swarm init');
+            log('部署:   docker stack deploy -c compose.yml app');
+            log('服务:   docker service create/scale/update');
+            log('');
+            log('特性:');
+            log('  简单 (Compose 语法)');
+            log('  内置负载均衡');
+            log('  Rolling update');
+            log('  Secrets 管理');
+        }
+
+        function demoK8s() {
+            result.innerHTML = '';
+            log('# Kubernetes');
+            log('');
+            log('核心:');
+            log('  Pod → Deployment → Service → Ingress');
+            log('');
+            log('命令:');
+            log('  kubectl apply -f deployment.yaml');
+            log('  kubectl get pods/deployments/services');
+            log('  kubectl scale deployment web --replicas=5');
+            log('  kubectl rollout undo deployment/web');
+            log('');
+            log('资源:');
+            log('  ConfigMap / Secret');
+            log('  Namespace / Volume');
+        }
+
+        function demoLocal() {
+            result.innerHTML = '';
+            log('# 本地 K8s 集群');
+            log('');
+            log('minikube:');
+            log('  minikube start --cpus=4 --memory=8g');
+            log('  minikube dashboard');
+            log('');
+            log('kind:');
+            log('  kind create cluster');
+            log('  Docker 内运行 K8s (CI 友好)');
+            log('');
+            log('k3s:');
+            log('  单二进制 <100MB');
+            log('  适合边缘/IoT');
+            log('');
+            log('Helm:');
+            log('  helm install/release/upgrade');
+        }
+    </script>
+</body>
+</html>

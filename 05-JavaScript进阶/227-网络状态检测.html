@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网络状态检测</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        #status-box { padding: 20px; border-radius: 8px; text-align: center; font-size: 24px; font-weight: bold; margin: 10px 0; transition: all 0.3s; }
+        #status-box.online { background: #d5f5e3; color: #27ae60; }
+        #status-box.offline { background: #fadbd8; color: #e74c3c; }
+        #net-details { background: #f8f9fa; padding: 15px; border-radius: 4px; font-size: 13px; }
+        #net-details .row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #eee; }
+        #net-details .key { color: #7f8c8d; }
+        #net-details .val { font-weight: bold; color: #2c3e50; font-family: monospace; }
+        #event-log { background: #1e1e1e; color: #d4d4d4; padding: 10px; border-radius: 4px; font-size: 12px; max-height: 100px; overflow-y: auto; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>网络状态检测</h2><p>检测浏览器在线/离线状态及网络类型（3G/4G/WiFi 等）。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 1. 在线/离线状态
+navigator.onLine;  // true = 在线, false = 离线
+
+window.addEventListener('online', () => {
+    console.log('网络已连接');
+});
+window.addEventListener('offline', () => {
+    console.log('网络已断开');
+});
+
+// 2. Network Information API（非标准，但有广泛支持）
+const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+
+connection.effectiveType;  // 'slow-2g' | '2g' | '3g' | '4g' (5g 也可能)
+connection.downlink;       // 下行速度（Mbps）
+connection.rtt;            // 往返时延（ms）
+connection.saveData;       // 是否开启省流量模式
+
+// 监听网络类型变化
+connection.addEventListener('change', () => {
+    console.log('网络变化:', connection.effectiveType);
+});
+
+// 用途：根据网络质量调整资源加载
+if (connection?.effectiveType === '4g') {
+    loadHDImages();
+} else {
+    loadLowResImages();
+}</div>
+        <div class="note">⚠️ navigator.onLine 并不完全可靠（可能返回 false 但实际能联网）。<br>
+        ⚠️ NetworkInformation API 是实验性功能，部分浏览器不支持。<br>
+        💡 最佳实践：online/offline + 实际请求（fetch）双重检测。</div>
+    </div>
+    <div class="card">
+        <h2>演示：网络状态</h2>
+        <div id="status-box" class="online">🟢 在线</div>
+        <div id="net-details">
+            <div class="row"><span class="key">navigator.onLine</span><span class="val" id="net-online">-</span></div>
+            <div class="row"><span class="key">网络类型</span><span class="val" id="net-type">-</span></div>
+            <div class="row"><span class="key">下行速度</span><span class="val" id="net-downlink">-</span></div>
+            <div class="row"><span class="key">RTT 时延</span><span class="val" id="net-rtt">-</span></div>
+            <div class="row"><span class="key">省流量模式</span><span class="val" id="net-save">-</span></div>
+        </div>
+        <div id="event-log">事件日志：<br></div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const statusBox = document.getElementById('status-box');
+        const netOnline = document.getElementById('net-online');
+        const netType = document.getElementById('net-type');
+        const netDownlink = document.getElementById('net-downlink');
+        const netRtt = document.getElementById('net-rtt');
+        const netSave = document.getElementById('net-save');
+        const eventLog = document.getElementById('event-log');
+
+        function log(msg) {
+            const time = new Date().toLocaleTimeString();
+            eventLog.innerHTML += `[${time}] ${msg}<br>`;
+            if (eventLog.children.length > 20) eventLog.removeChild(eventLog.firstChild);
+            console.log(msg);
+        }
+
+        function updateNetworkStatus() {
+            const online = navigator.onLine;
+            statusBox.className = online ? 'online' : 'offline';
+            statusBox.textContent = online ? '🟢 在线' : '🔴 离线';
+            netOnline.textContent = online;
+
+            const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+            if (conn) {
+                netType.textContent = conn.effectiveType || 'N/A';
+                netDownlink.textContent = conn.downlink ? conn.downlink + ' Mbps' : 'N/A';
+                netRtt.textContent = conn.rtt ? conn.rtt + 'ms' : 'N/A';
+                netSave.textContent = conn.saveData ? '✅ 开启' : '❌ 未开启';
+            } else {
+                netType.textContent = '不支持';
+                netDownlink.textContent = '不支持';
+                netRtt.textContent = '不支持';
+                netSave.textContent = '不支持';
+            }
+        }
+
+        // 事件监听
+        window.addEventListener('online', () => {
+            updateNetworkStatus();
+            log('🟢 网络已连接');
+        });
+        window.addEventListener('offline', () => {
+            updateNetworkStatus();
+            log('🔴 网络已断开');
+        });
+
+        const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (conn) {
+            conn.addEventListener('change', () => {
+                updateNetworkStatus();
+                log(`📶 网络变化: ${conn.effectiveType} (${conn.downlink} Mbps, RTT ${conn.rtt}ms)`);
+            });
+        }
+
+        updateNetworkStatus();
+        log('📊 网络状态检测已启动');
+
+        console.log('=== 网络状态检测 ===');
+        console.log('navigator.onLine:', navigator.onLine);
+        console.log('connection:', navigator.connection);
+
+        document.getElementById('output').textContent =
+            `网络状态检测: online/offline + NetworkInformation\n` +
+            `effectiveType: slow-2g/2g/3g/4g  ||  downlink/RTT/saveData\n` +
+            `✅ 网络状态检测演示完成！`;
+    </script>
+</body>
+</html>

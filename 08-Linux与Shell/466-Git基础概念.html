@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Git基础概念</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📗 Git 基础概念</h2><p>Git 历史、分布式 vs 集中式、工作区/暂存区/仓库、数据模型 (blob/tree/commit)。</p></div>
+    <div class="card">
+        <h2>Git 概述</h2>
+        <div class="code">// ========== Git 是什么 ==========
+// Git = 分布式版本控制系统
+// 由 Linus Torvalds 于 2005 年创建 (管理 Linux 内核)
+// 特点: 分布式、速度快、分支轻量、数据完整性
+
+// ========== 分布式 vs 集中式 ==========
+// 集中式 (SVN/CVS):
+//   一个中央服务器存所有版本
+//   需要联网才能提交/查看历史
+//   中央服务器挂了全部瘫痪
+
+// 分布式 (Git):
+//   每个开发者本地有完整仓库
+//   离线即可提交、查看历史、创建分支
+//   任何节点都可以恢复整个仓库
+
+// ========== Git 的三个区域 ==========
+// 工作区 (Working Directory)
+//   → 你当前看到的文件
+//   ↓ git add
+// 暂存区 (Staging Area / Index)
+//   → 下一次要提交的内容
+//   ↓ git commit
+// 仓库 (Repository / .git)
+//   → 所有历史记录
+
+// 工作流:
+// 工作区 → git add → 暂存区 → git commit → 仓库 → git push → 远程仓库
+// 仓库 → git checkout → 工作区
+// 暂存区 → git reset HEAD → 工作区</div>
+    </div>
+    <div class="card">
+        <h2>Git 数据模型</h2>
+        <div class="code">// ========== 核心对象 ==========
+// Git 本质上是一个内容寻址的文件系统
+
+// Blob (二进制大对象):
+//   存储文件内容,不包含文件名
+//   相同内容的文件共享一个 blob
+//   SHA-1 哈希作为标识
+
+// Tree (目录树):
+//   存储目录结构: 文件名 → blob/tree 映射
+//   包含权限、类型、哈希、名称
+
+// Commit (提交):
+//   指向一个 tree
+//   指向前一个 commit (parent)
+//   包含作者、时间、提交信息
+
+// 数据关系:
+// commit → tree → blob (文件)
+//                → tree (子目录) → blob (文件)
+
+// ========== 对象存储 ==========
+// 所有对象存储在 .git/objects/ 目录
+// 哈希前 2 位作为目录名,后 38 位作为文件名
+
+// .git/objects/
+// ├── ab/
+// │   └── cdef1234...    (commit 对象)
+// ├── 12/
+// │   └── 3456abcd...    (tree 对象)
+// └── ef/
+//     └── 7890abcd...    (blob 对象)
+
+// 查看对象:
+git cat-file -p <hash>      # 查看对象内容
+git cat-file -t <hash>      # 查看对象类型 (blob/tree/commit)
+
+// ========== SHA-1 哈希 ==========
+// Git 使用 SHA-1 哈希 (40 位十六进制)
+// 唯一标识所有对象
+// 基于文件内容或 commit 元数据计算
+// 输入相同 → 输出相同 (所以内容不变 hash 不变)</div>
+    </div>
+    <div class="card">
+        <h2>配置与初始化</h2>
+        <div class="code">// ========== Git 配置 ==========
+// 配置分为三级:
+// --system   系统级 (/etc/gitconfig)
+// --global   用户级 (~/.gitconfig)
+// --local    仓库级 (.git/config) 默认
+
+// 首次配置 (必须!):
+git config --global user.name "Alice"
+git config --global user.email "alice@example.com"
+
+// 推荐配置:
+git config --global init.defaultBranch main
+git config --global core.editor vim
+git config --global core.autocrlf input     # Linux/Mac
+git config --global core.autocrlf true      # Windows
+git config --global pull.rebase false       # 默认 merge
+git config --global push.default current
+git config --global color.ui auto
+
+// 别名:
+git config --global alias.co checkout
+git config --global alias.br branch
+git config --global alias.ci commit
+git config --global alias.st status
+git config --global alias.lg "log --oneline --graph --decorate --all"
+
+// 查看配置:
+git config --list              # 所有配置
+git config --global --list     # 用户配置
+git config user.name           # 查看特定值
+
+// ========== 初始化与克隆 ==========
+git init                       # 在当前目录创建仓库
+git init myproject             # 在 myproject 目录创建仓库
+git clone https://github.com/user/repo.git  # 克隆远程仓库
+git clone git@github.com:user/repo.git      # SSH 方式克隆
+git clone --depth 1 <url>                   # 浅克隆 (只最新版本)
+git clone --branch develop <url>            # 克隆特定分支</div>
+        <div class="note">💡 新机器上第一件事:git config --global user.name 和 user.email,否则 Git 不允许提交。Git 使用 SHA-1 哈希来确保数据完整性,这是它被称为"可信的版本控制"的原因——任何文件损坏都能被检测到。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoGitInit()">Git 初始演示</button>
+        <button onclick="demoGitConfig()">配置演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoGitInit() {
+            result.innerHTML = '';
+            log('# Git 初始化与数据模型演示');
+            log('');
+            log('$ git init my-project');
+            log('  Initialized empty Git repository in my-project/.git/');
+            log('');
+            log('$ cd my-project');
+            log('$ echo "hello" > file.txt');
+            log('$ git add file.txt');
+            log('$ git commit -m "first commit"');
+            log('');
+            log('  .git/objects 目录下会生成:');
+            log('  blob: file.txt 内容的哈希');
+            log('  tree: 目录结构');
+            log('  commit: 提交元数据');
+            log('');
+            log('三个区域工作流:');
+            log('  Working Dir → git add → Staging Area → git commit → Repository');
+            log('    修改文件      暂存快照       创建提交      永久记录');
+        }
+
+        function demoGitConfig() {
+            result.innerHTML = '';
+            log('# Git 配置演示');
+            log('');
+            log('$ git config --global user.name "Alice"');
+            log('$ git config --global user.email "alice@example.com"');
+            log('$ git config --global init.defaultBranch main');
+            log('');
+            log('$ git config --global alias.lg "log --oneline --graph --all"');
+            log('$ git config --global pull.rebase false');
+            log('');
+            log('$ git config --list');
+            log('  user.name=Alice');
+            log('  user.email=alice@example.com');
+            log('  init.defaultbranch=main');
+            log('  alias.lg=log --oneline --graph --all');
+            log('  core.editor=vim');
+        }
+    </script>
+</body>
+</html>

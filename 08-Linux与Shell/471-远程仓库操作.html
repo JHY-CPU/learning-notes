@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>远程仓库操作</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🌐 远程仓库操作</h2><p>git remote、push/pull/fetch、upstream、远程分支管理、SSH vs HTTPS。</p></div>
+    <div class="card">
+        <h2>远程仓库概念</h2>
+        <div class="code">// ========== 远程仓库 ==========
+// 远程仓库是存放在网络上的 Git 仓库副本
+// 常见的: GitHub、GitLab、Gitee、自建 Git 服务器
+// 本地可以有多个远程仓库
+
+// ========== git remote ==========
+git remote                        # 列出远程仓库名 (默认 origin)
+git remote -v                     # 显示 URL (fetch/push)
+
+// 输出:
+// origin  https://github.com/user/repo.git (fetch)
+// origin  https://github.com/user/repo.git (push)
+
+// 添加远程仓库:
+git remote add origin https://github.com/user/repo.git
+git remote add upstream https://github.com/other/repo.git
+
+// 管理远程:
+git remote rename origin upstream
+git remote remove origin
+git remote set-url origin https://new-url.com/repo.git
+git remote show origin            # 查看详细信息</div>
+    </div>
+    <div class="card">
+        <h2>git push — 推送</h2>
+        <div class="code">// ========== git push 基础 ==========
+git push origin main              # 推送 main 到远程 origin
+git push -u origin feature        # 推送并设置 upstream (下次可直接 git push)
+git push                          # 如果已设 upstream,可直接推送
+
+// ========== 推送策略 ==========
+// 设置 push.default:
+// nothing:    必须显式指定
+// current:    推送当前分支到同名远程分支 (推荐)
+// simple:     推送当前分支到 upstream (Git 2.0+ 默认)
+// matching:   推送所有匹配分支 (旧默认)
+
+git config --global push.default current
+
+// ========== 强制推送 ==========
+git push --force origin feature   # 强制覆盖远程分支 (小心!)
+git push --force-with-lease origin feature  # 较安全的强制推送
+
+// --force-with-lease 检查远程是否有新提交
+// 如果有,拒绝推送,防止覆盖别人的工作
+// 推荐使用 --force-with-lease 代替 --force
+
+// ========== 删除远程分支 ==========
+git push origin --delete feature  # 删除远程 feature 分支
+git push origin :feature          # 同上 (旧式语法)
+git push origin --delete --dry-run feature  # 预览
+
+// ========== 推送标签 ==========
+git push origin v1.0.0           # 推送单个标签
+git push origin --tags           # 推送所有本地标签
+git push --follow-tags           # 推送 commit 连同附注标签</div>
+    </div>
+    <div class="card">
+        <h2>git pull / git fetch</h2>
+        <div class="code">// ========== git fetch — 获取 ==========
+// 从远程下载数据,但不合并到工作区
+// 安全: 不会影响当前工作
+
+git fetch origin                 # 获取远程所有更新
+git fetch origin main            # 获取远程 main 分支
+git fetch --all                  # 获取所有远程
+git fetch --prune                # 获取并清理已删除的远程分支
+
+// fetch 后查看远程分支:
+git log origin/main              # 查看远程 main 分支的 commit
+git diff main origin/main        # 本地 vs 远程差异
+git checkout origin/main         # 查看远程分支的代码 (detached HEAD)
+
+// ========== git pull — 拉取并合并 ==========
+// pull = fetch + merge
+// 从远程获取并自动合并到当前分支
+
+git pull origin main             # 拉取并合并
+git pull                         # 如果已设 upstream
+git pull --rebase                # 拉取并 rebase (替代 merge)
+git pull --ff-only               # 只做 fast-forward 合并
+
+// ========== pull 模式配置 ==========
+// 推荐配置 pull.rebase 为 false (merge 模式):
+git config --global pull.rebase false   # merge
+git config --global pull.rebase true    # rebase
+git config --global pull.ff only        # 只快进
+
+// ========== pull 冲突 ==========
+// 如果拉取时有冲突:
+// 1. 解决冲突
+// 2. git add .
+// 3. git commit  (merge 模式) 或 git rebase --continue (rebase 模式)
+
+// 放弃 pull:
+git merge --abort                # merge 模式中止
+git rebase --abort               # rebase 模式中止</div>
+    </div>
+    <div class="card">
+        <h2>upstream 与分支跟踪</h2>
+        <div class="code">// ========== upstream ==========
+// upstream = 本地分支跟踪的远程分支
+// 设了 upstream 后可直接 git push/pull 不指定参数
+
+// 设置 upstream:
+git branch -u origin/feature     # 设置当前分支的 upstream
+git branch -u origin/feature feature  # 指定本地分支
+git push -u origin feature       # 推送时同时设置
+
+// 查看 upstream:
+git branch -vv                   # 显示所有分支的 tracking 信息
+
+// 输出:
+// feature  abc123 [origin/feature] feat: login
+// main     def456 [origin/main] initial
+
+// 删除 upstream:
+git branch --unset-upstream      # 取消当前分支的 upstream
+
+// ========== 多远程仓库 ==========
+// 典型场景: 自己的 fork + 原项目
+git remote add origin git@github.com:myuser/repo.git      # 自己 fork
+git remote add upstream git@github.com:original/repo.git  # 原项目
+
+// 从原项目拉取更新:
+git fetch upstream
+git checkout main
+git merge upstream/main
+
+// 推送到自己的 fork:
+git push origin main
+
+// ========== SSH vs HTTPS ==========
+// HTTPS:
+//   URL: https://github.com/user/repo.git
+//   认证: Personal Access Token (密码已废弃)
+//   优点: 防火墙友好,无需额外配置
+//   缺点: 每次操作需要认证 (可缓存)
+
+// SSH:
+//   URL: git@github.com:user/repo.git
+//   认证: SSH 密钥对
+//   优点: 安全,无需重复认证
+//   缺点: 需要配置 SSH 密钥
+
+// 切换:
+git remote set-url origin git@github.com:user/repo.git
+
+// 测试 SSH 连接:
+ssh -T git@github.com
+// Hi username! You've successfully authenticated.</div>
+        <div class="note">💡 工作流建议: git fetch 是安全的,不会影响工作区,用来先看看远程有什么。git pull = git fetch + git merge,适合信任的团队。git push --force-with-lease 比 --force 安全,它会在强制推送前检查远程是否有新提交。upstream 设置后可以少打字: git pull / git push 即可。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoRemote()">远程操作演示</button>
+        <button onclick="demoPushPull()">push/pull 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoRemote() {
+            result.innerHTML = '';
+            log('# 远程仓库演示');
+            log('');
+            log('$ git remote -v');
+            log('  origin  https://github.com/user/repo.git (fetch)');
+            log('  origin  https://github.com/user/repo.git (push)');
+            log('');
+            log('$ git remote show origin');
+            log('  * remote origin');
+            log('    Fetch URL: https://github.com/user/repo.git');
+            log('    HEAD branch: main');
+            log('    Remote branches:');
+            log('      main    tracked');
+            log('      feature tracked');
+            log('    Local branches configured for git pull:');
+            log('      main    merges with remote main');
+            log('      feature merges with remote feature');
+        }
+
+        function demoPushPull() {
+            result.innerHTML = '';
+            log('# push/pull 演示');
+            log('');
+            log('$ git push -u origin feature');
+            log('  Counting objects: 100% (5/5)');
+            log('  Writing objects: 100% (3/3)');
+            log('  To github.com:user/repo.git');
+            log('   * [new branch]      feature -> feature');
+            log('  Branch "feature" set up to track remote branch "feature".');
+            log('');
+            log('$ git fetch origin');
+            log('  From github.com:user/repo');
+            log('   abc123..def456  main     -> origin/main');
+            log('');
+            log('$ git pull --rebase origin main');
+            log('  Successfully rebased and updated refs/heads/feature.');
+            log('');
+            log('$ git push origin --delete old-branch');
+            log('  - [deleted]         old-branch');
+        }
+    </script>
+</body>
+</html>

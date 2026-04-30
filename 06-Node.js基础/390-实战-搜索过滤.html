@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实战-搜索过滤</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; max-width: 500px; margin: 0 auto; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        /* 搜索区域 */
+        .search-bar { display: flex; gap: 8px; margin-bottom: 12px; }
+        .search-bar input { flex: 1; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; }
+        .search-bar input:focus { border-color: #3498db; outline: none; box-shadow: 0 0 0 2px rgba(52,152,219,0.15); }
+        .search-bar input.has-text { border-color: #3498db; }
+        .search-bar .clear-btn { padding: 8px 12px; border: none; border-radius: 4px; background: #95a5a6; color: white; cursor: pointer; font-size: 14px; display: none; }
+        .search-bar .clear-btn.show { display: block; }
+        .search-bar .clear-btn:hover { opacity: 0.9; }
+        /* 分类标签 */
+        .categories { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+        .categories button { padding: 5px 12px; border: 1px solid #ddd; border-radius: 14px; background: white; color: #666; cursor: pointer; font-size: 12px; transition: all 0.15s; }
+        .categories button:hover { border-color: #3498db; color: #3498db; }
+        .categories button.active { background: #3498db; color: white; border-color: #3498db; }
+        /* 结果列表 */
+        .result-list { list-style: none; padding: 0; margin: 0; }
+        .result-item { padding: 10px 12px; border-bottom: 1px solid #f0f0f0; display: flex; align-items: center; gap: 10px; transition: background 0.15s; }
+        .result-item:last-child { border-bottom: none; }
+        .result-item:hover { background: #f8f9fa; }
+        .result-item .icon { font-size: 20px; width: 32px; text-align: center; }
+        .result-item .info { flex: 1; }
+        .result-item .title { font-size: 14px; color: #2c3e50; }
+        .result-item .title em { background: #fff3cd; font-style: normal; padding: 0 2px; border-radius: 2px; }
+        .result-item .desc { font-size: 12px; color: #95a5a6; margin-top: 2px; }
+        .result-item .category-tag { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: #f0f4f8; color: #666; }
+        /* 高亮匹配 */
+        /* 空状态 */
+        .empty-state { text-align: center; color: #95a5a6; padding: 40px 0; font-size: 14px; }
+        .empty-state .big { font-size: 36px; margin-bottom: 8px; }
+        /* 统计 */
+        .stats { font-size: 12px; color: #95a5a6; margin-top: 8px; display: flex; justify-content: space-between; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>🔍 搜索过滤</h2>
+        <p style="color:#7f8c8d;font-size:13px;">实时搜索(防抖)、高亮匹配、分类过滤、空状态。</p>
+
+        <div class="search-bar">
+            <input type="text" id="searchInput" placeholder="搜索项目名称..." oninput="onSearchInput()">
+            <button class="clear-btn" id="clearBtn" onclick="clearSearch()">✕</button>
+        </div>
+        <div class="categories" id="categories"></div>
+        <ul class="result-list" id="resultList"></ul>
+        <div class="stats">
+            <span id="countInfo">0 / 0 个项目</span>
+            <span id="debugInfo" style="cursor:pointer;color:#bbb;" onclick="log('📊 数据量: ' + projects.length + ' 个项目')">ℹ️</span>
+        </div>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('🔍 搜索过滤演示:');
+        log('');
+
+        // ========== 数据 ==========
+        const projects = [
+            // 前端
+            { id: 1, icon: '⚛️', title: 'React 组件库', desc: 'UI 组件库搭建与 Storybook 文档', category: '前端' },
+            { id: 2, icon: '🎨', title: 'CSS 动画集', desc: '常见的 CSS 动画效果与性能优化', category: '前端' },
+            { id: 3, icon: '📱', title: '移动端适配方案', desc: '响应式布局与 rem/vw 适配', category: '前端' },
+            { id: 4, icon: '⚡', title: 'Vite 构建优化', desc: 'ESM 开发服务器与 Rollup 生产构建', category: '前端' },
+            { id: 5, icon: '🔧', title: 'Webpack 配置', desc: 'Loader/Plugin 开发与性能调优', category: '前端' },
+            { id: 6, icon: '📊', title: '数据可视化', desc: 'Canvas/SVG/D3.js 图表实现', category: '前端' },
+            // 后端
+            { id: 7, icon: '🖥️', title: 'Node.js API 设计', desc: 'RESTful API 设计与 Express 实践', category: '后端' },
+            { id: 8, icon: '🗄️', title: '数据库建模', desc: 'MySQL/MongoDB 数据模型设计', category: '后端' },
+            { id: 9, icon: '🔐', title: '身份认证系统', desc: 'JWT/OAuth/Session 认证方案', category: '后端' },
+            { id: 10, icon: '📨', title: '消息队列', desc: 'RabbitMQ/Kafka 消息中间件集成', category: '后端' },
+            // 工具
+            { id: 11, icon: '🐳', title: 'Docker 部署', desc: '容器化部署与 Docker Compose 编排', category: '工具' },
+            { id: 12, icon: '🔄', title: 'CI/CD 流水线', desc: 'GitHub Actions 自动化部署流程', category: '工具' },
+            { id: 13, icon: '📝', title: 'ESLint 规则集', desc: '代码规范与自动修复配置', category: '工具' },
+            { id: 14, icon: '🧪', title: '测试框架实践', desc: 'Jest/Vitest/Cypress 测试方案', category: '工具' },
+            // 算法
+            { id: 15, icon: '📐', title: '排序算法可视化', desc: '冒泡/快排/归并排序动画演示', category: '算法' },
+            { id: 16, icon: '🌳', title: '数据结构实现', desc: '链表/树/图/哈希表 JS 实现', category: '算法' },
+            { id: 17, icon: '🧮', title: '动态规划专题', desc: '背包/LCS/最短路径算法题解', category: '算法' },
+        ];
+
+        let searchTerm = '';
+        let activeCategory = '全部';
+        let debounceTimer = null;
+
+        // 提取分类
+        const categories = ['全部', ...new Set(projects.map(p => p.category))];
+
+        // ========== 渲染分类 ==========
+        function renderCategories() {
+            const container = document.getElementById('categories');
+            container.innerHTML = categories.map(cat =>
+                `<button class="${cat === activeCategory ? 'active' : ''}" onclick="setCategory('${cat}')">${cat}</button>`
+            ).join('');
+        }
+
+        function setCategory(cat) {
+            activeCategory = cat;
+            renderCategories();
+            renderResults();
+            log(`📂 分类: ${cat}`);
+        }
+
+        // ========== 搜索 (防抖) ==========
+        function onSearchInput() {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                searchTerm = document.getElementById('searchInput').value.trim();
+                document.getElementById('clearBtn').classList.toggle('show', searchTerm.length > 0);
+                renderResults();
+                if (searchTerm) log(`🔍 搜索: "${searchTerm}"`);
+            }, 200); // 200ms 防抖
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            searchTerm = '';
+            document.getElementById('clearBtn').classList.remove('show');
+            renderResults();
+            log('✕ 清除搜索');
+        }
+
+        // ========== 高亮匹配 ==========
+        function highlight(text, term) {
+            if (!term) return text;
+            const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`(${escaped})`, 'gi');
+            return text.replace(regex, '<em>$1</em>');
+        }
+
+        // ========== 渲染结果 ==========
+        function renderResults() {
+            const list = document.getElementById('resultList');
+            const filtered = projects.filter(p => {
+                // 分类过滤
+                if (activeCategory !== '全部' && p.category !== activeCategory) return false;
+                // 搜索过滤
+                if (searchTerm) {
+                    const term = searchTerm.toLowerCase();
+                    return p.title.toLowerCase().includes(term) || p.desc.toLowerCase().includes(term);
+                }
+                return true;
+            });
+
+            document.getElementById('countInfo').textContent = `${filtered.length} / ${projects.length} 个项目`;
+
+            if (filtered.length === 0) {
+                list.innerHTML = `
+                    <div class="empty-state">
+                        <div class="big">🔍</div>
+                        <div>没有匹配的项目</div>
+                        <div style="font-size:12px;margin-top:4px;">试试其他关键词或分类</div>
+                    </div>
+                `;
+                return;
+            }
+
+            list.innerHTML = filtered.map(p => `
+                <li class="result-item">
+                    <span class="icon">${p.icon}</span>
+                    <div class="info">
+                        <div class="title">${highlight(p.title, searchTerm)}</div>
+                        <div class="desc">${highlight(p.desc, searchTerm)}</div>
+                    </div>
+                    <span class="category-tag">${p.category}</span>
+                </li>
+            `).join('');
+        }
+
+        // ========== 初始化 ==========
+        renderCategories();
+        renderResults();
+        log(`✅ 搜索过滤就绪 (${projects.length} 个项目)`);
+    </script>
+</body>
+</html>

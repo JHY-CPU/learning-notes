@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mongoose ODM</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔌 Mongoose ODM</h2><p>Mongoose 安装与连接、Schema 定义与验证、Model CRUD、虚拟属性 virtuals、中间件 hooks (pre/post save)、populate 引用查询。</p></div>
+    <div class="card">
+        <h2>Mongoose 基础</h2>
+        <div class="code">// ========== Mongoose ==========
+// Node.js MongoDB ODM (Object Document Mapping)
+// 提供 schema 验证、中间件、populate 等功能
+
+// ========== 安装 ==========
+npm install mongoose
+
+// ========== 连接 ==========
+const mongoose = require('mongoose');
+
+// 连接数据库
+mongoose.connect('mongodb://localhost:27017/mydb')
+    .then(() => console.log('Connected'))
+    .catch(err => console.error(err));
+
+// 连接选项
+mongoose.connect('mongodb://localhost:27017/mydb', {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+    maxPoolSize: 10,           // 连接池大小
+    serverSelectionTimeoutMS: 5000,  // 超时
+    heartbeatFrequencyMS: 10000,
+});
+
+// 事件监听
+mongoose.connection.on('connected', () => {});
+mongoose.connection.on('error', (err) => {});
+mongoose.connection.on('disconnected', () => {});
+
+// 断开连接
+mongoose.disconnect();
+
+// ========== Schema 定义 ==========
+const userSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    age: { type: Number, min: 0, max: 150 },
+    status: {
+        type: String,
+        enum: ['active', 'inactive', 'banned'],
+        default: 'active'
+    },
+    tags: [String],
+    address: {
+        city: String,
+        street: String
+    },
+    scores: [{
+        subject: String,
+        score: Number
+    }],
+    created_at: { type: Date, default: Date.now }
+});
+
+// ========== Model ==========
+const User = mongoose.model('User', userSchema);
+// 'User' → 数据库集合 'users' (自动小写+复数)</div>
+    </div>
+    <div class="card">
+        <h2>CRUD 操作</h2>
+        <div class="code">// ========== 创建 ==========
+
+// 方法 1: save()
+const user = new User({
+    name: "Alice",
+    email: "alice@test.com",
+    age: 28,
+    tags: ["tech", "music"]
+});
+await user.save();
+
+// 方法 2: create()
+const user = await User.create({
+    name: "Bob",
+    email: "bob@test.com",
+    age: 25
+});
+
+// 批量创建
+const users = await User.insertMany([
+    { name: "Carol", email: "carol@test.com" },
+    { name: "Dave", email: "dave@test.com" }
+]);
+
+// ========== 查询 ==========
+
+// 基本查询
+await User.find()                                   // 所有
+await User.findById(id)                              // 按 ID
+await User.findOne({ email: "alice@test.com" })      // 单条
+
+// 条件查询
+await User.find({ age: { $gte: 25 } })
+await User.find({ tags: "tech" })
+await User.find({ name: /^A/ })
+
+// 链式查询
+await User.find({ age: { $gte: 25 } })
+    .sort({ age: -1 })
+    .skip(10)
+    .limit(5)
+    .select('name email')         // 只返回指定字段
+    .lean()                       // 返回普通 JS 对象 (更快)
+
+// ========== 更新 ==========
+
+// 更新单条
+await User.updateOne(
+    { email: "alice@test.com" },
+    { $set: { age: 29 } }
+)
+
+// 更新多条
+await User.updateMany(
+    { status: "inactive" },
+    { $set: { status: "active" } }
+)
+
+// 查找并更新 (返回原文档)
+const oldUser = await User.findOneAndUpdate(
+    { email: "alice@test.com" },
+    { $inc: { login_count: 1 } }
+)
+
+// 返回更新后的文档
+const newUser = await User.findOneAndUpdate(
+    { email: "alice@test.com" },
+    { $set: { age: 30 } },
+    { new: true }       // 返回更新后
+)
+
+// ========== 删除 ==========
+await User.deleteOne({ email: "bob@test.com" })
+await User.deleteMany({ status: "inactive" })
+await User.findByIdAndDelete(id)</div>
+    </div>
+    <div class="card">
+        <h2>Schema 进阶</h2>
+        <div class="code">// ========== 字段验证 ==========
+const productSchema = new mongoose.Schema({
+    name: {
+        type: String,
+        required: [true, '名称必填'],
+        minlength: [2, '名称至少 2 字符'],
+        maxlength: [100, '名称最多 100 字符'],
+        trim: true,
+    },
+    price: {
+        type: Number,
+        required: true,
+        min: [0, '价格不能为负'],
+    },
+    email: {
+        type: String,
+        match: [/^\S+@\S+\.\S+$/, '邮箱格式无效'],
+        lowercase: true,  // 自动转小写
+    },
+    url: {
+        type: String,
+        validate: {
+            validator: function(v) {
+                return v.startsWith('https://');
+            },
+            message: 'URL 必须以 https:// 开头'
+        }
+    },
+    stock: {
+        type: Number,
+        default: 0,
+        validate: {
+            validator: Number.isInteger,
+            message: '{VALUE} 不是整数'
+        }
+    }
+});
+
+// ========== 虚拟属性 (virtuals) ==========
+// 不存储在数据库, 但可像普通字段一样访问
+
+userSchema.virtual('fullName').get(function() {
+    return `${this.firstName} ${this.lastName}`;
+});
+
+userSchema.virtual('isAdult').get(function() {
+    return this.age >= 18;
+});
+
+// 虚拟属性不包含在 JSON 输出中, 需要显式允许:
+const userSchema = new mongoose.Schema({...}, {
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
+});
+
+// ========== 选项 ==========
+const schema = new mongoose.Schema({...}, {
+    timestamps: true,        // 自动添加 createdAt/updatedAt
+    strict: true,            // 只保存 schema 定义字段
+    collection: 'my_users',  // 指定集合名
+});</div>
+    </div>
+    <div class="card">
+        <h2>中间件与 Populate</h2>
+        <div class="code">// ========== 中间件 (Hooks) ==========
+
+// pre-save (保存前)
+userSchema.pre('save', function(next) {
+    // this → 当前文档
+    this.updated_at = new Date();
+
+    if (this.isModified('password')) {
+        this.password_hash = hashPassword(this.password);
+    }
+    next();
+});
+
+// post-save (保存后)
+userSchema.post('save', function(doc) {
+    console.log('User saved:', doc.email);
+});
+
+// pre-remove
+userSchema.pre('remove', async function(next) {
+    // 删除关联数据
+    await Comment.deleteMany({ author: this._id });
+    next();
+});
+
+// pre-find (查询前)
+userSchema.pre(/^find/, function(next) {
+    // this → query object
+    this.where({ status: { $ne: 'deleted' } });
+    next();
+});
+
+// ========== Populate (引用查询) ==========
+
+// 定义引用
+const orderSchema = new mongoose.Schema({
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    products: [{
+        product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+        quantity: Number
+    }],
+    total: Number
+});
+
+const Order = mongoose.model('Order', orderSchema);
+
+// 填充引用字段
+const order = await Order.findById(orderId)
+    .populate('user', 'name email')        // 填充用户, 只取 name/email
+    .populate('products.product', 'name price');  // 填充商品
+
+// 嵌套 populate
+const order = await Order.findById(orderId)
+    .populate({
+        path: 'user',
+        populate: { path: 'profile' }
+    });
+
+// ========== .lean() 性能优化 ==========
+// .lean() 返回普通 JS 对象 (无 Mongoose 文档方法)
+// 性能提升: 4-10x 更快
+
+// 不启用 lean:
+const users = await User.find({ age: { $gte: 25 } });
+// 每个 user 是 Mongoose Document (有 save/remove 等方法)
+
+// 启用 lean:
+const users = await User.find({ age: { $gte: 25 } }).lean();
+// 每个 user 是普通 JS 对象
+
+// 只读查询推荐使用 .lean()</div>
+        <div class="note">💡 Mongoose 要点: Schema 定义字段和验证; Model 对应集合; pre/post 中间件在操作前后执行; virtuals 不存数据库; populate 替代 MongoDB $lookup; .lean() 性能优化; timestamps 自动管理时间。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSchema()">Schema 定义</button>
+        <button onclick="demoCRUD()">CRUD 操作</button>
+        <button onclick="demoPopulate()">Populate</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSchema() {
+            result.innerHTML = '';
+            log('# Mongoose Schema');
+            log('');
+            log('const userSchema = new Schema({');
+            log('  name: { type: String, required: true },');
+            log('  email: { type: String, unique: true },');
+            log('  age: { type: Number, min: 0 },');
+            log('  tags: [String]');
+            log('});');
+            log('');
+            log('自动验证 + 类型转换');
+        }
+
+        function demoCRUD() {
+            result.innerHTML = '';
+            log('# Mongoose CRUD');
+            log('');
+            log('await User.create({ name: "Alice" })');
+            log('await User.find({ age: { $gte: 25 } })');
+            log('await User.findByIdAndUpdate(id, update)');
+            log('await User.deleteOne({ email: "x" })');
+            log('');
+            log('链式: .sort().skip().limit().select().lean()');
+        }
+
+        function demoPopulate() {
+            result.innerHTML = '';
+            log('# Populate 引用查询');
+            log('');
+            log('await Order.findById(id)');
+            log('  .populate("user", "name email")');
+            log('  .populate("products.product");');
+            log('');
+            log('类似 MongoDB $lookup');
+            log('但更简洁, Mongoose 自动处理');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户与组管理</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>👥 用户与组管理</h2><p>用户/组概念、useradd/usermod/userdel、passwd、groupadd、用户信息查看。</p></div>
+    <div class="card">
+        <h2>用户概念</h2>
+        <div class="code">// ========== 用户 ==========
+// Linux 是多用户操作系统
+// 每个用户有唯一 UID (User ID)
+// UID 0 = root (超级管理员)
+// 系统用户: UID 1-999 (CentOS) / 1-99 (Debian)
+// 普通用户: UID 1000+ (Ubuntu) / 500+ (CentOS)
+
+// ========== 用户信息存储 ==========
+// /etc/passwd — 用户账户信息
+//   alice:x:1001:1001:Alice:/home/alice:/bin/bash
+//   字段: 用户名:密码:x:UID:GID:注释:家目录:Shell
+//   x 表示密码加密存储在 /etc/shadow
+
+// /etc/shadow — 密码哈希 (仅 root 可读)
+//   alice:$6$saltsalt$hashhash:19100:0:99999:7:::
+//   字段: 用户名:密码哈希:最后修改日:最小天数:最大天数:警告期:宽限期:过期日:保留
+
+// /etc/group — 组信息
+//   developers:x:1001:alice,bob,charlie
+//   字段: 组名:密码:GID:成员列表
+
+// /etc/gshadow — 组密码
+//   很少用,通常组密码为空
+
+// ========== UID 范围 ==========
+// Debian/Ubuntu:
+//   0      root
+//   1-99   系统用户
+//   100-999 系统用户 (服务)
+//   1000+  普通用户
+
+// Red Hat/CentOS:
+//   0      root
+//   1-99   系统用户
+//   100-499 系统用户 (服务)
+//   500+   普通用户 (CentOS 6)
+//   1000+  普通用户 (CentOS 7+)</div>
+    </div>
+    <div class="card">
+        <h2>用户管理命令</h2>
+        <div class="code">// ========== 创建用户 ==========
+useradd alice                    # 创建用户 (默认配置)
+useradd -m alice                 # 创建用户并创建家目录
+useradd -m -s /bin/bash alice    # 指定 Shell
+useradd -m -g developers -G sudo,wheel alice  # 指定主组+附加组
+useradd -m -u 2001 alice         # 指定 UID
+useradd -m -d /data/alice alice  # 指定家目录
+useradd --system myapp           # 创建系统用户 (无家目录)
+
+// 推荐创建方式:
+useradd -m -s /bin/bash -U alice # -U 创建同名组
+
+// ========== 修改用户 ==========
+usermod -s /bin/zsh alice        # 修改 Shell
+usermod -l newname alice         # 改用户名
+usermod -d /home/newhome alice   # 改家目录
+usermod -L alice                 # 锁定用户
+usermod -U alice                 # 解锁用户
+usermod -aG sudo alice           # 追加到 sudo 组
+usermod -G "" alice              # 清空附加组
+
+// ========== 删除用户 ==========
+userdel alice                    # 删除用户 (保留家目录)
+userdel -r alice                 # 删除用户+家目录
+userdel -f alice                 # 强制删除 (即使进程在运行)
+
+// ========== 修改密码 ==========
+passwd alice                     # 设置/修改密码
+passwd -l alice                  # 锁定密码
+passwd -u alice                  # 解锁密码
+passwd -d alice                  # 删除密码 (空密码)
+passwd -e alice                  # 强制下次修改
+passwd -S alice                  # 查看密码状态
+
+// ========== 查看用户信息 ==========
+id alice                         # UID, GID, 所属组
+who                              # 当前登录用户
+whoami                           # 当前用户名
+w                                # 谁登录了+在做什么
+last                             # 最近登录记录
+lastlog                          # 所有用户最后登录
+users                            # 当前登录用户名列表
+finger alice                     # 用户详细信息
+getent passwd                    # 所有用户 (从所有源)
+getent group                     # 所有组</div>
+    </div>
+    <div class="card">
+        <h2>组管理</h2>
+        <div class="code">// ========== 组概念 ==========
+// 组是用户的集合,用于简化权限管理
+// 每个用户有一个主组 (primary group)
+// 可属于多个附加组 (supplementary groups)
+// 组文件: /etc/group
+
+// ========== 组命令 ==========
+groupadd developers              # 创建组
+groupadd -g 5000 developers      # 指定 GID
+groupdel developers               # 删除组
+groupmod -n newname oldname      # 改组名
+groupmod -g 5001 developers      # 改 GID
+
+// ========== 组成员管理 ==========
+gpasswd -a alice developers      # 添加成员
+gpasswd -d alice developers      # 移除成员
+gpasswd -M alice,bob,charlie     # 设置成员列表
+
+// groups 命令:
+groups alice                     # 查看用户所属组
+// → alice : alice sudo developers
+
+// ========== 新组生效 ==========
+// 用户已经登录后加入新组,需要重新登录生效
+// 或使用 newgrp / sg 临时切换
+newgrp developers                # 切换当前组
+sg developers -c "command"       # 以指定组执行
+
+// 不退出 Shell 刷新组:
+exec su - $USER                  # 重新登录
+newgrp                           # 刷新组权限
+
+// ========== 常用内置组 ==========
+// Debian/Ubuntu:
+//   sudo   — sudo 权限
+//   adm    — 读取 /var/log 日志
+//   lp     — 管理打印
+//   cdrom  — 访问光驱
+//   plugdev — 挂载可移动设备
+
+// Red Hat/CentOS:
+//   wheel  — sudo 权限
+//   adm    — 读取日志
+//   systemd-journal — 访问日志
+
+// ========== 批量创建用户 ==========
+// 从文件批量创建:
+newusers users.txt
+# users.txt 格式: username:password:UID:GID:comment:home:shell
+
+// 批量删除:
+userdel -r alice
+userdel -r bob</div>
+        <div class="note">💡 创建服务的黄金法则:每个服务使用单独的系统用户,例如 nginx 用 nginx 用户,postgres 用 postgres 用户。这样隔离权限,一个服务被攻破也不会影响其他服务。useradd -m -s /bin/bash -U 创建用户是最佳实践。</div>
+    </div>
+    <div class="card">
+        <h2>用户切换</h2>
+        <div class="code">// ========== su — 切换用户 ==========
+su alice                         # 切换用户 (不加载环境)
+su - alice                       # 切换用户 (登录 Shell,加载环境)
+su -                             # 切换到 root
+su -c "command" alice            # 以 alice 执行命令
+
+// 区别:
+// su alice  → 保留当前目录和环境变量
+// su - alice → 模拟登录,切到家目录,加载 .bashrc
+
+// ========== sudo — 以其他用户执行 ==========
+sudo command                     # 以 root 执行
+sudo -u alice command           # 以 alice 执行
+sudo -i                          # 交互式 root shell
+sudo -s                          # root shell (保留环境)
+sudo -l                          # 查看允许的命令
+sudo -k                          # 清除缓存的密码
+
+// 缓存: sudo 默认缓存密码 15 分钟
+
+// ========== 常见 sudo 技巧 ==========
+sudo !!                          # 以 sudo 执行上一条命令
+sudo !$                          # sudo + 上个命令的最后一个参数
+sudo -E command                 # 保留环境变量
+sudo env PATH=$PATH command     # 保留 PATH
+sudo visudo                      # 编辑 sudo 配置</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoUser()">用户管理演示</button>
+        <button onclick="demoGroup()">组管理演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoUser() {
+            result.innerHTML = '';
+            log('# 用户管理演示');
+            log('');
+            log('$ sudo useradd -m -s /bin/bash -U webapp');
+            log('$ id webapp');
+            log('  uid=1001(webapp) gid=1001(webapp) groups=1001(webapp)');
+            log('');
+            log('$ sudo passwd webapp');
+            log('  New password: ');
+            log('  Retype new password: ');
+            log('  passwd: password updated successfully');
+            log('');
+            log('$ sudo usermod -aG sudo webapp');
+            log('$ id webapp');
+            log('  uid=1001(webapp) gid=1001(webapp) groups=1001(webapp),27(sudo)');
+            log('');
+            log('$ grep webapp /etc/passwd');
+            log('  webapp:x:1001:1001::/home/webapp:/bin/bash');
+        }
+
+        function demoGroup() {
+            result.innerHTML = '';
+            log('# 组管理演示');
+            log('');
+            log('$ sudo groupadd developers');
+            log('$ sudo groupadd -g 5000 ops');
+            log('');
+            log('$ sudo gpasswd -a alice developers');
+            log('$ sudo gpasswd -a bob developers');
+            log('$ sudo gpasswd -a charlie ops');
+            log('');
+            log('$ grep developers /etc/group');
+            log('  developers:x:1002:alice,bob');
+            log('');
+            log('$ groups alice');
+            log('  alice : alice sudo developers');
+            log('');
+            log('$ id alice');
+            log('  uid=1000(alice) gid=1000(alice)');
+            log('  groups=1000(alice),27(sudo),1002(developers)');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Data JPA 关联映射</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔗 Spring Data JPA 关联映射</h2><p>@OneToMany/@ManyToOne/@ManyToMany 关联关系、懒加载 LAZY/EAGER、级联 Cascade、orphanRemoval、双向关联最佳实践。</p></div>
+    <div class="card">
+        <h2>@ManyToOne 多对一</h2>
+        <div class="code">// ========== 关联映射 ==========
+// 核心注解: @OneToOne, @OneToMany, @ManyToOne, @ManyToMany
+
+// ========== @ManyToOne (多对一, 维护外键) ==========
+// 多个 Order 属于一个 User
+// 数据库: order 表有 user_id 外键
+
+@Entity
+@Table(name = "orders")
+@Data
+@NoArgsConstructor
+public class Order {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String orderNo;
+    private BigDecimal totalAmount;
+
+    // ========== @ManyToOne (默认 EAGER) ==========
+    @ManyToOne(fetch = FetchType.LAZY)           // 改为懒加载!
+    @JoinColumn(name = "user_id", nullable = false)  // 外键列
+    @ToString.Exclude
+    @JsonIgnore                                  // JSON 忽略, 防止循环
+    private User user;
+}
+
+// 数据库 DDL:
+// CREATE TABLE orders (
+//     id BIGINT AUTO_INCREMENT PRIMARY KEY,
+//     order_no VARCHAR(255),
+//     total_amount DECIMAL,
+//     user_id BIGINT NOT NULL,
+//     FOREIGN KEY (user_id) REFERENCES users(id)
+// );
+
+// ========== 查询 ==========
+// Order 表有 user_id, 所以 @ManyToOne 默认 EAGER
+// 建议改为 LAZY, 需要时再查
+
+@Service
+@RequiredArgsConstructor
+public class OrderService {
+
+    private final OrderRepository orderRepository;
+
+    public Order findById(Long id) {
+        Order order = orderRepository.findById(id).orElseThrow();
+        // order.getUser()  — 懒加载, 需要时触发查询
+        return order;
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>@OneToMany 一对多</h2>
+        <div class="code">// ========== @OneToMany (一对多) ==========
+// 一个 User 有多个 Order
+// 由 @ManyToOne 端维护外键
+
+@Entity
+@Table(name = "users")
+@Data
+@NoArgsConstructor
+@ToString(exclude = "orders")               // 避免 toString 循环
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String username;
+
+    // ========== @OneToMany (默认 LAZY) ==========
+    @OneToMany(mappedBy = "user",            // 由 Order.user 维护关联
+               cascade = CascadeType.ALL,    // 级联操作
+               orphanRemoval = true,         // 移除孤儿记录
+               fetch = FetchType.LAZY)       // 默认 LAZY
+    @JsonIgnore                              // JSON 忽略, 避免循环
+    private List&lt;Order&gt; orders = new ArrayList&lt;&gt;();
+}
+
+// ========== 级联类型 ==========
+// CascadeType.PERSIST       — 保存父时自动保存子
+// CascadeType.MERGE         — 更新父时自动更新子
+// CascadeType.REMOVE        — 删除父时自动删除子
+// CascadeType.REFRESH       — 刷新父时自动刷新子
+// CascadeType.DETACH        — 分离父时自动分离子
+// CascadeType.ALL           — 全部
+
+// ========== orphanRemoval ==========
+// true: 从 orders 集合中移除的 Order 会自动删除
+// 相当于: 子对象不再被父引用时自动删除
+
+// ========== 级联保存 ==========
+@Service
+public class UserService {
+
+    @Transactional
+    public User createUserWithOrders() {
+        User user = new User();
+        user.setUsername("Alice");
+
+        Order order1 = new Order();
+        order1.setOrderNo("ORD-001");
+        order1.setUser(user);                       // 建立关联
+        order1.setTotalAmount(new BigDecimal("100"));
+
+        Order order2 = new Order();
+        order2.setOrderNo("ORD-002");
+        order2.setUser(user);
+        order2.setTotalAmount(new BigDecimal("200"));
+
+        user.setOrders(List.of(order1, order2));
+
+        return userRepository.save(user);            // 级联保存 orders
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>@ManyToMany 多对多</h2>
+        <div class="code">// ========== @ManyToMany (多对多) ==========
+// User ↔ Role: 一个用户有多个角色, 一个角色有多个用户
+// 需要中间表: user_roles
+
+// ========== Role 实体 ==========
+@Entity
+@Table(name = "roles")
+@Data
+@NoArgsConstructor
+public class Role {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(unique = true)
+    private String name;
+
+    private String description;
+}
+
+// ========== User 实体 (维护端) ==========
+@Entity
+@Table(name = "users")
+@Data
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String username;
+
+    // ========== @ManyToMany ==========
+    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinTable(
+        name = "user_roles",                        // 中间表名
+        joinColumns = @JoinColumn(name = "user_id"), // 当前实体在中间表的外键
+        inverseJoinColumns = @JoinColumn(name = "role_id") // 对方在中间表的外键
+    )
+    @JsonIgnoreProperties("users")                  // 防止循环
+    private Set&lt;Role&gt; roles = new HashSet&lt;&gt;();
+}
+
+// ========== 生成的 DDL ==========
+// CREATE TABLE user_roles (
+//     user_id BIGINT NOT NULL,
+//     role_id BIGINT NOT NULL,
+//     PRIMARY KEY (user_id, role_id),
+//     FOREIGN KEY (user_id) REFERENCES users(id),
+//     FOREIGN KEY (role_id) REFERENCES roles(id)
+// );
+
+// ========== 使用 ==========
+@Service
+@Transactional
+public class UserRoleService {
+
+    public User addRoleToUser(Long userId, Long roleId) {
+        User user = userRepository.findById(userId).orElseThrow();
+        Role role = roleRepository.findById(roleId).orElseThrow();
+
+        user.getRoles().add(role);                   // 添加到 Set
+        return userRepository.save(user);
+    }
+
+    public User removeRoleFromUser(Long userId, Long roleId) {
+        User user = userRepository.findById(userId).orElseThrow();
+        user.getRoles().removeIf(r -> r.getId().equals(roleId));
+        return userRepository.save(user);
+    }
+
+    public Set&lt;Role&gt; getUserRoles(Long userId) {
+        return userRepository.findById(userId)
+            .map(User::getRoles)
+            .orElse(Set.of());
+    }
+}
+
+// ========== Set vs List ==========
+// 推荐使用 Set 而不是 List
+// List 在 @ManyToMany 时可能产生重复记录
+// Set 更符合多对多的语义</div>
+    </div>
+    <div class="card">
+        <h2>@OneToOne 一对一</h2>
+        <div class="code">// ========== @OneToOne (一对一) ==========
+// User ↔ UserProfile: 一个用户有一个个人资料
+
+// ========== UserProfile 实体 (维护端) ==========
+@Entity
+@Table(name = "user_profiles")
+@Data
+@NoArgsConstructor
+public class UserProfile {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String avatar;
+    private String bio;
+    private String website;
+
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", unique = true)   // 外键 + 唯一约束
+    @ToString.Exclude
+    private User user;
+}
+
+// ========== User 实体 (被引用端) ==========
+@Entity
+@Table(name = "users")
+@Data
+public class User {
+
+    @Id
+    @GeneratedValue
+    private Long id;
+
+    private String username;
+
+    @OneToOne(mappedBy = "user",                     // 由 UserProfile.user 维护
+              cascade = CascadeType.ALL,
+              orphanRemoval = true,
+              fetch = FetchType.LAZY)
+    @ToString.Exclude
+    private UserProfile profile;
+}
+
+// ========== 双向关联的最佳实践 ==========
+// 1. 必须指定 mappedBy
+// 2. 总是 LAZY 加载
+// 3. 互相 set
+
+@Transactional
+public void createUserWithProfile() {
+    UserProfile profile = new UserProfile();
+    profile.setBio("Hello World");
+
+    User user = new User();
+    user.setUsername("Alice");
+    user.setProfile(profile);          // 建立双向
+    profile.setUser(user);             // 建立双向
+
+    userRepository.save(user);          // 级联保存 profile
+}
+
+// ========== 关联获取策略总结 ==========
+// ┌──────────────┬──────────┬────────────────────────────────┐
+// │ 注解         │ 默认     │ 说明                           │
+// ├──────────────┼──────────┼────────────────────────────────┤
+// │ @ManyToOne   │ EAGER    │ 总是立即加载 (性能问题!)       │
+// │              │          │ 建议改为 LAZY                  │
+// │ @OneToMany   │ LAZY     │ 延迟加载 (推荐)                │
+// │ @OneToOne    │ EAGER    │ 立即加载 (建议改为 LAZY)       │
+// │ @ManyToMany  │ LAZY     │ 延迟加载 (推荐)                │
+// └──────────────┴──────────┴────────────────────────────────┘</div>
+    </div>
+    <div class="card">
+        <h2>最佳实践</h2>
+        <div class="code">// ========== 关联映射最佳实践 ==========
+
+// ========== 1. 所有关联使用 FetchType.LAZY ==========
+// 默认 EAGER 的 @ManyToOne 和 @OneToOne 都改为 LAZY
+// 需要时用 @EntityGraph / JOIN FETCH 主动加载
+
+@ManyToOne(fetch = FetchType.LAZY)
+@JoinColumn(name = "user_id")
+private User user;
+
+// ========== 2. 避免双向关联的 toString 循环 ==========
+@ToString.Exclude                        // 排除关联字段
+private List&lt;Order&gt; orders;
+
+// ========== 3. @JsonIgnore / @JsonIgnoreProperties ==========
+// 防止 JSON 序列化循环引用
+// 或在 DTO 中处理
+
+@JsonIgnore
+private List&lt;Order&gt; orders;
+
+// ========== 4. 双向关联维护 ==========
+// 两端都要设值
+public void addOrder(Order order) {
+    orders.add(order);
+    order.setUser(this);
+}
+
+public void removeOrder(Order order) {
+    orders.remove(order);
+    order.setUser(null);
+}
+
+// ========== 5. Cascade 谨慎使用 ==========
+// cascade = ALL 可能误删数据
+// 推荐: 只在 @OneToMany(父→子) 用 CascadeType.PERSIST
+
+// ========== 6. orphanRemoval ==========
+// 适用于值对象 (Value Object)
+// 不适合聚合根 (Aggregate Root)
+
+// ========== 7. 中间表操作 ==========
+// @ManyToMany 用 Set 而非 List
+// 添加角色: user.getRoles().add(role)
+// 删除角色: user.getRoles().remove(role)
+
+// ========== 8. DTO 分离 ==========
+// Entity 层用 JPA 注解
+// DTO 层控制序列化
+// 不混用 @JsonIgnore 在 Entity 上</div>
+        <div class="note">💡 关联映射要点: @ManyToOne 维护外键; @OneToMany(mappedBy) 被引用; @ManyToMany @JoinTable 中间表; @OneToOne 唯一外键; 始终使用 LAZY 避免性能问题; CascadeType 控制级联; orphanRemoval 清理孤儿; @ToString.Exclude 防循环; Set 优于 List 用于多对多。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoMany()">多对一/一对多</button>
+        <button onclick="demoManyToMany()">多对多</button>
+        <button onclick="demoCascade()">级联操作</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoMany() {
+            result.innerHTML = '';
+            log('# @ManyToOne / @OneToMany');
+            log('');
+            log('Order → User (多对一):');
+            log('  @ManyToOne(fetch=LAZY)');
+            log('  @JoinColumn(name="user_id")');
+            log('');
+            log('User → Order (一对多):');
+            log('  @OneToMany(mappedBy="user")');
+            log('  cascade = ALL');
+            log('  orphanRemoval = true');
+        }
+
+        function demoManyToMany() {
+            result.innerHTML = '';
+            log('# @ManyToMany');
+            log('');
+            log('User ↔ Role');
+            log('  @JoinTable(name="user_roles")');
+            log('  joinColumns = @JoinColumn(name="user_id")');
+            log('  inverseJoinColumns = @JoinColumn(name="role_id")');
+            log('');
+            log('使用 Set 避免重复');
+            log('user.getRoles().add(role)');
+        }
+
+        function demoCascade() {
+            result.innerHTML = '';
+            log('# 级联操作');
+            log('');
+            log('CascadeType:');
+            log('  PERSIST — 保存父时保存子');
+            log('  MERGE   — 更新父时更新子');
+            log('  REMOVE  — 删除父时删除子');
+            log('  ALL     — 全部');
+            log('');
+            log('orphanRemoval:');
+            log('  移除集合中的元素时自动删除');
+            log('');
+            log('⚠️ 谨慎使用 CascadeType.REMOVE');
+            log('  可能误删数据!');
+        }
+    </script>
+</body>
+</html>

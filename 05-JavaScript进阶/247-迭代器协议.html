@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>迭代器协议</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #iter-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>迭代器协议</h2><p>Symbol.iterator、自定义可迭代对象、可迭代与类数组。</p></div>
+    <div class="card">
+        <h2>迭代器协议语法</h2>
+        <div class="code">// ========== 迭代器协议 (Iterator Protocol) ==========
+// 实现 next() 方法，返回 { value, done }
+const iterator = {
+    next() {
+        if (/* 还有值 */) return { value: 'x', done: false };
+        return { value: undefined, done: true };
+    }
+};
+
+// ========== 可迭代协议 (Iterable Protocol) ==========
+// 实现 [Symbol.iterator]() 方法，返回 iterator
+const iterable = {
+    [Symbol.iterator]() {
+        let i = 0;
+        return {
+            next() {
+                if (i < 3) return { value: i++, done: false };
+                return { value: undefined, done: true };
+            }
+        };
+    }
+};
+
+// 使用
+for (const val of iterable) console.log(val); // 0, 1, 2
+const arr = [...iterable]; // [0, 1, 2]
+
+// ========== 内置可迭代对象 ==========
+// Array, String, Map, Set, TypedArray, arguments, NodeList
+// ❌ Object 默认不可迭代
+
+// ========== 可迭代对象 vs 类数组 ==========
+// 可迭代: 有 [Symbol.iterator]
+// 类数组: 有 length 和数字索引
+// Array.from() 两者都支持
+const arrayLike = { 0: 'a', 1: 'b', length: 2 };
+Array.from(arrayLike); // ['a', 'b']</div>
+    </div>
+    <div class="card">
+        <h2>演示：自定义可迭代对象</h2>
+        <button onclick="demoIterable()">自定义可迭代</button>
+        <button onclick="demoRange()">Range 可迭代</button>
+        <div id="iter-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const iterResult = document.getElementById('iter-result');
+
+        function log(msg) {
+            iterResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // 自定义可迭代对象: 范围
+        class Range {
+            constructor(start, end, step = 1) {
+                this.start = start;
+                this.end = end;
+                this.step = step;
+            }
+            [Symbol.iterator]() {
+                let current = this.start;
+                const end = this.end;
+                const step = this.step;
+                return {
+                    next() {
+                        if (current <= end) {
+                            const value = current;
+                            current += step;
+                            return { value, done: false };
+                        }
+                        return { value: undefined, done: true };
+                    }
+                };
+            }
+        }
+
+        // 自定义可迭代: 斐波那契（有限）
+        class Fibonacci {
+            constructor(limit = 10) {
+                this.limit = limit;
+            }
+            [Symbol.iterator]() {
+                let a = 0, b = 1, count = 0;
+                const limit = this.limit;
+                return {
+                    next() {
+                        if (count++ < limit) {
+                            const value = a;
+                            [a, b] = [b, a + b];
+                            return { value, done: false };
+                        }
+                        return { value: undefined, done: true };
+                    }
+                };
+            }
+        }
+
+        // 手动实现迭代器
+        function createIterator(items) {
+            let i = 0;
+            return {
+                next() {
+                    if (i < items.length) {
+                        return { value: items[i++], done: false };
+                    }
+                    return { value: undefined, done: true };
+                }
+            };
+        }
+
+        function demoIterable() {
+            iterResult.innerHTML = '';
+            log('1️⃣ 手动迭代器:');
+            const it = createIterator(['a', 'b', 'c']);
+            log(`   ${JSON.stringify(it.next())}`);
+            log(`   ${JSON.stringify(it.next())}`);
+            log(`   ${JSON.stringify(it.next())}`);
+            log(`   ${JSON.stringify(it.next())}`);
+            log('');
+
+            log('2️⃣ 可迭代对象: Fibonacci');
+            const fib = new Fibonacci(10);
+            log(`   斐波那契数列: ${[...fib].join(', ')}`);
+            log('');
+
+            log('3️⃣ for...of 遍历 Fibonacci:');
+            let i = 0;
+            for (const val of new Fibonacci(6)) {
+                log(`   fib(${i++}) = ${val}`);
+            }
+            log('');
+
+            log('4️⃣ 展开运算符:');
+            log(`   [...new Range(5, 10)] = [${new Range(5, 10)}]`);
+            log('');
+
+            log('5️⃣ 解构赋值:');
+            const [first, second, ...rest] = new Range(1, 6);
+            log(`   first=${first}, second=${second}, rest=[${rest}]`);
+        }
+
+        function demoRange() {
+            iterResult.innerHTML = '';
+            log('📏 Range 可迭代对象演示:');
+            log('');
+
+            log('1到10 (步长2):');
+            for (const val of new Range(1, 10, 2)) {
+                log(`   ${val}`);
+            }
+            log('');
+
+            log('5到5:');
+            log(`   [${new Range(5, 5)}]`);
+            log('');
+
+            log('📌 可迭代协议要点:');
+            log('   • 实现 [Symbol.iterator]() 方法');
+            log('   • 返回 { next() } 迭代器对象');
+            log('   • next() 返回 { value, done }');
+            log('   • 可使用 for...of / ... / 解构');
+        }
+
+        console.log('=== 迭代器协议 ===');
+
+        document.getElementById('output').textContent =
+            `迭代器协议: Symbol.iterator / next() / 可迭代 vs 类数组\n` +
+            `内置可迭代: Array / String / Map / Set / arguments / NodeList\n` +
+            `✅ 迭代器协议演示完成！`;
+    </script>
+</body>
+</html>

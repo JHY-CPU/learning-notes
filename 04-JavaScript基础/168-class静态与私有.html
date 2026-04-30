@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>class静态与私有</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #2c3e50; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>class 静态成员与私有字段</h2><p>static 定义类级别的成员，# 定义私有字段（ES2022）。</p></div>
+    <div class="card">
+        <h2>static 静态成员</h2>
+        <div class="code">// 静态属性和方法属于类本身，而不是实例
+class MathUtils {
+    // 静态属性（ES2022+）
+    static PI = 3.14159;
+    static VERSION = '1.0.0';
+
+    // 静态方法
+    static add(a, b) {
+        return a + b;
+    }
+    static multiply(a, b) {
+        return a * b;
+    }
+
+    // 静态方法中不能访问实例属性
+    static createDefault() {
+        return new MathUtils();
+    }
+}
+
+// 通过类名访问
+console.log(MathUtils.PI);         // 3.14159
+console.log(MathUtils.add(2, 3));  // 5
+
+// 实例不能访问静态成员
+const m = new MathUtils();
+// console.log(m.PI);   // undefined
+// console.log(m.add);  // undefined
+
+// 静态方法中的 this 指向类本身
+class MyClass {
+    static whoAmI() {
+        console.log(this === MyClass);  // true
+    }
+}
+
+// 静态方法可以继承
+class Child extends MathUtils {}
+console.log(Child.add(1, 2));  // 3（继承了静态方法）</div>
+    </div>
+    <div class="card">
+        <h2>静态方法实际应用</h2>
+        <div class="code">// 1. 工厂方法
+class User {
+    constructor(name, role) {
+        this.name = name;
+        this.role = role;
+    }
+
+    static createAdmin(name) {
+        return new User(name, 'admin');
+    }
+
+    static createGuest() {
+        return new User('访客', 'guest');
+    }
+
+    static fromJSON(json) {
+        const data = JSON.parse(json);
+        return new User(data.name, data.role);
+    }
+}
+
+const admin = User.createAdmin('Alice');
+const guest = User.createGuest();
+const parsed = User.fromJSON('{"name":"Bob","role":"user"}');
+
+// 2. 工具/辅助方法
+class DateUtils {
+    static formatDate(date) {
+        return date.toISOString().split('T')[0];
+    }
+    static isWeekend(date) {
+        const day = date.getDay();
+        return day === 0 || day === 6;
+    }
+    static daysInMonth(year, month) {
+        return new Date(year, month, 0).getDate();
+    }
+}
+
+// 3. 单例模式
+class Database {
+    static instance = null;
+
+    static getInstance() {
+        if (!Database.instance) {
+            Database.instance = new Database();
+        }
+        return Database.instance;
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2># 私有字段（ES2022）</h2>
+        <div class="code">class BankAccount {
+    // 私有字段（以 # 开头）
+    #balance = 0;
+    #owner;
+
+    constructor(owner, initialBalance) {
+        this.#owner = owner;
+        if (initialBalance > 0) this.#balance = initialBalance;
+    }
+
+    // 公有方法
+    deposit(amount) {
+        if (amount <= 0) throw '金额必须大于0';
+        this.#balance += amount;
+        return this.#balance;
+    }
+
+    withdraw(amount) {
+        if (amount > this.#balance) throw '余额不足';
+        this.#balance -= amount;
+        return this.#balance;
+    }
+
+    getBalance() {
+        return this.#balance;
+    }
+
+    // 私有方法也可以！
+    #validateAmount(amount) {
+        return amount > 0 && amount < 1000000;
+    }
+}
+
+const account = new BankAccount('Alice', 1000);
+console.log(account.getBalance());   // 1000
+account.deposit(500);
+console.log(account.getBalance());   // 1500
+
+// ⚠️ 私有字段外部无法访问
+// console.log(account.#balance);  // ❌ SyntaxError
+// account.#validateAmount(100);   // ❌ SyntaxError
+// 'balance' in account;           // true（公有属性）
+// '#balance' in account;          // false（私有字段的 in 检查不同）</div>
+        <div class="note">💡 私有字段 # 是真正的硬限制（引擎级别），不同于 _ 命名约定（只是约定）。</div>
+    </div>
+    <div class="card">
+        <h2>私有字段的特性</h2>
+        <div class="code">// 1. 私有字段必须在类中声明
+class Good {
+    #name = 'declared';  // ✅ 先声明
+}
+class Bad {
+    constructor() {
+        // this.#name = 'test';  // ❌ 未声明就使用（SyntaxError）
+    }
+}
+
+// 2. 私有字段不能被子类访问
+class Parent {
+    #secret = 'parent secret';
+    getSecret() { return this.#secret; }
+}
+class Child extends Parent {
+    reveal() {
+        // return this.#secret;  // ❌ SyntaxError
+        return this.getSecret();  // ✅ 通过公有方法访问
+    }
+}
+
+// 3. 同名私有字段不冲突
+class A {
+    #val = 'A';
+    getVal() { return this.#val; }
+}
+class B {
+    #val = 'B';
+    getVal() { return this.#val; }
+}
+
+// 4. 私有字段的类型检查
+class Person {
+    #age;
+    constructor(age) {
+        this.#age = age;
+    }
+    isSameAge(other) {
+        // 同类的不同实例可以访问对方的私有字段
+        return this.#age === other.#age;
+    }
+}</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== 静态成员 ===');
+        class Config {
+            static API_URL = 'https://api.example.com';
+            static TIMEOUT = 5000;
+            static getConfig() {
+                return `API: ${this.API_URL}, Timeout: ${this.TIMEOUT}ms`;
+            }
+        }
+        console.log(Config.getConfig());
+        const c = new Config();
+        console.log('实例访问不到静态:', c.API_URL);
+
+        console.log('=== 工厂方法 ===');
+        class User {
+            constructor(name, role) { this.name = name; this.role = role; }
+            static createAdmin(name) { return new User(name, 'admin'); }
+        }
+        const admin = User.createAdmin('Alice');
+        console.log('工厂创建:', admin.name, admin.role);
+
+        console.log('=== 私有字段 ===');
+        class Wallet {
+            #money = 0;
+            constructor(initial) { if (initial > 0) this.#money = initial; }
+            add(amount) { if (amount > 0) this.#money += amount; }
+            get balance() { return this.#money; }
+        }
+        const w = new Wallet(100);
+        w.add(50);
+        console.log('余额:', w.balance);
+        // console.log(w.#money);  // 语法错误（取消注释试试）
+
+        console.log('=== 私有字段跨实例访问 ===');
+        class ID {
+            #id;
+            constructor(id) { this.#id = id; }
+            equals(other) { return this.#id === other.#id; }
+        }
+        const a = new ID(1);
+        const b = new ID(1);
+        console.log('a.equals(b):', a.equals(b));
+
+        document.getElementById('output').textContent =
+            `静态配置: ${Config.getConfig()}\n` +
+            `钱包余额: ${w.balance}\n` +
+            `✅ class 静态与私有演示完成！`;
+    </script>
+</body>
+</html>

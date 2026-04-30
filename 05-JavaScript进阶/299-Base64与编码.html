@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Base64与编码</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #b64-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; margin: 5px 0; width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Base64 与编码</h2><p>atob/btoa、中文 Base64、TextEncoder/TextDecoder、UTF-8/UTF-16。</p></div>
+    <div class="card">
+        <h2>编码 API</h2>
+        <div class="code">// ========== Base64 ==========
+// btoa() — 字符串 → Base64 (binary to ASCII)
+// atob() — Base64 → 字符串
+
+btoa('hello');      // 'aGVsbG8='
+atob('aGVsbG8=');   // 'hello'
+
+// ⚠️ btoa 只支持 Latin1 字符
+// 中文会报错！
+// btoa('你好'); // DOMException
+
+// 中文 Base64 (需要先编码为 UTF-8)
+function utf8ToBase64(str) {
+    return btoa(encodeURIComponent(str).replace(
+        /%([0-9A-F]{2})/g,
+        (_, p1) => String.fromCharCode(parseInt(p1, 16))
+    ));
+}
+function base64ToUtf8(base64) {
+    return decodeURIComponent(atob(base64).split('')
+        .map(c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0'))
+        .join(''));
+}
+
+// ========== TextEncoder / TextDecoder ==========
+// TextEncoder — 字符串 → Uint8Array (UTF-8)
+const encoder = new TextEncoder();
+encoder.encode('hello'); // Uint8Array [104, 101, 108, 108, 111]
+
+// TextDecoder — Uint8Array → 字符串
+const decoder = new TextDecoder();
+decoder.decode(new Uint8Array([104, 101, 108, 108, 111])); // 'hello'
+
+// 编码类型
+// TextEncoder: 只支持 UTF-8
+// TextDecoder: 支持多种编码 (UTF-8, UTF-16, latin1, etc.)</div>
+    </div>
+    <div class="card">
+        <h2>演示：Base64 和编码</h2>
+        <input id="b64Input" value="Hello 你好 World" placeholder="输入文本">
+        <button onclick="demoBase64()">Base64 编码</button>
+        <button onclick="demoTextEncoder()">TextEncoder/Decoder</button>
+        <div id="b64-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const b64Result = document.getElementById('b64-result');
+
+        function log(msg) {
+            b64Result.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function utf8ToBase64(str) {
+            return btoa(encodeURIComponent(str).replace(
+                /%([0-9A-F]{2})/g,
+                (_, p1) => String.fromCharCode(parseInt(p1, 16))
+            ));
+        }
+
+        function base64ToUtf8(base64) {
+            return decodeURIComponent(atob(base64).split('')
+                .map(c => '%' + c.charCodeAt(0).toString(16).padStart(2, '0'))
+                .join(''));
+        }
+
+        function demoBase64() {
+            b64Result.innerHTML = '';
+            const text = document.getElementById('b64Input').value;
+            log('🔐 Base64 编码演示:');
+            log('');
+
+            log('1️⃣ 普通 ASCII:');
+            const ascii = 'hello world 123';
+            log(`   原始: "${ascii}"`);
+            log(`   btoa: "${btoa(ascii)}"`);
+            log(`   atob: "${atob(btoa(ascii))}"`);
+            log('');
+
+            log('2️⃣ 中文 (需特殊处理):');
+            log(`   原始: "${text}"`);
+            const encoded = utf8ToBase64(text);
+            const decoded = base64ToUtf8(encoded);
+            log(`   Base64: "${encoded}"`);
+            log(`   解码后: "${decoded}"`);
+            log('');
+
+            log('3️⃣ 其他内容 Base64:');
+            const samples = [
+                { label: '数字', val: '1234567890' },
+                { label: '特殊字符', val: 'a&b=c+d/e' },
+                { label: 'emoji', val: '😀🎉🚀' },
+            ];
+            samples.forEach(({ label, val }) => {
+                const e = utf8ToBase64(val);
+                log(`   ${label}: "${val}" → "${e.substring(0, 20)}..."`);
+            });
+        }
+
+        function demoTextEncoder() {
+            b64Result.innerHTML = '';
+            const text = document.getElementById('b64Input').value;
+            log('📝 TextEncoder / TextDecoder 演示:');
+            log('');
+
+            const encoder = new TextEncoder();
+            const decoder = new TextDecoder();
+
+            log('1️⃣ TextEncoder (UTF-8):');
+            const encoded = encoder.encode(text);
+            log(`   原始: "${text}"`);
+            log(`   编码: [${encoded.slice(0, 20).join(', ')}${encoded.length > 20 ? ',...' : ''}]`);
+            log(`   长度: ${text.length} 字符 → ${encoded.length} 字节`);
+            log('');
+
+            log('2️⃣ TextDecoder:');
+            const decoded = decoder.decode(encoded);
+            log(`   解码: "${decoded}"`);
+            log(`   一致: ${text === decoded ? '✅' : '❌'}`);
+            log('');
+
+            log('3️⃣ 不同编码对比:');
+            const str = 'A你😀';
+            log(`   字符串 "${str}" 的字节长度:`);
+            log(`   UTF-8: ${new TextEncoder().encode(str).length} 字节`);
+            const utf16 = new TextEncoder('utf-16le');
+            const encoded16 = utf16.encode(str);
+            log(`   UTF-16: ${encoded16.length} 字节`);
+            log('');
+
+            log('4️⃣ 编码转换应用:');
+            log('   字符串 → UTF-8 → Base64 → 传输 → 解码 → 还原');
+            const b64 = btoa(String.fromCharCode(...new TextEncoder().encode('Hello!')));
+            log(`   "Hello!" → Base64: "${b64}"`);
+        }
+
+        console.log('=== Base64 与编码 ===');
+
+        document.getElementById('output').textContent =
+            `Base64: btoa/atob / 中文处理 / 编码转换\n` +
+            `TextEncoder: UTF-8 → Uint8Array\n` +
+            `TextDecoder: Uint8Array → 字符串\n` +
+            `✅ Base64 与编码演示完成！`;
+    </script>
+</body>
+</html>

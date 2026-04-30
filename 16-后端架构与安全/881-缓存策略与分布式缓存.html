@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>缓存策略与分布式缓存</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚡ 缓存策略与分布式缓存</h2><p>缓存模式 (Cache Aside/Read-Through/Write-Through/Write-Behind)、缓存穿透/击穿/雪崩、分布式缓存一致性、HTTP 缓存。</p></div>
+    <div class="card">
+        <h2>缓存模式</h2>
+        <div class="code">// ========== Cache Aside (旁路缓存) ==========
+// 最常用模式, 应用层管理缓存
+
+// 读操作:
+// func getUser(id string) User {
+//     // 1. 先查缓存
+//     user, err := cache.Get("user:" + id)
+//     if err == nil {
+//         return user
+//     }
+//
+//     // 2. 缓存未命中 → 查数据库
+//     user = db.FindUser(id)
+//
+//     // 3. 回填缓存 (设置 TTL)
+//     cache.Set("user:"+id, user, 1*time.Hour)
+//
+//     return user
+// }
+
+// 写操作:
+// func updateUser(id string, data User) {
+//     // 1. 更新数据库
+//     db.UpdateUser(id, data)
+//
+//     // 2. 删除缓存 (不是更新!)
+//     cache.Del("user:" + id)
+// }
+
+// 为什么写操作删除缓存而不是更新?
+// 1. 并发更新 → 脏数据 (A/B 交替写)
+// 2. 删除更简单, 下次读自然回填
+// 3. 懒加载: 不常用的 key 不用缓存
+
+// ========== Read-Through ==========
+// 缓存库负责回填, 应用透明
+// 应用只跟缓存交互
+// 缓存未命中 → 缓存库自动查 DB
+
+// ========== Write-Through ==========
+// 写操作: 先写缓存 → 缓存同步写 DB
+// 优点: 缓存总是最新的
+// 缺点: 写延迟增加
+
+// ========== Write-Behind ==========
+// 写操作: 只写缓存 → 异步批量写 DB
+// 优点: 高吞吐, 支持合并写入
+// 缺点: 宕机可能丢数据
+// 适合: 日志, 点击流, 批量统计</div>
+    </div>
+    <div class="card">
+        <h2>缓存问题与解决方案</h2>
+        <div class="code">// ========== 缓存穿透 ==========
+// 查询一个不存在的数据
+// 每次都穿透缓存到数据库
+// 恶意攻击: 大量查询不存在的 ID
+//
+// 解决方案:
+// 1. 缓存空值 (短期, 如 60s)
+//    cache.Set("user:999", nil, 60*time.Second)
+//
+// 2. 布隆过滤器 (Bloom Filter)
+//    位数组 + 多个哈希函数
+//    一定不存在 → 直接返回
+//    可能存在 → 继续查询
+//
+// type BloomFilter struct {
+//     bits   []bool
+//     hashes []func([]byte) uint
+// }
+//
+// func (b *BloomFilter) Add(key string) {
+//     data := []byte(key)
+//     for _, h := range b.hashes {
+//         b.bits[h(data)%uint(len(b.bits))] = true
+//     }
+// }
+//
+// func (b *BloomFilter) MightExist(key string) bool {
+//     data := []byte(key)
+//     for _, h := range b.hashes {
+//         if !b.bits[h(data)%uint(len(b.bits))] {
+//             return false // 一定不存在
+//         }
+//     }
+//     return true // 可能存在
+// }
+
+// ========== 缓存击穿 ==========
+// 热点 key 过期瞬间, 大量请求打到数据库
+//
+// 解决方案:
+// 1. 互斥锁 (Mutex)
+//    第一个请求加锁查 DB
+//    后续请求等待锁 → 读缓存
+//
+// 2. 热点数据永不过期
+//    后台线程定期刷新
+//
+// 3. 提前预热
+//    过期前主动刷新
+
+// ========== 缓存雪崩 ==========
+// 大量缓存同时过期 → 请求全部打到数据库
+// 原因: 批量写入相同 TTL
+//
+// 解决方案:
+// 1. TTL 随机化 (基础 + random)
+//    ttl = 3600 + rand.Intn(600)
+//
+// 2. 多级缓存
+//    本地缓存 (Caffeine) + 分布式缓存 (Redis)
+//
+// 3. 限流 + 降级
+//    数据库打满 → 返回旧缓存 / 默认值
+//
+// 4. 缓存预热
+//    提前加载热点数据</div>
+    </div>
+    <div class="card">
+        <h2>分布式缓存一致性</h2>
+        <div class="code">// ========== 分布式缓存挑战 ==========
+// 多台缓存节点, 数据分布在不同节点
+// 增删节点 → 数据重新分布
+
+// ========== 一致性哈希 ==========
+// 将节点和数据映射到同一个哈希环
+// 数据顺时针找到最近的节点
+// 虚拟节点解决数据倾斜
+
+// func consistentHash(key string, nodes []string) string {
+//     ring := make([]uint32, 0)
+//     nodeMap := make(map[uint32]string)
+//
+//     // 每个节点创建多个虚拟节点
+//     for _, node := range nodes {
+//         for i := 0; i < 150; i++ { // 150 虚拟节点
+//             hash := hash("node:" + node + ":" + strconv.Itoa(i))
+//             ring = append(ring, hash)
+//             nodeMap[hash] = node
+//         }
+//     }
+//
+//     sort.Slice(ring, func(i, j int) bool {
+//         return ring[i] < ring[j]
+//     })
+//
+//     // 找 key 的 hash 在环上的位置
+//     keyHash := hash(key)
+//     idx := sort.Search(len(ring), func(i int) bool {
+//         return ring[i] >= keyHash
+//     })
+//
+//     if idx == len(ring) {
+//         idx = 0
+//     }
+//     return nodeMap[ring[idx]]
+// }
+
+// ========== 缓存一致性策略 ==========
+// 情况: 数据库更新后缓存如何同步
+
+// 1. 强一致性 (牺牲性能)
+//    分布式锁 + 同步更新
+//    写: 锁 → 写 DB → 写缓存 → 解锁
+//    读: 从缓存读
+
+// 2. 最终一致性 (常用)
+//    延迟双删: 先删缓存 → 写 DB → 延迟再删
+//    或: 写 DB → 发消息 → 消费删缓存
+
+// 3. 基于 Binlog 同步
+//    Canal / Debezium 监听 MySQL binlog
+//    变更 → 自动更新缓存
+//    无侵入业务代码
+
+// ========== 多级缓存 ==========
+// L1: 本地缓存 (Caffeine/Go-Cache)
+//     访问快 (~ns), 容量小
+// L2: 分布式缓存 (Redis/Memcached)
+//     访问较快 (~ms), 容量大
+// L3: 数据库
+//     访问慢 (~10ms), 容量最大
+
+// 查询流程:
+// L1 命中 → 返回
+// L1 未命中 → 查 L2 → 回填 L1
+// L2 未命中 → 查 DB → 回填 L2 + L1</div>
+    </div>
+    <div class="card">
+        <h2>HTTP 缓存</h2>
+        <div class="code">// ========== 强缓存 ==========
+// 浏览器直接读本地缓存, 不发请求
+//
+// Cache-Control: max-age=3600
+//   1小时内直接使用缓存
+//
+// Expires: Wed, 21 Oct 2024 07:28:00 GMT
+//   绝对过期时间 (HTTP/1.0, 不推荐)
+//
+// 优先级: Cache-Control > Expires
+
+// ========== 协商缓存 ==========
+// 发请求到服务器, 验证资源是否变更
+// 未变更 → 304 Not Modified (不传体)
+//
+// 1. Last-Modified / If-Modified-Since
+//    服务器返回最后修改时间
+//    下次请求带上 If-Modified-Since
+//    缺点: 秒级精度, 可能不准确
+
+// 2. ETag / If-None-Match
+//    服务器返回资源哈希
+//    下次请求带上 If-None-Match
+//    更精确, 优先于 Last-Modified
+
+// ========== 最佳实践 ==========
+// 静态资源 (JS/CSS/图片):
+//   Cache-Control: public, max-age=31536000, immutable
+//   文件名带 hash: app.a1b2c3.js
+//   更新 = 改文件名
+
+// HTML 页面:
+//   Cache-Control: no-cache (每次检查)
+//   或 max-age=0 + ETag
+
+// API 响应:
+//   动态数据: Cache-Control: no-store (不缓存)
+//   可缓存 GET: Cache-Control: public, max-age=60
+
+// Service Worker 缓存策略:
+//   Cache First: 静态资源
+//   Network First: API 请求
+//   Stale While Revalidate: 更新不着急</div>
+        <div class="note">💡 缓存要点: Cache Aside 最常用 (读→回填, 写→删缓存); 穿透查不存在(布隆过滤器); 击穿热点过期(互斥锁); 雪崩大量过期(TTL随机化); 一致性哈希加虚拟节点; 多级缓存 L1+L2+DB; HTTP 强缓存 max-age 与协商缓存 ETag; 静态资源 hash 文件名长期缓存。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoPatterns()">缓存模式</button>
+        <button onclick="demoProblems()">缓存问题</button>
+        <button onclick="demoHTTP()">HTTP缓存</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoPatterns() {
+            result.innerHTML = '';
+            log('# 缓存模式');
+            log('');
+            log('Cache Aside:');
+            log('  读: 缓存→DB→回填');
+            log('  写: 更新DB→删缓存');
+            log('');
+            log('Read-Through:');
+            log('  缓存库自动回填');
+            log('');
+            log('Write-Through:');
+            log('  写缓存同步写DB');
+            log('');
+            log('Write-Behind:');
+            log('  异步批量写DB');
+            log('  高吞吐, 可能丢数据');
+        }
+
+        function demoProblems() {
+            result.innerHTML = '';
+            log('# 缓存问题');
+            log('');
+            log('穿透: 查不存在的数据');
+            log('  解决: 空值缓存 / 布隆过滤器');
+            log('');
+            log('击穿: 热点key过期');
+            log('  解决: 互斥锁 / 永不过期');
+            log('');
+            log('雪崩: 大量key同时过期');
+            log('  解决: TTL随机化 / 多级缓存');
+            log('');
+            log('一致性: DB与缓存同步');
+            log('  策略: 延迟双删 / binlog同步');
+        }
+
+        function demoHTTP() {
+            result.innerHTML = '';
+            log('# HTTP 缓存');
+            log('');
+            log('强缓存:');
+            log('  Cache-Control: max-age=3600');
+            log('  不发请求, 直接读缓存');
+            log('');
+            log('协商缓存:');
+            log('  ETag / If-None-Match');
+            log('  304 Not Modified');
+            log('');
+            log('最佳实践:');
+            log('  静态资源: hash文件名 + 长缓存');
+            log('  API: no-store 或短缓存');
+            log('  HTML: no-cache 每次检查');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>认证与会话管理</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔑 认证与会话管理</h2><p>密码哈希 bcrypt/argon2、JWT 结构与安全、Session 管理、MFA 多因素认证、令牌刷新与轮换。</p></div>
+    <div class="card">
+        <h2>密码哈希</h2>
+        <div class="code">// ========== 密码存储原则 ==========
+// ❌ 不存储明文!
+// ❌ 不只用哈希 (MD5/SHA1)
+// ✅ 加盐哈希 (bcrypt/argon2/scrypt)
+
+// ========== bcrypt (Go) ==========
+import "golang.org/x/crypto/bcrypt"
+
+// 哈希密码
+func hashPassword(password string) (string, error) {
+    // cost: 4-31, 默认 10, 越高越慢越安全
+    bytes, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+    return string(bytes), err
+}
+
+// 验证密码
+func checkPassword(password, hash string) bool {
+    err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+    return err == nil
+}
+
+// cost 影响:
+// cost=10: ~100ms
+// cost=12: ~400ms
+// cost=14: ~1.6s
+
+// ========== argon2 (Go) ==========
+import "golang.org/x/crypto/argon2"
+
+// argon2 是 2015 年密码哈希竞赛获胜者
+// 推荐用于新项目
+
+type Argon2Params struct {
+    Memory      uint32 // 内存 (KB)
+    Iterations  uint32 // 迭代次数
+    Parallelism uint8  // 并行数
+    SaltLength  uint32 // 盐长度
+    KeyLength   uint32 // 密钥长度
+}
+
+func generateFromPassword(password string, p *Argon2Params) (string, error) {
+    salt := make([]byte, p.SaltLength)
+    _, err := rand.Read(salt)
+    if err != nil {
+        return "", err
+    }
+
+    hash := argon2.IDKey([]byte(password), salt, p.Iterations, p.Memory, p.Parallelism, p.KeyLength)
+
+    // Base64 编码盐和哈希
+    b64Salt := base64.RawStdEncoding.EncodeToString(salt)
+    b64Hash := base64.RawStdEncoding.EncodeToString(hash)
+
+    // 格式: $argon2id$v=19$m=65536,t=3,p=4$<salt>$<hash>
+    encoded := fmt.Sprintf("$argon2id$v=19$m=%d,t=%d,p=%d$%s$%s",
+        p.Memory, p.Iterations, p.Parallelism, b64Salt, b64Hash)
+
+    return encoded, nil
+}
+
+// ========== 密码策略 ==========
+// 1. 最小长度: 8 位
+// 2. 复杂度: 大写+小写+数字+符号 (可选)
+// 3. 常用密码黑名单
+// 4. 密码过期: 90 天 (可选)
+// 5. 不允许重复使用最近 5 次
+// 6. 登录失败锁定: 5 次失败, 锁定 15 分钟</div>
+    </div>
+    <div class="card">
+        <h2>JWT (JSON Web Token)</h2>
+        <div class="code">// ========== JWT 结构 ==========
+// header.payload.signature
+// eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.
+// eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4iLCJpYXQiOjE1MTYyMzkwMjJ9.
+// SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c
+
+// Header:
+// { "alg": "HS256", "typ": "JWT" }
+
+// Payload (claims):
+// {
+//   "sub": "1234567890",       // subject (用户ID)
+//   "name": "John Doe",
+//   "iat": 1516239022,         // issued at
+//   "exp": 1516242622,         // expiration
+//   "iss": "myapp",            // issuer
+//   "aud": "myapp-users"       // audience
+// }
+
+// Signature: HMACSHA256(base64(header) + "." + base64(payload), secret)
+
+// ========== Go JWT 实现 ==========
+import "github.com/golang-jwt/jwt/v5"
+
+type Claims struct {
+    UserID int    `json:"user_id"`
+    Role   string `json:"role"`
+    jwt.RegisteredClaims
+}
+
+// 生成 token
+func generateToken(userID int, role, secret string) (string, error) {
+    claims := Claims{
+        UserID: userID,
+        Role:   role,
+        RegisteredClaims: jwt.RegisteredClaims{
+            ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+            IssuedAt:  jwt.NewNumericDate(time.Now()),
+            Issuer:    "myapp",
+        },
+    }
+
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+    return token.SignedString([]byte(secret))
+}
+
+// 验证 token
+func validateToken(tokenString, secret string) (*Claims, error) {
+    token, err := jwt.ParseWithClaims(tokenString, &Claims{},
+        func(token *jwt.Token) (interface{}, error) {
+            // 验证签名算法
+            if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+                return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+            }
+            return []byte(secret), nil
+        })
+
+    if err != nil {
+        return nil, err
+    }
+
+    claims, ok := token.Claims.(*Claims)
+    if !ok || !token.Valid {
+        return nil, fmt.Errorf("invalid token")
+    }
+
+    return claims, nil
+}
+
+// ========== JWT 安全最佳实践 ==========
+// 1. 短过期时间 (15-30 分钟)
+// 2. 使用刷新令牌 (Refresh Token)
+// 3. 签名算法使用 HS256 或 RS256
+// 4. 验证签名算法 (防算法混淆攻击)
+// 5. 不在 payload 存敏感信息
+// 6. Secret 足够复杂 (>=256 bits)
+// 7. 使用黑名单实现登出
+// 8. 刷新令牌轮换 (Rotation)</div>
+    </div>
+    <div class="card">
+        <h2>Session 与 MFA</h2>
+        <div class="code">// ========== Session 管理 ==========
+// 相比 JWT, Session 更适合传统 Web 应用
+
+type SessionStore struct {
+    rdb *redis.Client
+}
+
+func (s *SessionStore) Create(userID int) (string, error) {
+    sessionID := uuid.New().String()
+    err := s.rdb.HSet(context.Background(), "session:"+sessionID,
+        "user_id", userID,
+        "created_at", time.Now().Unix(),
+    ).Err()
+    if err != nil {
+        return "", err
+    }
+    s.rdb.Expire(context.Background(), "session:"+sessionID, 24*time.Hour)
+    return sessionID, nil
+}
+
+func (s *SessionStore) Get(sessionID string) (int, error) {
+    userID, err := s.rdb.HGet(context.Background(),
+        "session:"+sessionID, "user_id").Int()
+    if err == redis.Nil {
+        return 0, fmt.Errorf("session expired")
+    }
+    return userID, err
+}
+
+func (s *SessionStore) Delete(sessionID string) error {
+    return s.rdb.Del(context.Background(), "session:"+sessionID).Err()
+}
+
+// ========== 刷新令牌 ==========
+type TokenPair struct {
+    AccessToken  string `json:"access_token"`
+    RefreshToken string `json:"refresh_token"`
+    ExpiresIn    int    `json:"expires_in"`
+}
+
+func generateTokenPair(userID int, secret string) (*TokenPair, error) {
+    // Access Token: 短寿命 (15 分钟)
+    accessToken, _ := generateToken(userID, "user", secret, 15*time.Minute)
+
+    // Refresh Token: 长寿命 (7 天)
+    refreshToken, _ := generateToken(userID, "user", secret, 7*24*time.Hour)
+
+    return &TokenPair{
+        AccessToken:  accessToken,
+        RefreshToken: refreshToken,
+        ExpiresIn:    900, // 15 分钟
+    }, nil
+}
+
+// ========== MFA (TOTP) ==========
+// Time-based One-Time Password
+
+import "github.com/pquerna/otp/totp"
+
+// 生成密钥
+func generateMFAKey(username string) (string, string, error) {
+    key, err := totp.Generate(totp.GenerateOpts{
+        Issuer:      "MyApp",
+        AccountName: username,
+    })
+    return key.Secret(), key.URL(), err  // URL = QR 码内容
+}
+
+// 验证 TOTP 码
+func verifyTOTP(secret, code string) bool {
+    return totp.Validate(code, secret)
+}
+
+// MFA 中间件:
+// func MFAMiddleware() gin.HandlerFunc {
+//     return func(c *gin.Context) {
+//         if c.GetBool("mfa_verified") {
+//             c.Next()
+//             return
+//         }
+//         code := c.GetHeader("X-MFA-Code")
+//         if !verifyTOTP(userSecret, code) {
+//             c.AbortWithStatusJSON(401, gin.H{"error": "MFA required"})
+//             return
+//         }
+//         c.Set("mfa_verified", true)
+//         c.Next()
+//     }
+// }</div>
+        <div class="note">💡 认证要点: bcrypt/argon2 加盐哈希密码 (不用 MD5/SHA1); bcrypt cost=10; JWT 三部分 header.payload.signature; 短过期 + Refresh Token; 验证签名算法防混淆; Session 用 Redis 存储; TOTP MFA (Google Authenticator); 密码策略: 8位+复杂度+锁定; 刷新令牌轮换; 黑名单实现登出。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoPassword()">密码哈希</button>
+        <button onclick="demoJWT()">JWT</button>
+        <button onclick="demoMFA()">MFA</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoPassword() {
+            result.innerHTML = '';
+            log('# 密码安全');
+            log('');
+            log('❌ 不安全: MD5, SHA1, 明文');
+            log('');
+            log('✅ bcrypt (Go):');
+            log('  hash, _ := bcrypt.GenerateFromPassword(pwd, 10)');
+            log('  bcrypt.CompareHashAndPassword(hash, pwd)');
+            log('');
+            log('✅ argon2 (最新标准):');
+            log('  抗 GPU/ASIC 攻击');
+            log('  可配置内存+时间+并行');
+        }
+
+        function demoJWT() {
+            result.innerHTML = '';
+            log('# JWT 认证');
+            log('');
+            log('结构:');
+            log('  header.payload.signature');
+            log('');
+            log('安全实践:');
+            log('  Access: 15分, Refresh: 7天');
+            log('  HS256/RS256 签名');
+            log('  验证算法类型');
+            log('  黑名单登出');
+            log('');
+            log('Payload:');
+            log('  sub, exp, iat, iss');
+            log('  不存敏感信息');
+        }
+
+        function demoMFA() {
+            result.innerHTML = '';
+            log('# 多因素认证');
+            log('');
+            log('TOTP:');
+            log('  totp.Generate → 密钥 + URL');
+            log('  totp.Validate(code, secret)');
+            log('  30 秒过期');
+            log('');
+            log('其他 MFA:');
+            log('  SMS 验证码');
+            log('  硬件密钥 (YubiKey)');
+            log('  生物识别');
+        }
+    </script>
+</body>
+</html>

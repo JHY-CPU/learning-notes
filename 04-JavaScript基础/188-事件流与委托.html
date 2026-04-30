@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>事件流与委托</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #8e44ad; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        #outer { background: #3498db; padding: 30px; border-radius: 8px; color: white; text-align: center; cursor: pointer; margin: 10px 0; }
+        #middle { background: #2ecc71; padding: 30px; border-radius: 8px; margin: 10px; }
+        #inner { background: #e74c3c; padding: 30px; border-radius: 8px; margin: 10px; }
+        #delegate-list { background: white; border: 2px solid #bdc3c7; border-radius: 8px; padding: 15px; margin: 10px 0; min-height: 100px; }
+        #delegate-list .list-item { padding: 8px 12px; margin: 4px 0; background: #f8f9fa; border-radius: 4px; cursor: pointer; border-left: 3px solid #3498db; }
+        #delegate-list .list-item:hover { background: #e8f4fd; }
+        .highlight-item { background: #fff3cd !important; border-left-color: #f39c12 !important; }
+        .log-box { max-height: 200px; overflow-y: auto; background: #1e1e1e; color: #d4d4d4; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 12px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>事件流与事件委托</h2><p>事件捕获 → 目标 → 冒泡。利用冒泡实现事件委托。</p></div>
+    <div class="card">
+        <h2>事件流三阶段</h2>
+        <div class="code">// DOM 事件流分为三个阶段：
+
+// 1. 捕获阶段（Capture Phase）
+//    从 window → document → html → body → ... → 目标父元素
+//    事件从外层向内层传播
+
+// 2. 目标阶段（Target Phase）
+//    事件到达目标元素本身
+
+// 3. 冒泡阶段（Bubble Phase）
+//    从目标元素 → 父元素 → ... → body → html → document → window
+//    事件从内层向外层传播
+
+//    ┌─── 捕获 ──→  window  ←── 冒泡 ──┐
+//    │             document              │
+//    │             html                  │
+//    │             body                  │
+//    │             parent                │
+//    │             child                 │
+//    └───         target        ─────────┘
+
+// 默认情况下，事件在冒泡阶段触发
+// addEventListener 的第三个参数指定阶段：
+// false（默认）→ 冒泡阶段触发
+// true          → 捕获阶段触发</div>
+    </div>
+    <div class="card">
+        <h2>stopPropagation — 阻止传播</h2>
+        <div class="code">// stopPropagation() — 阻止事件继续传播
+// 在捕获阶段调用 → 阻止后续捕获和目标
+// 在冒泡阶段调用 → 阻止后续冒泡
+
+child.addEventListener('click', function(e) {
+    e.stopPropagation();  // 父元素不会收到事件
+    console.log('子元素点击（不会冒泡）');
+});
+
+// stopImmediatePropagation() — 立即阻止所有传播
+// 1. 阻止事件继续传播（同 stopPropagation）
+// 2. 阻止当前元素上后续事件处理函数执行
+
+element.addEventListener('click', function(e) {
+    e.stopImmediatePropagation();
+    console.log('第一个处理器');
+});
+element.addEventListener('click', function() {
+    console.log('第二个处理器（不会执行）');
+});
+// 只输出 '第一个处理器'</div>
+    </div>
+    <div class="card">
+        <h2>事件委托（Event Delegation）</h2>
+        <div class="code">// 利用事件冒泡，在父元素上监听事件
+// 而不是给每个子元素单独绑定
+
+// ❌ 传统方式：给每个 li 绑定
+document.querySelectorAll('li').forEach(li => {
+    li.addEventListener('click', () => {
+        console.log('点击了', li.textContent);
+    });
+});
+// 问题：新增 li 不会自动绑定
+// 问题：大量 li 时性能开销大
+
+// ✅ 事件委托：在父元素上绑定一次
+document.querySelector('ul').addEventListener('click', function(e) {
+    const target = e.target.closest('li');  // 找到 li
+    if (!target) return;  // 没点到 li 就忽略
+    console.log('点击了', target.textContent);
+});
+// 好处：
+// 1. 动态元素也能处理（新增 li 无需再绑定）
+// 2. 只需要一个监听器（省内存）
+// 3. 统一管理
+
+// 常用委托模式：
+// table > td → 在 table 上监听
+// ul > li → 在 ul 上监听
+// div.items > div.item → 在 .items 上监听</div>
+    </div>
+    <div class="card">
+        <h2>事件委托示例</h2>
+        <div class="code">// 完整事件委托示例
+
+const list = document.getElementById('task-list');
+
+// 在父元素上绑定一次
+list.addEventListener('click', function(e) {
+    const item = e.target.closest('.task-item');
+    if (!item) return;
+
+    // 根据不同子元素做不同操作
+    if (e.target.classList.contains('delete-btn')) {
+        item.remove();
+        console.log('删除:', item.textContent);
+    } else if (e.target.classList.contains('edit-btn')) {
+        console.log('编辑:', item.textContent);
+    } else {
+        // 点击任务本身
+        item.classList.toggle('completed');
+        console.log('切换完成状态:', item.textContent);
+    }
+});
+
+// 动态添加的新项目自动生效
+list.appendChild(createTaskItem('新任务'));  // ✅ 不用再绑定
+
+// 数据属性方案：
+// &lt;li data-action="delete"&gt;...&lt;/li&gt;
+list.addEventListener('click', function(e) {
+    const action = e.target.closest('[data-action]')?.dataset.action;
+    if (action === 'delete') { /* 删除 */ }
+    if (action === 'edit') { /* 编辑 */ }
+});</div>
+    </div>
+    <div id="outer">outer（外）
+        <div id="middle">middle（中）
+            <div id="inner">inner（内）</div>
+        </div>
+    </div>
+    <div class="log-box" id="flow-log"></div>
+    <div id="delegate-list">
+        <div class="list-item" data-id="1">项目 1 <span style="color:#e74c3c;float:right;">✕</span></div>
+        <div class="list-item" data-id="2">项目 2 <span style="color:#e74c3c;float:right;">✕</span></div>
+        <div class="list-item" data-id="3">项目 3 <span style="color:#e74c3c;float:right;">✕</span></div>
+    </div>
+    <div style="display:flex;gap:10px;margin:10px 0;flex-wrap:wrap;">
+        <button onclick="addDelegateItem()">添加项目（委托）</button>
+        <button onclick="clearDelegateLog()">清除日志</button>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const outer = document.getElementById('outer');
+        const middle = document.getElementById('middle');
+        const inner = document.getElementById('inner');
+        const flowLog = document.getElementById('flow-log');
+        const delegateList = document.getElementById('delegate-list');
+
+        function logFlow(msg) {
+            const div = document.createElement('div');
+            div.textContent = msg;
+            flowLog.appendChild(div);
+            flowLog.scrollTop = flowLog.scrollHeight;
+            console.log(msg);
+        }
+
+        console.log('=== 事件流演示 ===');
+
+        // 捕获阶段（第三个参数 true）
+        outer.addEventListener('click', function(e) {
+            logFlow(`捕获: outer → ${this.id} (target: ${e.target.id})`);
+        }, true);
+        middle.addEventListener('click', function(e) {
+            logFlow(`捕获: middle → ${this.id} (target: ${e.target.id})`);
+        }, true);
+        inner.addEventListener('click', function(e) {
+            logFlow(`捕获: inner → ${this.id} (target: ${e.target.id})`);
+        }, true);
+
+        // 冒泡阶段（默认，第三个参数 false）
+        outer.addEventListener('click', function(e) {
+            logFlow(`冒泡: outer → ${this.id} (target: ${e.target.id})`);
+        }, false);
+        middle.addEventListener('click', function(e) {
+            logFlow(`冒泡: middle → ${this.id} (target: ${e.target.id})`);
+        }, false);
+        inner.addEventListener('click', function(e) {
+            logFlow(`冒泡: inner → ${this.id} (target: ${e.target.id})`);
+        }, false);
+
+        console.log('=== 事件委托 ===');
+        // 在父元素上委托
+        delegateList.addEventListener('click', function(e) {
+            const item = e.target.closest('.list-item');
+            if (!item) return;
+
+            // 检查是否点了 ✕
+            if (e.target.tagName === 'SPAN' && e.target.textContent === '✕') {
+                item.remove();
+                logFlow(`委托: 删除了 "${item.textContent.trim()}"`);
+                return;
+            }
+
+            // 点击项目本身
+            item.classList.toggle('highlight-item');
+            const dataId = item.dataset.id;
+            logFlow(`委托: 点击项目 ${dataId} (${item.textContent.trim()})`);
+        });
+
+        function addDelegateItem() {
+            const id = delegateList.children.length + 1;
+            const item = document.createElement('div');
+            item.className = 'list-item';
+            item.dataset.id = id;
+            item.innerHTML = `项目 ${id} <span style="color:#e74c3c;float:right;">✕</span>`;
+            delegateList.appendChild(item);
+            logFlow(`委托: 添加了项目 ${id}（自动支持点击）`);
+        }
+
+        function clearDelegateLog() {
+            flowLog.innerHTML = '';
+        }
+
+        console.log('=== stopPropagation 演示 ===');
+        // 取消注释看效果（点击 inner 时 middle/outer 不会收到冒泡）
+        // inner.addEventListener('click', function(e) {
+        //     e.stopPropagation();
+        //     console.log('inner 点击（阻止冒泡）');
+        // });
+
+        // 事件对象目标属性
+        inner.addEventListener('click', function(e) {
+            console.log('e.target:', e.target.id);
+            console.log('e.currentTarget:', e.currentTarget.id);
+            console.log('e.eventPhase:', e.eventPhase); // 2 = 目标阶段
+        });
+
+        document.getElementById('output').textContent =
+            `事件流: 捕获 → 目标 → 冒泡\n` +
+            `委托列表子元素数: ${delegateList.children.length}\n` +
+            `✅ 事件流与委托演示完成！\n` +
+            `(点击彩色盒子看事件流日志)`;
+    </script>
+</body>
+</html>

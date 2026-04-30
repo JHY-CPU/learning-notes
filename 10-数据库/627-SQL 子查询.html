@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 子查询</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔍 SQL 子查询</h2><p>标量子查询、行子查询、表子查询、EXISTS/NOT EXISTS、关联子查询、LATERAL JOIN、子查询在 SELECT/FROM/WHERE 中的使用。</p></div>
+    <div class="card">
+        <h2>子查询基础</h2>
+        <div class="code">// ========== 子查询概念 ==========
+-- 子查询: 嵌套在另一个 SQL 中的查询
+-- 外层称"主查询",内层称"子查询"
+-- 子查询总是在主查询之前执行 (通常)
+
+-- ========== 子查询的位置 ==========
+-- SELECT 子句中: 标量子查询
+-- FROM 子句中: 派生表 (派生表)
+-- WHERE 子句中: 行/表子查询
+-- HAVING 子句中: 过滤分组
+-- EXISTS / NOT EXISTS: 存在性检查
+
+-- ========== 子查询返回类型 ==========
+-- 标量子查询: 返回单行单列 (一个值)
+-- 行子查询:   返回单行多列
+-- 表子查询:   返回多行多列
+
+-- ========== 数据 ==========
+-- employees:
+-- id | name  | department | salary | manager_id
+-- 1  | Alice | Engineering| 120000 | NULL
+-- 2  | Bob   | Engineering| 100000 | 1
+-- 3  | Carol | Engineering| 110000 | 1
+-- 4  | Dave  | Sales      | 80000  | 2
+-- 5  | Eve   | Sales      | 90000  | 2
+-- 6  | Frank | Marketing  | 85000  | 3
+-- 7  | Grace | Marketing  | 95000  | 3</div>
+    </div>
+    <div class="card">
+        <h2>标量子查询 (SELECT / WHERE)</h2>
+        <div class="code">// ========== 标量子查询 ==========
+-- 返回单个值的子查询
+-- 可用在 SELECT、WHERE、HAVING 中
+
+-- 1. SELECT 子句中的标量子查询
+-- 每个员工与其部门平均薪资对比
+SELECT
+    name,
+    department,
+    salary,
+    (SELECT AVG(salary)
+     FROM employees e2
+     WHERE e2.department = e1.department
+    ) AS dept_avg,
+    salary - (SELECT AVG(salary)
+              FROM employees e2
+              WHERE e2.department = e1.department
+             ) AS diff
+FROM employees e1;
+
+-- 2. WHERE 中的标量子查询
+-- 薪资高于全公司平均的员工
+SELECT name, salary
+FROM employees
+WHERE salary > (SELECT AVG(salary) FROM employees);
+
+-- 3. 最高薪资员工
+SELECT name, salary
+FROM employees
+WHERE salary = (SELECT MAX(salary) FROM employees);
+
+-- 4. HAVING 中的标量子查询
+-- 部门平均薪资 > 全公司平均
+SELECT department, AVG(salary) AS avg_salary
+FROM employees
+GROUP BY department
+HAVING AVG(salary) > (SELECT AVG(salary) FROM employees);
+
+-- ========== 注意事项 ==========
+-- 标量子查询必须返回一行一列!
+-- 如果返回多行 → 报错
+-- 如果返回 NULL → 结果是 NULL</div>
+    </div>
+    <div class="card">
+        <h2>行子查询与表子查询</h2>
+        <div class="code">// ========== 行子查询 ==========
+-- 返回单行多列 (行构造器)
+
+-- 查找与 Alice 同一部门且同薪资的人
+SELECT name, department, salary
+FROM employees
+WHERE (department, salary) = (
+    SELECT department, salary
+    FROM employees
+    WHERE name = 'Alice'
+);
+
+-- 等价于:
+SELECT name, department, salary
+FROM employees
+WHERE department = 'Engineering'
+  AND salary = 120000;
+
+-- ========== 表子查询 (派生表) ==========
+-- 多行多列,必须用别名
+
+-- 1. FROM 子句中的派生表
+-- 部门平均薪资排名
+SELECT department, avg_salary
+FROM (
+    SELECT department, AVG(salary) AS avg_salary
+    FROM employees
+    GROUP BY department
+) AS dept_stats
+ORDER BY avg_salary DESC;
+
+-- 2. 每个部门薪资最高的员工
+SELECT e.name, e.department, e.salary
+FROM employees e
+JOIN (
+    SELECT department, MAX(salary) AS max_salary
+    FROM employees
+    GROUP BY department
+) AS dept_max ON e.department = dept_max.department
+              AND e.salary = dept_max.max_salary;
+
+-- 3. IN 操作符 + 表子查询
+SELECT name, department
+FROM employees
+WHERE department IN (
+    SELECT DISTINCT department
+    FROM employees
+    WHERE salary > 100000
+);</div>
+    </div>
+    <div class="card">
+        <h2>关联子查询</h2>
+        <div class="code">// ========== 关联子查询 ==========
+-- 子查询引用外层查询的列
+-- 对外层每一行,子查询执行一次
+
+-- 1. 每个部门薪资高于该部门平均的员工
+SELECT e1.name, e1.department, e1.salary
+FROM employees e1
+WHERE e1.salary > (
+    SELECT AVG(e2.salary)
+    FROM employees e2
+    WHERE e2.department = e1.department  -- 关联条件
+)
+ORDER BY e1.department, e1.salary DESC;
+
+-- 2. 每个员工中薪资超过本部门平均的幅度
+SELECT
+    name,
+    department,
+    salary,
+    (SELECT AVG(salary)
+     FROM employees e2
+     WHERE e2.department = e1.department
+    ) AS dept_avg,
+    ROUND(salary - (SELECT AVG(salary)
+                    FROM employees e2
+                    WHERE e2.department = e1.department
+                   ), 2) AS above_avg
+FROM employees e1;
+
+-- ========== 关联子查询 vs JOIN ==========
+-- 关联子查询:
+SELECT e1.*
+FROM employees e1
+WHERE e1.salary > (
+    SELECT AVG(e2.salary)
+    FROM employees e2
+    WHERE e2.department = e1.department
+);
+
+-- 用 JOIN 重写 (通常性能更好):
+SELECT e1.name, e1.department, e1.salary
+FROM employees e1
+JOIN (
+    SELECT department, AVG(salary) AS avg_salary
+    FROM employees
+    GROUP BY department
+) dept_avg ON e1.department = dept_avg.department
+WHERE e1.salary > dept_avg.avg_salary;
+
+-- 关联子查询每行执行一次 → 大表慢
+-- JOIN + 分组 预先计算 → 通常更快</div>
+    </div>
+    <div class="card">
+        <h2>EXISTS / NOT EXISTS</h2>
+        <div class="code">// ========== EXISTS ==========
+-- EXISTS: 子查询有结果则返回 TRUE
+-- 不关心子查询的具体值,只关心是否存在行
+
+-- 1. 有订单的用户
+SELECT u.id, u.name
+FROM users u
+WHERE EXISTS (
+    SELECT 1
+    FROM orders o
+    WHERE o.user_id = u.id
+);
+
+-- 等价于:
+SELECT DISTINCT u.id, u.name
+FROM users u
+JOIN orders o ON u.id = o.user_id;
+
+-- 2. 从未下单的用户 (NOT EXISTS)
+SELECT u.id, u.name
+FROM users u
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM orders o
+    WHERE o.user_id = u.id
+);
+
+-- 等价于 LEFT JOIN + NULL:
+SELECT u.id, u.name
+FROM users u
+LEFT JOIN orders o ON u.id = o.user_id
+WHERE o.id IS NULL;
+
+-- ========== EXISTS vs IN ==========
+-- IN 适合小结果集:
+SELECT * FROM employees
+WHERE department IN ('Engineering', 'Sales');
+
+-- EXISTS 更适合大结果集/关联子查询:
+SELECT * FROM employees e
+WHERE EXISTS (
+    SELECT 1 FROM departments d
+    WHERE d.name = e.department
+    AND d.active = TRUE
+);
+
+-- EXISTS 优势:
+-- 1. 半连接 (SEMI JOIN): 找到第一个匹配即停止
+-- 2. 不产生重复 (不像 JOIN 可能产生)
+-- 3. 可表达更复杂的关系
+
+-- ========== 实际案例 ==========
+-- 找到从未购买过电子产品的用户
+SELECT u.name, u.email
+FROM users u
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM orders o
+    JOIN order_items oi ON o.id = oi.order_id
+    JOIN products p ON oi.product_id = p.id
+    JOIN categories c ON p.category_id = c.id
+    WHERE o.user_id = u.id
+      AND c.name = 'Electronics'
+);</div>
+    </div>
+    <div class="card">
+        <h2>LATERAL JOIN</h2>
+        <div class="code">// ========== LATERAL ==========
+-- LATERAL: 允许子查询引用前面表的列
+-- 类似关联子查询,但以 JOIN 形式
+-- PostgreSQL / MySQL 8.0+ / SQL Server
+
+-- ========== 数据 ==========
+-- orders: id | user_id | amount | created_at
+-- 1  | 1  | 100  | 2024-01-01
+-- 2  | 1  | 200  | 2024-02-01
+-- 3  | 2  | 150  | 2024-01-15
+-- 4  | 2  | 300  | 2024-03-01
+-- 5  | 3  | 50   | 2024-02-15
+
+-- 1. 每个用户最近的一笔订单
+SELECT u.name, latest.order_id, latest.amount, latest.order_date
+FROM users u
+LEFT JOIN LATERAL (
+    SELECT o.id AS order_id, o.amount, o.created_at AS order_date
+    FROM orders o
+    WHERE o.user_id = u.id
+    ORDER BY o.created_at DESC
+    LIMIT 1
+) latest ON true;
+
+-- 2. 每个用户最近的 3 笔订单
+SELECT u.name, recent.order_id, recent.amount
+FROM users u
+CROSS JOIN LATERAL (
+    SELECT o.id AS order_id, o.amount, o.created_at
+    FROM orders o
+    WHERE o.user_id = u.id
+    ORDER BY o.created_at DESC
+    LIMIT 3
+) recent;
+
+-- 3. 每个分类销量前 2 的商品
+SELECT c.name AS category, top.name AS product, top.units_sold
+FROM categories c
+LEFT JOIN LATERAL (
+    SELECT p.name, SUM(oi.quantity) AS units_sold
+    FROM products p
+    JOIN order_items oi ON p.id = oi.product_id
+    WHERE p.category_id = c.id
+    GROUP BY p.id, p.name
+    ORDER BY units_sold DESC
+    LIMIT 2
+) top ON true;
+
+-- ========== LATERAL vs 关联子查询 ==========
+-- 关联子查询: 只能在 SELECT/WHERE 中,返回单值
+-- LATERAL:    可在 FROM 中,返回多行多列
+-- LATERAL:    LIMIT 很方便 (Top-N per group)</div>
+    </div>
+    <div class="card">
+        <h2>子查询实战案例</h2>
+        <div class="code">// ========== 综合案例 ==========
+-- 案例: 员工绩效分析
+
+-- 1. 每个部门的"明星员工"(薪资 > 部门平均 20%)
+SELECT e1.name, e1.department, e1.salary,
+       ROUND((e1.salary - dept_avg.avg_salary) / dept_avg.avg_salary * 100, 1) AS pct_above_avg
+FROM employees e1
+JOIN (
+    SELECT department, AVG(salary) AS avg_salary
+    FROM employees
+    GROUP BY department
+) dept_avg ON e1.department = dept_avg.department
+WHERE e1.salary > dept_avg.avg_salary * 1.2;
+
+-- 2. 跨部门薪资排名 (前 3 名)
+SELECT name, department, salary
+FROM employees
+WHERE salary IN (
+    SELECT DISTINCT salary
+    FROM employees
+    ORDER BY salary DESC
+    LIMIT 3
+)
+ORDER BY salary DESC;
+
+-- (注意: IN + LIMIT 在某些数据库需要包装)
+SELECT name, department, salary
+FROM employees
+WHERE salary IN (
+    SELECT salary FROM (
+        SELECT DISTINCT salary
+        FROM employees
+        ORDER BY salary DESC
+        LIMIT 3
+    ) AS top_salaries
+)
+ORDER BY salary DESC;
+
+-- 3. 薪资高于所有下属的经理
+SELECT e.name AS manager, e.salary
+FROM employees e
+WHERE e.id IN (SELECT DISTINCT manager_id FROM employees WHERE manager_id IS NOT NULL)
+  AND e.salary > ALL (
+      SELECT salary
+      FROM employees
+      WHERE manager_id = e.id
+  );
+
+-- ========== ALL / ANY / SOME ==========
+-- > ALL:   大于子查询中的所有值
+-- > ANY:   大于子查询中的任意一个值
+-- = SOME:  同 IN
+
+-- 薪资高于 Engineering 部门所有人
+SELECT name, salary
+FROM employees
+WHERE salary > ALL (
+    SELECT salary
+    FROM employees
+    WHERE department = 'Engineering'
+);
+
+-- 薪资高于 Engineering 部门任意一人
+SELECT name, salary
+FROM employees
+WHERE salary > ANY (
+    SELECT salary
+    FROM employees
+    WHERE department = 'Engineering'
+);</div>
+        <div class="note">💡 子查询: 标量=单值; 行=单行多列; 表=派生表; 关联子查询引用外层列; EXISTS 检查存在性; LATERAL 实现每组 Top-N; ALL/ANY 子查询比较; 能用 JOIN 替代时通常性能更好。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoScalar()">标量子查询</button>
+        <button onclick="demoExists()">EXISTS 演示</button>
+        <button onclick="demoLateral()">LATERAL 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoScalar() {
+            result.innerHTML = '';
+            log('# 标量子查询');
+            log('');
+            log('SELECT name, salary,');
+            log('    (SELECT AVG(salary) FROM employees e2');
+            log('     WHERE e2.department = e1.department) AS dept_avg');
+            log('FROM employees e1;');
+            log('');
+            log('特点: 返回单个值, 可用在 SELECT/WHERE/HAVING');
+            log('必须返回一行一列, 否则报错');
+        }
+
+        function demoExists() {
+            result.innerHTML = '';
+            log('# EXISTS / NOT EXISTS');
+            log('');
+            log('SELECT * FROM users u');
+            log('WHERE EXISTS (');
+            log('    SELECT 1 FROM orders o');
+            log('    WHERE o.user_id = u.id');
+            log(');');
+            log('');
+            log('EXISTS 只检查是否存在, 不返回值');
+            log('找到第一个匹配即停止 (半连接)');
+            log('NOT EXISTS = 找不匹配行');
+        }
+
+        function demoLateral() {
+            result.innerHTML = '';
+            log('# LATERAL JOIN');
+            log('');
+            log('SELECT u.name, latest.amount');
+            log('FROM users u');
+            log('LEFT JOIN LATERAL (');
+            log('    SELECT o.amount, o.created_at');
+            log('    FROM orders o');
+            log('    WHERE o.user_id = u.id');
+            log('    ORDER BY created_at DESC');
+            log('    LIMIT 1');
+            log(") latest ON true;");
+            log('');
+            log('LATERAL = 关联子查询的 JOIN 形式');
+            log('常用: 每组 Top-N, 最新记录');
+        }
+    </script>
+</body>
+</html>

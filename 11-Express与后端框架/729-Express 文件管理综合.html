@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express 文件管理综合</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📁 Express 文件管理综合</h2><p>文件 Model 设计、文件 CRUD API、图片相册管理、文件搜索与过滤、上传队列与进度、文件版本管理、缩略图生成、访问权限控制、文件分享链接、图片墙展示。</p></div>
+    <div class="card">
+        <h2>文件 Model 设计</h2>
+        <div class="code">// ========== 文件管理 ==========
+// 完整的文件 Model + CRUD + 权限
+
+// ========== 文件 Schema ==========
+const fileSchema = new mongoose.Schema({
+    userId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true,
+        index: true,
+    },
+    // 文件信息
+    name: { type: String, required: true },
+    originalName: { type: String, required: true },
+    mimetype: { type: String, required: true },
+    size: { type: Number, required: true },  // 字节
+
+    // 存储信息
+    storage: {
+        type: String,
+        enum: ['local', 's3', 'minio'],
+        default: process.env.STORAGE_TYPE || 'local',
+    },
+    key: { type: String },         // S3/MinIO key
+    path: { type: String },        // 本地路径
+    url: { type: String },         // 访问 URL
+
+    // 图片专用
+    image: {
+        width: Number,
+        height: Number,
+        thumbnail: String,         // 缩略图 URL
+        blurhash: String,          // 模糊哈希 (占位图)
+        dominantColor: String,     // 主色调
+    },
+
+    // 状态与权限
+    visibility: {
+        type: String,
+        enum: ['private', 'public', 'shared'],
+        default: 'private',
+    },
+    status: {
+        type: String,
+        enum: ['uploading', 'processing', 'ready', 'failed'],
+        default: 'uploading',
+    },
+
+    // 分享
+    shareToken: { type: String, unique: true, sparse: true },
+    shareExpiresAt: Date,
+
+    // 版本
+    version: { type: Number, default: 1 },
+    parentFileId: { type: mongoose.Schema.Types.ObjectId, ref: 'File' },
+
+    // 元数据
+    tags: [String],
+    description: String,
+    album: { type: mongoose.Schema.Types.ObjectId, ref: 'Album' },
+}, { timestamps: true });
+
+// ========== 索引 ==========
+fileSchema.index({ userId: 1, createdAt: -1 });
+fileSchema.index({ userId: 1, mimetype: 1 });  // 按类型过滤
+fileSchema.index({ userId: 1, album: 1 });      // 按相册
+fileSchema.index({ shareToken: 1 }, { unique: true, sparse: true });
+
+// ========== 虚拟字段: 格式化大小 ==========
+fileSchema.virtual('sizeFormatted').get(function () {
+    const bytes = this.size;
+    if (bytes === 0) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(1024));
+    return (bytes / Math.pow(1024, i)).toFixed(1) + ' ' + units[i];
+});
+
+// ========== 虚拟: 文件类型分类 ==========
+fileSchema.virtual('category').get(function () {
+    if (this.mimetype.startsWith('image/')) return 'image';
+    if (this.mimetype.startsWith('video/')) return 'video';
+    if (this.mimetype.startsWith('audio/')) return 'audio';
+    if (this.mimetype.includes('pdf')) return 'document';
+    if (this.mimetype.includes('zip') || this.mimetype.includes('rar')) return 'archive';
+    return 'other';
+});
+
+module.exports = mongoose.model('File', fileSchema);</div>
+    </div>
+    <div class="card">
+        <h2>文件 CRUD API</h2>
+        <div class="code">// ========== 文件服务 ==========
+// routes/files.js
+
+const router = require('express').Router();
+const multer = require('multer');
+const sharp = require('sharp');
+const crypto = require('crypto');
+
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 100 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const allowed = ['image/', 'application/pdf', 'text/'];
+        if (allowed.some(a => file.mimetype.startsWith(a))) {
+            cb(null, true);
+        } else {
+            cb(new Error('File type not allowed'), false);
+        }
+    },
+});
+
+// ========== 上传文件 ==========
+router.post('/files', authenticate, upload.single('file'), async (req, res, next) => {
+    try {
+        const { buffer, originalname, mimetype, size } = req.file;
+
+        // 图片: 生成缩略图
+        let thumbnail;
+        let metadata;
+        if (mimetype.startsWith('image/')) {
+            metadata = await sharp(buffer).metadata();
+
+            // 生成 200px 缩略图
+            const thumbBuffer = await sharp(buffer)
+                .resize(200, 200, { fit: 'cover', position: 'center' })
+                .webp({ quality: 70 })
+                .toBuffer();
+
+            // 保存缩略图
+            const thumbName = `thumb-${Date.now()}.webp`;
+            await fs.promises.writeFile(
+                path.join('uploads/thumbs', thumbName),
+                thumbBuffer
+            );
+            thumbnail = `/uploads/thumbs/${thumbName}`;
+        }
+
+        // 保存文件
+        const filename = `${Date.now()}-${crypto.randomBytes(4).toString('hex')}-${originalname}`;
+        const filePath = path.join('uploads', filename);
+        await fs.promises.writeFile(filePath, buffer);
+
+        // 数据库记录
+        const file = await File.create({
+            userId: req.user.sub,
+            name: filename,
+            originalName: originalname,
+            mimetype,
+            size,
+            path: filePath,
+            url: `/uploads/${filename}`,
+            status: 'ready',
+            image: metadata ? {
+                width: metadata.width,
+                height: metadata.height,
+                thumbnail,
+            } : undefined,
+        });
+
+        res.created(file);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// ========== 文件列表 ==========
+router.get('/files', authenticate, async (req, res) => {
+    const {
+        page = 1, limit = 20,
+        mimetype, album, search,
+        sort = '-createdAt',
+    } = req.query;
+
+    const filter = { userId: req.user.sub };
+
+    if (mimetype) {
+        if (mimetype === 'image') filter.mimetype = /^image\//;
+        else filter.mimetype = new RegExp(mimetype, 'i');
+    }
+    if (album) filter.album = album;
+    if (search) filter.originalName = new RegExp(search, 'i');
+
+    const [files, total] = await Promise.all([
+        File.find(filter).sort(sort)
+            .skip((page - 1) * limit).limit(limit)
+            .lean(),
+        File.countDocuments(filter),
+    ]);
+
+    res.paginated(files, total, { page, limit });
+});
+
+// ========== 文件详情 ==========
+router.get('/files/:id', authenticate, async (req, res) => {
+    const file = await File.findOne({
+        _id: req.params.id,
+        $or: [
+            { userId: req.user.sub },
+            { visibility: 'public' },
+            { shareToken: req.query.share },
+        ],
+    });
+
+    if (!file) throw new NotFoundError('File not found');
+    res.success(file);
+});
+
+// ========== 删除文件 ==========
+router.delete('/files/:id', authenticate, async (req, res) => {
+    const file = await File.findOne({ _id: req.params.id, userId: req.user.sub });
+    if (!file) throw new NotFoundError('File not found');
+
+    // 删除物理文件
+    try {
+        await fs.promises.unlink(file.path);
+        if (file.image?.thumbnail) {
+            await fs.promises.unlink(
+                path.join('uploads/thumbs', path.basename(file.image.thumbnail))
+            );
+        }
+    } catch (err) {
+        // 文件可能已被删除
+    }
+
+    await file.deleteOne();
+    res.noContent();
+});
+
+// ========== 批量操作 ==========
+router.post('/files/batch', authenticate, async (req, res) => {
+    const { action, ids, data } = req.body;
+
+    switch (action) {
+        case 'delete':
+            const files = await File.find({ _id: { $in: ids }, userId: req.user.sub });
+            for (const file of files) {
+                try { await fs.promises.unlink(file.path); } catch {}
+                await file.deleteOne();
+            }
+            return res.success({ deleted: files.length });
+
+        case 'move':
+            await File.updateMany(
+                { _id: { $in: ids }, userId: req.user.sub },
+                { album: data.albumId }
+            );
+            return res.success({ updated: ids.length });
+
+        case 'visibility':
+            await File.updateMany(
+                { _id: { $in: ids }, userId: req.user.sub },
+                { visibility: data.visibility }
+            );
+            return res.success({ updated: ids.length });
+
+        default:
+            throw new BadRequestError('Unknown action');
+    }
+});
+
+// ========== 更新文件信息 ==========
+router.patch('/files/:id', authenticate, async (req, res) => {
+    const allowed = ['tags', 'description', 'album', 'visibility'];
+    const updates = {};
+    for (const field of allowed) {
+        if (req.body[field] !== undefined) updates[field] = req.body[field];
+    }
+
+    const file = await File.findOneAndUpdate(
+        { _id: req.params.id, userId: req.user.sub },
+        { $set: updates },
+        { new: true, runValidators: true }
+    );
+
+    if (!file) throw new NotFoundError('File not found');
+    res.success(file);
+});</div>
+    </div>
+    <div class="card">
+        <h2>文件分享</h2>
+        <div class="code">// ========== 文件分享链接 ==========
+
+const crypto = require('crypto');
+
+// ========== 生成分享链接 ==========
+router.post('/files/:id/share', authenticate, async (req, res) => {
+    const file = await File.findOne({ _id: req.params.id, userId: req.user.sub });
+    if (!file) throw new NotFoundError('File not found');
+
+    const { expiresIn = 86400 * 7 } = req.body;  // 默认 7 天
+
+    // 生成唯一 token
+    const shareToken = crypto.randomBytes(32).toString('hex');
+
+    file.shareToken = shareToken;
+    file.shareExpiresAt = new Date(Date.now() + expiresIn * 1000);
+    file.visibility = 'shared';
+    await file.save();
+
+    const shareUrl = `${req.protocol}://${req.get('host')}/api/share/${shareToken}`;
+
+    res.success({ shareToken, shareUrl, expiresAt: file.shareExpiresAt });
+});
+
+// ========== 访问分享链接 (无需登录) ==========
+router.get('/share/:token', async (req, res) => {
+    const file = await File.findOne({
+        shareToken: req.params.token,
+        shareExpiresAt: { $gt: new Date() },
+    });
+
+    if (!file) throw new NotFoundError('Link expired or invalid');
+
+    // 文件存在本地就流式返回
+    if (file.storage === 'local') {
+        res.setHeader('Content-Type', file.mimetype);
+        res.setHeader('Content-Disposition', `inline; filename="${file.originalName}"`);
+        fs.createReadStream(file.path).pipe(res);
+    } else {
+        // S3 重定向到预签名 URL
+        res.redirect(file.url);
+    }
+});
+
+// ========== 取消分享 ==========
+router.delete('/files/:id/share', authenticate, async (req, res) => {
+    const file = await File.findOne({ _id: req.params.id, userId: req.user.sub });
+    if (!file) throw new NotFoundError('File not found');
+
+    file.shareToken = undefined;
+    file.shareExpiresAt = undefined;
+    file.visibility = 'private';
+    await file.save();
+
+    res.success({ message: 'Share cancelled' });
+});
+
+// ========== 相册管理 ==========
+const albumSchema = new mongoose.Schema({
+    userId: { type: ObjectId, ref: 'User', required: true },
+    name: { type: String, required: true },
+    description: String,
+    coverUrl: String,  // 封面图
+}, { timestamps: true });
+
+const Album = mongoose.model('Album', albumSchema);
+
+// 创建相册
+router.post('/albums', authenticate, async (req, res) => {
+    const album = await Album.create({ ...req.body, userId: req.user.sub });
+    res.created(album);
+});
+
+// 相册列表 (含文件数)
+router.get('/albums', authenticate, async (req, res) => {
+    const albums = await Album.find({ userId: req.user.sub }).lean();
+
+    const albumsWithCount = await Promise.all(albums.map(async (album) => {
+        const count = await File.countDocuments({ album: album._id, userId: req.user.sub });
+        return { ...album, fileCount: count };
+    }));
+
+    res.success(albumsWithCount);
+});
+
+// 相册中的文件
+router.get('/albums/:id/files', authenticate, async (req, res) => {
+    const files = await File.find({
+        album: req.params.id,
+        userId: req.user.sub,
+    }).sort({ createdAt: -1 });
+
+    res.success(files);
+});</div>
+        <div class="note">💡 文件管理要点: File Schema 完整设计 (存储/状态/权限/版本/分享); 图片自动生成缩略图; 分类虚拟字段 (image/video/document/archive); 列表查询 过滤/搜索/排序; 批量操作 (删除/移动/可见性); 分享链接 token + 过期; 相册管理 Album; 文件清理 (物理删除 + 数据库); 权限控制 (自己的/公开的/分享的)。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoModel()">文件 Model</button>
+        <button onclick="demoShare()">分享链接</button>
+        <button onclick="demoAlbum()">相册管理</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoModel() {
+            result.innerHTML = '';
+            log('# 文件 Model 核心字段');
+            log('');
+            log('userId           - 所有者');
+            log('originalName     - 原始文件名');
+            log('mimetype         - 文件类型');
+            log('size             - 大小 (字节)');
+            log('storage          - local/s3/minio');
+            log('url              - 访问 URL');
+            log('status           - uploading/processing/ready');
+            log('visibility       - private/public/shared');
+            log('shareToken       - 分享令牌');
+            log('image.thumbnail  - 缩略图');
+            log('album            - 所属相册');
+            log('tags[]           - 标签');
+        }
+
+        function demoShare() {
+            result.innerHTML = '';
+            log('# 文件分享流程');
+            log('');
+            log('1. POST /files/:id/share');
+            log('   → 生成 shareToken (32字节 hex)');
+            log('   → 设置过期时间');
+            log('   → 返回分享 URL');
+            log('');
+            log('2. 访问 GET /share/:token');
+            log('   → 验证 token + 未过期');
+            log('   → 流式返回文件');
+            log('   → 无需登录!');
+            log('');
+            log('3. DELETE /files/:id/share');
+            log('   → 清除 token');
+            log('   → 链接立即失效');
+        }
+
+        function demoAlbum() {
+            result.innerHTML = '';
+            log('# 相册管理');
+            log('');
+            log('Album Schema:');
+            log('  userId, name, description, coverUrl');
+            log('');
+            log('API:');
+            log('POST   /albums           创建相册');
+            log('GET    /albums           相册列表 (含文件数)');
+            log('GET    /albums/:id/files 相册文件');
+            log('');
+            log('批量操作:');
+            log('POST /files/batch');
+            log('  { action: "move", ids: [...], data: { albumId } }');
+            log('  { action: "delete", ids: [...] }');
+        }
+    </script>
+</body>
+</html>

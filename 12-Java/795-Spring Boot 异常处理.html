@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot 异常处理</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚠️ Spring Boot 异常处理</h2><p>@ControllerAdvice + @ExceptionHandler 全局异常处理、业务异常体系、验证错误处理、ErrorController/ApiError 统一响应。</p></div>
+    <div class="card">
+        <h2>@ControllerAdvice</h2>
+        <div class="code">// ========== @ControllerAdvice ==========
+// 全局异常处理器 (AOP 思想)
+// 拦截所有 Controller 的异常
+
+// ========== 基本用法 ==========
+@RestControllerAdvice                       // @ControllerAdvice + @ResponseBody
+public class GlobalExceptionHandler {
+
+    // ========== 处理特定异常 ==========
+    @ExceptionHandler(ResourceNotFoundException.class)
+    @ResponseStatus(HttpStatus.NOT_FOUND)
+    public ApiResponse&lt;Void&gt; handleNotFound(ResourceNotFoundException e) {
+        log.warn("资源未找到: {}", e.getMessage());
+        return ApiResponse.error(404, e.getMessage());
+    }
+
+    // ========== 参数校验失败 ==========
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse&lt;Map&lt;String, String&gt;&gt; handleValidation(
+            MethodArgumentNotValidException e) {
+        Map&lt;String, String&gt; errors = new HashMap&lt;&gt;();
+        e.getBindingResult().getFieldErrors().forEach(error ->
+            errors.put(error.getField(), error.getDefaultMessage())
+        );
+        return ApiResponse.error(400, "参数校验失败")
+            .withData(errors);           // 字段级错误详情
+    }
+
+    // ========== 参数类型转换错误 ==========
+    @ExceptionHandler(ConstraintViolationException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse&lt;Void&gt; handleConstraintViolation(ConstraintViolationException e) {
+        return ApiResponse.error(400, "参数错误: " + e.getMessage());
+    }
+
+    // ========== HTTP 消息不可读 (JSON 格式错误) ==========
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse&lt;Void&gt; handleHttpMessageNotReadable(HttpMessageNotReadableException e) {
+        return ApiResponse.error(400, "请求体格式错误");
+    }
+
+    // ========== 参数缺失 ==========
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse&lt;Void&gt; handleMissingParam(MissingServletRequestParameterException e) {
+        return ApiResponse.error(400, "缺少必要参数: " + e.getParameterName());
+    }
+
+    // ========== 权限不足 ==========
+    @ExceptionHandler(AccessDeniedException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ApiResponse&lt;Void&gt; handleAccessDenied(AccessDeniedException e) {
+        return ApiResponse.error(403, "没有操作权限");
+    }
+
+    // ========== 兜底: 未知异常 ==========
+    @ExceptionHandler(Exception.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ApiResponse&lt;Void&gt; handleUnknown(Exception e, HttpServletRequest request) {
+        log.error("请求 {} 发生未预期异常", request.getRequestURI(), e);
+        return ApiResponse.error(500, "服务器内部错误");
+    }
+}
+
+// ========== @RestControllerAdvice ==========
+// @ControllerAdvice + @ResponseBody 组合
+// 无需在每个方法上加 @ResponseBody</div>
+    </div>
+    <div class="card">
+        <h2>业务异常体系</h2>
+        <div class="code">// ========== 业务异常体系 ==========
+// 统一业务异常, 带错误码 + HTTP 状态码
+
+// ========== 基础业务异常 ==========
+@Getter
+public class BusinessException extends RuntimeException {
+    private final int code;              // 业务错误码
+    private final String message;        // 错误描述
+    private final HttpStatus httpStatus; // HTTP 状态码
+
+    public BusinessException(int code, String message, HttpStatus httpStatus) {
+        super(message);
+        this.code = code;
+        this.message = message;
+        this.httpStatus = httpStatus;
+    }
+
+    public BusinessException(int code, String message) {
+        this(code, message, HttpStatus.BAD_REQUEST);
+    }
+
+    public ApiResponse&lt;Void&gt; toResponse() {
+        return ApiResponse.error(code, message);
+    }
+}
+
+// ========== 具体异常 ==========
+public class ResourceNotFoundException extends BusinessException {
+    public ResourceNotFoundException(String resource, Object id) {
+        super(404, resource + " 不存在: " + id, HttpStatus.NOT_FOUND);
+    }
+}
+
+public class InvalidOperationException extends BusinessException {
+    public InvalidOperationException(String message) {
+        super(400, message, HttpStatus.BAD_REQUEST);
+    }
+}
+
+public class UnauthorizedException extends BusinessException {
+    public UnauthorizedException(String message) {
+        super(401, message, HttpStatus.UNAUTHORIZED);
+    }
+}
+
+public class ForbiddenException extends BusinessException {
+    public ForbiddenException(String message) {
+        super(403, message, HttpStatus.FORBIDDEN);
+    }
+}
+
+public class DuplicateResourceException extends BusinessException {
+    public DuplicateResourceException(String resource, String field) {
+        super(409, resource + " 的 " + field + " 已存在", HttpStatus.CONFLICT);
+    }
+}
+
+// ========== 业务异常处理器 ==========
+@RestControllerAdvice
+public class BusinessExceptionHandler {
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; handleBusiness(BusinessException e) {
+        log.warn("业务异常: code={}, message={}", e.getCode(), e.getMessage());
+        return ResponseEntity
+            .status(e.getHttpStatus())
+            .body(ApiResponse.error(e.getCode(), e.getMessage()));
+    }
+}
+
+// ========== 使用 ==========
+@Service
+public class UserService {
+
+    public User findById(Long id) {
+        return userRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("用户", id));
+    }
+
+    public User create(User user) {
+        if (userRepository.existsByUsername(user.getUsername())) {
+            throw new DuplicateResourceException("用户", "用户名");
+        }
+        return userRepository.save(user);
+    }
+
+    public void delete(Long id, Long currentUserId) {
+        User user = findById(id);
+        if (!user.getId().equals(currentUserId)) {
+            throw new ForbiddenException("只能删除自己的账号");
+        }
+        userRepository.delete(user);
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>@ControllerAdvice 过滤器</h2>
+        <div class="code">// ========== @ControllerAdvice 作用范围 ==========
+// 默认拦截所有 Controller
+// 可通过参数限定范围
+
+// ========== 限定包范围 ==========
+@RestControllerAdvice(basePackages = "com.example.myapp.controller")
+public class AppExceptionHandler { ... }
+
+// ========== 限定注解 ==========
+@RestControllerAdvice(annotations = RestController.class)
+public class RestExceptionHandler { ... }
+
+// ========== 限定类 ==========
+@RestControllerAdvice(assignableTypes = {UserController.class, OrderController.class})
+public class LimitedHandler { ... }
+
+// ========== 多个 Handler 优先级 ==========
+// 匹配更具体的异常 → 优先级更高
+// 范围更小的 Handler → 优先级更高
+// 可覆盖: @Order(Ordered.HIGHEST_PRECEDENCE)
+
+@Order(1)
+@RestControllerAdvice
+public class SpecificHandler { ... }         // 高优先级
+
+@Order(2)
+@RestControllerAdvice
+public class GeneralHandler { ... }          // 低优先级
+
+// ========== ErrorController ==========
+// 处理 Spring 底层错误 (404, 500 等)
+// 替代 Spring Boot 默认 Whitelabel 错误页
+
+@Component
+public class CustomErrorController implements ErrorController {
+
+    @RequestMapping("/error")
+    public ApiResponse&lt;Void&gt; handleError(HttpServletRequest request) {
+        Integer status = (Integer) request.getAttribute(
+            RequestDispatcher.ERROR_STATUS_CODE);
+        String message = (String) request.getAttribute(
+            RequestDispatcher.ERROR_MESSAGE);
+
+        if (status == null) {
+            status = 500;
+        }
+        return ApiResponse.error(status, message != null ? message : "未知错误");
+    }
+}
+
+// ========== 或使用 ErrorAttributes ==========
+@Component
+public class CustomErrorController implements ErrorController {
+
+    private final ErrorAttributes errorAttributes;
+
+    public CustomErrorController(ErrorAttributes errorAttributes) {
+        this.errorAttributes = errorAttributes;
+    }
+
+    @RequestMapping("/error")
+    public ApiResponse&lt;Void&gt; handleError(HttpServletRequest request) {
+        Map&lt;String, Object&gt; errors = errorAttributes.getErrorAttributes(
+            request, ErrorAttributeOptions.defaults());
+        int status = (int) errors.getOrDefault("status", 500);
+        String message = (String) errors.getOrDefault("error", "未知错误");
+        return ApiResponse.error(status, message);
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>验证错误处理</h2>
+        <div class="code">// ========== 验证错误详细处理 ==========
+
+// ========== 字段级错误 ==========
+@RestControllerAdvice
+public class ValidationHandler {
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ApiResponse&lt;List&lt;FieldError&gt;&gt; handleValidation(
+            MethodArgumentNotValidException e) {
+
+        List&lt;FieldError&gt; fieldErrors = e.getBindingResult()
+            .getFieldErrors()
+            .stream()
+            .map(error -> new FieldError(
+                error.getField(),
+                error.getDefaultMessage(),
+                error.getRejectedValue()
+            ))
+            .collect(Collectors.toList());
+
+        return ApiResponse.&lt;List&lt;FieldError&gt;&gt;builder()
+            .code(400)
+            .message("参数校验失败")
+            .data(fieldErrors)
+            .build();
+    }
+
+    @Data
+    @AllArgsConstructor
+    public static class FieldError {
+        private String field;
+        private String message;
+        private Object rejectedValue;
+    }
+}
+
+// ========== 验证分组错误 ==========
+@ExceptionHandler(ConstraintViolationException.class)
+@ResponseStatus(HttpStatus.BAD_REQUEST)
+public ApiResponse&lt;List&lt;String&gt;&gt; handleConstraintViolation(
+        ConstraintViolationException e) {
+    List&lt;String&gt; errors = e.getConstraintViolations()
+        .stream()
+        .map(v -> v.getPropertyPath() + ": " + v.getMessage())
+        .collect(Collectors.toList());
+    return ApiResponse.error(400, "参数校验失败")
+        .withData(errors);
+}
+
+// ========== BindException (@ModelAttribute 校验) ==========
+@ExceptionHandler(BindException.class)
+@ResponseStatus(HttpStatus.BAD_REQUEST)
+public ApiResponse&lt;Void&gt; handleBindException(BindException e) {
+    String message = e.getFieldErrors().stream()
+        .map(error -> error.getField() + ": " + error.getDefaultMessage())
+        .collect(Collectors.joining(", "));
+    return ApiResponse.error(400, message);
+}
+
+// ========== 统一日志记录 ==========
+// 使用 AOP 统一记录异常
+@Aspect
+@Component
+public class ExceptionLogAspect {
+
+    @AfterThrowing(pointcut = "execution(* com.example..*.*(..))", throwing = "e")
+    public void logException(JoinPoint joinPoint, Exception e) {
+        if (!(e instanceof BusinessException)) {
+            log.error("方法 {} 抛出异常: {}",
+                joinPoint.getSignature().toShortString(), e.getMessage(), e);
+        }
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>最佳实践</h2>
+        <div class="code">// ========== 异常处理最佳实践 ==========
+
+// ========== 1. 使用业务异常体系 ==========
+// BusinessException(code, message, httpStatus)
+// 区分: 4xx = 客户端错误, 5xx = 服务端错误
+// 业务异常用 WARN 级别, 系统异常用 ERROR 级别
+
+// ========== 2. 统一响应格式 ==========
+// 所有异常返回相同的 ApiResponse 结构
+// {
+//   "code": 400,
+//   "message": "参数校验失败",
+//   "data": { "field": "username", "message": "不能为空" },
+//   "timestamp": 1714389000000
+// }
+
+// ========== 3. 精准的 HTTP 状态码 ==========
+// 400 — 参数错误/校验失败
+// 401 — 未认证
+// 403 — 无权限
+// 404 — 资源不存在
+// 409 — 冲突 (重复)
+// 422 — 业务逻辑错误
+// 429 — 请求太频繁
+// 500 — 服务器内部错误
+
+// ========== 4. 参数校验详细 ==========
+// 返回哪个字段错了、为什么错、拒绝的值
+// 方便前端定位问题
+
+// ========== 5. 记录足够上下文 ==========
+// 日志中包含: 请求 URL, 参数, 用户 ID, 异常详情
+// 方便排查问题
+
+// ========== 6. 安全 ==========
+// 生产环境不暴露异常堆栈和内部信息
+// 500 错误返回通用信息 "服务器内部错误"
+// 使用 @Profile 区分环境
+
+@RestControllerAdvice
+public class ProdExceptionHandler {
+
+    @ExceptionHandler(Exception.class)
+    @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
+    public ApiResponse&lt;Void&gt; handleUnknown(Exception e, HttpServletRequest request) {
+        log.error("请求 {} 异常", request.getRequestURI(), e);
+        return ApiResponse.error(500, "服务器内部错误");  // 不暴露细节
+    }
+}
+
+// ========== 7. 验证顺序 ==========
+// 先声明式校验 (@Valid) → 业务异常 → 兜底异常</div>
+        <div class="note">💡 异常处理要点: @ControllerAdvice/@RestControllerAdvice 全局处理; @ExceptionHandler 指定异常类型; BusinessException 统一业务异常 (code/message/httpStatus); 参数校验 MethodArgumentNotValidException 返回字段级错误; 404/403/400/500 精准状态码; 兜底 Exception 避免未处理异常; 生产环境隐藏堆栈。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoGlobal()">全局异常处理</button>
+        <button onclick="demoBiz()">业务异常</button>
+        <button onclick="demoValid()">校验异常</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoGlobal() {
+            result.innerHTML = '';
+            log('# @ControllerAdvice');
+            log('');
+            log('作用: 统一处理 Controller 异常');
+            log('');
+            log('常用处理方法:');
+            log('  handleNotFound     → 404');
+            log('  handleValidation   → 400 (字段错误)');
+            log('  handleAccessDenied → 403');
+            log('  handleUnknown      → 500 (兜底)');
+            log('');
+            log('@RestControllerAdvice = @ControllerAdvice + @ResponseBody');
+        }
+
+        function demoBiz() {
+            result.innerHTML = '';
+            log('# 业务异常体系');
+            log('');
+            log('BusinessException extends RuntimeException');
+            log('  属性: code + message + httpStatus');
+            log('');
+            log('具体异常:');
+            log('  ResourceNotFoundException    → 404');
+            log('  UnauthorizedException       → 401');
+            log('  ForbiddenException          → 403');
+            log('  InvalidOperationException   → 400');
+            log('  DuplicateResourceException  → 409');
+            log('');
+            log('使用: throw new ResourceNotFoundException("用户", id)');
+        }
+
+        function demoValid() {
+            result.innerHTML = '';
+            log('# 校验异常处理');
+            log('');
+            log('MethodArgumentNotValidException:');
+            log('  包含 BindingResult → 字段级错误');
+            log('  返回: field + message + rejectedValue');
+            log('');
+            log('ConstraintViolationException:');
+            log('  @PathVariable/@RequestParam 校验');
+            log('');
+            log('BindException:');
+            log('  @ModelAttribute 绑定错误');
+        }
+    </script>
+</body>
+</html>

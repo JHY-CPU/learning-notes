@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>24-斐波那契查找 (Fibonacci Search)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; white-space: pre-wrap; }
+</style></head>
+<body>
+<div class="card">
+  <h2>斐波那契查找 (Fibonacci Search)</h2>
+  <p>斐波那契查找基于斐波那契数列进行分割，使用黄金比例（约 0.618）决定查找位置，是二分查找的一种变体。</p>
+  <div class="note">
+    <strong>与二分查找的区别：</strong>斐波那契查找只用加/减法运算确定分割点（二分查找需要除法/移位），在有些平台上可能更快。
+  </div>
+</div>
+
+<div class="card">
+  <h2>斐波那契数列</h2>
+  <div class="code">F(0) = 0
+F(1) = 1
+F(n) = F(n-1) + F(n-2)
+
+前几项：0, 1, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144...</div>
+</div>
+
+<div class="card">
+  <h2>算法步骤</h2>
+  <ol>
+    <li>找到大于等于数组长度的最小斐波那契数 F(k)</li>
+    <li>将数组长度扩展到 F(k) - 1（补最后一个元素）</li>
+    <li>设置两个斐波那契指针：fibK = F(k), fibK1 = F(k-1), fibK2 = F(k-2)</li>
+    <li>检查位置 index = min(offset + fibK2, n-1)：</li>
+    <ul>
+      <li>如果 target = arr[index]，返回 index</li>
+      <li>如果 target > arr[index]，在右侧查找（调整 fibK1, fibK2）</li>
+      <li>如果 target < arr[index]，在左侧查找</li>
+    </ul>
+  </ol>
+</div>
+
+<div class="card">
+  <h2>代码实现</h2>
+  <pre>function fibonacciSearch(arr, target) {
+  const n = arr.length;
+  let fibK2 = 0, fibK1 = 1, fibK = fibK2 + fibK1;
+
+  while (fibK < n) {
+    fibK2 = fibK1;
+    fibK1 = fibK;
+    fibK = fibK2 + fibK1;
+  }
+
+  let offset = -1;
+  while (fibK > 1) {
+    const i = Math.min(offset + fibK2, n - 1);
+    if (arr[i] < target) {
+      fibK = fibK1;
+      fibK1 = fibK2;
+      fibK2 = fibK - fibK1;
+      offset = i;
+    } else if (arr[i] > target) {
+      fibK = fibK2;
+      fibK1 = fibK1 - fibK2;
+      fibK2 = fibK - fibK1;
+    } else {
+      return i;
+    }
+  }
+  if (fibK1 === 1 && arr[offset + 1] === target) return offset + 1;
+  return -1;
+}</pre>
+</div>
+
+<div class="card">
+  <h2>交互演示</h2>
+  <button onclick="runFibonacciSearch()">运行斐波那契查找</button>
+  <div id="result"></div>
+</div>
+
+<script>
+function fibonacciSearch(arr, target) {
+  const n = arr.length;
+  let fibK2 = 0, fibK1 = 1, fibK = fibK2 + fibK1;
+  const steps = [];
+
+  while (fibK < n) {
+    fibK2 = fibK1;
+    fibK1 = fibK;
+    fibK = fibK2 + fibK1;
+  }
+  steps.push('最小斐波那契数 F(k)=' + fibK + '，F(k-1)=' + fibK1 + '，F(k-2)=' + fibK2);
+
+  let offset = -1;
+  while (fibK > 1) {
+    const i = Math.min(offset + fibK2, n - 1);
+    steps.push('检查位置 ' + i + '（arr[' + i + ']=' + arr[i] + '）');
+    if (arr[i] < target) {
+      steps.push(arr[i] + ' < ' + target + '，向右查找');
+      fibK = fibK1;
+      fibK1 = fibK2;
+      fibK2 = fibK - fibK1;
+      offset = i;
+    } else if (arr[i] > target) {
+      steps.push(arr[i] + ' > ' + target + '，向左查找');
+      fibK = fibK2;
+      fibK1 = fibK1 - fibK2;
+      fibK2 = fibK - fibK1;
+    } else {
+      steps.push('找到目标 ' + target + ' 在位置 ' + i);
+      return { index: i, steps };
+    }
+  }
+  if (fibK1 === 1 && arr[offset + 1] === target) {
+    steps.push('找到目标 ' + target + ' 在位置 ' + (offset + 1));
+    return { index: offset + 1, steps };
+  }
+  steps.push('未找到目标 ' + target);
+  return { index: -1, steps };
+}
+
+function runFibonacciSearch() {
+  const arr = Array.from({length: 15}, (_, i) => i * 3 + Math.floor(Math.random() * 3));
+  arr.sort((a, b) => a - b);
+  const target = arr[Math.floor(Math.random() * arr.length)];
+
+  // 有时也让查找不存在的元素
+  const useMissing = Math.random() > 0.7;
+  const finalTarget = useMissing ? arr[arr.length - 1] + 7 : target;
+
+  const result = fibonacciSearch(arr, finalTarget);
+  const el = document.getElementById('result');
+
+  let html = '<strong>有序数组：</strong>[' + arr.join(', ') + ']<br>';
+  html += '<strong>查找目标：</strong>' + finalTarget + '<br><br>';
+  html += '<strong>查找过程：</strong><br>';
+  html += result.steps.map(s => '&emsp;' + s).join('<br>');
+  html += '<br><br><strong>查找结果：</strong>' +
+    (result.index !== -1 ? '下标 ' + result.index + '，值 ' + arr[result.index] : '未找到');
+
+  document.getElementById('result').innerHTML = html;
+}
+</script>
+</body></html>

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>宏任务与微任务</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #c0392b; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>宏任务与微任务</h2><p>JavaScript 的事件循环机制：微任务优先于宏任务执行。</p></div>
+    <div class="card">
+        <h2>事件循环（Event Loop）</h2>
+        <div class="code">// JavaScript 单线程，通过事件循环处理异步任务
+
+// 调用栈（Call Stack）：
+//   执行同步代码，函数调用入栈/出栈
+
+// 宏任务队列（Macro Task Queue / Task Queue）：
+//   存放 setTimeout, setInterval, I/O, UI 渲染, 事件回调等
+
+// 微任务队列（Micro Task Queue）：
+//   存放 Promise.then/catch/finally, MutationObserver,
+//   queueMicrotask, async/await 等
+
+// 事件循环循环过程：
+// 1. 执行一个宏任务（从宏任务队列取出）
+// 2. 执行所有微任务（清空微任务队列）
+// 3. 执行 UI 渲染（需要时）
+// 4. 回到第1步
+
+// ⭐ 关键：每执行完一个宏任务，立即清空所有微任务
+// 微任务优先级高于下一个宏任务</div>
+    </div>
+    <div class="card">
+        <h2>执行顺序示例</h2>
+        <div class="code">console.log('1. 同步代码开始');
+
+setTimeout(() => {
+    console.log('6. 宏任务 setTimeout');
+}, 0);
+
+Promise.resolve().then(() => {
+    console.log('4. 微任务 Promise.then');
+});
+
+queueMicrotask(() => {
+    console.log('5. 另一个微任务');
+});
+
+console.log('2. 同步代码中间');
+
+// 嵌套 promise
+Promise.resolve().then(() => {
+    console.log('微任务3');
+});
+
+console.log('3. 同步代码结束');
+
+// 输出顺序：
+// 1. 同步代码开始
+// 2. 同步代码中间
+// 3. 同步代码结束
+// 4. 微任务 Promise.then
+// 5. 另一个微任务（microtask）
+// 微任务3
+// 6. 宏任务 setTimeout
+
+// 解释：
+// 1) 执行所有同步代码（调用栈清空）
+// 2) 清空微任务队列（所有 Promise.then/microtask）
+// 3) 执行下一个宏任务（setTimeout）</div>
+    </div>
+    <div class="card">
+        <h2>宏任务类型</h2>
+        <div class="code">// 常见的宏任务（Macro Task）：
+// setTimeout      — 定时器
+// setInterval     — 间隔执行
+// setImmediate    — Node.js 立即执行
+// I/O             — 文件/网络操作（Node.js）
+// UI 渲染         — 浏览器渲染
+// requestAnimationFrame — 下次重绘前执行
+// 事件回调        — click, mouse 等 DOM 事件
+
+// 每个宏任务之间，浏览器可能会渲染 UI
+setTimeout(() => console.log('宏任务1'), 0);
+setTimeout(() => console.log('宏任务2'), 0);
+// 宏任务1 → 微任务 → 渲染 → 宏任务2 → 微任务 → 渲染</div>
+    </div>
+    <div class="card">
+        <h2>微任务类型</h2>
+        <div class="code">// 常见的微任务（Micro Task）：
+// Promise.then/catch/finally
+// async/await 后续代码
+// queueMicrotask(fn)
+// MutationObserver（监听 DOM 变化）
+// process.nextTick（Node.js，优先级比 Promise.then 还高）
+
+// queueMicrotask — 显式创建微任务
+queueMicrotask(() => {
+    console.log('这是一个微任务');
+});
+
+// 微任务可以派生子微任务
+Promise.resolve().then(() => {
+    console.log('微任务1');
+    Promise.resolve().then(() => {
+        console.log('微任务2（微任务1 派生的）');
+    });
+    console.log('微任务1 同步部分');
+});
+// 输出：微任务1 → 微任务1 同步部分 → 微任务2
+// 因为微任务队列是"清空"，新加的微任务也会在当前批次执行</div>
+    </div>
+    <div class="card">
+        <h2>经典面试题</h2>
+        <div class="code">// 题目1
+console.log(1);
+
+setTimeout(() => console.log(2), 0);
+
+Promise.resolve().then(() => console.log(3));
+
+console.log(4);
+// 答案：1, 4, 3, 2
+
+// 题目2（微任务派生）
+console.log('A');
+
+setTimeout(() => console.log('B'), 0);
+
+Promise.resolve()
+    .then(() => {
+        console.log('C');
+        Promise.resolve().then(() => console.log('D'));
+    })
+    .then(() => console.log('E'));
+
+console.log('F');
+// A, F    — 同步
+// C, D, E — 微任务（C → 注册 D → E → D 在本轮清空）
+// B       — 下一个宏任务
+
+// 实际输出：A, F, C, D, E, B
+// 注意：第二个 .then 是在第一个 .then 返回后才注册的
+// 但 D 是在 C 的 then 回调中注册的
+// 微任务队列会持续清空，所以 D 也在本轮</div>
+    </div>
+    <div class="card">
+        <h2>async/await 与微任务</h2>
+        <div class="code">// await 后面的代码相当于 Promise.then 的微任务
+
+async function foo() {
+    console.log('2. foo 开始');
+    await bar();
+    console.log('5. foo 中 await 之后（微任务）');
+}
+
+async function bar() {
+    console.log('3. bar 执行');
+}
+
+console.log('1. 同步开始');
+foo();
+console.log('4. 同步结束');
+
+// 输出顺序：
+// 1. 同步开始
+// 2. foo 开始
+// 3. bar 执行
+// 4. 同步结束
+// 5. foo 中 await 之后（微任务）
+
+// async 函数中 await 之前的代码是同步执行的
+// await 之后的代码相当于 then 回调（微任务）</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== 执行顺序演示 ===');
+        console.log('1. 同步代码');
+
+        setTimeout(() => {
+            console.log('6. setTimeout 宏任务');
+        }, 0);
+
+        Promise.resolve().then(() => {
+            console.log('4. Promise.then 微任务（第一批）');
+        });
+
+        queueMicrotask(() => {
+            console.log('5. queueMicrotask 微任务（第一批）');
+        });
+
+        Promise.resolve().then(() => {
+            console.log('微任务（第一批）');
+        });
+
+        console.log('2. 同步代码');
+
+        // 再注册一个 setTimeout
+        setTimeout(() => {
+            console.log('7. 第二个 setTimeout 宏任务');
+        }, 0);
+
+        console.log('3. 同步代码结束');
+
+        console.log('=== async/await 顺序 ===');
+        async function test() {
+            console.log('  async 函数开始（同步）');
+            await Promise.resolve();
+            console.log('  await 之后（微任务）');
+        }
+        test();
+        console.log('  async 调用后的同步代码');
+
+        console.log('=== 微任务派生微任务 ===');
+        Promise.resolve()
+            .then(() => {
+                console.log('  then1');
+                Promise.resolve().then(() => console.log('  then1 派生的 then'));
+            })
+            .then(() => console.log('  then2（then1 返回后注册）'));
+        // 注意：then2 是在 then1 回调执行后才注册到微任务队列的
+        // 但微任务会持续清空，所以 then1 派生和 then2 都在同一轮
+
+        document.getElementById('output').textContent =
+            `同步优先 → 微任务 → 宏任务\n` +
+            `setTimeout 是宏任务\n` +
+            `Promise.then 是微任务\n` +
+            `✅ 宏任务与微任务演示完成！\n` +
+            `(请看控制台输出顺序)`;
+    </script>
+</body>
+</html>

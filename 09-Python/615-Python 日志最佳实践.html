@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python 日志最佳实践</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📝 Python 日志最佳实践</h2><p>logging 深入 (Filter/Adapter)、结构化日志、日志轮转、异步日志 (aiologger)、集成 Elastic Stack、生产配置。</p></div>
+    <div class="card">
+        <h2>Logger 命名与继承</h2>
+        <div class="code">// ========== Logger 层级 ==========
+import logging
+
+# Logger 按名称层级组织,点号分隔
+# root → myapp → myapp.api → myapp.api.users
+
+# 创建层级 logger:
+logging.getLogger()           # root logger
+logging.getLogger("myapp")     # myapp
+logging.getLogger("myapp.api") # myapp 的子 logger
+
+# 日志传播: 子 logger 默认将日志传给父 logger
+logger = logging.getLogger("myapp.api.users")
+logger.info("消息")  # → myapp.api.users → myapp.api → myapp → root
+
+# 阻止传播:
+logger.propagate = False  # 日志不传给父 logger
+
+# ========== 推荐模式 ==========
+# 每个模块使用 __name__ 作为 logger 名称
+# __name__ 自动包含包路径
+
+# myapp/api/users.py:
+logger = logging.getLogger(__name__)
+# logger name = "myapp.api.users"
+
+logger.info("用户模块启动")
+logger.warning("配置缺失")
+
+# main.py:
+logging.basicConfig(level=logging.INFO)
+# 所有子 logger 自动继承 root 的配置</div>
+    </div>
+    <div class="card">
+        <h2>Filter 过滤器</h2>
+        <div class="code">// ========== Filter ==========
+import logging
+
+# Filter: 精细化控制哪些日志被记录
+
+# 1. 级别过滤:
+class LevelFilter(logging.Filter):
+    """只允许特定级别的日志"""
+
+    def __init__(self, min_level, max_level=None):
+        super().__init__()
+        self.min_level = min_level
+        self.max_level = max_level or float("inf")
+
+    def filter(self, record):
+        return self.min_level <= record.levelno <= self.max_level
+
+handler = logging.StreamHandler()
+handler.addFilter(LevelFilter(logging.WARNING, logging.ERROR))
+# 只输出 WARNING 和 ERROR 级别的日志
+
+# 2. 内容过滤:
+class SensitiveFilter(logging.Filter):
+    """过滤敏感信息"""
+
+    def filter(self, record):
+        # 替换信用卡号
+        if hasattr(record, "msg"):
+            record.msg = record.msg.replace(
+                r"\d{16}", "****-****-****-****"
+            )
+        return True
+
+# 3. 上下文过滤:
+class RequestFilter(logging.Filter):
+    """自动添加请求上下文"""
+
+    def filter(self, record):
+        record.ip = getattr(thread_local, "ip", "unknown")
+        record.user = getattr(thread_local, "user", "anonymous")
+        return True
+
+# 使用:
+handler.addFilter(SensitiveFilter())</div>
+    </div>
+    <div class="card">
+        <h2>结构化日志</h2>
+        <div class="code">// ========== 结构化日志 ==========
+import logging
+import json
+
+# 结构化日志: JSON 格式,便于日志分析系统
+
+class JSONFormatter(logging.Formatter):
+    """JSON 日志格式化器"""
+
+    def format(self, record):
+        log_data = {
+            "timestamp": self.formatTime(record),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+
+        # 添加异常信息
+        if record.exc_info:
+            log_data["exception"] = self.formatException(record.exc_info)
+
+        # 添加自定义字段
+        for key, value in record.__dict__.items():
+            if key not in ("args", "asctime", "created", "exc_info",
+                          "exc_text", "filename", "funcName", "levelname",
+                          "levelno", "lineno", "module", "msecs",
+                          "message", "msg", "name", "pathname",
+                          "process", "processName", "relativeCreated",
+                          "stack_info", "thread", "threadName"):
+                log_data[key] = value
+
+        return json.dumps(log_data, ensure_ascii=False)
+
+# 配置:
+handler = logging.StreamHandler()
+handler.setFormatter(JSONFormatter())
+logger = logging.getLogger("myapp")
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+
+# 使用 extra 添加自定义字段:
+logger.info("用户登录", extra={
+    "user_id": 123,
+    "ip": "192.168.1.1",
+    "action": "login",
+})
+# {"timestamp": "...", "level": "INFO", "user_id": 123, "ip": "192.168.1.1", ...}
+
+# ========== structlog 库 ==========
+# pip install structlog
+import structlog
+
+logger = structlog.get_logger()
+logger.info("user_login", user_id=123, ip="192.168.1.1")</div>
+    </div>
+    <div class="card">
+        <h2>日志轮转</h2>
+        <div class="code">// ========== 日志轮转 ==========
+import logging
+from logging.handlers import (
+    RotatingFileHandler,
+    TimedRotatingFileHandler,
+    WatchedFileHandler,
+)
+
+# 1. 按大小轮转
+handler = RotatingFileHandler(
+    "app.log",
+    maxBytes=10 * 1024 * 1024,  # 10 MB
+    backupCount=5,               # 保留 5 个备份
+    encoding="utf-8",
+)
+# 文件: app.log → app.log.1 → app.log.2 → ... → app.log.5
+
+# 2. 按时间轮转
+handler = TimedRotatingFileHandler(
+    "app.log",
+    when="midnight",        # 每天午夜轮转
+    # when="H",             # 每小时
+    # when="W0",            # 每周一
+    interval=1,
+    backupCount=30,         # 保留 30 天
+    encoding="utf-8",
+)
+# 文件: app.log → app.log.2024-01-01 → app.log.2024-01-02 → ...
+
+# 3. 生产配置示例
+LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+formatter = logging.Formatter(LOG_FORMAT, DATE_FORMAT)
+
+# 文件 handler (INFO+, 按天轮转)
+file_handler = TimedRotatingFileHandler(
+    "logs/app.log",
+    when="midnight",
+    backupCount=90,
+    encoding="utf-8",
+)
+file_handler.setLevel(logging.INFO)
+file_handler.setFormatter(formatter)
+
+# 错误 handler (WARNING+, 单独文件)
+error_handler = TimedRotatingFileHandler(
+    "logs/error.log",
+    when="midnight",
+    backupCount=90,
+)
+error_handler.setLevel(logging.WARNING)
+error_handler.setFormatter(formatter)
+
+# 控制台 handler (开发用)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.DEBUG)
+console_handler.setFormatter(formatter)
+
+# 配置 root logger
+logging.basicConfig(
+    level=logging.INFO,
+    handlers=[file_handler, error_handler, console_handler],
+)</div>
+    </div>
+    <div class="card">
+        <h2>项目日志配置</h2>
+        <div class="code">// ========== 项目级日志配置 ==========
+import logging
+import logging.config
+import json
+
+# ========== dictConfig (推荐) ==========
+LOGGING_CONFIG = {
+    "version": 1,
+    "disable_existing_loggers": False,
+
+    "formatters": {
+        "standard": {
+            "format": "%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        },
+        "json": {
+            "()": "your_module.JSONFormatter",  # 自定义格式化器
+        },
+    },
+
+    "filters": {
+        "sensitive": {
+            "()": "your_module.SensitiveFilter",
+        },
+    },
+
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "level": "DEBUG",
+            "formatter": "standard",
+        },
+        "file": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "level": "INFO",
+            "formatter": "json",
+            "filename": "logs/app.log",
+            "when": "midnight",
+            "backupCount": 30,
+            "encoding": "utf-8",
+        },
+        "error_file": {
+            "class": "logging.handlers.TimedRotatingFileHandler",
+            "level": "WARNING",
+            "formatter": "json",
+            "filename": "logs/error.log",
+            "when": "midnight",
+            "backupCount": 90,
+        },
+    },
+
+    "loggers": {
+        "myapp": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "myapp.api": {
+            "handlers": ["console", "file", "error_file"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+        "uvicorn": {  # FastAPI 的日志
+            "handlers": ["console"],
+            "level": "INFO",
+        },
+    },
+
+    "root": {
+        "handlers": ["console", "file"],
+        "level": "WARNING",
+    },
+}
+
+logging.config.dictConfig(LOGGING_CONFIG)</div>
+        <div class="note">💡 日志最佳实践: 每个模块用 __name__ 做 logger 名; JSON 结构化日志方便分析; TimedRotatingFileHandler 按天轮转; dictConfig 统一配置; Filter 过滤敏感信息; extra 添加上下文。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoConfig()">配置演示</button>
+        <button onclick="demoJSON()">JSON 日志演示</button>
+        <button onclick="demoRotate()">轮转演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoConfig() {
+            result.innerHTML = '';
+            log('# 日志配置');
+            log('');
+            log('logger = logging.getLogger(__name__)');
+            log('');
+            log('dictConfig:');
+            log("  formatters: standard/json");
+            log("  handlers: console/file/error_file");
+            log("  loggers: myapp (INFO)");
+            log("  root: WARNING");
+        }
+
+        function demoJSON() {
+            result.innerHTML = '';
+            log('# 结构化日志');
+            log('');
+            log('{"timestamp": "2024-01-01",');
+            log(' "level": "INFO",');
+            log(' "logger": "myapp.api",');
+            log(' "message": "User login",');
+            log(' "user_id": 123,');
+            log(' "ip": "192.168.1.1"}');
+            log('');
+            log('优点: 可搜索/可分析/可告警');
+        }
+
+        function demoRotate() {
+            result.innerHTML = '';
+            log('# 日志轮转');
+            log('');
+            log('按大小:');
+            log('  RotatingFileHandler(maxBytes=10MB, backupCount=5)');
+            log('');
+            log('按时间:');
+            log("  TimedRotatingFileHandler(when='midnight', backupCount=30)");
+            log('');
+            log('单独的错误日志:');
+            log('  error.log (WARNING+)');
+        }
+    </script>
+</body>
+</html>

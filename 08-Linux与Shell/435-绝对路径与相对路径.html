@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>绝对路径与相对路径</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📌 绝对路径与相对路径</h2><p>绝对路径、相对路径、路径解析规则、路径最佳实践、符号链接路径。</p></div>
+    <div class="card">
+        <h2>绝对路径</h2>
+        <p>绝对路径从根目录 / 开始，完整描述文件在文件系统中的位置，在任何位置都可访问。</p>
+        <div class="code">// ========== 绝对路径 ==========
+// 以 / 开头,从根目录到目标文件的完整路径
+//
+// /home/alice/projects/backend/app.js
+// ─┬── ───┬─── ───┬──── ───┬───
+// 根    用户   项目     文件
+//
+// 特点:
+//   - 总是以 / 开头
+//   - 在任何目录下都有效
+//   - 唯一标识一个文件
+//
+// 示例:
+//   /etc/nginx/nginx.conf
+//   /var/log/syslog
+//   /usr/local/bin/node
+
+// ========== 相对路径 ==========
+// 相对于当前工作目录的路径
+// 不以 / 开头
+//
+// 假设当前在 /home/alice/projects:
+//
+// 相对路径              绝对路径
+// backend/app.js  =  /home/alice/projects/backend/app.js
+// ../downloads    =  /home/alice/downloads
+// ./README.md     =  /home/alice/projects/README.md
+// ../../etc       =  /home/etc
+
+// ========== 路径组成 ==========
+// .   当前目录引用
+// ..  父目录引用
+// /   路径分隔符 (Linux/macOS)
+//     注意: Windows 用 \ 但 Linux 也用 /</div>
+    </div>
+    <div class="card">
+        <h2>路径解析规则</h2>
+        <div class="code">// ========== 路径解析规则 ==========
+// Linux 按以下规则解析路径:
+//
+// 1. 如果以 / 开头 → 绝对路径
+// 2. 否则 → 从当前目录开始
+// 3. 按 / 分割路径组件
+// 4. 按顺序解析每个组件
+// 5. . 表示当前目录
+// 6. .. 表示父目录
+// 7. 符号链接按指向解析
+//
+// ========== 路径简化的例子 ==========
+// 假设当前: /home/alice/projects
+//
+// path = "backend/app.js"
+// → /home/alice/projects/backend/app.js
+//
+// path = "../downloads/file.txt"
+// → /home/alice/downloads/file.txt
+//
+// path = "../../etc/hosts"
+// → /etc/hosts
+//
+// path = "./././file"
+// → /home/alice/projects/file
+
+// ========== 常见错误 ==========
+// ❌ /home/alice//projects    (双斜杠,但通常也能工作)
+// ❌ /home/alice/./projects   (多余 ./, 能工作但不简洁)
+// ❌ /home/alice/../bob       (能工作但可读性差)
+// ✅ 使用 clean paths: /home/bob/projects</div>
+    </div>
+    <div class="card">
+        <h2>路径最佳实践</h2>
+        <div class="code">// ========== 脚本中使用路径 ==========
+// 在脚本中,推荐使用绝对路径或基于变量的路径
+//
+// # 不好的写法 (依赖当前目录)
+// config="./config/app.conf"
+//
+// # 好的写法 (使用变量)
+// SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+// CONFIG="$SCRIPT_DIR/config/app.conf"
+//
+// # 基于家目录
+// DATA_DIR="$HOME/data"
+
+// ========== 符号链接与真实路径 ==========
+// 符号链接 (Symlink) 是特殊的文件类型
+// 指向另一个文件或目录
+//
+// 创建符号链接:
+//   $ ln -s /real/file link_name
+//
+// 查看指向:
+//   $ ls -la link_name
+//   lrwxrwxrwx 1 alice alice 12 Jan 15 10:00 link_name -> /real/file
+//
+// 获取真实路径:
+//   $ readlink -f link_name
+//   /real/file
+//   $ realpath link_name
+//   /real/file
+
+// ========== 实用路径命令 ==========
+// $ realpath file.txt       # 获取文件的绝对路径
+// $ readlink -f file.txt    # 同 realpath
+// $ basename /a/b/c.txt     # c.txt
+// $ dirname /a/b/c.txt      # /a/b
+// $ which node              # 显示命令的路径
+// /usr/local/bin/node
+// $ whereis node            # 显示命令所有相关路径
+
+// ========== ~ 扩展 ==========
+// ~/projects       → /home/alice/projects
+// ~root/projects   → /root/projects
+// ~other/projects  → /home/other/projects
+
+// ========== 路径中空格的处理 ==========
+// 文件名有空格时:
+//   $ cd My\ Documents      # 用反斜杠转义
+//   $ cd "My Documents"     # 用引号
+//   $ cd 'My Documents'     # 单引号也可
+//
+// 建议: 文件名中不要用空格!</div>
+        <div class="note">🔑 理解绝对路径和相对路径是 Linux 操作的基础。一条关键规则: 在脚本中总是使用绝对路径或基于变量的路径,不要依赖 cd 后的当前目录。</div>
+    </div>
+    <div class="card">
+        <h2>路径解析练习</h2>
+        <button onclick="pathPractice()">练习: 路径解析</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function pathPractice() {
+            result.innerHTML = '';
+            log('📌 路径解析练习');
+            log('假设当前目录: /home/alice/projects');
+            log('');
+
+            const tests = [
+                ['README.md', '/home/alice/projects/README.md'],
+                ['src/app.js', '/home/alice/projects/src/app.js'],
+                ['../docs/manual.pdf', '/home/alice/docs/manual.pdf'],
+                ['../../etc/hosts', '/etc/hosts'],
+                ['../../../usr/bin', '/usr/bin'],
+                ['././test/../data.txt', '/home/alice/projects/data.txt'],
+                ['~/.bashrc', '/home/alice/.bashrc'],
+            ];
+
+            tests.forEach(([rel, abs]) => {
+                log(`  相对: ${rel}`);
+                log(`  → 绝对: ${abs}`);
+                log('');
+            });
+        }
+
+        log('点击按钮查看路径解析示例');
+    </script>
+</body>
+</html>

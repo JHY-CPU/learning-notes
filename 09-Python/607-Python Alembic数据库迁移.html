@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Alembic数据库迁移</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+
+        .code {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            border-left: 3px solid #3498db;
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }
+
+        .note {
+            background: #fef9e7;
+            border-left: 4px solid #f39c12;
+            padding: 10px 15px;
+            font-size: 14px;
+            color: #7f8c8d;
+            margin-top: 10px;
+        }
+
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background: #3498db;
+            color: white;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        #result {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            min-height: 20px;
+            font-family: monospace;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h2>🗃️ Alembic 数据库迁移</h2>
+        <p>Alembic 初始化与配置、自动生成迁移、手动编写迁移、降级操作、数据迁移、多环境管理。</p>
+    </div>
+    <div class="card">
+        <h2>初始化与配置</h2>
+        <div class="code">// ========== Alembic 安装与初始化 ==========
+            # pip install alembic
+
+            # 初始化:
+            # alembic init alembic
+            # 创建目录结构:
+            # project/
+            # ├── alembic/
+            # │ ├── env.py # 运行环境配置
+            # │ ├── script.py.mako # 迁移脚本模板
+            # │ └── versions/ # 迁移版本文件
+            # └── alembic.ini # 主配置文件
+
+            # ========== 配置 alembic.ini ==========
+            # [alembic]
+            # script_location = alembic
+            # sqlalchemy.url = sqlite:///./blog.db
+
+            # 更常见的: 在 env.py 中设置数据库 URL
+            # 使用应用已有的配置:
+
+            # alembic/env.py:
+            import sys
+            from pathlib import Path
+
+            # 添加项目根目录到路径
+            sys.path.append(str(Path(__file__).parent.parent))
+
+            from app.database import Base
+            from app.models import * # 导入所有模型
+
+            # 告诉 Alembic 使用应用的 metadata
+            target_metadata = Base.metadata
+
+            # 从环境变量读取数据库 URL
+            from app.config import settings
+
+            # 覆盖 alembic.ini 中的 URL
+            def run_migrations_online():
+            from alembic import context
+            from sqlalchemy import create_engine
+
+            connectable = create_engine(settings.DATABASE_URL)
+            # ...</div>
+    </div>
+    <div class="card">
+        <h2>生成与运行迁移</h2>
+        <div class="code">// ========== 迁移命令 ==========
+            # 1. 创建迁移 (自动检测模型变更)
+            # alembic revision --autogenerate -m "添加用户表"
+
+            # 2. 查看状态
+            # alembic current # 当前版本
+            # alembic history # 版本历史
+            # alembic heads # 最新版本
+
+            # 3. 应用迁移
+            # alembic upgrade head # 升级到最新
+            # alembic upgrade +2 # 升级 2 个版本
+            # alembic upgrade abc123 # 升级到指定版本
+
+            # 4. 降级
+            # alembic downgrade -1 # 降级 1 个版本
+            # alembic downgrade base # 降级到空白
+
+            # 5. 其他
+            # alembic check # 检查是否有未生成的变更
+            # alembic show abc123 # 显示版本详情
+
+            # ========== 自动生成示例 ==========
+            # 添加 User 模型后:
+            # alembic revision --autogenerate -m "add user table"
+
+            # 生成的迁移文件:
+            """add user table
+
+            Revision ID: abc123def456
+            Revises:
+            Create Date: 2024-01-01 12:00:00
+            """
+            from alembic import op
+            import sqlalchemy as sa
+
+            revision = "abc123def456"
+            down_revision = None # 前一个版本 (首个迁移为 None)
+
+            def upgrade():
+            op.create_table("users",
+            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("name", sa.String(length=50), nullable=False),
+            sa.Column("email", sa.String(length=100), nullable=True),
+            sa.PrimaryKeyConstraint("id"),
+            sa.UniqueConstraint("email"),
+            )
+
+            def downgrade():
+            op.drop_table("users")</div>
+    </div>
+    <div class="card">
+        <h2>手动编写迁移</h2>
+        <div class="code">// ========== 常用迁移操作 ==========
+            from alembic import op
+            import sqlalchemy as sa
+
+            # 创建表:
+            def upgrade():
+            op.create_table("categories",
+            sa.Column("id", sa.Integer(), nullable=False),
+            sa.Column("name", sa.String(50), nullable=False),
+            sa.Column("description", sa.Text(), nullable=True),
+            sa.Column("created_at", sa.DateTime(), server_default=sa.func.now()),
+            sa.PrimaryKeyConstraint("id"),
+            )
+
+            # 添加列:
+            def upgrade():
+            op.add_column("users", sa.Column("age", sa.Integer(), nullable=True))
+            op.add_column("users", sa.Column("bio", sa.Text(), server_default=""))
+
+            # 删除列:
+            def upgrade():
+            op.drop_column("users", "old_field")
+
+            # 修改列:
+            def upgrade():
+            op.alter_column("users", "name",
+            existing_type=sa.String(50),
+            type_=sa.String(100), # 修改长度
+            nullable=False,
+            )
+
+            # 添加/删除索引:
+            def upgrade():
+            op.create_index("idx_users_email", "users", ["email"])
+            op.create_index("idx_users_name_email", "users", ["name", "email"], unique=True)
+            op.drop_index("idx_old_index")
+
+            # 添加外键:
+            def upgrade():
+            op.create_foreign_key(
+            "fk_posts_users", # 约束名
+            "posts", "users", # 源表,目标表
+            ["user_id"], ["id"], # 源列,目标列
+            ondelete="CASCADE",
+            )
+
+            # 添加唯一约束:
+            def upgrade():
+            op.create_unique_constraint("uq_users_username", "users", ["username"])</div>
+    </div>
+    <div class="card">
+        <h2>数据迁移</h2>
+        <div class="code">// ========== 数据迁移 ==========
+            from alembic import op
+            import sqlalchemy as sa
+
+            # 有时需要迁移数据 (非仅 schema 变更)
+
+            # 示例: 合并 name 和 last_name 到 full_name
+            def upgrade():
+            # 1. 先添加新列
+            op.add_column("users", sa.Column("full_name", sa.String(100), nullable=True))
+
+            # 2. 填充数据 (使用 op.get_bind 执行原始 SQL)
+            op.execute("""
+            UPDATE users
+            SET full_name = name || ' ' || COALESCE(last_name, '')
+            """)
+
+            # 3. 设置 NOT NULL (数据填充后)
+            op.alter_column("users", "full_name", nullable=False)
+
+            # 4. 可选: 删除旧列
+            # op.drop_column("users", "name")
+            # op.drop_column("users", "last_name")
+
+            def downgrade():
+            op.drop_column("users", "full_name")
+            # op.add_column("users", sa.Column("name", sa.String(50)))
+            # op.add_column("users", sa.Column("last_name", sa.String(50)))
+
+            # ========== 批量迁移 (大表/SQLite) ==========
+            # ⚠️ SQLite 不支持大部分 ALTER TABLE 操作!
+            # 以下操作在 SQLite 中必须使用 batch_alter_table:
+            # - 删除列
+            # - 修改列类型
+            # - 重命名列
+            # - 添加 NOT NULL 约束到已有数据的列
+
+            from alembic import op
+            import sqlalchemy as sa
+
+            def upgrade():
+            with op.batch_alter_table("users") as batch_op:
+            batch_op.add_column(sa.Column("nickname", sa.String(30), nullable=True))
+            batch_op.alter_column("name", new_column_name="username")
+            batch_op.drop_column("old_field")
+
+            # PostgreSQL/MySQL 可以直接使用:
+            # op.add_column(...)
+            # op.alter_column(...)
+            # op.drop_column(...)
+
+            # ========== 版本合并 ==========
+            # 当有多个分叉时:
+            # alembic merge heads -m "merge branches"
+            # 会生成一个合并迁移</div>
+    </div>
+    <div class="card">
+        <h2>多环境管理</h2>
+        <div class="code">// ========== 多环境配置 ==========
+            # alembic.ini 中可以配置多个数据库
+
+            # 方式 1: 环境变量
+            # export DATABASE_URL=postgresql://prod/db
+            # alembic upgrade head
+
+            # 方式 2: 多个 alembic 配置
+            # alembic.ini # 默认 (开发)
+            # alembic.test.ini # 测试
+            # alembic.prod.ini # 生产
+
+            # 方式 3: env.py 中动态选择
+            import os
+
+            env = os.getenv("ALEMBIC_ENV", "dev")
+            databases = {
+            "dev": "sqlite:///dev.db",
+            "test": "sqlite:///test.db",
+            "prod": os.getenv("DATABASE_URL"),
+            }
+
+            def run_migrations_online():
+            url = databases.get(env)
+            connectable = create_engine(url)
+            # ...
+
+            # ========== 迁移最佳实践 ==========
+            # 1. 数据库 url 使用环境变量,不硬编码
+            # 2. 每个变更一个迁移文件 (原子性)
+            # 3. 永远不要修改已提交的迁移文件!
+            # 4. 总是编写 downgrade() (可回滚)
+            # 5. 提交迁移文件到版本控制
+            # 6. 生产环境迁移前先备份数据库
+            # 7. CI 中运行 alembic check 验证一致性
+
+            # ========== 自动迁移安全配置 ==========
+            # env.py 中:
+            # 只自动检测表/列变更,忽略重命名
+            # compare_type=True # 检测列类型变更
+            # compare_server_default=True # 检测默认值
+
+            # 防止自动删除 (启用后更安全)
+            def include_object(obj, name, type_, reflected, compare_to):
+            if type_ == "table" and reflected:
+            return False # 不删除已存在的表
+            return True</div>
+        <div class="note">💡 Alembic 要点: alembic init/revision/upgrade/downgrade; --autogenerate 自动检测模型变更; 手动编写复杂迁移;
+            数据迁移用 op.execute; 总是编写 downgrade 可回滚。</div>
+    </div>
+    <div class="card">
+        <h2>完整工作流</h2>
+        <div class="code">// ========== 典型工作流 ==========
+            # 1. 初始化 (项目开始时)
+            # alembic init alembic
+
+            # 2. 配置 env.py 连接应用的 Base.metadata
+
+            # 3. 创建第一个迁移
+            # alembic revision --autogenerate -m "init"
+
+            # 4. 应用迁移
+            # alembic upgrade head
+
+            # 5. 修改模型 (添加字段)
+
+            # 6. 生成新迁移
+            # alembic revision --autogenerate -m "add avatar to user"
+
+            # 7. 检查生成的迁移脚本 (手动修改必要时)
+
+            # 8. 应用
+            # alembic upgrade head
+
+            # 9. 如果需要回滚
+            # alembic downgrade -1
+
+            # ========== CI/CD 集成 ==========
+            # .github/workflows/test.yml:
+            # - name: Run migrations
+            # run: |
+            # alembic upgrade head
+            # alembic check # 验证迁移与模型一致
+
+            # ========== 迁移文件示例 ==========
+            # versions/001_init.py
+            # versions/002_add_user_table.py
+            # versions/003_add_post_table.py
+            # versions/004_add_tags_m2m.py
+            # versions/005_add_user_bio.py</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoInit()">初始化演示</button>
+        <button onclick="demoCommands()">常用命令演示</button>
+        <button onclick="demoWorkflow()">工作流演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoInit() {
+            result.innerHTML = '';
+            log('# Alembic 初始化');
+            log('');
+            log('alembic init alembic');
+            log('');
+            log('目录:');
+            log('  alembic/');
+            log('  ├── env.py');
+            log('  ├── script.py.mako');
+            log('  ├── versions/');
+            log('  └── README');
+            log('  alembic.ini');
+        }
+
+        function demoCommands() {
+            result.innerHTML = '';
+            log('# 常用命令');
+            log('');
+            log('生成迁移:');
+            log('  alembic revision --autogenerate');
+            log('  alembic revision --autogenerate -m "msg"');
+            log('');
+            log('应用:');
+            log('  alembic upgrade head');
+            log('  alembic upgrade +2');
+            log('');
+            log('回滚:');
+            log('  alembic downgrade -1');
+            log('  alembic downgrade base');
+            log('');
+            log('检查:');
+            log('  alembic current');
+            log('  alembic history');
+            log('  alembic check');
+        }
+
+        function demoWorkflow() {
+            result.innerHTML = '';
+            log('# 典型工作流');
+            log('');
+            log('1. init → 配置 env.py');
+            log('2. revision --autogenerate -m "init"');
+            log('3. upgrade head');
+            log('4. 修改模型');
+            log('5. revision --autogenerate -m "add field"');
+            log('6. upgrade head');
+            log('7. git commit (迁移文件)');
+            log('');
+            log('原则:');
+            log('  不修改已提交的迁移');
+            log('  总是编写 downgrade');
+        }
+    </script>
+</body>
+
+</html>

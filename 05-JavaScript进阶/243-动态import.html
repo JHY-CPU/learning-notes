@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>动态import</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #dynamic-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>动态 import</h2><p>import() 按需加载、条件加载、模块预加载。</p></div>
+    <div class="card">
+        <h2>动态 import 语法</h2>
+        <div class="code">// ========== 动态 import() ==========
+// import() 返回 Promise&lt;Module&gt;
+const module = await import('./module.js');
+
+// ========== 基本用法 ==========
+// 按需加载
+button.addEventListener('click', async () => {
+    const { showToast } = await import('./toast.js');
+    showToast('Hello!');
+});
+
+// 条件加载
+if (locale === 'zh') {
+    const { formatDate } = await import('./date-zh.js');
+} else {
+    const { formatDate } = await import('./date-en.js');
+}
+
+// ========== 解构导入 ==========
+const { default: React, useState } = await import('react');
+
+// ========== 命名空间导入 ==========
+const math = await import('./math.js');
+math.sum(1, 2);
+
+// ========== 动态路径 ==========
+const path = `./lang/${lang}.js`;
+const messages = await import(path);
+
+// ========== 预加载 (Webpack magic comment) ==========
+// webpackPrefetch: true  — 浏览器空闲时预加载
+// webpackPreload: true   — 与父模块并行加载
+const Chart = await import(/* webpackPrefetch: true */ './Chart.js');
+
+// ========== 与静态 import 对比 ==========
+// 静态 import: 编译时解析，提升到顶部，必须写在顶层
+// 动态 import: 运行时解析，可在任何位置，返回 Promise
+// ✅ 动态 import 支持: 按需 / 条件 / 变量路径
+// ❌ 动态 import 不能静态分析 (tree-shaking 失效)</div>
+    </div>
+    <div class="card">
+        <h2>演示：模拟动态导入</h2>
+        <button onclick="loadModule('math')">加载 math 模块</button>
+        <button onclick="loadModule('utils')">加载 utils 模块</button>
+        <button onclick="loadModule('unknown')">加载不存在的模块</button>
+        <div id="dynamic-result">点击按钮模拟动态加载</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const dynamicResult = document.getElementById('dynamic-result');
+
+        function log(msg) {
+            dynamicResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // 模拟模块加载器
+        const moduleRegistry = {
+            math: {
+                sum: (a, b) => a + b,
+                multiply: (a, b) => a * b,
+                PI: 3.14159,
+            },
+            utils: {
+                greet: (name) => `Hello, ${name}!`,
+                formatDate: (d) => d.toLocaleDateString(),
+            },
+        };
+
+        function simulateImport(moduleName) {
+            return new Promise((resolve, reject) => {
+                log(`⏳ 加载模块: ${moduleName}...`);
+                setTimeout(() => {
+                    if (moduleRegistry[moduleName]) {
+                        log(`✅ 模块 "${moduleName}" 加载完成`);
+                        resolve(moduleRegistry[moduleName]);
+                    } else {
+                        reject(new Error(`Module "${moduleName}" not found`));
+                    }
+                }, 800 + Math.random() * 400);
+            });
+        }
+
+        async function loadModule(name) {
+            dynamicResult.innerHTML = '';
+            try {
+                // 模拟动态 import()
+                const mod = await simulateImport(name);
+                log('');
+
+                if (name === 'math') {
+                    log(`📐 math 模块方法：`);
+                    log(`   sum(3, 7) = ${mod.sum(3, 7)}`);
+                    log(`   multiply(4, 5) = ${mod.multiply(4, 5)}`);
+                    log(`   PI = ${mod.PI}`);
+                } else if (name === 'utils') {
+                    log(`🔧 utils 模块方法：`);
+                    log(`   greet("World") = ${mod.greet("World")}`);
+                    log(`   formatDate = ${mod.formatDate(new Date())}`);
+                }
+            } catch (err) {
+                log(`❌ 加载失败: ${err.message}`);
+                log('💡 动态 import 支持错误处理 (try/catch)');
+            }
+
+            log('');
+            log('📌 动态 import 特点:');
+            log('   • 返回 Promise，支持 await');
+            log('   • 支持变量路径');
+            log('   • 可在函数/条件中调用');
+            log('   • 支持按需加载和代码分割');
+        }
+
+        console.log('=== 动态 import ===');
+
+        document.getElementById('output').textContent =
+            `动态 import: import() 按需加载 / 条件加载 / 预加载\n` +
+            `const mod = await import('./path.js')\n` +
+            `支持: 变量路径 / 解构 / 命名空间 / 错误处理\n` +
+            `✅ 动态 import 演示完成！`;
+    </script>
+</body>
+</html>

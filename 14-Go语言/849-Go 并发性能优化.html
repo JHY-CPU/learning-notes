@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 并发性能优化</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🚀 Go 并发性能优化</h2><p>锁竞争优化、缓存行伪共享、GOMAXPROCS 调优、channel vs mutex 性能、goroutine 数量选择、无锁优化、Benchmark 方法论。</p></div>
+    <div class="card">
+        <h2>锁竞争优化</h2>
+        <div class="code">// ========== 锁竞争 ==========
+// 锁竞争是并发性能的最大杀手
+
+// ❌ 高竞争: 一把锁保护所有
+type BigLockCache struct {
+    mu    sync.Mutex
+    data  map[string]interface{}
+    stats map[string]int64
+    meta  map[string]string
+}
+
+// ✅ 优化: 拆分锁 (每个数据结构独立锁)
+type SplitCache struct {
+    dataMu  sync.RWMutex
+    data    map[string]interface{}
+    statsMu sync.Mutex
+    stats   map[string]int64
+    metaMu  sync.RWMutex
+    meta    map[string]string
+}
+
+// ✅ 优化: 分片 (Sharding)
+// 参考 847 的 ShardedMap
+
+// ========== 锁粒度 ==========
+// 粗粒度: goroutine 等待时间长
+// 细粒度: 管理复杂, 但并发高
+
+// 锁的三种粒度:
+// 1. 全局锁: 最简单, 最低并发
+// 2. 分片锁: 折中
+// 3. 无锁 (CAS/原子操作): 最复杂, 最高并发
+
+// 选择准则:
+// - 临界区 < 100ns → 自旋锁/CAS
+// - 临界区 100ns-1us → Mutex
+// - 临界区 > 1us → 考虑无锁/分片
+
+// ========== 锁的持有时间 ==========
+// 尽量减少锁内操作!
+
+// ❌ 锁内做太多
+func (c *Cache) Get(key string) (interface{}, bool) {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    // 在锁内调用外部服务
+    return c.data[key], true
+}
+
+// ✅ 锁内只读取, 外部处理
+func (c *Cache) Get(key string) (interface{}, bool) {
+    c.mu.RLock()
+    v, ok := c.data[key]
+    c.mu.RUnlock()
+    // 锁外处理
+    if ok {
+        log.Printf("cache hit: %s", key)
+    }
+    return v, ok
+}
+
+// ========== Read-Write 锁的合适场景 ==========
+// RWMutex 性能取决于读/写比例
+// RLock 比 Lock 快, 但需要额外维护
+
+// 经验:
+// 读:写 >= 10:1 → 用 RWMutex 有明显收益
+// 读:写 < 3:1  → 用 Mutex 就够
+// 写频繁 → RWMutex 可能导致写饥饿
+
+// Benchmark:
+// BenchmarkMutex-8  100M  12 ns/op
+// BenchmarkRWMutex-8 W 50M  20 ns/op (写)
+// BenchmarkRWMutex-8 R 200M  5 ns/op  (读)</div>
+    </div>
+    <div class="card">
+        <h2>伪共享与缓存行</h2>
+        <div class="code">// ========== CPU 缓存行伪共享 ==========
+// CPU 缓存行通常 64 字节
+// 两个变量在同一个缓存行 → 一个修改导致另一个缓存失效
+
+// ❌ 伪共享: counter1 和 counter2 可能在同缓存行
+type BadCounters struct {
+    counter1 int64
+    counter2 int64
+}
+
+// ✅ 填充: 确保在不同缓存行
+type GoodCounters struct {
+    counter1 int64
+    _        [7]int64  // 填充 56 字节
+    counter2 int64
+    _        [7]int64
+}
+
+// 或者用原子数组
+type StripedCounter struct {
+    counters [8]atomic.Int64
+}
+
+func (sc *StripedCounter) Inc(idx int) {
+    sc.counters[idx].Add(1)
+}
+
+// ========== 对齐与性能 ==========
+// 结构体对齐优化可提升缓存效率
+
+// 按访问频率分组
+type HotData struct {
+    visited int64    // 频繁访问
+    mu      sync.Mutex
+    _       [56]byte // 填充
+    name    string   // 低频访问
+    desc    string
+}
+
+// ========== 锁分离 ==========
+// 读写分离: 读不阻塞写, 写不阻塞读
+
+type ReadWriteData struct {
+    // 读路径: 只用原子操作
+    value atomic.Value
+
+    // 写路径: 加锁
+    mu    sync.Mutex
+}
+
+func (r *ReadWriteData) Read() interface{} {
+    return r.value.Load()
+}
+
+func (r *ReadWriteData) Write(v interface{}) {
+    r.mu.Lock()
+    // 更新
+    r.value.Store(v)
+    r.mu.Unlock()
+}</div>
+    </div>
+    <div class="card">
+        <h2>goroutine 与 GOMAXPROCS</h2>
+        <div class="code">// ========== goroutine 数量选择 ==========
+// 太多 goroutine: 调度开销增加
+// 太少 goroutine: CPU 利用率不足
+
+// CPU 密集型: goroutine 数 ≈ GOMAXPROCS
+func cpuBound() {
+    g := runtime.GOMAXPROCS(0)
+    var wg sync.WaitGroup
+    for i := 0; i < g; i++ {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            cpuIntensiveWork()
+        }()
+    }
+    wg.Wait()
+}
+
+// IO 密集型: goroutine 数 = IO 等待数 + 一些余量
+func ioBound(items []int, concurrency int) {
+    sem := make(chan struct{}, concurrency)
+    var wg sync.WaitGroup
+
+    for _, item := range items {
+        wg.Add(1)
+        sem <- struct{}{}
+        go func(v int) {
+            defer wg.Done()
+            defer func() { <-sem }()
+            ioOperation()
+        }(item)
+    }
+    wg.Wait()
+}
+
+// ========== GOMAXPROCS 调优 ==========
+// 默认 = CPU 核心数
+
+// 容器中注意: 需读取 cgroup 限制
+// import "go.uber.org/automaxprocs"
+// 自动适配容器 CPU 限制
+
+// import _ "go.uber.org/automaxprocs"
+// 在 main 最顶部 import
+
+// ========== channel vs Mutex 性能 ==========
+// channel 包含 Mutex + 调度 + 内存分配
+// 简单通信: channel (符合 Go 哲学)
+// 高频共享: Mutex (更高效)
+
+// 性能基准:
+// atomic.Add   → ~8 ns
+// Mutex.Lock   → ~45 ns
+// chan <- int  → ~150 ns (无缓冲)
+// chan <- int  → ~80 ns (有缓冲)
+
+// ========== 减少内存分配 ==========
+// 1. 对象池 sync.Pool
+// 2. 预分配 slice/map
+// 3. 复用 buffer
+// 4. 避免 []byte → string 频繁转换
+
+// ========== Benchmark 对比 ==========
+func BenchmarkAtomic(b *testing.B) {
+    var c atomic.Int64
+    b.RunParallel(func(pb *testing.PB) {
+        for pb.Next() { c.Add(1) }
+    })
+}
+
+func BenchmarkMutex(b *testing.B) {
+    var mu sync.Mutex
+    var c int64
+    b.RunParallel(func(pb *testing.PB) {
+        for pb.Next() {
+            mu.Lock()
+            c++
+            mu.Unlock()
+        }
+    })
+}
+
+func BenchmarkChannel(b *testing.B) {
+    ch := make(chan int, 100)
+    done := make(chan struct{})
+
+    go func() {
+        for range ch {}
+        close(done)
+    }()
+
+    b.ResetTimer()
+    for i := 0; i < b.N; i++ {
+        ch <- i
+    }
+    close(ch)
+    <-done
+}
+
+// 结果 (估算, 4核):
+// BenchmarkAtomic-8    200M   8 ns/op
+// BenchmarkMutex-8     100M  45 ns/op
+// BenchmarkChannel-8   20M   80 ns/op (有缓冲)</div>
+    </div>
+    <div class="card">
+        <h2>优化方法论</h2>
+        <div class="code">// ========== 并发性能优化步骤 ==========
+// 1. 测量 (profile), 不猜测
+// 2. 定位瓶颈
+// 3. 优化
+// 4. 再次测量验证
+
+// ========== 优化清单 ==========
+// 1. 减少锁持有时间
+//   - 锁内只做必要操作
+//   - IO 操作放到锁外
+//
+// 2. 减小锁粒度
+//   - 分片 (Sharding)
+//   - 读写锁分离
+//   - 独立锁保护独立数据
+//
+// 3. 减少 goroutine 数量
+//   - 工作池固定大小
+//   - 避免每个请求一个 goroutine
+//
+// 4. 避免伪共享
+//   - 填充缓存行
+//   - 热点数据分离
+//
+// 5. 使用合适的同步原语
+//   - atomic > Mutex > channel
+//   - 简单计数用 atomic
+//   - 复杂协调用 channel
+//
+// 6. 减少内存分配
+//   - sync.Pool
+//   - 预分配
+//   - 复用
+
+// ========== 优化决策树 ==========
+// 问题: 并发性能不足
+// ├─ 锁竞争高?
+// │  ├─ 是 → 分片 / 无锁
+// │  └─ 否 → 检查 goroutine 数量
+// ├─ goroutine 太多?
+// │  ├─ 是 → 工作池限制
+// │  └─ 否 → 检查内存分配
+// └─ 内存分配多?
+//    ├─ 是 → sync.Pool / 复用
+//    └─ 否 → 检查 IO / 业务逻辑
+
+// ========== 常见并发性能反模式 ==========
+// 1. 每个请求启动 goroutine (无控制)
+// 2. 忘记控制 goroutine 数量
+// 3. 锁内做 IO 操作
+// 4. 频繁创建/销毁 goroutine
+// 5. 无缓冲 channel 的过度使用
+// 6. 循环中每次都 new 对象
+// 7. interface{} 装箱导致逃逸</div>
+        <div class="note">💡 并发优化要点: 锁竞争是最大杀手; 减少锁持有时间 (IO 放锁外); 拆分粗粒度锁 (分片/独立锁); RWMutex 读写比 >10:1 才有优势; 伪共享: 不同缓存行用填充; goroutine 数: CPU 密集 ≈ GOMAXPROCS, IO 密集 = 等待数; channel 比 Mutex 慢 2-3x; atomic 最快; GOMAXPROCS 默认 = CPU 核, 容器用 automaxprocs; 优化步骤: 测量 → 定位 → 优化 → 再测量。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoLock()">锁优化</button>
+        <button onclick="demoCache()">缓存行</button>
+        <button onclick="demoBench()">性能对比</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoLock() {
+            result.innerHTML = '';
+            log('# 锁竞争优化');
+            log('');
+            log('锁粒度选择:');
+            log('  粗: 简单, 低并发');
+            log('  分片: 折中');
+            log('  无锁: 复杂, 高并发');
+            log('');
+            log('减少锁时间:');
+            log('  锁内只做必要操作');
+            log('  IO/日志放锁外');
+            log('');
+            log('RWMutex: 读>>写 (10:1) 才有优势');
+            log('写频繁用 Mutex 避免写饥饿');
+        }
+
+        function demoCache() {
+            result.innerHTML = '';
+            log('# 伪共享与缓存行');
+            log('');
+            log('CPU 缓存行 = 64 字节');
+            log('同缓存行变量互相影响性能');
+            log('');
+            log('填充分离:');
+            log('  type Good struct {');
+            log('    counter1 int64');
+            log('    _ [7]int64 // 填充');
+            log('    counter2 int64');
+            log('  }');
+            log('');
+            log('热点数据分离:');
+            log('  频繁访问字段单独一组');
+            log('  低频访问字段另一组');
+        }
+
+        function demoBench() {
+            result.innerHTML = '';
+            log('# 同步性能对比');
+            log('');
+            log('atomic   → ~8 ns/op');
+            log('Mutex    → ~45 ns/op');
+            log('RWMutex  → ~5 ns (读)');
+            log('Channel  → ~80-150 ns/op');
+            log('');
+            log('选择准则:');
+            log('  简单计数 → atomic');
+            log('  共享状态 → Mutex');
+            log('  通信     → Channel');
+            log('  读多写少 → RWMutex/sync.Map');
+        }
+    </script>
+</body>
+</html>

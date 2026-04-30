@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>位运算</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        .bits { font-family: monospace; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>位运算</h2><p>& / | / ^ / ~ / « / » 、位掩码、权限标志、奇偶判断、2的幂、状态压缩。</p></div>
+    <div class="card">
+        <h2>位运算操作符</h2>
+        <div class="code">// ========== 位运算符 ==========
+// &  按位与   (5 & 3 = 1)
+// |  按位或   (5 | 3 = 7)
+// ^  按位异或 (5 ^ 3 = 6)
+// ~  按位取反 (~5 = -6)
+// << 左移     (5 << 1 = 10)
+// >> 有符号右移 (5 >> 1 = 2)
+// >>> 无符号右移 (-5 >>> 1 = 2147483645)
+
+// ========== 常用技巧 ==========
+// 判断奇偶: n & 1
+// 取 2 的幂: n & (n - 1) === 0
+// 取最低位1: n & -n
+// 清除最低位1: n & (n - 1)
+// 设置第k位: n | (1 << k)
+// 清除第k位: n & ~(1 << k)
+// 翻转第k位: n ^ (1 << k)
+// 查询第k位: (n >> k) & 1</div>
+    </div>
+    <div class="card">
+        <h2>演示：位运算</h2>
+        <button onclick="demoBasics()">基础运算</button>
+        <button onclick="demoFlags()">位掩码与权限</button>
+        <button onclick="demoTricks()">技巧应用</button>
+        <button onclick="demoColor()">位运算实战</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function toBin(n, bits = 8) {
+            if (n < 0) n = n >>> 0;
+            return n.toString(2).padStart(bits, '0').slice(-bits);
+        }
+
+        function demoBasics() {
+            result.innerHTML = '';
+            log('🔢 位运算基础:');
+            log('');
+
+            const a = 5, b = 3;  // 0101 & 0011
+            log(`a = ${a} (${toBin(a)})`);
+            log(`b = ${b} (${toBin(b)})`);
+            log('');
+
+            log('1️⃣ 按位与 & (都为1才为1):');
+            log(`   ${a} & ${b} = ${a & b} (${toBin(a & b)})`);
+
+            log('2️⃣ 按位或 | (有1则为1):');
+            log(`   ${a} | ${b} = ${a | b} (${toBin(a | b)})`);
+
+            log('3️⃣ 按位异或 ^ (不同为1):');
+            log(`   ${a} ^ ${b} = ${a ^ b} (${toBin(a ^ b)})`);
+
+            log('4️⃣ 按位取反 ~:');
+            log(`   ~${a} = ${~a} (${toBin(~a, 16)})`);
+
+            log('5️⃣ 左移 <<:');
+            log(`   ${a} << 1 = ${a << 1} (${toBin(a << 1)})`);
+            log(`   1 << 3 = ${1 << 3} (= 2³)`);
+
+            log('6️⃣ 右移 >>:');
+            log(`   ${a} >> 1 = ${a >> 1} (${toBin(a >> 1)})`);
+
+            log('7️⃣ 无符号右移 >>>:');
+            log(`   -5 >>> 1 = ${(-5 >>> 1)} (${toBin(-5 >>> 1, 16)})`);
+
+            log('');
+            log('📌 位运算优先级: ~ > << >> >>> > & > ^ > |');
+        }
+
+        function demoFlags() {
+            result.innerHTML = '';
+            log('🏳️ 位掩码与权限系统:');
+            log('');
+
+            // 权限定义 (用 2 的幂)
+            const READ = 1;     // 001
+            const WRITE = 2;    // 010
+            const EXECUTE = 4;  // 100
+
+            log(`权限定义:`);
+            log(`   READ    = 1 (${toBin(READ, 3)})`);
+            log(`   WRITE   = 2 (${toBin(WRITE, 3)})`);
+            log(`   EXECUTE = 4 (${toBin(EXECUTE, 3)})`);
+            log('');
+
+            function hasPermission(perm, flag) { return (perm & flag) === flag; }
+            function addPermission(perm, flag) { return perm | flag; }
+            function removePermission(perm, flag) { return perm & ~flag; }
+            function togglePermission(perm, flag) { return perm ^ flag; }
+
+            let permissions = 0;
+
+            log('初始权限: 无');
+            log(`   has(READ): ${hasPermission(permissions, READ)}`);
+            log('');
+
+            permissions = addPermission(permissions, READ);
+            log('添加 READ:');
+            log(`   权限值: ${permissions} (${toBin(permissions, 3)})`);
+            log(`   has(READ): ${hasPermission(permissions, READ)}`);
+            log('');
+
+            permissions = addPermission(permissions, WRITE);
+            log('添加 WRITE:');
+            log(`   权限值: ${permissions} (${toBin(permissions, 3)})`);
+            log(`   has(READ | WRITE): ${hasPermission(permissions, READ | WRITE)}`);
+            log('');
+
+            permissions = removePermission(permissions, READ);
+            log('移除 READ:');
+            log(`   权限值: ${permissions} (${toBin(permissions, 3)})`);
+            log('');
+
+            log('切换 EXECUTE:');
+            permissions = togglePermission(permissions, EXECUTE);
+            log(`   切换后: ${permissions} (${toBin(permissions, 3)})`);
+            permissions = togglePermission(permissions, EXECUTE);
+            log(`   再切换: ${permissions} (${toBin(permissions, 3)})`);
+
+            log('');
+            log('📌 位掩码优点:');
+            log('   • 一个整数存多个权限');
+            log('   • 操作极快 (CPU 原生支持)');
+            log('   • 节省内存');
+        }
+
+        function demoTricks() {
+            result.innerHTML = '';
+            log('⚡ 位运算技巧:');
+            log('');
+
+            log('1️⃣ 判断奇偶: n & 1');
+            [3, 4, 7, 10].forEach(n => log(`   ${n} & 1 = ${n & 1} → ${n & 1 ? '奇数' : '偶数'}`));
+            log('');
+
+            log('2️⃣ 判断 2 的幂: n & (n-1) === 0');
+            [1, 2, 3, 4, 8, 16].forEach(n => {
+                const isPower = (n & (n - 1)) === 0 && n > 0;
+                log(`   ${n} → ${isPower ? '✅ 是2的幂' : '❌ 不是2的幂'}`);
+            });
+            log('');
+
+            log('3️⃣ 清除最低位的 1: n & (n-1)');
+            log(`   ${toBin(12)} (12) → ${toBin(12 & 11)} (${12 & 11})`);
+            log('');
+
+            log('4️⃣ 取最低位的 1: n & -n');
+            for (const n of [6, 10, 12, 16]) {
+                log(`   ${toBin(n)} (${n}) → ${toBin(n & -n)} (${n & -n})`);
+            }
+            log('');
+
+            log('5️⃣ 交换两数 (不用临时变量):');
+            let x = 3, y = 7;
+            log(`   交换前: x=${x}, y=${y}`);
+            x ^= y; y ^= x; x ^= y;
+            log(`   交换后: x=${x}, y=${y}`);
+            log('');
+
+            log('6️⃣ 统计 1 的个数 (Brian Kernighan):');
+            function countBits(n) {
+                let count = 0;
+                while (n) { n &= n - 1; count++; }
+                return count;
+            }
+            [0, 1, 3, 7, 15, 255].forEach(n => {
+                log(`   ${n} (${toBin(n)}) → ${countBits(n)} 个 1`);
+            });
+        }
+
+        function demoColor() {
+            result.innerHTML = '';
+            log('🎨 位运算实战: 颜色编码');
+            log('');
+
+            // 32-bit 颜色: 0xAARRGGBB
+            function rgbaToInt(r, g, b, a = 255) {
+                return (a << 24) | (r << 16) | (g << 8) | b;
+            }
+
+            function intToHex(color) {
+                return '#' + (color & 0xFFFFFF).toString(16).padStart(6, '0');
+            }
+
+            function getAlpha(color) { return (color >>> 24) & 0xFF; }
+            function getRed(color) { return (color >> 16) & 0xFF; }
+            function getGreen(color) { return (color >> 8) & 0xFF; }
+            function getBlue(color) { return color & 0xFF; }
+
+            const color = rgbaToInt(52, 152, 219, 255);
+            log(`RGBA(52, 152, 219, 255):`);
+            log(`   整数: ${color}`);
+            log(`   十六进制: ${intToHex(color)}`);
+            log(`   二进制: ${toBin(color, 32)}`);
+            log('');
+            log('提取通道:');
+            log(`   Alpha: ${getAlpha(color)}`);
+            log(`   Red:   ${getRed(color)}`);
+            log(`   Green: ${getGreen(color)}`);
+            log(`   Blue:  ${getBlue(color)}`);
+            log('');
+
+            // 状态压缩 (子集枚举)
+            log('状态压缩: 枚举子集');
+            const items = ['A', 'B', 'C'];
+            const n = items.length;
+            log(`   元素: [${items}]`);
+            for (let mask = 0; mask < (1 << n); mask++) {
+                const subset = [];
+                for (let i = 0; i < n; i++) {
+                    if (mask & (1 << i)) subset.push(items[i]);
+                }
+                log(`   ${toBin(mask, 3)} → [${subset.join(', ') || '空'}]`);
+            }
+
+            log('');
+            log('📌 状态压缩应用:');
+            log('   • 子集枚举 (2ⁿ 种组合)');
+            log('   • 旅行商问题 (TSP)');
+            log('   • 棋盘覆盖');
+            log('   • 数独求解');
+        }
+
+        console.log('=== 位运算 ===');
+        document.getElementById('output').textContent = `位运算: & | ^ ~ << >> >>> / 位掩码 / 权限 / 状态压缩\n✅ 位运算演示完成！`;
+    </script>
+</body>
+</html>

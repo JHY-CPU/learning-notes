@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>链表</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        .node-viz { display: flex; align-items: center; gap: 6px; margin: 10px 0; flex-wrap: wrap; }
+        .node-box { background: #3498db; color: white; padding: 8px 12px; border-radius: 4px; font-size: 14px; display: inline-flex; align-items: center; gap: 8px; }
+        .node-arrow { color: #7f8c8d; font-size: 18px; }
+        .node-null { background: #95a5a6; padding: 4px 8px; border-radius: 4px; color: white; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>链表</h2><p>单向链表、双向链表、增删改查、反转、环检测。</p></div>
+    <div class="card">
+        <h2>链表实现</h2>
+        <div class="code">// ========== 链表节点 ==========
+class ListNode {
+    constructor(val) {
+        this.val = val;
+        this.next = null;
+    }
+}
+
+// ========== 单向链表 ==========
+class LinkedList {
+    constructor() {
+        this.head = null;
+        this.tail = null;
+        this.length = 0;
+    }
+
+    append(val) { /* 尾部添加 */ }
+    prepend(val) { /* 头部插入 */ }
+    insertAt(index, val) { /* 指定位置 */ }
+    remove(val) { /* 删除 */ }
+    find(val) { /* 查找 */ }
+    reverse() { /* 反转 */ }
+    toArray() { /* 转数组 */ }
+}
+
+// ========== 双向链表节点 ==========
+class DoublyListNode {
+    constructor(val) {
+        this.val = val;
+        this.prev = null;
+        this.next = null;
+    }
+}
+
+// ========== 环检测 (快慢指针) ==========
+function hasCycle(head) {
+    let slow = head, fast = head;
+    while (fast && fast.next) {
+        slow = slow.next;
+        fast = fast.next.next;
+        if (slow === fast) return true;
+    }
+    return false;
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：链表</h2>
+        <button onclick="demoLinkedList()">单向链表</button>
+        <button onclick="demoDoubly()">双向链表</button>
+        <button onclick="demoReverse()">链表反转</button>
+        <button onclick="demoCycle()">环检测</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        // ========== 链表节点 ==========
+        class ListNode {
+            constructor(val) { this.val = val; this.next = null; }
+        }
+
+        // ========== 单向链表 ==========
+        class LinkedList {
+            constructor() {
+                this.head = null;
+                this.tail = null;
+                this.length = 0;
+            }
+
+            append(val) {
+                const node = new ListNode(val);
+                if (!this.head) { this.head = this.tail = node; }
+                else { this.tail.next = node; this.tail = node; }
+                this.length++;
+                return this;
+            }
+
+            prepend(val) {
+                const node = new ListNode(val);
+                node.next = this.head;
+                this.head = node;
+                if (!this.tail) this.tail = node;
+                this.length++;
+                return this;
+            }
+
+            remove(val) {
+                if (!this.head) return false;
+                if (this.head.val === val) {
+                    this.head = this.head.next;
+                    this.length--;
+                    if (!this.head) this.tail = null;
+                    return true;
+                }
+                let curr = this.head;
+                while (curr.next && curr.next.val !== val) curr = curr.next;
+                if (curr.next) {
+                    if (curr.next === this.tail) this.tail = curr;
+                    curr.next = curr.next.next;
+                    this.length--;
+                    return true;
+                }
+                return false;
+            }
+
+            find(val) {
+                let curr = this.head;
+                let idx = 0;
+                while (curr) {
+                    if (curr.val === val) return idx;
+                    curr = curr.next;
+                    idx++;
+                }
+                return -1;
+            }
+
+            toArray() {
+                const arr = [];
+                let curr = this.head;
+                while (curr) { arr.push(curr.val); curr = curr.next; }
+                return arr;
+            }
+
+            reverse() {
+                let prev = null, curr = this.head;
+                this.tail = curr;
+                while (curr) {
+                    const next = curr.next;
+                    curr.next = prev;
+                    prev = curr;
+                    curr = next;
+                }
+                this.head = prev;
+                return this;
+            }
+        }
+
+        function demoLinkedList() {
+            result.innerHTML = '';
+            log('🔗 单向链表:');
+            log('');
+
+            const list = new LinkedList();
+            log('1️⃣ 追加元素:');
+            list.append(10).append(20).append(30).append(40);
+            log(`   链表: ${list.toArray().join(' → ')}`);
+            log(`   长度: ${list.length}`);
+
+            log('');
+            log('2️⃣ 头部插入:');
+            list.prepend(5);
+            log(`   链表: ${list.toArray().join(' → ')}`);
+            log(`   长度: ${list.length}`);
+
+            log('');
+            log('3️⃣ 查找:');
+            log(`   find(20) = ${list.find(20)}`);
+            log(`   find(99) = ${list.find(99)}`);
+
+            log('');
+            log('4️⃣ 删除:');
+            list.remove(20);
+            log(`   删除 20: ${list.toArray().join(' → ')}`);
+            list.remove(5);
+            log(`   删除 5: ${list.toArray().join(' → ')}`);
+
+            log('');
+            log('📌 链表 vs 数组:');
+            log('   • 插入/删除 O(1) vs O(n)');
+            log('   • 随机访问 O(n) vs O(1)');
+        }
+
+        function demoDoubly() {
+            result.innerHTML = '';
+            log('🔗 双向链表:');
+            log('');
+
+            class DoublyListNode {
+                constructor(val) { this.val = val; this.prev = null; this.next = null; }
+            }
+
+            class DoublyLinkedList {
+                constructor() {
+                    this.head = null;
+                    this.tail = null;
+                    this.length = 0;
+                }
+
+                append(val) {
+                    const node = new DoublyListNode(val);
+                    if (!this.head) { this.head = this.tail = node; }
+                    else { node.prev = this.tail; this.tail.next = node; this.tail = node; }
+                    this.length++;
+                }
+
+                prepend(val) {
+                    const node = new DoublyListNode(val);
+                    if (!this.head) { this.head = this.tail = node; }
+                    else { node.next = this.head; this.head.prev = node; this.head = node; }
+                    this.length++;
+                }
+
+                remove(val) {
+                    let curr = this.head;
+                    while (curr) {
+                        if (curr.val === val) {
+                            if (curr.prev) curr.prev.next = curr.next;
+                            else this.head = curr.next;
+                            if (curr.next) curr.next.prev = curr.prev;
+                            else this.tail = curr.prev;
+                            this.length--;
+                            return true;
+                        }
+                        curr = curr.next;
+                    }
+                    return false;
+                }
+
+                toArray() {
+                    const arr = [];
+                    let curr = this.head;
+                    while (curr) { arr.push(curr.val); curr = curr.next; }
+                    return arr;
+                }
+
+                toArrayReverse() {
+                    const arr = [];
+                    let curr = this.tail;
+                    while (curr) { arr.push(curr.val); curr = curr.prev; }
+                    return arr;
+                }
+            }
+
+            const list = new DoublyLinkedList();
+            list.append('A').append('B').append('C').append('D');
+            log(`正向: ${list.toArray().join(' ⇄ ')}`);
+            log(`反向: ${list.toArrayReverse().join(' ⇄ ')}`);
+            log(`长度: ${list.length}`);
+
+            log('');
+            log('头部插入:');
+            list.prepend('Z');
+            log(`正向: ${list.toArray().join(' ⇄ ')}`);
+
+            log('');
+            log('删除:');
+            list.remove('B');
+            log(`删除 B: ${list.toArray().join(' ⇄ ')}`);
+        }
+
+        function demoReverse() {
+            result.innerHTML = '';
+            log('🔄 链表反转:');
+            log('');
+
+            const list = new LinkedList();
+            list.append(1).append(2).append(3).append(4).append(5);
+
+            log(`原始: ${list.toArray().join(' → ')} (head=${list.head?.val}, tail=${list.tail?.val})`);
+            log('');
+
+            log('反转过程:');
+            log('   prev = null, curr = head');
+            log('   每次将 curr.next 指向 prev');
+            log('   然后 prev 和 curr 前移');
+            log('');
+
+            list.reverse();
+            log(`反转: ${list.toArray().join(' → ')} (head=${list.head?.val}, tail=${list.tail?.val})`);
+            log('');
+
+            // 再次反转回来
+            list.reverse();
+            log(`再反转: ${list.toArray().join(' → ')}`);
+
+            log('');
+            log('📌 反转核心:');
+            log('   1. 保存 next = curr.next');
+            log('   2. curr.next = prev');
+            log('   3. prev = curr');
+            log('   4. curr = next');
+            log('   时间复杂度 O(n), 空间 O(1)');
+        }
+
+        function demoCycle() {
+            result.innerHTML = '';
+            log('🔄 环检测 (Floyd 快慢指针):');
+            log('');
+
+            function hasCycle(head) {
+                let slow = head, fast = head;
+                while (fast && fast.next) {
+                    slow = slow.next;
+                    fast = fast.next.next;
+                    if (slow === fast) return true;
+                }
+                return false;
+            }
+
+            // 无环链表
+            const list1 = new LinkedList();
+            list1.append(1).append(2).append(3).append(4).append(5);
+            log(`1️⃣ 无环链表: ${list1.toArray().join(' → ')}`);
+            log(`   是否有环: ${hasCycle(list1.head)}`);
+
+            log('');
+
+            // 有环链表
+            const node1 = new ListNode(1);
+            const node2 = new ListNode(2);
+            const node3 = new ListNode(3);
+            const node4 = new ListNode(4);
+            node1.next = node2; node2.next = node3;
+            node3.next = node4; node4.next = node2; // 环: 4→2
+
+            log('2️⃣ 有环链表: 1 → 2 → 3 → 4 → 2 ...');
+            log(`   是否有环: ${hasCycle(node1)}`);
+
+            log('');
+            log('3️⃣ 环的入口:');
+            function detectCycle(head) {
+                let slow = head, fast = head;
+                while (fast && fast.next) {
+                    slow = slow.next;
+                    fast = fast.next.next;
+                    if (slow === fast) {
+                        slow = head;
+                        while (slow !== fast) {
+                            slow = slow.next;
+                            fast = fast.next;
+                        }
+                        return slow.val;
+                    }
+                }
+                return null;
+            }
+            log(`   环入口节点值: ${detectCycle(node1)}`);
+
+            log('');
+            log('📌 快慢指针应用:');
+            log('   • 环检测 (Floyd)');
+            log('   • 寻找中点 (快指针走完时慢指针在中点)');
+            log('   • 寻找倒数第 K 个节点');
+        }
+
+        console.log('=== 链表 ===');
+        document.getElementById('output').textContent = `链表: 单向 / 双向 / 反转 / 环检测 / 增删改查\n✅ 链表演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>观察者模式</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; max-height: 250px; overflow-y: auto; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        .weather-display { display: flex; gap: 15px; flex-wrap: wrap; margin: 10px 0; }
+        .weather-panel { background: #f8f9fa; border-radius: 8px; padding: 15px; flex: 1; min-width: 150px; text-align: center; border: 2px solid #ddd; }
+        .weather-panel.active { border-color: #3498db; }
+        .weather-panel h3 { margin: 0 0 5px 0; font-size: 14px; color: #7f8c8d; }
+        .weather-panel .value { font-size: 24px; font-weight: bold; color: #2c3e50; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>观察者模式 Observer</h2><p>定义一对多依赖关系，当主题（Subject）状态变化时，自动通知所有观察者（Observer）。与发布订阅模式的区别：观察者直接依赖主题，没有事件中心作为中间人。</p></div>
+    <div class="card"><h2>气象站示例</h2><p>Subject 代表气象站，Observer 代表各个显示面板。气象站数据更新时，所有面板自动刷新。</p></div>
+    <div class="card"><h2>Push vs Pull 模型</h2><p><b>Push:</b> 主题主动推送所有数据给观察者。<b>Pull:</b> 主题仅通知变化，观察者按需拉取数据。</p></div>
+    <div id="weather-display" class="weather-display"></div>
+    <div class="card"><h2>控制面板</h2><p>
+        <button onclick="updateWeather(25, 65, 1013)">晴天 25°C</button>
+        <button onclick="updateWeather(18, 90, 1005)">雨天 18°C</button>
+        <button onclick="updateWeather(30, 40, 1018)">炎热 30°C</button>
+        <button onclick="updateWeather(5, 80, 1025)">寒冷 5°C</button>
+        <button onclick="addDisplay()">添加显示面板</button>
+        <button onclick="removeLastDisplay()">移除面板</button>
+    </p></div>
+    <div class="note"><b>观察者 vs 发布订阅：</b>观察者模式中 Observer 直接注册到 Subject（紧耦合）；发布订阅模式通过 EventBus 中介（松耦合）。观察者适合对象间直接交互，发布订阅适合跨层级/跨模块通信。</div>
+    <pre id="output"></pre>
+    <script>
+        // ========== Subject（主题/被观察者） ==========
+        class Subject {
+            constructor(name) {
+                this.name = name;
+                this.observers = []; // 观察者列表
+                this.state = {};
+            }
+
+            // 订阅（注册观察者）
+            subscribe(observer) {
+                if (!this.observers.includes(observer)) {
+                    this.observers.push(observer);
+                    log(`[${this.name}] 新观察者加入，当前共 ${this.observers.length} 个`);
+                    return true;
+                }
+                return false;
+            }
+
+            // 取消订阅
+            unsubscribe(observer) {
+                const idx = this.observers.indexOf(observer);
+                if (idx !== -1) {
+                    this.observers.splice(idx, 1);
+                    log(`[${this.name}] 观察者移除，剩余 ${this.observers.length} 个`);
+                    return true;
+                }
+                return false;
+            }
+
+            // 通知所有观察者（Push 模型：推送完整数据）
+            notify(data) {
+                log(`[${this.name}] 通知 ${this.observers.length} 个观察者: ${JSON.stringify(data)}`);
+                this.observers.forEach(observer => observer.update(data));
+            }
+
+            // 通知（Pull 模型：仅通知变化，观察者自主拉取）
+            notifyPull() {
+                log(`[${this.name}] 推送变化通知，观察者自行拉取数据`);
+                this.observers.forEach(observer => observer.pullUpdate(this));
+            }
+
+            // 获取状态（用于 Pull 模型）
+            getState() {
+                return this.state;
+            }
+
+            // 更新状态（Push 模式）
+            setState(newState) {
+                this.state = { ...this.state, ...newState };
+                log(`[${this.name}] 状态更新为: ${JSON.stringify(this.state)}`);
+                this.notify(this.state); // Push 模型
+            }
+        }
+
+        // ========== Observer（观察者） ==========
+        class Observer {
+            constructor(name) {
+                this.name = name;
+            }
+
+            // Push 模型：被动接收数据
+            update(data) {
+                log(`  [${this.name}] 收到推送数据: ${JSON.stringify(data)}`);
+                this.render(data);
+            }
+
+            // Pull 模型：主动拉取数据
+            pullUpdate(subject) {
+                const data = subject.getState();
+                log(`  [${this.name}] 拉取到数据: ${JSON.stringify(data)}`);
+                this.render(data);
+            }
+
+            render(data) {
+                // 子类实现
+            }
+        }
+
+        // ========== 具体观察者：温度显示面板 ==========
+        class TemperatureDisplay extends Observer {
+            constructor() {
+                super('温度面板');
+            }
+            render(data) {
+                const el = document.getElementById('temp-display');
+                if (el) {
+                    el.querySelector('.value').textContent = `${data.temperature ?? '--'}°C`;
+                    el.classList.add('active');
+                }
+            }
+        }
+
+        // ========== 具体观察者：湿度显示面板 ==========
+        class HumidityDisplay extends Observer {
+            constructor() {
+                super('湿度面板');
+            }
+            render(data) {
+                const el = document.getElementById('humid-display');
+                if (el) {
+                    el.querySelector('.value').textContent = `${data.humidity ?? '--'}%`;
+                    el.classList.add('active');
+                }
+            }
+        }
+
+        // ========== 具体观察者：气压显示面板 ==========
+        class PressureDisplay extends Observer {
+            constructor() {
+                super('气压面板');
+            }
+            render(data) {
+                const el = document.getElementById('pressure-display');
+                if (el) {
+                    el.querySelector('.value').textContent = `${data.pressure ?? '--'} hPa`;
+                    el.classList.add('active');
+                }
+            }
+        }
+
+        // ========== 具体观察者：通用面板（可动态添加） ==========
+        class GenericDisplay extends Observer {
+            constructor(id, label) {
+                super(label);
+                this.id = id;
+                this._createPanel();
+            }
+            _createPanel() {
+                const container = document.getElementById('weather-display');
+                const panel = document.createElement('div');
+                panel.className = 'weather-panel';
+                panel.id = `display-${this.id}`;
+                panel.innerHTML = `<h3>${this.name}</h3><div class="value">--</div>`;
+                container.appendChild(panel);
+            }
+            render(data) {
+                const el = document.getElementById(`display-${this.id}`);
+                if (el) {
+                    el.querySelector('.value').textContent = JSON.stringify(data).substring(0, 30);
+                    el.classList.add('active');
+                }
+            }
+            remove() {
+                const el = document.getElementById(`display-${this.id}`);
+                if (el) el.remove();
+            }
+        }
+
+        // ========== 初始化 ==========
+        let displayCounter = 0;
+        const output = document.getElementById('output');
+
+        function log(msg) {
+            const time = new Date().toLocaleTimeString();
+            output.innerHTML += `<div style="padding:2px 0;font-size:13px;border-bottom:1px solid #333;">[${time}] ${msg}</div>`;
+            output.scrollTop = output.scrollHeight;
+            console.log(msg);
+        }
+
+        // 创建气象站（Subject）
+        const weatherStation = new Subject('气象站');
+
+        // 创建显示面板（Observers）
+        const tempDisplay = new TemperatureDisplay();
+        const humidDisplay = new HumidityDisplay();
+        const pressureDisplay = new PressureDisplay();
+
+        // 订阅
+        weatherStation.subscribe(tempDisplay);
+        weatherStation.subscribe(humidDisplay);
+        weatherStation.subscribe(pressureDisplay);
+
+        // ========== 全局函数 ==========
+        function updateWeather(temp, humidity, pressure) {
+            weatherStation.setState({ temperature: temp, humidity, pressure });
+        }
+
+        function addDisplay() {
+            displayCounter++;
+            const display = new GenericDisplay(displayCounter, `自定义面板 #${displayCounter}`);
+            weatherStation.subscribe(display);
+            log(`添加了 ${display.name}`);
+        }
+
+        function removeLastDisplay() {
+            if (weatherStation.observers.length <= 3) {
+                log('至少保留三个基础面板');
+                return;
+            }
+            const observer = weatherStation.observers[weatherStation.observers.length - 1];
+            if (observer instanceof GenericDisplay) {
+                weatherStation.unsubscribe(observer);
+                observer.remove();
+            }
+        }
+
+        // ========== 对比 Pub-Sub ==========
+        log('=== 观察者模式演示 ===');
+        log('初始状态：气象站（Subject）+ 3个显示面板（Observers）');
+        log('点击按钮修改气象站数据，所有面板自动更新');
+        log('Push 模型：Subject 推送完整状态给所有 Observer');
+    </script>
+</body>
+</html>

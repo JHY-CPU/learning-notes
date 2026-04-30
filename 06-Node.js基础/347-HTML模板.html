@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML模板</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>HTML 模板</h2><p>template 标签、content 片段、cloning、slot 插槽、组成复用。</p></div>
+    <div class="card">
+        <h2>HTML Template API</h2>
+        <div class="code">// ========== template 标签 ==========
+<template id="my-tpl">
+    <style>/* 模板样式 */</style>
+    <div class="card">
+        <h3></h3>
+        <p></p>
+        <slot name="actions"></slot>
+    </div>
+</template>
+
+// ========== 使用模板 ==========
+const template = document.getElementById('my-tpl');
+const clone = template.content.cloneNode(true);
+// clone 是 DocumentFragment, 不会出现在 DOM 树
+
+// ========== 填充数据 ==========
+clone.querySelector('h3').textContent = '标题';
+clone.querySelector('p').textContent = '内容';
+
+// ========== 添加到 DOM ==========
+document.body.appendChild(clone);
+
+// ========== 模板优点 ==========
+// 1. 内容不可见 (不渲染)
+// 2. 无网络请求
+// 3. 可克隆复用
+// 4. 保持 HTML 结构</div>
+    </div>
+    <div class="card">
+        <h2>演示：HTML 模板</h2>
+        <button onclick="demoTemplate()">模板基础</button>
+        <button onclick="demoList()">列表渲染</button>
+        <button onclick="demoComposition()">组合模板</button>
+        <button onclick="demoSlot()">Slot 插槽</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        // ========== Mock Template ==========
+        class MockTemplate {
+            constructor(id, html) {
+                this.id = id;
+                this.content = { innerHTML: html };
+                this._instances = 0;
+            }
+
+            cloneNode(deep) {
+                this._instances++;
+                const clone = {
+                    _id: `${this.id}-${this._instances}`,
+                    _template: this.id,
+                    innerHTML: this.content.innerHTML,
+                    querySelector(sel) {
+                        return { textContent: '', set textContent(v) {} };
+                    },
+                    querySelectorAll(sel) { return []; },
+                    appendChild() {},
+                };
+                return clone;
+            }
+        }
+
+        function demoTemplate() {
+            result.innerHTML = '';
+            log('📄 HTML Template 基础:');
+            log('');
+
+            log('1️⃣ 定义模板:');
+            const tpl = `
+            <template id="user-card-tpl">
+                <style>
+                    .card { border: 1px solid #ddd; padding: 16px; border-radius: 8px; }
+                    .name { font-size: 18px; font-weight: bold; color: #333; }
+                    .email { color: #666; }
+                </style>
+                <div class="card">
+                    <div class="name"></div>
+                    <div class="email"></div>
+                    <slot></slot>
+                </div>
+            </template>`;
+            log(tpl);
+            log('');
+
+            log('2️⃣ 模板特性:');
+            log('   • 内容不渲染 (display: none)');
+            log('   • 无网络请求 (src 不加载)');
+            log('   • 可通过 content 访问 DocumentFragment');
+            log('   • content.cloneNode(true) 创建实例');
+            log('');
+
+            log('3️⃣ 使用流程:');
+            log('   const tpl = document.getElementById("my-tpl");');
+            log('   const clone = tpl.content.cloneNode(true);');
+            log('   clone.querySelector(".name").textContent = "Alice";');
+            log('   document.body.appendChild(clone);');
+            log('');
+
+            log('4️⃣ 模拟模板实例化:');
+            function instantiate(templateId, data) {
+                const tpl = new MockTemplate(templateId, '<div>模板内容</div>');
+                const clone = tpl.cloneNode(true);
+                log(`   从 "${templateId}" 创建实例`);
+                log(`   数据: ${JSON.stringify(data)}`);
+                log(`   实例 ID: ${clone._id}`);
+                return clone;
+            }
+
+            instantiate('user-card-tpl', { name: 'Alice', email: 'alice@example.com' });
+            instantiate('user-card-tpl', { name: 'Bob', email: 'bob@example.com' });
+        }
+
+        function demoList() {
+            result.innerHTML = '';
+            log('📋 模板列表渲染:');
+            log('');
+
+            const template = new MockTemplate('item-tpl', '<li class="item"><span class="text"></span></li>');
+
+            function renderList(items) {
+                log('渲染列表:');
+                const fragment = [];
+                items.forEach((item, i) => {
+                    const clone = template.cloneNode(true);
+                    clone._data = item;
+                    fragment.push(clone);
+                    log(`   项目 ${i + 1}: ${item}`);
+                });
+                log(`   共 ${fragment.length} 项`);
+                return fragment;
+            }
+
+            const items = ['Apple', 'Banana', 'Cherry', 'Date'];
+            const rendered = renderList(items);
+
+            log('');
+            log('📌 模板 vs 字符串拼接:');
+            log('   模板: 保持 HTML 结构, DOM 操作');
+            log('   字符串: innerHTML +=, 可能 XSS');
+            log('');
+
+            log('📌 模板引擎对比:');
+            log('   • 原生 template: 浏览器内置, 无依赖');
+            log('   • Handlebars/Mustache: 服务端模板');
+            log('   • JSX: React 模板');
+            log('   • Vue SFC: .vue 单文件组件');
+        }
+
+        function demoComposition() {
+            result.innerHTML = '';
+            log('🔧 组合模板:');
+            log('');
+
+            const templates = {
+                header: new MockTemplate('header', '<header><slot name="title"></slot></header>'),
+                card: new MockTemplate('card', '<div class="card"><slot></slot></div>'),
+                footer: new MockTemplate('footer', '<footer><slot name="copy"></slot></footer>'),
+            };
+
+            function composePage(data) {
+                log('组合页面模板:');
+                log('');
+
+                log('1️⃣ 创建 Header:');
+                const header = templates.header.cloneNode(true);
+                log(`   标题: "${data.title}"`);
+                log('');
+
+                log('2️⃣ 创建 Card 列表:');
+                const cards = data.items.map((item, i) => {
+                    const card = templates.card.cloneNode(true);
+                    log(`   卡片 ${i + 1}: ${item}`);
+                    return card;
+                });
+                log('');
+
+                log('3️⃣ 创建 Footer:');
+                const footer = templates.footer.cloneNode(true);
+                log(`   版权: "${data.copyright}"`);
+                log('');
+
+                log('4️⃣ 组装页面:');
+                log('   page.appendChild(header)');
+                log('   cards.forEach(c => page.appendChild(c))');
+                log('   page.appendChild(footer)');
+                log('');
+
+                log('📌 组合优势:');
+                log('   • 每个模板独立维护');
+                log('   • 支持嵌套组合');
+                log('   • 数据驱动渲染');
+            }
+
+            composePage({
+                title: '用户列表',
+                items: ['Alice', 'Bob', 'Charlie'],
+                copyright: '© 2025 MyApp'
+            });
+        }
+
+        function demoSlot() {
+            result.innerHTML = '';
+            log('🔲 Slot 插槽与模板:');
+            log('');
+
+            log('1️⃣ 模板中的插槽:');
+            log('   <template id="card">');
+            log('     <div class="card">');
+            log('       <h2><slot name="title">默认标题</slot></h2>');
+            log('       <div class="body"><slot>默认内容</slot></div>');
+            log('       <div class="footer"><slot name="actions"></slot></div>');
+            log('     </div>');
+            log('   </template>');
+            log('');
+
+            log('2️⃣ 使用插槽:');
+            log('   <my-card>');
+            log('     <span slot="title">自定义标题</span>');
+            log('     <p>这是正文内容</p>');
+            log('     <button slot="actions">确认</button>');
+            log('   </my-card>');
+            log('');
+
+            log('3️⃣ 模拟插槽填充:');
+            function fillSlots(templateName, slots) {
+                log(`   模板: <${templateName}>`);
+                log(`   插槽配置:`);
+                for (const [name, content] of Object.entries(slots)) {
+                    const slotName = name === 'default' ? '(默认)' : `"${name}"`;
+                    log(`     slot=${slotName} → "${content}"`);
+                }
+            }
+
+            fillSlots('my-card', {
+                title: '用户信息',
+                default: '这是一张用户卡片...',
+                actions: '<button>编辑</button> <button>删除</button>'
+            });
+
+            log('');
+            log('4️⃣ 插槽 vs props:');
+            log('   • Slot: HTML 结构, 布局灵活');
+            log('   • Props: 数据传递, 逻辑驱动');
+            log('   • Slot = 内容分发');
+            log('   • Props = 数据通信');
+        }
+
+        console.log('=== HTML 模板 ===');
+        document.getElementById('output').textContent =
+            `HTML 模板: template / content / cloneNode / DocumentFragment / Slot\n` +
+            `✅ HTML 模板演示完成！`;
+    </script>
+</body>
+</html>

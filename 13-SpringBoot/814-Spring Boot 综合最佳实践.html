@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot 综合最佳实践</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📐 Spring Boot 综合最佳实践</h2><p>项目结构分层、配置管理、异常处理体系、分层验证、日志规范、API 设计规范、性能优化、安全清单、测试策略、部署与运维。</p></div>
+    <div class="card">
+        <h2>项目结构</h2>
+        <div class="code">// ========== 推荐项目结构 ==========
+
+// src/main/java/com/example/myapp/
+//
+// ├── MyApplication.java                    // 启动类
+// │
+// ├── config/                               // 配置类
+// │   ├── SecurityConfig.java
+// │   ├── SwaggerConfig.java
+// │   ├── RedisConfig.java
+// │   └── WebMvcConfig.java
+// │
+// ├── common/                               // 公共模块
+// │   ├── response/
+// │   │   ├── ApiResponse.java              // 统一响应
+// │   │   └── PageResponse.java             // 分页响应
+// │   ├── exception/
+// │   │   ├── BusinessException.java        // 业务异常
+// │   │   ├── ErrorCode.java                // 错误码枚举
+// │   │   └── GlobalExceptionHandler.java   // 全局异常处理
+// │   ├── constant/
+// │   │   └── AppConstants.java             // 常量
+// │   └── util/
+// │       ├── DateUtils.java
+// │       └── SecurityUtils.java
+// │
+// ├── user/                                 // 用户模块 (按业务分包)
+// │   ├── User.java                         // Entity
+// │   ├── UserRepository.java               // Repository
+// │   ├── UserService.java                  // Service
+// │   ├── UserController.java               // Controller
+// │   ├── dto/
+// │   │   ├── CreateUserRequest.java
+// │   │   ├── UpdateUserRequest.java
+// │   │   ├── UserVO.java
+// │   │   └── UserQueryCriteria.java
+// │   └── mapstruct/
+// │       └── UserMapper.java               // MapStruct
+// │
+// ├── order/                                // 订单模块
+// │   ├── Order.java
+// │   ├── OrderRepository.java
+// │   ├── OrderService.java
+// │   ├── OrderController.java
+// │   └── dto/
+// │       ├── CreateOrderRequest.java
+// │       ├── OrderVO.java
+// │       └── OrderDetailVO.java
+// │
+// └── common/                               // 跨模块通用
+//     ├── model/
+//     │   └── BaseEntity.java               // 审计基类
+//     └── enums/
+//         └── UserStatus.java
+
+// src/main/resources/
+// ├── application.yml                       // 主配置
+// ├── application-dev.yml                   // 开发环境
+// ├── application-prod.yml                  // 生产环境
+// ├── messages.properties                   // i18n 默认
+// ├── messages_zh_CN.properties
+// ├── db/migration/                         // Flyway
+// │   ├── V1__init_schema.sql
+// │   └── V2__add_index.sql
+// └── static/                               // 静态资源
+
+// src/test/java/com/example/myapp/
+// ├── user/
+// │   ├── UserControllerTest.java
+// │   ├── UserServiceTest.java
+// │   └── UserRepositoryTest.java
+// └── common/
+//     └── GlobalExceptionHandlerTest.java
+
+// ========== 分层职责 ==========
+// Controller: 接收请求, 参数校验, 调用 Service, 返回
+// Service:    业务逻辑, 事务管理, 调用 Repository
+// Repository: 数据访问 (JPA/MyBatis)
+// DTO:        Controller ↔ Service 数据传输
+// Entity:     JPA 实体, 与数据库表映射
+// VO:         返回给前端的视图对象
+
+// ========== 依赖方向 ==========
+// Controller → Service → Repository
+// Controller → DTO (输入/输出)
+// Service    → DTO + Entity
+// Repository → Entity</div>
+    </div>
+    <div class="card">
+        <h2>配置与日志</h2>
+        <div class="code">// ========== application.yml 规范 ==========
+
+spring:
+  profiles:
+    active: @spring.profiles.active@    # Maven 构建时替换
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api/v1               # API 前缀
+
+# ========== 多环境配置 ==========
+// 1. application-dev.yml:
+//   server.port=8080
+//   spring.jpa.show-sql=true
+//   spring.jpa.hibernate.ddl-auto=update
+//
+// 2. application-staging.yml:
+//   server.port=8080
+//   spring.jpa.show-sql=false
+//   spring.jpa.hibernate.ddl-auto=validate
+//
+// 3. application-prod.yml:
+//   server.port=8080
+//   spring.jpa.hibernate.ddl-auto=none  # 用 Flyway
+//   spring.jpa.show-sql=false
+//
+// 启动: java -jar app.jar --spring.profiles.active=prod
+
+// ========== 配置管理 ==========
+// 方式 1: @ConfigurationProperties (推荐)
+@ConfigurationProperties(prefix = "app")
+@Data
+public class AppProperties {
+    private String name;
+    private String version;
+    private Jwt jwt = new Jwt();
+    private Cors cors = new Cors();
+
+    @Data
+    public static class Jwt {
+        private String secret;
+        private long expirationMs;
+    }
+
+    @Data
+    public static class Cors {
+        private List&lt;String&gt; allowedOrigins;
+        private List&lt;String&gt; allowedMethods;
+    }
+}
+
+@Configuration
+@EnableConfigurationProperties(AppProperties.class)
+public class PropertiesConfig {}
+
+// application.yml:
+// app:
+//   name: my-service
+//   version: 1.0.0
+//   jwt:
+//     secret: xxx
+//     expiration-ms: 86400000
+//   cors:
+//     allowed-origins: https://example.com
+//     allowed-methods: GET,POST,PUT
+
+// 方式 2: @Value (简单值)
+@Value("${app.name}")
+private String appName;
+
+// 方式 3: Spring Cloud Config (分布式)
+
+// ========== 日志规范 ==========
+// 生产配置: logback-spring.xml
+
+// 日志规范:
+// 1. 使用 SLF4J + Lombok @Slf4j
+// 2. 统一格式: [时间] [线程] [级别] [请求ID] [类名] - 消息
+// 3. 敏感信息脱敏 (密码/手机号/身份证)
+// 4. 异常日志打印完整堆栈
+// 5. 避免日志级别滥用 (生产 INFO, 调试 DEBUG)
+
+// 日志最佳:
+// - 系统启动/关闭: INFO
+// - 业务操作: INFO (关键路径)
+// - 错误: ERROR (含上下文)
+// - 调试: DEBUG (开发环境)
+// - 追踪: TRACE (极少使用)</div>
+    </div>
+    <div class="card">
+        <h2>异常处理与验证</h2>
+        <div class="code">// ========== 统一异常处理体系 ==========
+
+// 1. 错误码枚举
+public enum ErrorCode {
+    // 通用
+    SUCCESS(0, "成功"),
+    FAILED(1000, "操作失败"),
+    PARAM_ERROR(1001, "参数错误"),
+    UNAUTHORIZED(1002, "未认证"),
+    FORBIDDEN(1003, "无权限"),
+    NOT_FOUND(1004, "资源不存在"),
+    CONFLICT(1005, "资源冲突"),
+
+    // 业务
+    USER_NOT_FOUND(2001, "用户不存在"),
+    USER_EXISTS(2002, "用户已存在"),
+    PASSWORD_ERROR(2003, "密码错误"),
+    ORDER_NOT_FOUND(3001, "订单不存在"),
+    ORDER_STATUS_INVALID(3002, "订单状态无效"),
+    INSUFFICIENT_STOCK(3003, "库存不足");
+
+    private final int code;
+    private final String message;
+}
+
+// 2. 业务异常
+@Getter
+public class BusinessException extends RuntimeException {
+    private final int code;
+    private final String message;
+
+    public BusinessException(ErrorCode errorCode) {
+        super(errorCode.getMessage());
+        this.code = errorCode.getCode();
+        this.message = errorCode.getMessage();
+    }
+
+    public BusinessException(ErrorCode errorCode, Object... args) {
+        super(String.format(errorCode.getMessage(), args));
+        this.code = errorCode.getCode();
+        this.message = String.format(errorCode.getMessage(), args);
+    }
+}
+
+// 3. 统一响应
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
+public class ApiResponse&lt;T&gt; {
+    private int code;
+    private String message;
+    private T data;
+    private String requestId;
+    private long timestamp;
+
+    public static &lt;T&gt; ApiResponse&lt;T&gt; success(T data) {
+        ApiResponse&lt;T&gt; response = new ApiResponse&lt;&gt;();
+        response.code = ErrorCode.SUCCESS.getCode();
+        response.message = ErrorCode.SUCCESS.getMessage();
+        response.data = data;
+        response.timestamp = System.currentTimeMillis();
+        response.requestId = MDC.get("requestId");
+        return response;
+    }
+
+    public static &lt;T&gt; ApiResponse&lt;T&gt; error(ErrorCode errorCode) {
+        ApiResponse&lt;T&gt; response = new ApiResponse&lt;&gt;();
+        response.code = errorCode.getCode();
+        response.message = errorCode.getMessage();
+        response.timestamp = System.currentTimeMillis();
+        response.requestId = MDC.get("requestId");
+        return response;
+    }
+}
+
+// 4. 全局异常处理器
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; handleBusiness(BusinessException e) {
+        log.warn("业务异常: code={}, message={}", e.getCode(), e.getMessage());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(ApiResponse.error(e.getCode(), e.getMessage()));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity&lt;ApiResponse&lt;Map&lt;String, String&gt;&gt;&gt; handleValidation(
+            MethodArgumentNotValidException e) {
+        Map&lt;String, String&gt; errors = new HashMap&lt;&gt;();
+        e.getBindingResult().getFieldErrors()
+            .forEach(err -> errors.put(err.getField(), err.getDefaultMessage()));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+            .body(ApiResponse.error(ErrorCode.PARAM_ERROR.getCode(), "参数校验失败", errors));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity&lt;ApiResponse&lt;Void&gt;&gt; handleUnknown(Exception e) {
+        log.error("未知异常", e);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(ApiResponse.error(ErrorCode.FAILED));
+    }
+}
+
+// ========== 分层验证 ==========
+// Controller: @Valid 基础格式校验
+// Service:    业务规则校验 (唯一性/状态)
+// Repository: 数据完整性约束 (DB 约束)
+
+// Controller 校验:
+@PostMapping
+public ResponseEntity&lt;ApiResponse&lt;UserVO&gt;&gt; createUser(
+        @Valid @RequestBody CreateUserRequest request) {
+    // @Valid 自动校验 @NotBlank/@Email/@Size 等
+}
+
+// Service 校验:
+public UserVO createUser(CreateUserRequest request) {
+    // 业务校验
+    if (userRepository.existsByUsername(request.getUsername())) {
+        throw new BusinessException(ErrorCode.USER_EXISTS);
+    }
+    // ...
+}</div>
+    </div>
+    <div class="card">
+        <h2>API 设计与性能</h2>
+        <div class="code">// ========== API 设计规范 ==========
+
+// ========== URL 设计 ==========
+// 资源名用复数: /users, /orders
+// 层级用斜杠:   /users/{id}/orders
+// 查询用参数:   ?page=0&size=20&sort=createdAt,desc
+// 动词用方法:   GET/POST/PUT/PATCH/DELETE
+
+// ========== RESTful 示例 ==========
+// GET    /users                  — 列表
+// GET    /users/{id}             — 详情
+// POST   /users                  — 创建
+// PUT    /users/{id}             — 全量更新
+// PATCH  /users/{id}             — 部分更新
+// DELETE /users/{id}             — 删除
+
+// ========== 统一响应 ==========
+// {
+//   "code": 0,
+//   "message": "success",
+//   "data": { ... },
+//   "requestId": "req-xxx",
+//   "timestamp": 1700000000000
+// }
+
+// 分页响应:
+// {
+//   "code": 0,
+//   "message": "success",
+//   "data": {
+//     "content": [...],
+//     "page": 0,
+//     "size": 20,
+//     "totalElements": 100,
+//     "totalPages": 5
+//   },
+//   "requestId": "...",
+//   "timestamp": 1700000000000
+// }
+
+// ========== 性能优化 ==========
+
+// ========== 1. 数据库 ==========
+// - 合理索引 (复合索引最左前缀)
+// - @EntityGraph / JOIN FETCH 避免 N+1
+// - 分页查询 (Pageable)
+// - 只查需要的字段 (DTO 投影)
+
+// ========== 2. 缓存 ==========
+// - 热点数据 @Cacheable
+// - 本地缓存 Caffeine + 分布式 Redis
+// - 缓存穿透/击穿/雪崩防御
+
+// ========== 3. 异步 ==========
+// - 非核心逻辑 @Async
+// - 消息队列解耦
+// - CompletableFuture 并行调用
+
+// ========== 4. 连接池 ==========
+// - HikariCP 合理配置 (max=20, min=5)
+// - 连接超时: connectionTimeout=30000
+// - 空闲回收: idleTimeout=600000
+
+// ========== 5. JVM ==========
+// - 堆内存: -Xms512m -Xmx2g
+// - GC 策略: G1GC
+// - 元空间: -XX:MaxMetaspaceSize=256m
+
+// ========== 6. 压缩 ==========
+// server.compression.enabled=true
+// server.compression.min-response-size=1024
+
+// ========== 7. 静态资源 ==========
+// - CDN 加速
+// - HTTP 缓存 (Cache-Control)
+// - 资源压缩 (CSS/JS)</div>
+    </div>
+    <div class="card">
+        <h2>安全与测试清单</h2>
+        <div class="code">// ========== 安全清单 ==========
+
+// ✅ 认证
+// [ ] 密码 BCrypt 加密 (强度 ≥ 10)
+// [ ] JWT 短期有效 (Access 15m, Refresh 7d)
+// [ ] 刷新 Token 轮换 (旧 Token 失效)
+// [ ] 登录失败限制 (防暴力破解)
+
+// ✅ 授权
+// [ ] @PreAuthorize 方法级权限
+// [ ] RBAC 角色权限模型
+// [ ] 敏感操作二次验证
+
+// ✅ API 安全
+// [ ] HTTPS 强制跳转
+// [ ] CSRF 保护 (浏览器)
+// [ ] CORS 最小源配置
+// [ ] 请求限流 (Rate Limiter)
+// [ ] 安全头 (CSP/HSTS/X-Frame-Options)
+
+// ✅ 数据安全
+// [ ] SQL 注入防御 (参数化查询)
+// [ ] XSS 过滤
+// [ ] 敏感数据脱敏
+// [ ] 输入校验 (@Valid)
+// [ ] 输出编码
+
+// ✅ 基础设施
+// [ ] Actuator 独立端口 + 认证
+// [ ] 密钥管理 (Vault/环境变量)
+// [ ] 依赖漏洞扫描
+// [ ] 审计日志
+// [ ] 容器非 root 运行
+
+// ========== 测试策略 ==========
+
+// ========== 测试金字塔 ==========
+// 1. 单元测试 (70%) — Service / Util
+// 2. 集成测试 (20%) — Repository / Controller
+// 3. E2E 测试 (10%) — 全流程
+
+// ========== 测试清单 ==========
+// [ ] 单元测试覆盖核心业务逻辑
+// [ ] @DataJpaTest 测试 Repository 查询
+// [ ] @WebMvcTest + MockMvc 测试 Controller
+// [ ] @SpringBootTest 测试集成
+// [ ] Testcontainers 测试真实数据库
+// [ ] 测试异常路径和边界条件
+// [ ] 测试事务回滚
+// [ ] 测试并发安全
+// [ ] API 文档测试 (自动验证)
+
+// ========== 命名规范 ==========
+// shouldXxx_whenYyy
+// @Test
+// void shouldReturnUser_whenValidId() { ... }
+// @Test
+// void shouldThrowException_whenUserNotFound() { ... }
+
+// ========== CI/CD 集成 ==========
+// [ ] 代码检查 (Checkstyle/PMD/SpotBugs)
+// [ ] 单元测试 (mvn test)
+// [ ] 集成测试 (mvn verify)
+// [ ] 构建 (mvn package)
+// [ ] Docker 镜像构建
+// [ ] 部署 (Dev/Staging/Prod)
+// [ ] 健康检查 (Actuator /health)
+// [ ] 监控告警 (Prometheus + Grafana)</div>
+    </div>
+    <div class="card">
+        <h2>部署与运维</h2>
+        <div class="code">// ========== Docker 部署 ==========
+// Dockerfile:
+
+FROM eclipse-temurin:21-jre-alpine AS builder
+WORKDIR /app
+COPY target/*.jar app.jar
+RUN java -Djarmode=layertools -jar app.jar extract
+
+FROM eclipse-temurin:21-jre-alpine
+RUN addgroup -S spring && adduser -S spring -G spring
+USER spring:spring
+WORKDIR /app
+COPY --from=builder app/dependencies/ ./
+COPY --from=builder app/spring-boot-loader/ ./
+COPY --from=builder app/snapshot-dependencies/ ./
+COPY --from=builder app/application/ ./
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+  CMD wget -qO- http://localhost:8080/actuator/health || exit 1
+ENTRYPOINT ["java", "org.springframework.boot.loader.launch.JarLauncher"]
+
+// ========== docker-compose.yml ==========
+// version: '3.8'
+// services:
+//   app:
+//     build: .
+//     ports:
+//       - "8080:8080"
+//     environment:
+//       - SPRING_PROFILES_ACTIVE=prod
+//       - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/mydb
+//       - SPRING_REDIS_HOST=redis
+//     depends_on:
+//       db:
+//         condition: service_healthy
+//       redis:
+//         condition: service_started
+//
+//   db:
+//     image: postgres:16-alpine
+//     environment:
+//       POSTGRES_DB: mydb
+//       POSTGRES_PASSWORD: secret
+//     healthcheck:
+//       test: ["CMD-SHELL", "pg_isready -U postgres"]
+//
+//   redis:
+//     image: redis:7-alpine
+
+// ========== JVM 参数 ==========
+// java -jar app.jar \
+//   -Xms512m -Xmx2g \
+//   -XX:+UseG1GC \
+//   -XX:MaxGCPauseMillis=200 \
+//   -XX:+ParallelRefProcEnabled \
+//   -Djava.security.egd=file:/dev/./urandom \
+//   -Dcom.sun.management.jmxremote
+
+// ========== K8s 部署 ==========
+// apiVersion: apps/v1
+// kind: Deployment
+// metadata:
+//   name: myapp
+// spec:
+//   replicas: 3
+//   strategy:
+//     type: RollingUpdate
+//     rollingUpdate:
+//       maxUnavailable: 1
+//       maxSurge: 1
+//   template:
+//     spec:
+//       containers:
+//       - name: app
+//         image: myapp:latest
+//         ports:
+//         - containerPort: 8080
+//         livenessProbe:
+//           httpGet:
+//             path: /actuator/health/liveness
+//             port: 8080
+//         readinessProbe:
+//           httpGet:
+//             path: /actuator/health/readiness
+//             port: 8080
+//         resources:
+//           requests:
+//             cpu: 500m
+//             memory: 512Mi
+//           limits:
+//             cpu: 2000m
+//             memory: 2Gi
+
+// ========== 优雅关闭 ==========
+// server.shutdown=graceful
+// spring.lifecycle.timeout-per-shutdown-phase=30s
+
+// @Bean
+// public GracefulShutdownHandler gracefulShutdown() {
+//     return new GracefulShutdownHandler();
+// }</div>
+        <div class="note">💡 综合实践: 按业务分包结构; @ConfigurationProperties 配置管理; 统一异常+错误码; 分层验证; RESTful 命名; 性能优化 (缓存/异步/索引); 安全清单7大类; 测试金字塔; Docker 分层构建; K8s 健康探针; 优雅关闭。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoStructure()">项目结构</button>
+        <button onclick="demoApi()">API 规范</button>
+        <button onclick="demoChecklist()">安全清单</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoStructure() {
+            result.innerHTML = '';
+            log('# 推荐项目结构');
+            log('');
+            log('按业务分包:');
+            log('  user/ order/ product/');
+            log('');
+            log('每模块:');
+            log('  Entity.java');
+            log('  Repository.java');
+            log('  Service.java');
+            log('  Controller.java');
+            log('  dto/ (Request/Response)');
+            log('  mapstruct/ (Mapper)');
+            log('');
+            log('公用:');
+            log('  common/exception');
+            log('  common/response');
+            log('  config/');
+            log('  util/');
+        }
+
+        function demoApi() {
+            result.innerHTML = '';
+            log('# RESTful API 设计');
+            log('');
+            log('URL 规范:');
+            log('  GET    /users          — 列表');
+            log('  GET    /users/{id}     — 详情');
+            log('  POST   /users          — 创建');
+            log('  PUT    /users/{id}     — 全量更新');
+            log('  DELETE /users/{id}     — 删除');
+            log('');
+            log('响应格式:');
+            log('  {code, message, data, requestId, timestamp}');
+            log('');
+            log('分页:');
+            log('  ?page=0&size=20&sort=createdAt,desc');
+        }
+
+        function demoChecklist() {
+            result.innerHTML = '';
+            log('# 安全清单');
+            log('');
+            log('🔐 认证:');
+            log('  BCrypt / JWT 短期 / 刷新轮换');
+            log('');
+            log('🛡️ 授权:');
+            log('  @PreAuthorize / RBAC');
+            log('');
+            log('🌐 API:');
+            log('  HTTPS / CORS / 限流 / 安全头');
+            log('');
+            log('🗄️ 数据:');
+            log('  参数化 SQL / XSS 过滤 / 脱敏');
+            log('');
+            log('⚙️ 基建:');
+            log('  Actuator 保护 / Secrets 管理');
+            log('');
+            log('✅ 测试:');
+            log('  单元 70% / 集成 20% / E2E 10%');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>量词</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #quant-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; margin: 5px 0; width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>量词</h2><p>* / + / ? / {n,m}、贪婪模式、懒惰模式。</p></div>
+    <div class="card">
+        <h2>量词大全</h2>
+        <div class="code">// ========== 量词 ==========
+// *     — 0 次或多次  {0,}
+// +     — 1 次或多次  {1,}
+// ?     — 0 次或 1 次  {0,1}
+// {n}   — 恰好 n 次
+// {n,}  — 至少 n 次
+// {n,m} — n 到 m 次
+
+// ========== 贪婪模式 (默认) ==========
+// 尽量匹配更多字符
+/a+/        // 对 'aaa' ⇒ 'aaa'
+/\d{2,4}/   // 对 '12345' ⇒ '1234' (取最多)
+
+// ========== 懒惰模式 (加 ?) ==========
+// 尽量匹配更少字符
+/a+?/       // 对 'aaa' ⇒ 'a'
+/\d{2,4}?/  // 对 '12345' ⇒ '12' (取最少)
+/a*?b/      // 对 'aab' ⇒ 'aab' (找到即停)
+/.*?/       // 尽量少匹配 (可能为空)
+
+// ========== 占有量词 (JS 不支持) ==========
+// JS 不支持 *+ / ++ / ?+ (占有量词)
+// 但可用原子组 (?>...) 替代 (部分引擎)
+
+// ========== 常见陷阱 ==========
+// /<.+>/ 对 '<div>text</div>' ⇒ 整个字符串（贪婪）
+// /<.+?>/ 对 '<div>text</div>' ⇒ '<div>'（懒惰）
+
+// 对比
+'abbb'.match(/ab+/)   // ['abb'] 贪婪
+'abbb'.match(/ab+?/)  // ['ab']  懒惰</div>
+    </div>
+    <div class="card">
+        <h2>演示：量词对比</h2>
+        <input id="quantInput" value='<div><p>hello</p></div>' placeholder="输入文本">
+        <button onclick="demoGreedy()">贪婪 vs 懒惰</button>
+        <button onclick="demoQuantifiers()">量词测试</button>
+        <div id="quant-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const quantResult = document.getElementById('quant-result');
+
+        function log(msg) {
+            quantResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoGreedy() {
+            quantResult.innerHTML = '';
+            const text = document.getElementById('quantInput').value;
+            log(`📋 文本: "${text}"`);
+            log('');
+
+            log('1️⃣ 贪婪模式 (默认):');
+            const greedy1 = text.match(/<.+>/);
+            log(`   <.+>: ${greedy1 ? greedy1[0] : '无匹配'}`);
+
+            const greedy2 = text.match(/\w+/);
+            log(`   \\w+: ${greedy2 ? greedy2[0] : '无匹配'}`);
+
+            const greedy3 = 'abc123def456'.match(/\d+.+/);
+            log(`   \\d+.+: ${greedy3 ? greedy3[0] : '无匹配'}`);
+            log('');
+
+            log('2️⃣ 懒惰模式 (加 ?):');
+            const lazy1 = text.match(/<.+?>/);
+            log(`   <.+?>: ${lazy1 ? lazy1[0] : '无匹配'}`);
+
+            const lazy2 = text.match(/<.+?>$/);
+            log(`   <.+?>$: ${lazy2 ? lazy2[0] : '无匹配'}`);
+
+            log('');
+            log('3️⃣ 量词对比:');
+            const tests = ['ab', 'abb', 'abbb'];
+            tests.forEach(s => {
+                const g = s.match(/ab+/);
+                const l = s.match(/ab+?/);
+                log(`   "${s}" → 贪婪: ${g[0]}, 懒惰: ${l[0]}`);
+            });
+        }
+
+        function demoQuantifiers() {
+            quantResult.innerHTML = '';
+            log('📏 量词用法大全:');
+            log('');
+
+            const tests = [
+                { pattern: /a*/, desc: 'a* (0次或多次)' },
+                { pattern: /a+/, desc: 'a+ (1次或多次)' },
+                { pattern: /a?/, desc: 'a? (0次或1次)' },
+                { pattern: /a{2}/, desc: 'a{2} (恰好2次)' },
+                { pattern: /a{2,}/, desc: 'a{2,} (至少2次)' },
+                { pattern: /a{1,3}/, desc: 'a{1,3} (1-3次)' },
+            ];
+
+            const str = 'aaab';
+            tests.forEach(({ pattern, desc }) => {
+                const match = str.match(pattern);
+                log(`   ${desc}: ${match ? `"${match[0]}"` : 'null'} (str: "${str}")`);
+            });
+
+            log('');
+            log('📌 量词后面加 ? 变成懒惰模式:');
+            log('   *? → 尽量少 (0次优先)');
+            log('   +? → 尽量少 (1次优先)');
+            log('   ?? → 尽量少 (0次优先)');
+            log('   {n,m}? → 尽量少 (n次优先)');
+        }
+
+        console.log('=== 量词 ===');
+
+        document.getElementById('output').textContent =
+            `量词: * / + / ? / {n} / {n,} / {n,m}\n` +
+            `贪婪模式(默认) vs 懒惰模式(+?)\n` +
+            `✅ 量词演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java 类与对象</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📦 Java 类与对象</h2><p>类定义、对象创建 (new)、构造器、this 关键字、实例 vs 静态成员、对象生命周期、垃圾回收、finalize。</p></div>
+    <div class="card">
+        <h2>类定义与对象创建</h2>
+        <div class="code">// ========== 类 (Class) 与 对象 (Object) ==========
+// 类: 模板/蓝图
+// 对象: 类的实例 (实例化)
+
+// ========== 定义一个类 ==========
+class Student {
+    // ========== 字段 (Fields / 成员变量) ==========
+    String name;      // 实例变量 (每个对象独有)
+    int age;
+    String studentId;
+
+    // ========== 构造器 (Constructor) ==========
+    // 与类同名, 无返回类型
+    // 用于初始化对象
+
+    // 默认无参构造器 (如果不定义任何构造器, Java 自动提供)
+    Student() {
+        this.name = "Unknown";
+        this.age = 0;
+    }
+
+    // 有参构造器
+    Student(String name, int age, String studentId) {
+        this.name = name;         // this.字段 = 参数
+        this.age = age;
+        this.studentId = studentId;
+    }
+
+    // ========== 方法 ==========
+    void introduce() {
+        System.out.println("Hi, I'm " + name + ", " + age + " years old");
+    }
+
+    boolean isAdult() {
+        return age >= 18;
+    }
+
+    void birthday() {
+        age++;
+        System.out.println("Happy birthday! Now " + age);
+    }
+}
+
+// ========== 使用类 ==========
+public class ClassDemo {
+    public static void main(String[] args) {
+        // ========== 创建对象 (new) ==========
+        // new 关键字: 分配堆内存, 调用构造器, 返回引用
+
+        Student s1 = new Student();  // 无参构造器
+        s1.name = "Alice";           // 直接访问字段 (不推荐)
+        s1.age = 20;
+
+        Student s2 = new Student("Bob", 22, "S2024002");  // 有参构造器
+
+        // ========== 调用方法 ==========
+        s1.introduce();  // "Hi, I'm Alice, 20 years old"
+        s2.introduce();  // "Hi, I'm Bob, 22 years old"
+
+        System.out.println(s1.isAdult());  // true
+        s2.birthday();                     // age: 22 → 23
+
+        // ========== 多个对象 ==========
+        Student s3 = s1;  // 引用复制, 指向同一对象
+        s3.name = "Charlie";
+        System.out.println(s1.name);  // "Charlie" (s1 也被改了!)
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>构造器详解</h2>
+        <div class="code">// ========== 构造器深入 ==========
+
+class ConstructorDemo {
+    String name;
+    int age;
+    String email;
+
+    // ========== 构造器重载 ==========
+    ConstructorDemo() {
+        this("Guest", 0);  // 用 this() 调用另一个构造器!
+    }
+
+    ConstructorDemo(String name) {
+        this(name, 0, null);  // 链式调用
+    }
+
+    ConstructorDemo(String name, int age) {
+        this(name, age, null);
+    }
+
+    // 全参构造器 (终极目标)
+    ConstructorDemo(String name, int age, String email) {
+        this.name = name;
+        this.age = age;
+        this.email = email;
+    }
+
+    // ========== this 关键字 ==========
+    // 1. this.字段 — 区分字段和参数
+    // 2. this() — 调用本类其他构造器 (必须在第一行)
+    // 3. this 引用本身
+
+    void printThis() {
+        System.out.println("this = " + this);  // 对象地址
+        System.out.println("name = " + this.name);
+    }
+
+    // 返回 this (链式调用)
+    ConstructorDemo setName(String name) {
+        this.name = name;
+        return this;
+    }
+
+    ConstructorDemo setAge(int age) {
+        this.age = age;
+        return this;
+    }
+
+    void show() {
+        System.out.println(name + " (" + age + ")");
+    }
+
+    // 使用链式:
+    // new ConstructorDemo()
+    //     .setName("Alice")
+    //     .setAge(25)
+    //     .show();
+}
+
+// ========== 默认构造器 ==========
+class DefaultConstructor {
+    // 没有定义构造器时, Java 自动生成:
+    // DefaultConstructor() { super(); }
+    // 一旦定义了任何构造器, 默认不再生成
+}
+
+class NoDefault {
+    int x;
+    NoDefault(int x) {
+        this.x = x;
+    }
+    // 没有无参构造器!
+    // new NoDefault()  // 编译错误!
+}</div>
+    </div>
+    <div class="card">
+        <h2>实例 vs 静态成员</h2>
+        <div class="code">// ========== static 关键字 ==========
+// 静态成员属于类, 不属于对象
+
+class StaticDemo {
+    // ========== 实例变量 ==========
+    // 每个对象独有, 通过对象访问
+    String instanceVar = "I belong to object";
+
+    // ========== 静态变量 (类变量) ==========
+    // 所有对象共享, 通过类名访问
+    static int objectCount = 0;
+    static String classDesc = "This is a demo class";
+
+    // ========== 实例方法 ==========
+    // 需要对象调用
+    void instanceMethod() {
+        System.out.println("Instance method: " + instanceVar);
+        System.out.println("Can access static: " + objectCount);  // ✅
+    }
+
+    // ========== 静态方法 (类方法) ==========
+    // 通过类名调用
+    static void staticMethod() {
+        System.out.println("Static method: " + classDesc);
+        // System.out.println(instanceVar);  // ❌ 不能访问实例变量!
+        // instanceMethod();  // ❌ 不能直接调用实例方法!
+    }
+
+    // ========== 静态方法用途 ==========
+    static int getObjectCount() {
+        return objectCount;
+    }
+
+    // ========== 构造器与 static ==========
+    StaticDemo() {
+        objectCount++;  // 每创建对象, 计数 +1
+    }
+
+    public static void main(String[] args) {
+        // 静态成员: 类名.成员
+        System.out.println(StaticDemo.classDesc);
+        StaticDemo.staticMethod();
+
+        // 实例成员: 对象.成员
+        StaticDemo obj = new StaticDemo();
+        System.out.println(obj.instanceVar);
+        obj.instanceMethod();
+
+        System.out.println("Objects created: " + StaticDemo.objectCount);
+    }
+}
+
+// ========== 访问静态成员的注意事项 ==========
+// 1. 静态方法不能使用 this/super
+// 2. 静态方法不能访问实例变量/方法
+// 3. 静态变量在类加载时初始化 (方法区)
+// 4. 静态方法可以被重载, 但不能被重写 (override)
+// 5. 通过对象引用访问静态成员 (不推荐)
+//    obj.staticMethod()  // 实际等于 ClassName.staticMethod()</div>
+    </div>
+    <div class="card">
+        <h2>对象生命周期与垃圾回收</h2>
+        <div class="code">// ========== 对象生命周期 ==========
+// 1. 声明: Student s;
+// 2. 创建: new Student()  — 堆内存分配
+// 3. 使用: s.study();
+// 4. 不可达: s = null; 或超出作用域
+// 5. GC 回收: JVM 自动回收
+
+public class LifecycleDemo {
+
+    String name;
+
+    LifecycleDemo(String name) {
+        this.name = name;
+        System.out.println(name + " created");
+    }
+
+    void use() {
+        System.out.println(name + " in use");
+    }
+
+    @Override
+    protected void finalize() throws Throwable {
+        // 不建议使用! (Java 9+ 已废弃)
+        // GC 回收前调用, 不保证执行
+        System.out.println(name + " is being GC'd");
+    }
+
+    public static void main(String[] args) {
+        // 对象创建
+        LifecycleDemo obj1 = new LifecycleDemo("Object 1");
+        obj1.use();
+
+        // 引用重新赋值 → 原对象变为垃圾
+        obj1 = new LifecycleDemo("Object 2");
+        obj1.use();
+
+        // 匿名对象 (没有引用)
+        new LifecycleDemo("Anonymous").use();
+
+        // 请求 GC (不保证立即执行)
+        System.gc();
+
+        // 推荐: try-with-resources 管理资源
+        // 而不是依赖 finalize()
+    }
+}
+
+// ========== GC 与内存管理 ==========
+// 堆内存分代:
+// - Young Gen (Eden + Survivor 0/1)
+// - Old Gen
+// - Metaspace (Java 8+, 取代 PermGen)
+
+// GC 算法:
+// - Minor GC: 清理 Young Gen
+// - Major GC / Full GC: 清理所有
+
+// 对象成为垃圾的条件:
+// 1. 引用赋 null
+// 2. 超出作用域
+// 3. 对象互相引用但整体不可达 (孤岛)
+
+// 建议:
+// - 不需要手动调用 System.gc()
+// - 资源管理用 try-with-resources
+// - 留意对象引用避免内存泄漏</div>
+        <div class="note">💡 类与对象要点: class 定义; new 创建对象; 构造器与类同名, 无返回类型, 可重载; this 区分字段/参数 + 构造器链式调用 this(); 实例成员属对象, 静态成员属类; static 方法不能访问实例成员; 对象用完后 GC 自动回收; finalize() 已废弃。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoClass()">类与对象</button>
+        <button onclick="demoConstructor()">构造器</button>
+        <button onclick="demoStatic()">静态成员</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoClass() {
+            result.innerHTML = '';
+            log('# 类与对象');
+            log('');
+            log('class Student {');
+            log('  String name;          // 字段');
+            log('  Student(String n) {   // 构造器');
+            log('    name = n;');
+            log('  }');
+            log('  void study() { }       // 方法');
+            log('}');
+            log('');
+            log('Student s = new Student("Alice");');
+            log('s.study();');
+        }
+
+        function demoConstructor() {
+            result.innerHTML = '';
+            log('# 构造器');
+            log('');
+            log('规则:');
+            log('  ✓ 与类同名, 无返回类型');
+            log('  ✓ 可重载 (多参数版本)');
+            log('  ✓ this() 调用另一构造器');
+            log('  ✗ 不能递归调用');
+            log('');
+            log('默认构造器:');
+            log('  未定义构造器时自动生成');
+            log('  定义了其他构造器 → 不再生成');
+        }
+
+        function demoStatic() {
+            result.innerHTML = '';
+            log('# 静态成员');
+            log('');
+            log('static 字段: 所有对象共享');
+            log('  static int count = 0;');
+            log('');
+            log('static 方法: 属于类');
+            log('  ClassName.method()');
+            log('  不能访问 this/实例成员');
+            log('');
+            log('常用: Math.PI, Arrays.sort()');
+            log('     Integer.parseInt()');
+        }
+    </script>
+</body>
+</html>

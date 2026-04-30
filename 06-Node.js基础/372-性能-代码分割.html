@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>性能-代码分割</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>性能-代码分割</h2><p>动态 import() 分包、React.lazy、路由级分割、chunk 命名。</p></div>
+    <div class="card">
+        <h2>代码分割 API</h2>
+        <div class="code">// ========== 动态 import() ==========
+const module = await import('./module.js');
+// 返回 Promise<Module>
+// Webpack/Vite 自动分包
+
+// ========== React.lazy ==========
+const HeavyComponent = React.lazy(() => import('./Heavy'));
+<React.Suspense fallback={<Loading />}>
+    <HeavyComponent />
+</React.Suspense>
+
+// ========== 路由级分割 ==========
+const Home = () => import('./pages/Home');
+const About = () => import('./pages/About');
+const Dashboard = () => import('./pages/Dashboard');
+
+// ========== Chunk 命名 ==========
+// Webpack: /* webpackChunkName: "admin" */
+// Vite: 自动按目录命名
+// 魔法注释: import(/* webpackPrefetch: true */ './a')</div>
+    </div>
+    <div class="card">
+        <h2>演示：代码分割</h2>
+        <button onclick="demoDynamic()">动态 import</button>
+        <button onclick="demoReact()">React.lazy</button>
+        <button onclick="demoRoute()">路由分割</button>
+        <button onclick="demoStrategy()">分割策略</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoDynamic() {
+            result.innerHTML = '';
+            log('📦 动态 import():');
+            log('');
+
+            log('1️⃣ 基本用法:');
+            log('   // 静态导入（编译时）');
+            log('   import { debounce } from "lodash";');
+            log('');
+            log('   // 动态导入（运行时）');
+            log('   const { debounce } = await import("lodash");');
+            log('');
+
+            log('2️⃣ 动态导入的特性:');
+            log('   • 返回 Promise<Module>');
+            log('   • 支持默认导出: module.default');
+            log('   • 支持命名导出: module.namedExport');
+            log('   • 可以在任何地方使用 (if/for/function)');
+            log('');
+
+            log('3️⃣ 示例: 按条件加载:');
+            log('   if (user.isAdmin) {');
+            log('     const AdminPanel = await import("./admin/panel.js");');
+            log('     adminContainer.appendChild(AdminPanel.default());');
+            log('   }');
+            log('');
+
+            log('4️⃣ Webpack 魔法注释:');
+            log('   // 命名 chunk');
+            log('   import(/* webpackChunkName: "admin" */ "./admin.js");');
+            log('');
+            log('   // 预加载 (加载当前页面时)');
+            log('   import(/* webpackPrefetch: true */ "./next-page.js");');
+            log('');
+            log('   // 预获取 (浏览器空闲时)');
+            log('   import(/* webpackPreload: true */ "./critical.js");');
+            log('');
+
+            log('5️⃣ Vite 分包:');
+            log('   // vite.config.js');
+            log('   build: {');
+            log('     rollupOptions: {');
+            log('       output: {');
+            log('         chunkFileNames: "chunks/[name]-[hash].js"');
+            log('       }');
+            log('     }');
+            log('   }');
+        }
+
+        function demoReact() {
+            result.innerHTML = '';
+            log('⚛️ React.lazy + Suspense:');
+            log('');
+
+            log('1️⃣ React.lazy 基本用法:');
+            log('   import React, { lazy, Suspense } from "react";');
+            log('');
+            log('   const MarkdownEditor = lazy(() => import("./MarkdownEditor"));');
+            log('   const Chart = lazy(() => import("./Chart"));');
+            log('');
+            log('   function App() {');
+            log('     return (');
+            log('       <Suspense fallback={<Loading />}>');
+            log('         <MarkdownEditor />');
+            log('       </Suspense>');
+            log('     );');
+            log('   }');
+            log('');
+
+            log('2️⃣ Suspense 嵌套:');
+            log('   <Suspense fallback={<HeaderSkeleton />}>');
+            log('     <Header />');
+            log('   </Suspense>');
+            log('   <Suspense fallback={<ContentSkeleton />}>');
+            log('     <MainContent />  {/* 可能包含多个 lazy */}');
+            log('   </Suspense>');
+            log('');
+
+            log('3️⃣ 错误边界配合:');
+            log('   <ErrorBoundary fallback={<ErrorPage />}>');
+            log('     <Suspense fallback={<Loading />}>');
+            log('       <HeavyComponent />');
+            log('     </Suspense>');
+            log('   </ErrorBoundary>');
+            log('');
+
+            log('4️⃣ 加载指示器类型:');
+            log('   • Spinner — 通用加载');
+            log('   • Skeleton — 模拟内容结构');
+            log('   • 进度条 — 预估加载时间');
+            log('   • 延迟显示 — 300ms 后再显示 (防闪烁)');
+        }
+
+        function demoRoute() {
+            result.innerHTML = '';
+            log('🗺️ 路由级代码分割:');
+            log('');
+
+            log('1️⃣ React Router 分割:');
+            log('   import { lazy, Suspense } from "react";');
+            log('   import { Routes, Route } from "react-router-dom";');
+            log('');
+            log('   const Home = lazy(() => import("./pages/Home"));');
+            log('   const About = lazy(() => import("./pages/About"));');
+            log('   const Dashboard = lazy(() => import("./pages/Dashboard"));');
+            log('   const Settings = lazy(() => import("./pages/Settings"));');
+            log('');
+            log('   function App() {');
+            log('     return (');
+            log('       <Suspense fallback={<PageSkeleton />}>');
+            log('         <Routes>');
+            log('           <Route path="/" element={<Home />} />');
+            log('           <Route path="/about" element={<About />} />');
+            log('           <Route path="/dashboard" element={<Dashboard />} />');
+            log('           <Route path="/settings" element={<Settings />} />');
+            log('         </Routes>');
+            log('       </Suspense>');
+            log('     );');
+            log('   }');
+            log('');
+
+            log('2️⃣ Vue Router 分割:');
+            log('   const routes = [');
+            log('     { path: "/", component: () => import("./pages/Home.vue") },');
+            log('     { path: "/about", component: () => import("./pages/About.vue") },');
+            log('     { path: "/dashboard", component: () => import("./pages/Dashboard.vue") },');
+            log('   ];');
+            log('');
+
+            log('3️⃣ 分割粒度建议:');
+            log('   ✅ 路由级别 (推荐, 平衡)');
+            log('   ✅ 大组件 (图表/编辑器/地图)');
+            log('   ✅ 条件加载 (管理员面板)');
+            log('   ❌ 全部分割 (HTTP 请求过多)');
+            log('   ❌ 小组件 (增加复杂性无收益)');
+        }
+
+        function demoStrategy() {
+            result.innerHTML = '';
+            log('📋 代码分割策略:');
+            log('');
+
+            log('1️⃣ 分割粒度:');
+            log('   ┌──────────┬──────────┬──────────┬──────────┐');
+            log('   │ 粒度      │ 文件数   │ 加载速度 │ 缓存效率 │');
+            log('   ├──────────┼──────────┼──────────┼──────────┤');
+            log('   │ 一个包    │ 1        │ 慢       │ 低       │');
+            log('   │ 路由分割  │ 5-20     │ 中       │ 中       │');
+            log('   │ 组件分割  │ 20-100   │ 快       │ 高       │');
+            log('   │ 原子分割  │ 100+     │ 最快     │ 最高    │');
+            log('   └──────────┴──────────┴──────────┴──────────┘');
+            log('');
+
+            log('2️⃣ 常见的分割点:');
+            log('   • 路由切换 → 页面级');
+            log('   • 用户交互 → 弹窗/编辑器');
+            log('   • 视口可见 → 懒加载组件');
+            log('   • 条件渲染 → 管理员功能');
+            log('');
+
+            log('3️⃣ Vendor 分包:');
+            log('   // 将第三方库分离');
+            log('   // Webpack:');
+            log('   optimization: {');
+            log('     splitChunks: {');
+            log('       cacheGroups: {');
+            log('         vendor: {');
+            log('           test: /[\\/]node_modules[\\/]/,');
+            log('           name: "vendor",');
+            log('           chunks: "all"');
+            log('         }');
+            log('       }');
+            log('     }');
+            log('   }');
+            log('');
+
+            log('4️⃣ 共享模块:');
+            log('   // 避免重复打包公共代码');
+            log('   // 多个 chunk 共享的代码提出');
+            log('   optimization: {');
+            log('     splitChunks: {');
+            log('       minChunks: 2,  // 被引用 ≥2 次');
+            log('       minSize: 20000 // ≥20KB');
+            log('     }');
+            log('   }');
+            log('');
+
+            log('5️⃣ 监控与优化:');
+            log('   • 分析工具: Webpack Bundle Analyzer');
+            log('   • 关注重复依赖');
+            log('   • 关注大型第三方库');
+            log('   • 关注未使用的导出 (Tree Shaking)');
+        }
+
+        console.log('=== 性能-代码分割 ===');
+        document.getElementById('output').textContent =
+            `代码分割: 动态 import() / React.lazy / 路由级分割 / 分包策略 / chunk命名\n` +
+            `✅ 代码分割演示完成！`;
+    </script>
+</body>
+</html>

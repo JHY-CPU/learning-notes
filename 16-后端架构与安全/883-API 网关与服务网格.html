@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API 网关与服务网格</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🚪 API 网关与服务网格</h2><p>API Gateway 职责 (路由/认证/限流/聚合)、Nginx 反向代理与负载均衡、Kong/APISIX 网关、服务网格 sidecar 模式 Istio/Linkerd。</p></div>
+    <div class="card">
+        <h2>API Gateway 模式</h2>
+        <div class="code">// ========== API Gateway 职责 ==========
+// 微服务统一入口, 处理横切关注点
+
+// ┌──────────┐   ┌──────────────┐   ┌──────────┐
+// │ 客户端    │──→│ API Gateway  │──→│ 服务 A    │
+// │ Mobile    │   │              │   ├──────────┤
+// │ Web       │   │ 路由/认证    │──→│ 服务 B    │
+// │ Third-Pty │   │ 限流/聚合    │   ├──────────┤
+// └──────────┘   │ 缓存/协议转换 │──→│ 服务 C    │
+//                └──────────────┘   └──────────┘
+
+// 核心职责:
+// 1. 路由: 请求分发到对应服务
+// 2. 认证: JWT/OAuth 验证, 身份校验
+// 3. 限流: 令牌桶/滑动窗口, 防止滥用
+// 4. 聚合: 合并多个服务响应 (BFF)
+// 5. 缓存: 缓存热点响应, 减少后端压力
+// 6. 协议转换: HTTP → gRPC, REST → GraphQL
+// 7. 日志/监控: 统一请求日志和指标
+
+// ========== BFF (Backend For Frontend) ==========
+// 为每种客户端定制后端
+//
+// ┌──────────────┐
+// │ Mobile BFF   │──→ 服务 A, B
+// ├──────────────┤
+// │ Web BFF      │──→ 服务 B, C, D
+// ├──────────────┤
+// │ 三方 BFF     │──→ 服务 A, D
+// └──────────────┘
+//
+// 优点: 按客户端优化数据格式
+// 缺点: 增加维护成本
+
+// ========== Nginx 反向代理 ==========
+// HTTP 服务器 + 反向代理 + 负载均衡
+
+// /etc/nginx/nginx.conf:
+// http {
+//     upstream api_servers {
+//         least_conn;
+//         server 10.0.0.1:3000 weight=3;
+//         server 10.0.0.2:3000;
+//         server 10.0.0.3:3000 backup;
+//     }
+//
+//     server {
+//         listen 443 ssl;
+//         server_name api.example.com;
+//
+//         ssl_certificate     /etc/ssl/cert.pem;
+//         ssl_certificate_key /etc/ssl/key.pem;
+//
+//         location /api/ {
+//             proxy_pass http://api_servers;
+//             proxy_set_header Host $host;
+//             proxy_set_header X-Real-IP $remote_addr;
+//             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+//
+//             # 限流
+//             limit_req zone=api burst=20 nodelay;
+//         }
+//
+//         location /static/ {
+//             root /var/www;
+//             expires 365d;
+//             add_header Cache-Control "public, immutable";
+//         }
+//     }
+// }
+//
+// # 限流区域定义
+// limit_req_zone $binary_remote_addr zone=api:10m rate=100r/s;</div>
+    </div>
+    <div class="card">
+        <h2>API 网关产品对比</h2>
+        <div class="code">// ========== Kong ==========
+// 基于 OpenResty (Nginx + Lua)
+// 插件生态丰富, 企业级
+//
+// 核心概念:
+//   Service: 后端服务定义
+//   Route:  请求路由规则
+//   Plugin: 插件 (认证/限流/日志/CORS)
+//   Consumer: API 消费者
+//
+// 常用插件:
+//   key-auth / jwt / oauth2  — 认证
+//   rate-limiting            — 限流
+//   cors                     — 跨域
+//   prometheus               — 监控
+//   file-log / syslog        — 日志
+//
+// 部署:
+//   kong start
+//   curl -X POST http://localhost:8001/services \
+//     --data name=users \
+//     --data url=http://user-service:3000
+//
+//   curl -X POST http://localhost:8001/services/users/routes \
+//     --data paths[]=/users
+
+// ========== APISIX ==========
+// Apache 开源, 高性能云原生网关
+// 支持热更新, 不 reload
+//
+// 特点:
+//   动态路由: 随时修改不重启
+//   多语言插件: Lua/Java/Go/Python/Wasm
+//   服务发现: 集成 K8s/Nacos/Consul
+//   性能: 单核 ~23k QPS
+
+// ========== 网关对比 ==========
+// 特性        | Kong      | APISIX     | Nginx
+// 动态路由    | 需 reload  | 热更新     | 需 reload
+// 插件        | Lua       | 多语言     | Lua
+// K8s 集成   | Ingress   | Ingress    | Ingress
+// 性能        | 中        | 高         | 高
+// 运维        | 中        | 简单       | 手工
+// 社区        | 大        | 增长快     | 最大</div>
+    </div>
+    <div class="card">
+        <h2>服务网格 (Service Mesh)</h2>
+        <div class="code">// ========== 服务网格概念 ==========
+// 将微服务通信抽象到基础设施层
+// 通过 sidecar 代理实现
+
+// ┌───────── POD ─────────────┐
+// │ ┌──────────────────────┐  │
+// │ │    Service Container  │  │
+// │ ├──────────────────────┤  │
+// │ │    Sidecar Proxy     │──│──→ 其他服务
+// │ │    (Envoy)           │  │
+// │ └──────────────────────┘  │
+// └────────────────────────────┘
+
+// 控制平面 (Control Plane):
+//   管理代理配置, 策略, 证书
+//
+// 数据平面 (Data Plane):
+//   所有 sidecar 代理集合
+//   处理服务间通信
+
+// 能力:
+//   流量管理: 路由/分流/金丝雀
+//   安全: mTLS 加密, 认证授权
+//   可观测: 指标/日志/追踪
+//   弹性: 重试/超时/断路器
+
+// ========== Istio ==========
+// 最流行的服务网格
+
+// 架构:
+//   Pilot: 流量管理 (路由/负载均衡)
+//   Citadel: 安全 (mTLS 证书)
+//   Galley: 配置管理
+//   Proxy: Envoy sidecar (数据平面)
+
+// 流量管理:
+// VirtualService:
+//   apiVersion: networking.istio.io/v1beta1
+//   kind: VirtualService
+//   metadata:
+//     name: reviews
+//   spec:
+//     hosts:
+//     - reviews
+//     http:
+//     - match:
+//       - headers:
+//           end-user:
+//             exact: jason
+//       route:
+//       - destination:
+//           host: reviews
+//           subset: v2
+//     - route:
+//       - destination:
+//           host: reviews
+//           subset: v1
+//
+// 金丝雀: 按权重分发
+//   route:
+//   - destination: { host: reviews, subset: v2 }
+//     weight: 10
+//   - destination: { host: reviews, subset: v1 }
+//     weight: 90
+
+// ========== Linkerd ==========
+// 更轻量, 更简单的服务网格
+// Rust 实现的代理 (比 Envoy 轻)
+//
+// 特点:
+//   轻量: 每个 sidecar ~10MB
+//   简单: 不需 Istio 那么多 CRD
+//   性能: 延迟增加 < 1ms
+//   安全: 自动 mTLS
+//
+// Istio vs Linkerd:
+//   Istio: 功能丰富, 复杂, Envoy
+//   Linkerd: 简单轻量, 功能适中</div>
+        <div class="note">💡 API 网关要点: 路由/认证/限流/聚合/协议转换; Nginx 反向代理性能高配置复杂; Kong/APISIX 插件生态; 服务网格 sidecar 透明拦截通信; Istio 功能丰富 (Pilot/Citadel/Galley + Envoy); Linkerd 更轻量; VirtualService/DestinationRule 实现金丝雀发布; mTLS 服务间加密。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoGateway()">API 网关</button>
+        <button onclick="demoNginx()">Nginx</button>
+        <button onclick="demoMesh()">服务网格</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoGateway() {
+            result.innerHTML = '';
+            log('# API Gateway');
+            log('');
+            log('核心职责:');
+            log('  路由: 请求→对应服务');
+            log('  认证: JWT/OAuth 验证');
+            log('  限流: 令牌桶/滑动窗口');
+            log('  聚合: 合并多服务响应');
+            log('  协议转换: HTTP↔gRPC');
+            log('');
+            log('Kong vs APISIX:');
+            log('  Kong: 插件丰富, 需reload');
+            log('  APISIX: 热更新, 多语言插件');
+        }
+
+        function demoNginx() {
+            result.innerHTML = '';
+            log('# Nginx 反向代理');
+            log('');
+            log('用途:');
+            log('  静态服务器: HTML/CSS/JS');
+            log('  反向代理: proxy_pass');
+            log('  负载均衡: upstream');
+            log('  SSL 终止: ssl_certificate');
+            log('  限流: limit_req_zone');
+            log('');
+            log('指令:');
+            log('  location /api/ { proxy_pass ... }');
+            log('  upstream backend { server ... }');
+            log('  limit_req zone=api burst=20');
+        }
+
+        function demoMesh() {
+            result.innerHTML = '';
+            log('# 服务网格');
+            log('');
+            log('Sidecar 模式:');
+            log('  每个 Pod 一个代理');
+            log('  透明拦截所有流量');
+            log('');
+            log('Istio:');
+            log('  Pilot: 流量管理');
+            log('  Citadel: mTLS 证书');
+            log('  Envoy Proxy: 数据平面');
+            log('');
+            log('能力:');
+            log('  流量管理: 路由/分流');
+            log('  安全: mTLS 加密');
+            log('  可观测: 追踪/指标');
+            log('  弹性: 重试/断路器');
+        }
+    </script>
+</body>
+</html>

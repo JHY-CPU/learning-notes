@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 条件表达式与函数</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔀 SQL 条件表达式与函数</h2><p>CASE WHEN 条件表达式 (简单/搜索)、IF/IFNULL/COALESCE NULL 处理、NULLIF、条件聚合、ELT/FIELD 选择函数、IF 在 SELECT/WHERE/ORDER BY 中的使用。</p></div>
+    <div class="card">
+        <h2>CASE WHEN 基础</h2>
+        <div class="code">// ========== CASE WHEN 语法 ==========
+-- SQL 中的 if-else 逻辑
+-- 两种形式: 简单 CASE 和搜索 CASE
+
+-- 1. 简单 CASE (等值比较)
+SELECT
+    name,
+    status,
+    CASE status
+        WHEN 'pending'  THEN '待付款'
+        WHEN 'paid'     THEN '已付款'
+        WHEN 'shipped'  THEN '已发货'
+        WHEN 'delivered' THEN '已送达'
+        WHEN 'cancelled' THEN '已取消'
+        ELSE '未知状态'
+    END AS status_cn
+FROM orders;
+
+-- 2. 搜索 CASE (范围/条件)
+SELECT
+    name,
+    salary,
+    CASE
+        WHEN salary > 100000 THEN '高'
+        WHEN salary > 70000  THEN '中'
+        WHEN salary > 40000  THEN '低'
+        ELSE '入门'
+    END AS salary_level
+FROM employees;
+
+-- ========== CASE WHEN 在 SELECT 中 ==========
+SELECT
+    id,
+    name,
+    salary,
+    CASE WHEN salary >= 100000 THEN 'A'
+         WHEN salary >= 80000  THEN 'B'
+         WHEN salary >= 60000  THEN 'C'
+         ELSE 'D'
+    END AS grade,
+    CASE WHEN salary < 80000 THEN salary * 1.1  -- 涨薪 10%
+         ELSE salary
+    END AS new_salary
+FROM employees;</div>
+    </div>
+    <div class="card">
+        <h2>CASE WHEN 进阶</h2>
+        <div class="code">// ========== CASE WHEN 在 WHERE 中 ==========
+
+-- 复杂条件过滤
+SELECT * FROM orders
+WHERE
+    CASE
+        WHEN user_id IN (SELECT id FROM vip_users) THEN amount > 50
+        ELSE amount > 100
+    END;
+
+-- ========== CASE WHEN 在 ORDER BY 中 ==========
+
+-- 自定义排序顺序
+SELECT name, status
+FROM orders
+ORDER BY
+    CASE status
+        WHEN 'pending'  THEN 1  -- 待付款排最前
+        WHEN 'paid'     THEN 2
+        WHEN 'shipped'  THEN 3
+        WHEN 'delivered' THEN 4
+        WHEN 'cancelled' THEN 5
+    END;
+
+-- 优先级排序: 管理员优先,再按创建时间
+SELECT name, role, created_at
+FROM users
+ORDER BY
+    CASE role
+        WHEN 'admin'    THEN 1
+        WHEN 'editor'   THEN 2
+        WHEN 'user'     THEN 3
+        ELSE 4
+    END,
+    created_at DESC;
+
+-- ========== CASE WHEN 在 UPDATE 中 ==========
+
+-- 有条件更新
+UPDATE products
+SET price = CASE
+    WHEN category_id = 1 THEN price * 0.9   -- 10% 折扣
+    WHEN category_id = 2 THEN price * 0.8   -- 20% 折扣
+    WHEN stock = 0       THEN price * 0.5   -- 清仓
+    ELSE price
+END;
+
+-- ========== 条件聚合 (CASE WHEN 在聚合中) ==========
+
+-- 统计每个状态的订单数 (透视)
+SELECT
+    user_id,
+    COUNT(*) AS total_orders,
+    SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed_orders,
+    SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_orders,
+    SUM(CASE WHEN status = 'pending'   THEN 1 ELSE 0 END) AS pending_orders
+FROM orders
+GROUP BY user_id;
+
+-- 各部门薪资分布
+SELECT
+    department,
+    SUM(CASE WHEN salary > 100000 THEN 1 ELSE 0 END) AS high,
+    SUM(CASE WHEN salary BETWEEN 70000 AND 100000 THEN 1 ELSE 0 END) AS mid,
+    SUM(CASE WHEN salary < 70000 THEN 1 ELSE 0 END) AS low
+FROM employees
+GROUP BY department;</div>
+    </div>
+    <div class="card">
+        <h2>NULL 处理函数</h2>
+        <div class="code">// ========== IFNULL / COALESCE ==========
+
+-- 1. IFNULL: 如果 NULL 则返回默认值
+-- IFNULL(expr, default)
+SELECT
+    name,
+    IFNULL(phone, '无电话') AS phone,
+    IFNULL(age, 0) AS age,
+    IFNULL(bio, '暂无简介') AS bio
+FROM users;
+
+-- 2. COALESCE: 返回第一个非 NULL 值
+-- COALESCE(val1, val2, ..., default)
+SELECT
+    COALESCE(phone, email, '无联系方式') AS contact
+FROM users;
+
+-- 优先级: phone → email → 默认
+-- 常用于: 多字段备选, 配置默认值
+
+-- 3. NULLIF: 如果相等则返回 NULL
+-- NULLIF(expr1, expr2)
+SELECT NULLIF('abc', 'abc');  -- NULL
+SELECT NULLIF('abc', 'xyz');  -- 'abc'
+
+-- 防除零错误:
+SELECT
+    total_revenue,
+    total_orders,
+    total_revenue / NULLIF(total_orders, 0) AS avg_order_value
+FROM sales_stats;
+-- 如果 total_orders = 0, NULLIF 返回 NULL, 结果 NULL
+-- 而不是除以零错误!
+
+-- ========== IF 函数 (MySQL) ==========
+-- IF(condition, true_val, false_val)
+SELECT
+    name,
+    IF(age >= 18, '成年', '未成年') AS status,
+    IF(salary > 100000, '高薪', '普通') AS salary_level
+FROM employees;
+
+-- IF 嵌套 (不推荐,可读性差)
+SELECT IF(score >= 90, 'A',
+       IF(score >= 80, 'B',
+       IF(score >= 70, 'C', 'D'))) AS grade
+FROM exam_scores;
+
+-- 推荐用 CASE WHEN 替代复杂的 IF 嵌套
+
+-- ========== 特殊值处理 ==========
+-- 空字符串 vs NULL
+SELECT
+    COALESCE(NULLIF(TRIM(phone), ''), '无电话') AS phone_clean
+FROM users;
+-- 先去掉空格,如果空字符串则转 NULL,再设为默认值</div>
+    </div>
+    <div class="card">
+        <h2>ELT / FIELD 选择函数</h2>
+        <div class="code">// ========== ELT / FIELD (MySQL) ==========
+
+-- 1. ELT(n, str1, str2, str3, ...)
+-- 返回第 n 个参数 (1-indexed)
+SELECT ELT(2, '甲', '乙', '丙');     -- '乙'
+SELECT ELT(1, '第一', '第二', '第三'); -- '第一'
+
+-- 月份中文名
+SELECT ELTH(MONTH(NOW()),
+    '一月', '二月', '三月', '四月', '五月', '六月',
+    '七月', '八月', '九月', '十月', '十一月', '十二月'
+) AS month_cn;
+
+-- 2. FIELD(str, str1, str2, ...)
+-- 返回 str 在参数列表中的位置
+SELECT FIELD('乙', '甲', '乙', '丙');  -- 2
+
+-- 自定义排序:
+SELECT name, priority
+FROM tasks
+ORDER BY FIELD(priority, '高', '中', '低');
+
+-- ========== 综合案例 ==========
+
+-- 1. 客户分层
+SELECT
+    id,
+    name,
+    total_spent,
+    CASE
+        WHEN total_spent > 10000 THEN 'VIP'
+        WHEN total_spent > 5000  THEN '黄金'
+        WHEN total_spent > 1000  THEN '白银'
+        ELSE '普通'
+    END AS tier,
+    CASE
+        WHEN total_spent > 10000 THEN '专属客服'
+        WHEN total_spent > 5000  THEN '生日礼品'
+        ELSE '常规'
+    END AS benefits
+FROM customers;
+
+-- 2. 条件聚合: 交叉表
+SELECT
+    DATE_FORMAT(created_at, '%Y-%m') AS month,
+    COUNT(*) AS total,
+    SUM(IF(status = 'completed', 1, 0)) AS completed,
+    SUM(IF(status = 'cancelled', 1, 0)) AS cancelled,
+    ROUND(SUM(IF(status = 'completed', 1, 0)) / COUNT(*) * 100, 1) AS completion_rate
+FROM orders
+GROUP BY month
+ORDER BY month;
+
+-- 3. 多条件计算
+SELECT
+    product_id,
+    name,
+    price,
+    stock,
+    CASE
+        WHEN stock = 0 THEN '缺货'
+        WHEN stock < 10 THEN '库存不足'
+        WHEN stock < 50 THEN '库存正常'
+        ELSE '库存充足'
+    END AS stock_status,
+    CASE
+        WHEN stock = 0 THEN price * 0     -- 不打折
+        WHEN stock < 10 THEN price * 0.9  -- 10% off
+        WHEN stock > 100 THEN price * 0.8 -- 20% off (清库存)
+        ELSE price
+    END AS effective_price
+FROM products;</div>
+        <div class="note">💡 条件表达式: CASE WHEN 实现 if-else; 搜索 CASE 支持范围判断; 条件聚合 + GROUP BY 生成交叉表; COALESCE 返回首个非 NULL 值; NULLIF 防除零; IFNULL 设置默认值; CASE 在 ORDER BY 中实现自定义排序。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCase()">CASE WHEN 演示</button>
+        <button onclick="demoNull()">NULL 处理演示</button>
+        <button onclick="demoPivot()">条件聚合演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCase() {
+            result.innerHTML = '';
+            log('# CASE WHEN');
+            log('');
+            log('CASE');
+            log("    WHEN salary > 100000 THEN '高'");
+            log("    WHEN salary > 70000  THEN '中'");
+            log("    ELSE '低'");
+            log('END AS salary_level');
+            log('');
+            log('用在: SELECT / WHERE / ORDER BY / UPDATE');
+        }
+
+        function demoNull() {
+            result.innerHTML = '';
+            log('# NULL 处理');
+            log('');
+            log("IFNULL(phone, '无联系')   → NULL 变默认");
+            log("COALESCE(a, b, '默认')    → 首个非 NULL");
+            log("NULLIF(a, b)              → a=b 时返回 NULL");
+            log('');
+            log("-- 防除零:");
+            log("total / NULLIF(count, 0)  → 安全除法");
+        }
+
+        function demoPivot() {
+            result.innerHTML = '';
+            log('# 条件聚合 (交叉表)');
+            log('');
+            log("SELECT");
+            log("    DATE_FORMAT(created_at, '%Y-%m') AS month,");
+            log("    COUNT(*) AS total,");
+            log("    SUM(IF(status='completed',1,0)) AS completed,");
+            log("    SUM(IF(status='cancelled',1,0))  AS cancelled");
+            log("FROM orders GROUP BY month;");
+            log('');
+            log('效果: 行=月份, 列=状态, 值=计数');
+        }
+    </script>
+</body>
+</html>

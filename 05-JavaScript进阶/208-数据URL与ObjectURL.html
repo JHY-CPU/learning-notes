@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据URL与ObjectURL</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #url-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 12px; min-height: 40px; font-family: monospace; word-break: break-all; }
+        #data-url-size { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>数据 URL 与 Object URL</h2><p>data:URL vs blob:URL — 两种内联资源方式。</p></div>
+    <div class="card">
+        <h2>data:URL</h2>
+        <div class="code">// 格式: data:[&lt;mediatype&gt;][;base64],&lt;data&gt;
+// data:text/plain;base64,SGVsbG8=    → "Hello"
+// data:text/html,%3Ch1%3ETitle%3C%2Fh1%3E   → "<h1>Title</h1>"
+// data:image/png;base64,iVBORw0KGgo=...     → PNG 图片
+
+// 创建 Data URL
+// 方法1: FileReader.readAsDataURL()
+const reader = new FileReader();
+reader.onload = () => console.log(reader.result); // data:...;base64,...
+reader.readAsDataURL(file);
+
+// 方法2: 手动编码
+const dataUrl = `data:text/plain;base64,${btoa('Hello')}`;
+
+// 优点：自包含，无需额外网络请求
+// 缺点：base64 编码后体积增大 ~33%
+// 缺点：Data URL 不会被浏览器缓存（除非在 CSS 中）
+// 缺点：编码大文件时占用大量内存</div>
+    </div>
+    <div class="card">
+        <h2>blob:URL (Object URL)</h2>
+        <div class="code">// 创建 Object URL
+const blob = new Blob(['Hello'], { type: 'text/plain' });
+const url = URL.createObjectURL(blob);
+// → blob:http://localhost/550e8400-e29b-41d4-a716-446655440000
+
+// 使用
+img.src = url;
+iframe.src = url;
+a.href = url;
+
+// 释放
+URL.revokeObjectURL(url);
+
+// 优点：不增加数据大小（直接引用内存中的 Blob）
+// 优点：创建快（无需编码）
+// 缺点：必须手动释放，否则内存泄漏
+// 缺点：只在当前页面上下文有效（不能跨页面共享）
+// 缺点：blob URL 的生命周期与 document 绑定</div>
+    </div>
+    <div class="card">
+        <h2>对比与选择</h2>
+        <div class="note">📊 data:URL vs blob:URL:<br>
+        ✅ blob:URL 创建更快（无需 base64 编解码）<br>
+        ✅ blob:URL 不增加数据体积<br>
+        ✅ blob:URL 适合大文件（不阻塞主线程）<br>
+        ✅ data:URL 可以独立使用（不依赖内存中的 Blob）<br>
+        ✅ data:URL 可以直接嵌入 HTML/CSS<br>
+        💡 推荐：文件预览/下载用 blob:URL；小图标/内联资源用 data:URL</div>
+    </div>
+    <div class="card">
+        <h2>演示：两种 URL</h2>
+        <button onclick="compareURL()">比较两种 URL</button>
+        <button onclick="createObjectURL()">创建 Object URL</button>
+        <div id="url-result">点击按钮查看</div>
+        <div id="data-url-size"></div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const urlResult = document.getElementById('url-result');
+        const urlSize = document.getElementById('data-url-size');
+
+        function log(msg) {
+            urlResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function compareURL() {
+            urlResult.innerHTML = '';
+            urlSize.innerHTML = '';
+
+            const text = 'Hello, World! 🎉';
+            const blob = new Blob([text], { type: 'text/plain' });
+
+            // data:URL (手动)
+            const dataUrl = `data:text/plain;base64,${btoa(text)}`;
+            log(`原始文本: "${text}" (${text.length} 字符)`);
+            log(`data:URL 长度: ${dataUrl.length} 字符`);
+            log(`data:URL: ${dataUrl.substring(0, 50)}...`);
+
+            // blob:URL
+            const blobUrl = URL.createObjectURL(blob);
+            log(`blob:URL 长度: ${blobUrl.length} 字符`);
+            log(`blob:URL: ${blobUrl}`);
+
+            // 比较
+            const overhead = dataUrl.length - text.length;
+            urlSize.innerHTML = `
+                <b>对比:</b><br>
+                原始: ${text.length}B (UTF-8)<br>
+                data:URL: ${dataUrl.length}B (+${overhead}B, ${(overhead/text.length*100).toFixed(0)}% 开销)<br>
+                blob:URL: ${blobUrl.length}B (引用，不增加数据)
+            `;
+
+            URL.revokeObjectURL(blobUrl);
+        }
+
+        function createObjectURL() {
+            urlResult.innerHTML = '';
+
+            const content = `<!DOCTYPE html><html><body><h1>嵌入式页面</h1><p>来自 blob:URL</p></body></html>`;
+            const blob = new Blob([content], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+
+            log(`blob:URL: ${url}`);
+            log(`blob size: ${blob.size}B`);
+
+            // 显示 iframe
+            const iframe = document.createElement('iframe');
+            iframe.src = url;
+            iframe.style.width = '100%';
+            iframe.style.height = '80px';
+            iframe.style.border = '1px solid #ddd';
+            iframe.style.borderRadius = '4px';
+            iframe.style.margin = '5px 0';
+            urlResult.appendChild(iframe);
+
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
+            log('⏰ 5 秒后自动释放 URL');
+        }
+
+        console.log('=== 数据 URL vs Object URL ===');
+
+        document.getElementById('output').textContent =
+            `data:URL → data:type;base64,data\n` +
+            `blob:URL → URL.createObjectURL(blob)\n` +
+            `选择: 小数据用 data:URL，大数据用 blob:URL\n` +
+            `✅ URL 对比演示完成！`;
+    </script>
+</body>
+</html>

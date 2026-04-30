@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python dataclass进阶</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📦 Python dataclass 进阶</h2><p>field() 高级参数 (repr/compare/hash/metadata)、InitVar、ClassVar、dataclass 继承、slots=True (3.10+)、dataclasses 工具函数 (asdict/astuple/replace)。</p></div>
+    <div class="card">
+        <h2>field() 高级参数</h2>
+        <div class="code">// ========== field() 完整参数 ==========
+from dataclasses import dataclass, field
+
+@dataclass
+class Advanced:
+    # default: 默认值
+    a: int = field(default=0)
+
+    # default_factory: 可变默认值工厂
+    b: list = field(default_factory=list)
+
+    # init: 是否在 __init__ 中包含
+    c: int = field(init=False)         # 不来自 __init__
+
+    # repr: 是否在 __repr__ 中显示
+    password: str = field(repr=False)  # 隐藏密码!
+
+    # compare: 是否参与比较
+    metadata: dict = field(compare=False, default_factory=dict)
+
+    # hash: 是否参与哈希
+    temp_id: int = field(hash=False, default=0)
+
+    # metadata: 自定义元数据 (外部工具使用)
+    created_by: str = field(default="system", metadata={"description": "创建者"})
+
+    def __post_init__(self):
+        self.c = len(self.b)  # 派生字段
+
+obj = Advanced(password="secret123")
+print(obj)
+// Advanced(a=0, b=[], c=0, metadata={}, temp_id=0)
+// 没有 password! (repr=False)
+
+// ========== 实际应用 ==========
+@dataclass
+class User:
+    username: str
+    email: str
+    password: str = field(repr=False)     # 不在 repr 中暴露
+    created_at: str = field(compare=False) # 时间戳不影响相等判断
+    tags: list = field(default_factory=list, hash=False)  # 列表不参与哈希
+
+# 查看字段元信息:
+from dataclasses import fields
+for f in fields(User):
+    print(f.name, f.type, f.default, f.metadata)</div>
+    </div>
+    <div class="card">
+        <h2>InitVar 与 ClassVar</h2>
+        <div class="code">// ========== InitVar: 初始化时传入但不存储 ==========
+// InitVar 字段只用于 __init__,传递给 __post_init__,不成为实例变量
+
+from dataclasses import dataclass, InitVar
+
+@dataclass
+class Database:
+    host: str
+    port: int
+    # InitVar: 只在初始化时使用,不存储
+    password: InitVar[str] = None
+
+    def __post_init__(self, password):
+        # password 只在这里可用,不作为字段
+        if password:
+            print(f"使用密码连接 {self.host}:{self.port}")
+        else:
+            print(f"无密码连接 {self.host}:{self.port}")
+
+db = Database("localhost", 5432, "secret")
+# 打印: 使用密码连接 localhost:5432
+print(db)
+# Database(host='localhost', port=5432)  ← 没有 password!
+
+// ========== ClassVar: 类变量 ==========
+// 类变量,不是实例字段
+
+from dataclasses import dataclass, field
+from typing import ClassVar
+
+@dataclass
+class Employee:
+    name: str
+    salary: float
+
+    # 类变量 (不属于实例)
+    company: ClassVar[str] = "Python Corp"
+    employee_count: ClassVar[int] = 0
+
+    def __post_init__(self):
+        Employee.employee_count += 1
+
+e1 = Employee("Alice", 80000)
+e2 = Employee("Bob", 90000)
+
+print(Employee.company)          # Python Corp
+print(Employee.employee_count)   # 2
+print(e1.company)                # Python Corp (从类继承)
+# 'company' in e1.__dict__       # False! (不是实例变量)</div>
+    </div>
+    <div class="card">
+        <h2>dataclass 继承</h2>
+        <div class="code">// ========== dataclass 继承 ==========
+// 子类在父类字段后面追加字段
+// 注意: 有默认值的字段必须在无默认值字段之后
+
+@dataclass
+class Base:
+    name: str                    # 无默认值
+    created_at: str = "now"      # 有默认值
+
+@dataclass
+class Child(Base):
+    age: int                     # 没问题,追加在后面
+    email: str = ""              # 有默认值
+
+c = Child("Alice", age=25)
+print(c)                         # Child(name='Alice', created_at='now', age=25, email='')
+
+// ========== 默认值顺序问题 ==========
+// ❌ 错误: 子类字段在父类字段后,但不能插队
+@dataclass
+class Base:
+    name: str = "default"        # 有默认值
+
+@dataclass
+class Child(Base):
+    age: int                     # ❌ 无默认值字段跟在有默认值字段后面! 报错!
+    # 因为 Child 的全部字段按顺序是: name(有默认), age(无默认)
+    # 不符合 Python 参数规则
+
+// ✅ 正确方式:
+@dataclass
+class Child(Base):
+    age: int = 0                 # 给个默认值
+    email: str = ""
+
+// ========== super() 在 dataclass 中 ==========
+// __post_init__ 需要手动调用 super()
+
+@dataclass
+class Base:
+    x: int = 0
+
+    def __post_init__(self):
+        print(f"Base.__post_init__: x={self.x}")
+
+@dataclass
+class Child(Base):
+    y: int = 0
+
+    def __post_init__(self):
+        super().__post_init__()  # 手动调用!
+        print(f"Child.__post_init__: y={self.y}")
+
+c = Child(1, 2)
+// Base.__post_init__: x=1
+// Child.__post_init__: y=2</div>
+    </div>
+    <div class="card">
+        <h2>工具函数与 slots</h2>
+        <div class="code">// ========== dataclasses 工具函数 ==========
+from dataclasses import dataclass, asdict, astuple, replace
+
+@dataclass
+class Point:
+    x: float
+    y: float
+    label: str = ""
+
+p = Point(3.0, 4.0, "原点")
+
+# asdict: 转为字典
+d = asdict(p)
+print(d)                         # {'x': 3.0, 'y': 4.0, 'label': '原点'}
+print(d["x"])                    # 3.0
+
+# astuple: 转为元组
+t = astuple(p)
+print(t)                         # (3.0, 4.0, '')
+
+# replace: 创建修改后的副本 (类似 namedtuple._replace)
+p2 = replace(p, x=10.0, label="新点")
+print(p2)                        # Point(x=10.0, y=4.0, label='新点')
+print(p)                         # Point(x=3.0, y=4.0, label='原点') (不变)
+
+// ========== slots=True (Python 3.10+) ==========
+// 自动生成 __slots__,节省内存
+
+@dataclass(slots=True)
+class SlimPoint:
+    x: float
+    y: float
+
+p = SlimPoint(1, 2)
+print(p.x)                       # 1
+# p.z = 3                        # AttributeError! 没有 __slots__
+
+// 内存对比:
+import sys
+
+@dataclass
+class Normal:
+    x: int
+    y: int
+
+@dataclass(slots=True)
+class Slotted:
+    x: int
+    y: int
+
+n = Normal(1, 2)
+s = Slotted(1, 2)
+print(sys.getsizeof(n))          # 较大 (有 __dict__)
+print(sys.getsizeof(s))          # 较小 (无 __dict__)
+
+// ========== 完整例子: 配置管理 ==========
+@dataclass
+class DatabaseConfig:
+    host: str = field(default="localhost", metadata={"env": "DB_HOST"})
+    port: int = field(default=5432, metadata={"env": "DB_PORT"})
+    database: str = field(default="app", metadata={"env": "DB_NAME"})
+    username: str = field(default="admin", repr=False)
+    password: str = field(default="", repr=False)
+    pool_size: int = field(default=10, compare=False)
+
+    def connection_string(self):
+        return f"postgresql://{self.username}@{self.host}:{self.port}/{self.database}"
+
+config = DatabaseConfig()
+print(config.connection_string())</div>
+        <div class="note">💡 dataclass 进阶要点: (1) field(repr=False) 隐藏敏感数据,field(compare=False) 排除比较; (2) InitVar 只用于初始化不存储,ClassVar 是类变量; (3) 继承时注意默认值顺序; (4) asdict/astuple/replace 是实用工具; (5) slots=True (3.10+) 节省内存。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoField()">field 高级用法演示</button>
+        <button onclick="demoInherit()">dataclass 继承演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoField() {
+            result.innerHTML = '';
+            log('# field() 高级用法');
+            log('');
+            log('field(repr=False)   — 隐藏敏感字段');
+            log('field(compare=False) — 排除比较字段');
+            log('field(hash=False)   — 排除哈希字段');
+            log('field(init=False)   — 不在 __init__ 中');
+            log('field(default_factory=list) — 可变默认值');
+            log('');
+            log('InitVar — 只传不存');
+            log('ClassVar — 类变量 (非实例)');
+            log('');
+            log('工具函数:');
+            log('  asdict(p) — 转字典');
+            log('  astuple(p) — 转元组');
+            log('  replace(p, x=1) — 创建修改副本');
+        }
+
+        function demoInherit() {
+            result.innerHTML = '';
+            log('# dataclass 继承演示');
+            log('');
+            log('@dataclass');
+            log('class Base:');
+            log('    name: str');
+            log('    created: str = "now"');
+            log('');
+            log('@dataclass');
+            log('class Child(Base):');
+            log('    age: int = 0');
+            log('');
+            log('c = Child("Alice", age=25)');
+            log('→ Child(name="Alice", created="now", age=25)');
+            log('');
+            log('注意:');
+            log('  子类字段追加在父类字段后');
+            log('  有默认值的字段不能在前');
+            log('  __post_init__ 需手动 super()');
+        }
+    </script>
+</body>
+</html>

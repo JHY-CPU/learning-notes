@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cache API</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Cache API</h2><p>caches.open/add/delete/match、缓存版本管理、离线存储。</p></div>
+    <div class="card">
+        <h2>Cache API 方法</h2>
+        <div class="code">// ========== 打开缓存 ==========
+caches.open('my-cache').then(cache => {
+    // cache 对象可用
+});
+
+// ========== 添加资源 ==========
+cache.add('/api/data');          // fetch + put
+cache.addAll(['/', '/style.css']);
+
+// ========== 存储响应 ==========
+cache.put('/api/data', response);
+
+// ========== 读取缓存 ==========
+cache.match('/api/data');        // 匹配单个
+caches.match('/api/data');       // 所有缓存中查找
+
+// ========== 删除 ==========
+cache.delete('/api/data');
+caches.delete('my-cache');       // 删除整个缓存
+
+// ========== 遍历 ==========
+cache.keys();                    // 所有请求
+cache.keys('/api');              // 匹配模式</div>
+    </div>
+    <div class="card">
+        <h2>演示：Cache API</h2>
+        <button onclick="demoBasic()">基本操作</button>
+        <button onclick="demoVersion()">版本管理</button>
+        <button onclick="demoStrategy()">缓存策略</button>
+        <button onclick="demoPattern()">匹配模式</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        // Mock Cache 实现
+        class MockCache {
+            constructor(name) {
+                this.name = name;
+                this._store = new Map();
+            }
+            async add(request) {
+                const url = typeof request === 'string' ? request : request.url;
+                log(`   [${this.name}] 添加: ${url}`);
+                this._store.set(url, `模拟响应: ${url}`);
+            }
+            async addAll(requests) {
+                for (const req of requests) await this.add(req);
+            }
+            async put(request, response) {
+                const url = typeof request === 'string' ? request : request.url;
+                this._store.set(url, response);
+            }
+            async match(request) {
+                const url = typeof request === 'string' ? request : request.url;
+                return this._store.get(url) || null;
+            }
+            async delete(request) {
+                const url = typeof request === 'string' ? request : request.url;
+                return this._store.delete(url);
+            }
+            async keys() {
+                return Array.from(this._store.keys());
+            }
+            get size() { return this._store.size; }
+        }
+
+        // Mock CacheStorage
+        class MockCacheStorage {
+            constructor() {
+                this._caches = new Map();
+            }
+            async open(name) {
+                if (!this._caches.has(name)) this._caches.set(name, new MockCache(name));
+                return this._caches.get(name);
+            }
+            async has(name) { return this._caches.has(name); }
+            async delete(name) { return this._caches.delete(name); }
+            async keys() { return Array.from(this._caches.keys()); }
+            async match(request) {
+                for (const cache of this._caches.values()) {
+                    const result = await cache.match(request);
+                    if (result) return result;
+                }
+                return null;
+            }
+            get cacheNames() { return Array.from(this._caches.keys()); }
+        }
+
+        const caches_ = new MockCacheStorage();
+
+        function demoBasic() {
+            result.innerHTML = '';
+            log('💾 Cache API 基本操作:');
+            log('');
+
+            async function run() {
+                log('1️⃣ 打开缓存:');
+                const cache = await caches_.open('static-v1');
+                log(`   缓存 "${cache.name}" 已打开`);
+                log('');
+
+                log('2️⃣ 添加资源:');
+                await cache.addAll(['/index.html', '/style.css', '/app.js', '/logo.png']);
+                log('');
+
+                log('3️⃣ 读取缓存:');
+                const html = await cache.match('/index.html');
+                log(`   匹配 /index.html: ${html}`);
+
+                const notFound = await cache.match('/notfound.js');
+                log(`   匹配 /notfound.js: ${notFound}`);
+                log('');
+
+                log('4️⃣ 列出所有缓存:');
+                const keys = await cache.keys();
+                keys.forEach(k => log(`   ${k}`));
+                log(`   共 ${keys.length} 项`);
+                log('');
+
+                log('5️⃣ 删除缓存项:');
+                const deleted = await cache.delete('/logo.png');
+                log(`   删除 /logo.png: ${deleted}`);
+                log(`   剩余: ${(await cache.keys()).length} 项`);
+            }
+
+            run();
+        }
+
+        function demoVersion() {
+            result.innerHTML = '';
+            log('📌 缓存版本管理:');
+            log('');
+
+            async function run() {
+                const CACHE_VERSION = 'v3';
+                const CACHES = {
+                    static: `static-${CACHE_VERSION}`,
+                    api: `api-${CACHE_VERSION}`,
+                    fonts: `fonts-${CACHE_VERSION}`,
+                };
+
+                log(`当前缓存版本: ${CACHE_VERSION}`);
+                log('');
+
+                log('1️⃣ 创建新版本缓存:');
+                for (const [name, cacheName] of Object.entries(CACHES)) {
+                    const cache = await caches_.open(cacheName);
+                    log(`   创建 ${name}: ${cacheName}`);
+                }
+
+                log('');
+                log('2️⃣ 清理旧版本缓存:');
+                // 模拟已存在的旧缓存
+                await caches_.open('static-v1');
+                await caches_.open('static-v2');
+                await caches_.open('api-v1');
+
+                const validCaches = new Set(Object.values(CACHES));
+                const allCaches = caches_.cacheNames;
+
+                log(`   当前所有缓存: [${allCaches.join(', ')}]`);
+                log(`   有效缓存: [${[...validCaches].join(', ')}]`);
+
+                for (const cacheName of allCaches) {
+                    if (!validCaches.has(cacheName)) {
+                        await caches_.delete(cacheName);
+                        log(`   删除旧缓存: ${cacheName}`);
+                    }
+                }
+
+                log('');
+                log('3️⃣ activate 事件清理:');
+                log('   self.addEventListener("activate", e => {');
+                log('     const valid = new Set(["static-v3", "api-v3", "fonts-v3"]);');
+                log('     e.waitUntil(');
+                log('       caches.keys().then(keys =>');
+                log('         Promise.all(keys.filter(k => !valid.has(k)).map(k => caches.delete(k)))');
+                log('       )');
+                log('     );');
+                log('   });');
+            }
+
+            run();
+        }
+
+        function demoStrategy() {
+            result.innerHTML = '';
+            log('🎯 缓存策略实现:');
+            log('');
+
+            async function run() {
+                await caches_.open('api-v3');
+
+                const strategies = [
+                    {
+                        name: 'Cache First',
+                        code: `async function cacheFirst(req) {
+    const cached = await caches.match(req);
+    if (cached) return cached;
+    const resp = await fetch(req);
+    cache.put(req, resp.clone());
+    return resp;
+}`,
+                        note: '静态资源: 图片/CSS/JS/字体'
+                    },
+                    {
+                        name: 'Network First',
+                        code: `async function networkFirst(req) {
+    try {
+        const resp = await fetch(req);
+        cache.put(req, resp.clone());
+        return resp;
+    } catch {
+        return caches.match(req);
+    }
+}`,
+                        note: 'API 请求: 最新数据, 离线回退'
+                    },
+                    {
+                        name: 'Stale While Revalidate',
+                        code: `async function staleWhileRevalidate(req) {
+    const cached = caches.match(req);
+    const fetched = fetch(req).then(resp => {
+        cache.put(req, resp.clone());
+        return resp;
+    });
+    return cached || fetched;
+}`,
+                        note: '用户头像: 即时响应 + 后台更新'
+                    },
+                ];
+
+                strategies.forEach(({ name, code, note }) => {
+                    log(`📌 ${name}:`);
+                    log(code);
+                    log(`   适用: ${note}`);
+                    log('');
+                });
+
+                log('📌 通用匹配逻辑:');
+                log('   self.addEventListener("fetch", event => {');
+                log('     const url = new URL(event.request.url);');
+                log('     if (url.pathname.startsWith("/api/")) {');
+                log('       event.respondWith(networkFirst(event.request));');
+                log('     } else {');
+                log('       event.respondWith(cacheFirst(event.request));');
+                log('     }');
+                log('   });');
+            }
+
+            run();
+        }
+
+        function demoPattern() {
+            result.innerHTML = '';
+            log('🔍 缓存匹配模式:');
+            log('');
+
+            async function run() {
+                const cache = await caches_.open('test-cache');
+                const urls = [
+                    '/', '/index.html', '/api/users', '/api/users/1',
+                    '/api/posts', '/images/logo.png', '/images/bg.jpg',
+                    '/css/style.css', '/js/app.js', '/js/utils.js',
+                ];
+
+                log('缓存的 URL:');
+                for (const url of urls) {
+                    await cache.add(url);
+                }
+                log('');
+
+                log('1️⃣ 精确匹配:');
+                const exact = await cache.match('/api/users');
+                log(`   match("/api/users") → ${exact}`);
+
+                log('');
+                log('2️⃣ 忽略查询参数:');
+                const ignoreSearch = await cache.match('/api/users?page=1');
+                log(`   不传 options: ${await cache.match('/api/users?page=1')}`);
+                log(`   传 ignoreSearch: null (模拟中暂不支持)`);
+
+                log('');
+                log('3️⃣ 遍历所有缓存:');
+                const allKeys = await cache.keys();
+                log(`   共 ${allKeys.length} 个缓存项`);
+                allKeys.slice(0, 5).forEach(k => log(`   ${k}`));
+                log('   ...');
+
+                log('');
+                log('📌 match 选项:');
+                log('   { ignoreSearch: true } → 忽略查询参数');
+                log('   { ignoreMethod: true } → 忽略 HTTP 方法');
+                log('   { ignoreVary: true } → 忽略 Vary 头');
+                log('');
+                log('📌 缓存大小限制:');
+                log('   • 每个源: 存储配额 (StorageQuota)');
+                log('   • 超出配额: QuotaExceededError');
+                log('   • 使用 StorageManager 查询配额');
+            }
+
+            run();
+        }
+
+        console.log('=== Cache API ===');
+        document.getElementById('output').textContent =
+            `Cache API: caches.open / add / match / delete / 版本管理\n` +
+            `✅ Cache API 演示完成！`;
+    </script>
+</body>
+</html>

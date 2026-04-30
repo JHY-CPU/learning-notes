@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自定义事件</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #event-bus-log { background: #1e1e1e; color: #d4d4d4; padding: 10px; border-radius: 4px; font-size: 12px; max-height: 150px; overflow-y: auto; font-family: monospace; }
+        #output-box { background: #f8f9fa; padding: 15px; border-radius: 4px; min-height: 50px; font-size: 14px; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; margin: 2px; }
+        .badge.info { background: #d5f5e3; color: #27ae60; }
+        .badge.warn { background: #fef9e7; color: #f39c12; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>自定义事件 CustomEvent</h2><p>创建和触发自定义事件，实现组件间通信。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 1. 创建自定义事件
+const event = new CustomEvent('my-event', {
+    detail: { key: 'value' },   // 随事件传递的数据
+    bubbles: true,              // 是否冒泡
+    cancelable: true,           // 是否可取消
+    composed: true,             // 是否能穿越 Shadow DOM 边界
+});
+
+// 2. 派发事件
+element.dispatchEvent(event);
+
+// 3. 监听事件
+element.addEventListener('my-event', (e) => {
+    console.log(e.detail);  // { key: 'value' }
+    console.log(e.target);  // 派发事件的元素
+});
+
+// 4. 检查事件是否被 preventDefault
+if (!event.defaultPrevented) {
+    // 事件未被取消
+}
+
+// 5. 全局事件总线模式
+class EventBus {
+    constructor() {
+        this._events = {};
+    }
+    on(event, handler) {
+        if (!this._events[event]) this._events[event] = [];
+        this._events[event].push(handler);
+    }
+    off(event, handler) {
+        if (!this._events[event]) return;
+        this._events[event] = this._events[event].filter(h => h !== handler);
+    }
+    emit(event, data) {
+        (this._events[event] || []).forEach(h => h(data));
+    }
+    once(event, handler) {
+        const wrapper = (data) => { handler(data); this.off(event, wrapper); };
+        this.on(event, wrapper);
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：自定义事件</h2>
+        <button onclick="dispatchCustom()">📢 派发自定义事件</button>
+        <button onclick="dispatchBubble()">🫧 派发冒泡事件</button>
+        <div id="output-box">
+            <div>事件日志：</div>
+            <div id="event-bus-log">等待事件...</div>
+        </div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const eventLog = document.getElementById('event-bus-log');
+        const outputBox = document.getElementById('output-box');
+
+        function log(msg, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            eventLog.innerHTML += `<div><span class="badge ${type}">${type}</span> [${time}] ${msg}</div>`;
+            eventLog.scrollTop = eventLog.scrollHeight;
+            if (eventLog.children.length > 20) eventLog.removeChild(eventLog.firstChild);
+        }
+
+        // 监听自定义事件
+        outputBox.addEventListener('user-action', (e) => {
+            log(`收到 user-action: ${JSON.stringify(e.detail)}`);
+            console.log('user-action event:', e.detail);
+        });
+
+        outputBox.addEventListener('status-change', (e) => {
+            log(`状态变化: ${e.detail.from} → ${e.detail.to}`, 'warn');
+            console.log('status-change:', e.detail);
+        });
+
+        function dispatchCustom() {
+            // 派发 user-action 事件
+            const event = new CustomEvent('user-action', {
+                detail: { type: 'click', timestamp: Date.now(), user: 'guest' },
+                bubbles: false,
+            });
+            outputBox.dispatchEvent(event);
+            log('已派发 user-action 事件');
+        }
+
+        function dispatchBubble() {
+            // 派发 status-change 事件（冒泡）
+            const event = new CustomEvent('status-change', {
+                detail: { from: 'idle', to: 'active', reason: 'user_trigger' },
+                bubbles: true,
+            });
+            outputBox.dispatchEvent(event);
+            log('已派发 status-change 事件（冒泡）');
+        }
+
+        // 事件总线演示
+        log('📋 监听器已就绪: user-action, status-change');
+
+        console.log('=== CustomEvent ===');
+        console.log('CustomEvent 支持:', typeof CustomEvent);
+
+        document.getElementById('output').textContent =
+            `CustomEvent: 自定义事件\n` +
+            `new CustomEvent(name, {detail, bubbles, cancelable})\n` +
+            `dispatchEvent / addEventListener 配合使用\n` +
+            `EventBus 模式: on/emit/off/once\n` +
+            `✅ 自定义事件演示完成！`;
+    </script>
+</body>
+</html>

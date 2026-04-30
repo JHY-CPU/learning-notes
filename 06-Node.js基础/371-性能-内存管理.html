@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>性能-内存管理</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        .leak-example { background: #fdf0ef; border-left: 4px solid #e74c3c; padding: 10px; margin: 8px 0; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>性能-内存管理</h2><p>V8 垃圾回收、内存泄漏检测、Chrome DevTools Memory 面板、弱引用。</p></div>
+    <div class="card">
+        <h2>内存管理 API</h2>
+        <div class="code">// ========== 垃圾回收 (GC) ==========
+// V8 使用: 分代回收 (Generational GC)
+// 新生代: Scavenge (频繁, 小)
+// 老生代: Mark-Sweep / Mark-Compact (不频繁, 大)
+
+// ========== 内存泄漏常见原因 ==========
+// 1. 全局变量 (意外)
+// 2. 闭包引用未释放
+// 3. 定时器未清理
+// 4. DOM 引用未释放
+// 5. 事件监听未移除
+// 6. console.log (保留对象引用)
+
+// ========== WeakMap / WeakSet ==========
+// 弱引用: 不影响 GC
+// 适合: 对象额外数据 / 缓存 / DOM 关联数据</div>
+    </div>
+    <div class="card">
+        <h2>演示：内存管理</h2>
+        <button onclick="demoLeaks()">内存泄漏</button>
+        <button onclick="demoGC()">GC 原理</button>
+        <button onclick="demoWeakRef()">弱引用</button>
+        <button onclick="demoDevTools()">DevTools</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoLeaks() {
+            result.innerHTML = '';
+            log('🕳️ 常见内存泄漏:');
+            log('');
+
+            log('1️⃣ 意外全局变量:');
+            log('   function createLeak() {');
+            log('     leakedVar = "全局变量";  // 没有 let/const');
+            log('     this.alsoLeaked = "global";  // this → window');
+            log('   }');
+            log('   // 解决方法: 使用 "use strict"');
+            log('');
+
+            log('2️⃣ 定时器未清理:');
+            log('   const data = fetchData();');
+            log('   setInterval(() => {');
+            log('     // data 一直被引用, 无法释放');
+            log('     console.log(data);');
+            log('   }, 1000);');
+            log('   // 解决方法: clearInterval');
+            log('');
+
+            log('3️⃣ 闭包引用:');
+            log('   function createLeak() {');
+            log('     const hugeData = new Array(1000000);');
+            log('     return function() {');
+            log('       console.log(hugeData.length);  // 持有引用');
+            log('     };');
+            log('   }');
+            log('   const closure = createLeak();');
+            log('   // closure 持有 hugeData, 无法 GC');
+            log('');
+
+            log('4️⃣ DOM 引用未释放:');
+            log('   const elements = [];');
+            log('   const btn = document.getElementById("btn");');
+            log('   elements.push(btn);');
+            log('   // 即使 DOM 被移除, 数组仍持有引用');
+            log('   btn.parentNode.removeChild(btn);');
+            log('   // GC 无法回收 btn');
+            log('');
+
+            log('5️⃣ 事件监听未移除:');
+            log('   class Component {');
+            log('     constructor() {');
+            log('       window.addEventListener("resize", this.handler);');
+            log('     }');
+            log('   }');
+            log('   // 组件销毁后, resize 监听仍存在');
+            log('   // 需在 destroy 中 removeEventListener');
+            log('');
+
+            log('6️⃣ console.log:');
+            log('   // 浏览器 DevTools 打开时');
+            log('   console.log(obj);  // 持有对象引用');
+            log('   // 对象无法被 GC');
+            log('   // 生产环境应移除 console.log');
+        }
+
+        function demoGC() {
+            result.innerHTML = '';
+            log('♻️ V8 垃圾回收:');
+            log('');
+
+            log('1️⃣ 分代回收 (Generational GC):');
+            log('   ┌──────────┐          ┌──────────┐');
+            log('   │ 新生代    │ → → →  │ 老生代    │');
+            log('   │ (Young)  │ 晋升    │ (Old)    │');
+            log('   │ 小 + 频繁 │          │ 大 + 少  │');
+            log('   └──────────┘          └──────────┘');
+            log('');
+
+            log('2️⃣ 新生代 (Young Generation):');
+            log('   • 空间: 小 (1~8 MB)');
+            log('   • 算法: Scavenge (复制)');
+            log('   • 分两个半区: From + To');
+            log('   • 对象经过 2 次 GC 后存活 → 晋升');
+            log('');
+
+            log('3️⃣ 老生代 (Old Generation):');
+            log('   • 空间: 大 (几百 MB+)');
+            log('   • 算法: Mark-Sweep + Mark-Compact');
+            log('   • Mark-Sweep: 标记存活 → 清除死亡');
+            log('   • Mark-Compact: 标记 → 整理 (去碎片)');
+            log('');
+
+            log('4️⃣ 什么时候触发 GC:');
+            log('   • 新生代: From 空间满');
+            log('   • 老生代: 内存达到阈值');
+            log('   • 主动: global.gc() (Node.js --expose-gc)');
+            log('');
+
+            log('5️⃣ Node.js 内存查看:');
+            log('   console.log(process.memoryUsage());');
+            log('   // {');
+            log('   //   rss: 30 MB,        // 常驻内存');
+            log('   //   heapTotal: 10 MB,  // 堆总大小');
+            log('   //   heapUsed: 5 MB,    // 已使用');
+            log('   //   external: 1 MB,   // 外部 (C++)');
+            log('   //   arrayBuffers: 0   // ArrayBuffer');
+            log('   // }');
+        }
+
+        function demoWeakRef() {
+            result.innerHTML = '';
+            log('🔗 弱引用:');
+            log('');
+
+            log('1️⃣ WeakMap:');
+            log('   const cache = new WeakMap();');
+            log('   const obj = { id: 1 };');
+            log('   cache.set(obj, "数据");');
+            log('');
+            log('   // 当 obj 被回收 → WeakMap 自动移除');
+            log('   // 不会阻止 GC');
+            log('');
+
+            log('2️⃣ WeakSet:');
+            log('   const visited = new WeakSet();');
+            log('   const element = document.getElementById("btn");');
+            log('   visited.add(element);');
+            log('');
+            log('   // DOM 移除后 → WeakSet 自动清理');
+            log('   // 适合标记 DOM 元素');
+            log('');
+
+            log('3️⃣ WeakRef (ES2021):');
+            log('   // 创建弱引用');
+            log('   const ref = new WeakRef({ data: "test" });');
+            log('   const obj = ref.deref();  // 获取引用 (可能 undefined)');
+            log('   // 对象已被 GC → deref() 返回 undefined');
+            log('');
+
+            log('4️⃣ FinalizationRegistry (ES2021):');
+            log('   const registry = new FinalizationRegistry((held) => {');
+            log('     console.log("对象被回收:", held);');
+            log('   });');
+            log('');
+            log('   const obj = {};');
+            log('   registry.register(obj, "obj 的清理回调");');
+            log('   // obj 被 GC 时, 回调被执行');
+            log('');
+
+            log('5️⃣ WeakMap vs Map:');
+            log('   ┌────────┬──────────┬──────────┐');
+            log('   │        │ Map      │ WeakMap  │');
+            log('   ├────────┼──────────┼──────────┤');
+            log('   │ 键类型  │ 任意     │ 对象     │');
+            log('   │ 可遍历  │ ✅      │ ❌      │');
+            log('   │ 阻止 GC │ ✅      │ ❌      │');
+            log('   │ 应用    │ 通用     │ 缓存/DOM │');
+            log('   └────────┴──────────┴──────────┘');
+        }
+
+        function demoDevTools() {
+            result.innerHTML = '';
+            log('🔧 Chrome DevTools 内存分析:');
+            log('');
+
+            log('1️⃣ Memory 面板:');
+            log('   打开: DevTools → Memory (或 Performance)');
+            log('');
+
+            log('2️⃣ Heap Snapshot (堆快照):');
+            log('   ① 点击 "Take Snapshot"');
+            log('   ② 在 "Class" 视图中查看对象');
+            log('   ③ 按 "Retained Size" 排序找大对象');
+            log('   ④ 搜索 (Detached DOM Tree)');
+            log('');
+
+            log('3️⃣ Allocation Timeline (分配时间线):');
+            log('   ① 选择 "Allocation instrumentation on timeline"');
+            log('   ② 点击 "Start"');
+            log('   ③ 执行操作');
+            log('   ④ 停止后查看内存分配');
+            log('   ⑤ 蓝色条 = 未回收, 灰色条 = 已回收');
+            log('');
+
+            log('4️⃣ Allocation Sampling (分配采样):');
+            log('   • 低开销的方式分析内存分配');
+            log('   • 适合长时间分析');
+            log('   • 显示函数级别的分配');
+            log('');
+
+            log('5️⃣ 内存泄漏检测步骤:');
+            log('   ① 记录 Heap Snapshot');
+            log('   ② 执行可能泄漏的操作');
+            log('   ③ 再记录 Snapshot');
+            log('   ④ 对比两次 Snapshot');
+            log('   ⑤ 用 "Summary" 看 Delta 列');
+            log('   ⑥ 查找 Detached DOM Tree');
+            log('');
+
+            log('6️⃣ Performance 面板:');
+            log('   • 勾选 "Memory" 选项');
+            log('   • 录制操作');
+            log('   • 查看 JS Heap 线 (上升→不下降 = 泄漏)');
+            log('   • 配合 GC 按钮 (垃圾桶图标)');
+        }
+
+        console.log('=== 性能-内存管理 ===');
+        document.getElementById('output').textContent =
+            `内存管理: 内存泄漏 / V8 GC / WeakMap/WeakRef / DevTools Memory 面板\n` +
+            `✅ 内存管理演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排序-插入希尔</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>排序-插入希尔</h2><p>插入排序、希尔排序(间隔序列)、部分有序数组优势。</p></div>
+    <div class="card">
+        <h2>插入 & 希尔排序</h2>
+        <div class="code">// ========== 插入排序 O(n²) ==========
+function insertionSort(arr) {
+    const a = [...arr];
+    for (let i = 1; i < a.length; i++) {
+        const key = a[i];
+        let j = i - 1;
+        while (j >= 0 && a[j] > key) {
+            a[j + 1] = a[j];
+            j--;
+        }
+        a[j + 1] = key;
+    }
+    return a;
+}
+
+// ========== 希尔排序 O(n log² n) ==========
+function shellSort(arr) {
+    const a = [...arr];
+    let gap = Math.floor(a.length / 2);
+    while (gap > 0) {
+        for (let i = gap; i < a.length; i++) {
+            const temp = a[i];
+            let j = i;
+            while (j >= gap && a[j - gap] > temp) {
+                a[j] = a[j - gap];
+                j -= gap;
+            }
+            a[j] = temp;
+        }
+        gap = Math.floor(gap / 2);
+    }
+    return a;
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：插入 & 希尔排序</h2>
+        <button onclick="demoInsertion()">插入排序</button>
+        <button onclick="demoShell()">希尔排序</button>
+        <button onclick="demoPartial()">部分有序优势</button>
+        <button onclick="demoCompareAll()">全排序对比</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoInsertion() {
+            result.innerHTML = '';
+            log('📌 插入排序:');
+            log('');
+
+            function insertionSort(arr) {
+                const a = [...arr];
+                let comparisons = 0, moves = 0;
+                log(`初始: [${a}]`);
+                for (let i = 1; i < a.length; i++) {
+                    const key = a[i];
+                    let j = i - 1;
+                    log(`  取 key=${key}, 比较:`, '');
+                    while (j >= 0) {
+                        comparisons++;
+                        if (a[j] > key) {
+                            a[j + 1] = a[j];
+                            moves++;
+                            j--;
+                        } else {
+                            break;
+                        }
+                    }
+                    a[j + 1] = key;
+                    log(`  插入 key=${key} 到位置 ${j + 1}: [${a}]`);
+                }
+                log(`比较: ${comparisons} 次, 移动: ${moves} 次`);
+                return a;
+            }
+
+            const data = [6, 2, 9, 4, 1, 7];
+            log(`原始数组: [${data}]`);
+            log('');
+            insertionSort(data);
+            log('');
+            log('📌 插入排序特点:');
+            log('   • 在线算法 (可以边接收数据边排序)');
+            log('   • 稳定排序');
+            log('   • 部分有序时效率高 O(n)');
+        }
+
+        function demoShell() {
+            result.innerHTML = '';
+            log('🐚 希尔排序:');
+            log('');
+
+            function shellSort(arr) {
+                const a = [...arr];
+                let gap = Math.floor(a.length / 2);
+                let comparisons = 0;
+                log(`初始: [${a}]`);
+                log('');
+
+                while (gap > 0) {
+                    log(`间隔 gap=${gap}:`);
+                    for (let i = gap; i < a.length; i++) {
+                        const temp = a[i];
+                        let j = i;
+                        while (j >= gap) {
+                            comparisons++;
+                            if (a[j - gap] > temp) {
+                                a[j] = a[j - gap];
+                                j -= gap;
+                            } else {
+                                break;
+                            }
+                        }
+                        a[j] = temp;
+                    }
+                    log(`  结果: [${a}]`);
+                    gap = Math.floor(gap / 2);
+                }
+
+                log(`总比较: ${comparisons} 次`);
+                return a;
+            }
+
+            const data = [9, 8, 7, 6, 5, 4, 3, 2, 1];
+            log(`原始数组 (逆序): [${data}]`);
+            log('');
+            shellSort(data);
+            log('');
+            log('📌 希尔排序特点:');
+            log('   • 改进的插入排序');
+            log('   • 先使数组"基本有序"');
+            log('   • 时间复杂度: O(n log² n)');
+            log('   • 不稳定排序');
+        }
+
+        function demoPartial() {
+            result.innerHTML = '';
+            log('✅ 部分有序数组优势:');
+            log('');
+
+            function insertionSort(arr) {
+                const a = [...arr];
+                let comparisons = 0;
+                for (let i = 1; i < a.length; i++) {
+                    const key = a[i];
+                    let j = i - 1;
+                    while (j >= 0 && a[j] > key) {
+                        comparisons++;
+                        a[j + 1] = a[j];
+                        j--;
+                    }
+                    comparisons++;
+                    a[j + 1] = key;
+                }
+                return { sorted: a, comparisons };
+            }
+
+            // 随机数组
+            const randomArr = Array.from({ length: 100 }, () => Math.floor(Math.random() * 1000));
+
+            // 几乎有序数组 (只有 5% 无序)
+            const nearlySorted = Array.from({ length: 100 }, (_, i) => i);
+            for (let i = 0; i < 5; i++) {
+                const idx1 = Math.floor(Math.random() * 100);
+                const idx2 = Math.floor(Math.random() * 100);
+                [nearlySorted[idx1], nearlySorted[idx2]] = [nearlySorted[idx2], nearlySorted[idx1]];
+            }
+
+            // 逆序数组
+            const reversed = Array.from({ length: 100 }, (_, i) => 99 - i);
+
+            log('插入排序在不同数据下的比较次数:');
+            log('');
+
+            const randomResult = insertionSort(randomArr);
+            log(`1️⃣ 随机数组:     ${randomResult.comparisons} 次比较`);
+
+            const nearlyResult = insertionSort(nearlySorted);
+            log(`2️⃣ 几乎有序:     ${nearlyResult.comparisons} 次比较 (接近 O(n))`);
+
+            const reversedResult = insertionSort(reversed);
+            log(`3️⃣ 完全逆序:     ${reversedResult.comparisons} 次比较 (O(n²))`);
+
+            log('');
+            log('📌 结论:');
+            log('   • 插入排序在部分有序时接近 O(n)');
+            log('   • 希尔排序通过预排序利用这一特性');
+            log('   • 实际中数据经常是"几乎有序"的');
+        }
+
+        function demoCompareAll() {
+            result.innerHTML = '';
+            log('⚡ 全排序算法对比:');
+            log('');
+
+            const size = 500;
+            const testData = Array.from({ length: size }, () => Math.floor(Math.random() * 10000));
+            log(`测试规模: ${size} 个随机整数`);
+            log('');
+
+            function insertionSort(arr) { const a = [...arr]; for (let i = 1; i < a.length; i++) { const key = a[i]; let j = i - 1; while (j >= 0 && a[j] > key) { a[j + 1] = a[j]; j--; } a[j + 1] = key; } return a; }
+            function shellSort(arr) { const a = [...arr]; let gap = Math.floor(a.length / 2); while (gap > 0) { for (let i = gap; i < a.length; i++) { const temp = a[i]; let j = i; while (j >= gap && a[j - gap] > temp) { a[j] = a[j - gap]; j -= gap; } a[j] = temp; } gap = Math.floor(gap / 2); } return a; }
+            function bubbleSort(arr) { const a = [...arr]; for (let i = 0; i < a.length; i++) { for (let j = 0; j < a.length - 1 - i; j++) { if (a[j] > a[j + 1]) [a[j], a[j + 1]] = [a[j + 1], a[j]]; } } return a; }
+            function selectionSort(arr) { const a = [...arr]; for (let i = 0; i < a.length - 1; i++) { let minIdx = i; for (let j = i + 1; j < a.length; j++) { if (a[j] < a[minIdx]) minIdx = j; } if (minIdx !== i) [a[i], a[minIdx]] = [a[minIdx], a[i]]; } return a; }
+
+            const sorts = [
+                { name: '原生 sort', fn: (arr) => [...arr].sort((a, b) => a - b) },
+                { name: '冒泡排序', fn: bubbleSort },
+                { name: '选择排序', fn: selectionSort },
+                { name: '插入排序', fn: insertionSort },
+                { name: '希尔排序', fn: shellSort },
+            ];
+
+            sorts.forEach(({ name, fn }) => {
+                const start = performance.now();
+                fn(testData);
+                log(`   ${name.padEnd(14)} ${(performance.now() - start).toFixed(2)}ms`);
+            });
+
+            log('');
+            log('📊 复杂度总览:');
+            log('   算法'.padEnd(14) + '平均'.padEnd(14) + '最坏'.padEnd(14) + '空间'.padEnd(10) + '稳定');
+            log('   冒泡排序'.padEnd(14) + 'O(n²)'.padEnd(14) + 'O(n²)'.padEnd(14) + 'O(1)'.padEnd(10) + '✓');
+            log('   选择排序'.padEnd(14) + 'O(n²)'.padEnd(14) + 'O(n²)'.padEnd(14) + 'O(1)'.padEnd(10) + '✗');
+            log('   插入排序'.padEnd(14) + 'O(n²)'.padEnd(14) + 'O(n²)'.padEnd(14) + 'O(1)'.padEnd(10) + '✓');
+            log('   希尔排序'.padEnd(14) + 'O(n log² n)'.padEnd(14) + 'O(n²)'.padEnd(14) + 'O(1)'.padEnd(10) + '✗');
+        }
+
+        console.log('=== 排序-插入希尔 ===');
+        document.getElementById('output').textContent = `插入排序 / 希尔排序 / 部分有序优势 / 全排序对比\n✅ 排序-插入希尔演示完成！`;
+    </script>
+</body>
+</html>

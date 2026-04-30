@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>02-冒泡排序 (Bubble Sort)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; white-space: pre-wrap; }
+.bar-container { display: flex; align-items: flex-end; height: 200px; gap: 4px; margin: 10px 0; }
+.bar { background: #3498db; width: 30px; text-align: center; color: white; font-size: 12px; transition: height 0.3s; border-radius: 3px 3px 0 0; }
+.bar-active { background: #e74c3c; }
+.bar-sorted { background: #27ae60; }
+</style></head>
+<body>
+<div class="card">
+  <h2>冒泡排序 (Bubble Sort)</h2>
+  <p>冒泡排序重复遍历数组，依次比较相邻元素，如果顺序错误就交换它们。每轮遍历将最大（或最小）元素"冒泡"到末尾。</p>
+  <div class="note">
+    <strong>复杂度分析：</strong>平均/最坏 O(n^2)，最优 O(n)。空间 O(1)。稳定排序。
+  </div>
+</div>
+
+<div class="card">
+  <h2>算法步骤</h2>
+  <ol>
+    <li>从第一个元素开始，依次比较相邻元素</li>
+    <li>如果前一个比后一个大，则交换</li>
+    <li>每轮结束后，最大的元素被放到末尾</li>
+    <li>重复 n-1 轮，或某一轮没有交换时提前结束</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h2>代码实现</h2>
+  <pre>function bubbleSort(arr) {
+  const n = arr.length;
+  for (let i = 0; i < n - 1; i++) {
+    let swapped = false;
+    for (let j = 0; j < n - 1 - i; j++) {
+      if (arr[j] > arr[j + 1]) {
+        [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
+        swapped = true;
+      }
+    }
+    if (!swapped) break; // 优化：提前结束
+  }
+  return arr;
+}</pre>
+</div>
+
+<div class="card">
+  <h2>交互演示</h2>
+  <button onclick="runBubbleSort()">开始冒泡排序</button>
+  <button onclick="resetData()">重置数据</button>
+  <div id="bars" class="bar-container"></div>
+  <div id="result">点击按钮开始演示</div>
+</div>
+
+<script>
+let data = [];
+let isSorting = false;
+
+function initData() {
+  data = Array.from({length: 12}, () => Math.floor(Math.random() * 150) + 20);
+  renderBars(data, []);
+}
+
+function renderBars(arr, activeIndices) {
+  const container = document.getElementById('bars');
+  const maxVal = Math.max(...arr);
+  container.innerHTML = arr.map((val, i) => {
+    let cls = 'bar';
+    if (activeIndices.includes(i)) cls += ' bar-active';
+    const height = (val / maxVal) * 180;
+    return `<div class="${cls}" style="height:${height}px">${val}</div>`;
+  }).join('');
+}
+
+async function runBubbleSort() {
+  if (isSorting) return;
+  isSorting = true;
+  const arr = [...data];
+  const n = arr.length;
+  const resultEl = document.getElementById('result');
+
+  for (let i = 0; i < n - 1; i++) {
+    let swapped = false;
+    for (let j = 0; j < n - 1 - i; j++) {
+      renderBars(arr, [j, j + 1]);
+      await sleep(200);
+      if (arr[j] > arr[j + 1]) {
+        [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
+        swapped = true;
+        renderBars(arr, [j, j + 1]);
+        await sleep(200);
+      }
+    }
+    resultEl.textContent = `第 ${i + 1} 轮冒泡完成，当前数组: [${arr.join(', ')}]`;
+    if (!swapped) {
+      resultEl.textContent += ' —— 未发生交换，提前结束！';
+      break;
+    }
+  }
+  renderBars(arr, []);
+  resultEl.textContent = '排序完成: [' + arr.join(', ') + ']';
+  data = arr;
+  isSorting = false;
+}
+
+function resetData() {
+  if (isSorting) return;
+  initData();
+  document.getElementById('result').textContent = '数据已重置';
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+initData();
+</script>
+</body></html>

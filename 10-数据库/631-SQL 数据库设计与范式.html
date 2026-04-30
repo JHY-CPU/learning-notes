@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 数据库设计与范式</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📐 SQL 数据库设计与范式</h2><p>ER 实体关系模型、数据库设计流程、1NF/2NF/3NF/BCNF 范式、反范式化、命名规范、设计工具、完整电商设计案例。</p></div>
+    <div class="card">
+        <h2>数据库设计流程</h2>
+        <div class="code">// ========== 设计流程 ==========
+// 1. 需求分析
+//    - 理解业务需求
+//    - 确定核心实体和关系
+//    - 列出功能需求 (CRUD、报表等)
+//
+// 2. 概念设计 (ER 图)
+//    - 实体: 用户、订单、商品
+//    - 关系: 1:1, 1:N, M:N
+//    - 属性: 实体的特征
+//
+// 3. 逻辑设计 (表结构)
+//    - 实体 → 表
+//    - 属性 → 列
+//    - 关系 → 外键/关联表
+//    - 应用范式
+//
+// 4. 物理设计 (索引/分区)
+//    - 索引策略
+//    - 分区方案
+//    - 存储引擎
+//
+// 5. 实施与优化
+//    - 创建表
+//    - 导入数据
+//    - 监控优化
+
+// ========== ER 图核心概念 ==========
+// 实体 (Entity): 矩形,如 [用户] [订单]
+// 属性 (Attribute): 椭圆,如 (用户名) (邮箱)
+// 关系 (Relationship): 菱形,如 <下单>
+//
+// 关系类型:
+// 1:1  (一对一)  → 用户 ↔ 身份证
+// 1:N  (一对多)  → 用户 1→N 订单
+// M:N  (多对多)  → 学生 M↔N 课程</div>
+    </div>
+    <div class="card">
+        <h2>第一范式 (1NF)</h2>
+        <div class="code">// ========== 1NF: 原子性 ==========
+// 每列不可再分,每个单元格存一个值
+
+// ❌ 违反 1NF (多值列):
+// orders:
+// id | user | products
+// 1  | Alice| apple,banana     ← 一个单元格多个值!
+
+// ✅ 符合 1NF:
+// orders:
+// id | user | product
+// 1  | Alice| apple
+// 2  | Alice| banana
+
+// ❌ 违反 1NF (可拆分列):
+// users:
+// id | name    | address
+// 1  | Alice   | 北京市海淀区中关村大街1号  ← 可拆分为省/市/区/街道
+
+// ✅ 符合 1NF (按需求拆分):
+// users:
+// id | name | province | city | district | street
+
+// ⚠️ 是否拆分取决于业务需求
+// 如果只需要整个地址 → VARCHAR 就够
+// 如果需要按城市统计 → 拆分
+
+// ========== 判断标准 ==========
+// 一个单元格不能有多个值
+// 不使用逗号分隔列表、JSON 数组等
+// (但现代数据库如 PostgreSQL 支持数组/JSON,
+//  有时反范式也有其用途)</div>
+    </div>
+    <div class="card">
+        <h2>第二范式 (2NF)</h2>
+        <div class="code">// ========== 2NF: 部分依赖 ==========
+// 前提: 符合 1NF
+// 非主键列必须完全依赖于全部主键 (不能部分依赖)
+// 只在复合主键时有问题
+
+// ❌ 违反 2NF (部分依赖):
+// order_items:
+// order_id | product_id | product_name | quantity | price
+// ─────────┼────────────┼──────────────┼─────────┼──────
+// 1        | 1          | iPhone       | 2        | 5999
+// 1        | 2          | MacBook      | 1        | 12999
+// 2        | 1          | iPhone       | 1        | 5999
+
+// 主键: (order_id, product_id)
+// product_name 只依赖于 product_id (部分依赖!)
+// 应该拆分到 products 表
+
+// ✅ 符合 2NF:
+// order_items:
+// order_id | product_id | quantity | price
+// ─────────┼────────────┼─────────┼──────
+// 1        | 1          | 2        | 5999
+// 1        | 2          | 1        | 12999
+// 2        | 1          | 1        | 5999
+
+// products:
+// id | name
+// 1  | iPhone
+// 2  | MacBook
+
+// ========== 判断标准 ==========
+// 找到复合主键
+// 检查每个非主键列是否依赖全部主键
+// 如果有列只依赖部分主键 → 拆分出去</div>
+    </div>
+    <div class="card">
+        <h2>第三范式 (3NF)</h2>
+        <div class="code">// ========== 3NF: 传递依赖 ==========
+// 前提: 符合 2NF
+// 非主键列不能依赖于其他非主键列
+
+// ❌ 违反 3NF (传递依赖):
+// orders:
+// id | user_id | user_name | user_email | amount | date
+// ───┼─────────┼───────────┼────────────┼───────┼──────
+// 1  | 1       | Alice     | a@test.com | 100    | 2024-01-01
+
+// user_name 和 user_email 通过 user_id 间接依赖主键
+// user_name → 依赖于 user_id → 传递依赖!
+
+// ✅ 符合 3NF:
+// orders:
+// id | user_id | amount | date
+// 1  | 1       | 100    | 2024-01-01
+
+// users:
+// id | name | email
+// 1  | Alice| a@test.com
+
+// ========== 判断标准 ==========
+// 非主键列之间不能有依赖关系
+// 如果列 A 决定列 B (A→B) → 它们应该在同一张表!
+// 传递依赖: id → user_id → user_name
+
+// 规则: 每个非主键列只描述主键,不描述其他非主键列</div>
+    </div>
+    <div class="card">
+        <h2>BCNF 与反范式化</h2>
+        <div class="code">// ========== BCNF (鲍依斯-科得范式) ==========
+// 3NF 的加强版
+// 每个决定因素都必须是候选键
+
+// ❌ 违反 BCNF:
+// 教授 和 课程:
+// professor | course     | office
+// ──────────┼────────────┼──────
+// Dr.Smith  | Database   | A101
+// Dr.Smith  | Algorithms | A101
+// Dr.Jones  | AI         | A202
+
+// 候选键: (professor, course)
+// 但: professor → office (教授决定办公室)
+// professor 是决定因素但不是候选键
+
+// ✅ BCNF:
+// professors: id | name | office
+// courses:    id | name | professor_id
+
+// ========== 反范式化 ==========
+// 有时为了查询性能,故意违反范式
+
+// 反范式场景:
+// 1. 高并发读 (减少 JOIN)
+// 2. 报表/分析 (预计算聚合)
+// 3. 缓存热点数据
+
+// 示例: 订单表冗余用户姓名
+// ✅ 反范式 (减少 JOIN 查询):
+// orders: id | user_id | user_name | amount
+// 用户改名 → 需要同步更新所有相关订单!
+
+// 权衡:
+// 范式化: 更新快,查询慢 (JOIN 多)
+// 反范式: 查询快,更新慢 (冗余一致性问题)
+
+// 何时反范式:
+// - 读远多于写 (报表/分析)
+// - 数据不常更新
+// - JOIN 影响太大</div>
+    </div>
+    <div class="card">
+        <h2>完整案例: 电商数据库设计</h2>
+        <div class="code">// ========== 电商数据库设计 ==========
+
+-- 1. 用户模块
+CREATE TABLE users (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    username VARCHAR(50) NOT NULL UNIQUE,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(128) NOT NULL,
+    phone VARCHAR(20),
+    avatar_url VARCHAR(255),
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX idx_users_email (email),
+    INDEX idx_users_created (created_at)
+);
+
+-- 2. 用户地址 (1:N)
+CREATE TABLE addresses (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    user_id INT NOT NULL,
+    province VARCHAR(50),
+    city VARCHAR(50),
+    district VARCHAR(50),
+    detail VARCHAR(200) NOT NULL,
+    is_default BOOLEAN DEFAULT FALSE,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    INDEX idx_addresses_user (user_id)
+);
+
+-- 3. 商品分类 (自引用 1:N)
+CREATE TABLE categories (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(50) NOT NULL,
+    parent_id INT DEFAULT NULL,
+    sort_order INT DEFAULT 0,
+    FOREIGN KEY (parent_id) REFERENCES categories(id),
+    INDEX idx_categories_parent (parent_id)
+);
+
+-- 4. 商品
+CREATE TABLE products (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(200) NOT NULL,
+    description TEXT,
+    price DECIMAL(10, 2) NOT NULL,
+    stock INT NOT NULL DEFAULT 0,
+    category_id INT NOT NULL,
+    image_url VARCHAR(255),
+    status ENUM('active', 'inactive', 'discontinued') DEFAULT 'active',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES categories(id),
+    INDEX idx_products_category (category_id),
+    INDEX idx_products_price (price),
+    FULLTEXT INDEX ft_products_name (name)
+);
+
+-- 5. 订单
+CREATE TABLE orders (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    order_no VARCHAR(20) NOT NULL UNIQUE,
+    user_id INT NOT NULL,
+    address_id INT NOT NULL,
+    total_amount DECIMAL(12, 2) NOT NULL DEFAULT 0.00,
+    status ENUM('pending','paid','shipped','delivered','cancelled') DEFAULT 'pending',
+    paid_at DATETIME,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (address_id) REFERENCES addresses(id),
+    INDEX idx_orders_user (user_id),
+    INDEX idx_orders_status (status),
+    INDEX idx_orders_created (created_at)
+);
+
+-- 6. 订单明细
+CREATE TABLE order_items (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    order_id INT NOT NULL,
+    product_id INT NOT NULL,
+    product_name VARCHAR(200) NOT NULL,  -- 冗余: 商品改名后仍保留快照
+    price DECIMAL(10, 2) NOT NULL,       -- 下单时价格
+    quantity INT NOT NULL DEFAULT 1,
+    subtotal DECIMAL(12, 2) GENERATED ALWAYS AS (price * quantity) STORED,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id),
+    INDEX idx_items_order (order_id),
+    INDEX idx_items_product (product_id)
+);
+
+-- ========== 设计说明 ==========
+-- 1. 所有表有自增主键 (代理主键)
+-- 2. 外键建立索引 (JOIN 性能)
+-- 3. order_items.product_name 冗余 (历史快照)
+-- 4. GENERATED COLUMN 自动计算小计
+-- 5. 明确的状态枚举,可扩展
+-- 6. 时间戳字段自动维护</div>
+        <div class="note">💡 设计要点: 1NF 列不可拆分; 2NF 非主键完全依赖主键; 3NF 非主键不传递依赖; BCNF 决定因素必须候选键; 性能需要时可反范式化; 设计完成后再考虑索引策略。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demo1NF()">1NF 演示</button>
+        <button onclick="demo3NF()">3NF 演示</button>
+        <button onclick="demoDesign()">设计流程演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demo1NF() {
+            result.innerHTML = '';
+            log('# 第一范式 (1NF)');
+            log('');
+            log('要求: 每列不可再分');
+            log('');
+            log('❌ 错误:');
+            log('  id | products');
+            log('  1  | apple,banana  ← 逗号分隔');
+            log('');
+            log('✅ 正确:');
+            log('  id | product');
+            log('  1  | apple');
+            log('  2  | banana');
+            log('');
+            log('原则: 一个单元格一个值');
+        }
+
+        function demo3NF() {
+            result.innerHTML = '';
+            log('# 第三范式 (3NF)');
+            log('');
+            log('要求: 非主键列只依赖主键');
+            log('');
+            log('❌ 传递依赖:');
+            log('  orders: id | user_id | user_name');
+            log('  user_name 通过 user_id 间接依赖 id');
+            log('');
+            log('✅ 拆分成两张表:');
+            log('  orders:  id | user_id');
+            log('  users:   id | name');
+            log('');
+            log('规则: "每个非主键列只描述主键"');
+            log('非主键列之间不应有依赖关系');
+        }
+
+        function demoDesign() {
+            result.innerHTML = '';
+            log('# 数据库设计流程');
+            log('');
+            log('1. 需求分析 ← 理解业务');
+            log('2. ER 图 ← 实体 + 关系');
+            log('3. 逻辑设计 ← 表 + 范式');
+            log('4. 物理设计 ← 索引 + 分区');
+            log('5. 实施优化 ← 监控调整');
+            log('');
+            log('关键问题:');
+            log('  - 实体间关系 (1:1 / 1:N / M:N)');
+            log('  - 范式 vs 反范式权衡');
+            log('  - 索引策略');
+            log('  - 命名一致性');
+        }
+    </script>
+</body>
+</html>

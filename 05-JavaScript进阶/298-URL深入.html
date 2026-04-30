@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URL深入</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #url-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; margin: 5px 0; width: 350px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>URL 深入</h2><p>URL 构造与解析、URLSearchParams 参数操作、编码/解码。</p></div>
+    <div class="card">
+        <h2>URL 和 URLSearchParams</h2>
+        <div class="code">// ========== URL 构造 ==========
+const url = new URL('https://example.com:8080/path/to/page?name=Alice&age=25#section');
+
+// URL 属性
+url.href       // 完整 URL
+url.protocol   // 'https:'
+url.hostname   // 'example.com'
+url.port       // '8080'
+url.host       // 'example.com:8080'
+url.pathname   // '/path/to/page'
+url.search     // '?name=Alice&age=25'
+url.hash       // '#section'
+url.origin     // 'https://example.com:8080'
+
+// URL 修改
+url.pathname = '/new/path';
+url.searchParams.set('lang', 'zh');
+
+// ========== URLSearchParams ==========
+const params = new URLSearchParams('name=Alice&age=25&lang=zh-CN');
+
+params.get('name')         // 'Alice'
+params.getAll('name')      // ['Alice']
+params.has('lang')         // true
+params.append('tag', 'js');
+params.set('name', 'Bob');
+params.delete('age');
+
+// 遍历
+for (const [key, value] of params) {
+    console.log(key, value);
+}
+
+// 转为字符串
+params.toString(); // 'name=Bob&lang=zh-CN&tag=js'
+
+// ========== 编码/解码 ==========
+encodeURIComponent('hello world')  // 'hello%20world'
+decodeURIComponent('hello%20world') // 'hello world'
+encodeURI('https://example.com/路径') // 完整 URI
+decodeURI('https://example.com/%E8%B7%AF%E5%BE%84')</div>
+    </div>
+    <div class="card">
+        <h2>演示：URL 操作</h2>
+        <input id="urlInput" value="https://example.com:8080/search?q=hello+world&lang=zh-CN#top" placeholder="输入 URL">
+        <button onclick="demoURL()">解析 URL</button>
+        <button onclick="demoParams()">参数操作</button>
+        <div id="url-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const urlResult = document.getElementById('url-result');
+
+        function log(msg) {
+            urlResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoURL() {
+            urlResult.innerHTML = '';
+            const urlStr = document.getElementById('urlInput').value;
+
+            try {
+                const url = new URL(urlStr);
+                log(`🔗 URL 解析: ${urlStr}`);
+                log('');
+                log(`   href: ${url.href}`);
+                log(`   origin: ${url.origin}`);
+                log(`   protocol: ${url.protocol}`);
+                log(`   hostname: ${url.hostname}`);
+                log(`   port: ${url.port || '(默认)'}`);
+                log(`   host: ${url.host}`);
+                log(`   pathname: ${url.pathname}`);
+                log(`   search: ${url.search}`);
+                log(`   hash: ${url.hash}`);
+                log('');
+                log('📌 参数:');
+                for (const [k, v] of url.searchParams) {
+                    log(`   ${k}: ${v}`);
+                }
+            } catch (err) {
+                log(`❌ URL 无效: ${err.message}`);
+            }
+        }
+
+        function demoParams() {
+            urlResult.innerHTML = '';
+            log('🔧 URLSearchParams 操作:');
+            log('');
+
+            const params = new URLSearchParams('name=Alice&age=25&tag=js&tag=web');
+
+            log('1️⃣ 获取参数:');
+            log(`   get("name"): ${params.get('name')}`);
+            log(`   getAll("tag"): ${params.getAll('tag').join(', ')}`);
+            log(`   has("age"): ${params.has('age')}`);
+            log(`   has("lang"): ${params.has('lang')}`);
+            log('');
+
+            log('2️⃣ 修改参数:');
+            params.set('name', 'Bob');
+            params.append('lang', 'zh-CN');
+            params.delete('age');
+            log(`   修改后: ${params.toString()}`);
+            log('');
+
+            log('3️⃣ 遍历参数:');
+            for (const [k, v] of params) {
+                log(`   ${k} = ${v}`);
+            }
+            log('');
+
+            log('4️⃣ 编码/解码:');
+            const texts = ['hello world', 'a&b=c', '你好世界', '100% done'];
+            texts.forEach(t => {
+                const encoded = encodeURIComponent(t);
+                const decoded = decodeURIComponent(encoded);
+                log(`   "${t}" → "${encoded}" → "${decoded}"`);
+            });
+            log('');
+
+            log('5️⃣ 构建 URL 参数:');
+            const base = 'https://api.example.com/search';
+            const query = new URLSearchParams({ q: 'hello world', page: '1', limit: '10' });
+            log(`   ${base}?${query.toString()}`);
+        }
+
+        console.log('=== URL 深入 ===');
+
+        document.getElementById('output').textContent =
+            `URL 深入: URL 构造解析 / URLSearchParams / 编码解码\n` +
+            `encodeURIComponent / decodeURIComponent / URL 属性\n` +
+            `✅ URL 深入演示完成！`;
+    </script>
+</body>
+</html>

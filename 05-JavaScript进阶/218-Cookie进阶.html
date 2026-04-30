@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cookie进阶</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #cookie-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Cookie 进阶</h2><p>SameSite、Secure、HttpOnly、Domain/Path 等高级属性。</p></div>
+    <div class="card">
+        <h2>SameSite 属性</h2>
+        <div class="code">// SameSite 控制 Cookie 在跨站请求中是否发送
+
+// SameSite=Strict（最安全）
+// 只有在同站请求中发送
+// 用户从外部链接点击进入时，不发送 Cookie
+// 适用: 银行/支付等敏感操作
+Set-Cookie: session=abc; SameSite=Strict
+
+// SameSite=Lax（默认，平衡）
+// 同站请求 + 部分跨站导航（链接/GET 表单）发送
+// 跨站 POST/iframe/图片加载时不发送
+// 默认值（如果不设置 SameSite，现代浏览器默认 Lax）
+Set-Cookie: session=abc; SameSite=Lax
+
+// SameSite=None（不安全，需要 Secure）
+// 所有跨站请求都发送
+// 必须同时设置 Secure（仅 HTTPS）
+Set-Cookie: session=abc; SameSite=None; Secure</div>
+    </div>
+    <div class="card">
+        <h2>Secure 与 HttpOnly</h2>
+        <div class="code">// Secure — 仅通过 HTTPS 传输
+// 如果页面是 HTTP，设置了 Secure 的 Cookie 不会被发送
+Set-Cookie: token=xyz; Secure
+
+// HttpOnly — JS 无法读取（不可通过 document.cookie 访问）
+// 只能通过 HTTP 请求发送到服务器
+// 有效防御 XSS 攻击窃取 Cookie
+Set-Cookie: session=abc; HttpOnly
+
+// __Secure- 前缀
+// 带有此前缀的 Cookie 必须设置 Secure 属性
+Set-Cookie: __Secure-token=xyz; Secure
+
+// __Host- 前缀（更严格）
+// 必须: Secure, Path=/, 不能设置 Domain
+Set-Cookie: __Host-session=abc; Secure; Path=/
+
+// 常用组合
+Set-Cookie: sessionId=abc123; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=86400</div>
+    </div>
+    <div class="card">
+        <h2>Domain 与 Path</h2>
+        <div class="code">// Domain — 指定 Cookie 作用的域名
+// 如果不设置，默认为当前域名（不含子域名）
+Set-Cookie: lang=zh-CN; Domain=.example.com; Path=/
+// 所有 *.example.com 的子域名都能读取
+
+// Path — 指定路径
+Set-Cookie: theme=dark; Path=/app/
+// 只有在 /app/ 路径下才发送
+
+// Max-Age vs Expires
+// Max-Age: 相对时间（秒），优先级高于 Expires
+// Expires: 绝对时间
+Set-Cookie: session=abc; Max-Age=3600      // 1 小时后过期
+Set-Cookie: old=xyz; Expires=Thu, 01 Jan 2020 00:00:00 GMT  // 已过期
+
+// 删除 Cookie: 设置 Max-Age=0 或 Expires 为过去时间
+document.cookie = 'key=; Max-Age=0; Path=/';</div>
+    </div>
+    <div class="card">
+        <h2>演示：Cookie 属性</h2>
+        <button onclick="demoCookie()">演示 Cookie 属性</button>
+        <button onclick="showCookies()">显示当前 Cookie</button>
+        <div id="cookie-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const cookieResult = document.getElementById('cookie-result');
+
+        function log(msg) {
+            cookieResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoCookie() {
+            cookieResult.innerHTML = '';
+
+            log('📋 Cookie 属性演示 (JS 端)：');
+            log('');
+
+            // SameSite 演示
+            log('1️⃣ SameSite 属性：');
+            log('  Strict — 只有同站请求发送');
+            log('  Lax — 同站 + 链接导航发送 (默认)');
+            log('  None — 所有请求发送 (需 Secure)');
+            log('');
+
+            // Secure & HttpOnly
+            log('2️⃣ Secure & HttpOnly：');
+            log('  Secure — 仅 HTTPS 传输');
+            log('  HttpOnly — JS 不可读 (防御 XSS)');
+            log(`  document.cookie 可以看到: "${document.cookie.substring(0, 80)}"`);
+            log('  ⚠️ HttpOnly Cookie 不会出现在 document.cookie 中');
+            log('');
+
+            // 设置带 path 的 Cookie
+            document.cookie = 'demo_cookie=test_value; path=/; max-age=300';
+            log('3️⃣ 设置 Cookie: demo_cookie=test_value; path=/; max-age=300');
+            log('');
+
+            log('4️⃣ Cookie 前缀：');
+            log('  __Secure- 需要 Secure 属性');
+            log('  __Host- 需要 Secure + Path=/ + 无 Domain');
+            log('');
+
+            // 删除 Cookie 演示
+            log('5️⃣ 删除 Cookie: 设置 max-age=0');
+        }
+
+        function showCookies() {
+            cookieResult.innerHTML = '';
+            const cookies = document.cookie;
+            if (!cookies) {
+                log('📭 当前没有 Cookie (或只有 HttpOnly Cookie)');
+                log('💡 HttpOnly Cookie 不会被 JS 读取到');
+            } else {
+                log('📋 当前 document.cookie:');
+                cookies.split(';').forEach(c => {
+                    const [key, ...vals] = c.trim().split('=');
+                    log(`  ${key} = ${vals.join('=')}`);
+                });
+            }
+            log(`\nCookie 字符串长度: ${cookies.length} 字符`);
+        }
+
+        console.log('=== Cookie 进阶 ===');
+
+        document.getElementById('output').textContent =
+            `Cookie 进阶: SameSite/Secure/HttpOnly/Domain/Path\n` +
+            `SameSite: Strict(最安全) / Lax(默认) / None(需Secure)\n` +
+            `__Secure- / __Host- 前缀\n` +
+            `✅ Cookie 进阶演示完成！`;
+    </script>
+</body>
+</html>

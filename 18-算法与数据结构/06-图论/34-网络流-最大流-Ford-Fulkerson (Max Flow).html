@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>34-网络流-最大流-Ford-Fulkerson (Max Flow)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Max Flow</h2>
+  <div class="code">Ford-Fulkerson 方法通过增广路径不断找增广路求最大流。</div>
+  <pre>// 简化版 Ford-Fulkerson
+function maxFlow(capacity, source, sink) {
+  const n = capacity.length;
+  const residual = capacity.map(r => [...r]);
+  let flow = 0;
+  function bfs(parent) {
+    const visited = new Array(n).fill(false);
+    const q = [source]; visited[source] = true; parent[source] = -1;
+    while (q.length) {
+      const u = q.shift();
+      for (let v = 0; v < n; v++) {
+        if (!visited[v] && residual[u][v] > 0) {
+          parent[v] = u; visited[v] = true; q.push(v);
+        }
+      }
+    }
+    return visited[sink];
+  }
+  const parent = new Array(n);
+  while (bfs(parent)) {
+    let pathFlow = Infinity;
+    for (let v = sink; v !== source; v = parent[v]) pathFlow = Math.min(pathFlow, residual[parent[v]][v]);
+    for (let v = sink; v !== source; v = parent[v]) { residual[parent[v]][v] -= pathFlow; residual[v][parent[v]] += pathFlow; }
+    flow += pathFlow;
+  }
+  return flow;
+}
+const cap = [[0,16,13,0,0,0],[0,0,10,12,0,0],[0,4,0,0,14,0],[0,0,9,0,0,20],[0,0,0,7,0,4],[0,0,0,0,0,0]];
+console.log(maxFlow(cap, 0, 5)); // 23</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  function mf(cap,s,t){const n=cap.length;const res=cap.map(r=>[...r]);let f=0;function bfs(parent){const v=new Array(n).fill(false);const q=[s];v[s]=true;parent[s]=-1;while(q.length){const u=q.shift();for(let w=0;w<n;w++){if(!v[w]&&res[u][w]>0){parent[w]=u;v[w]=true;q.push(w);}}}return v[t];}const p=new Array(n);while(bfs(p)){let pf=Infinity;for(let v=t;v!==s;v=p[v])pf=Math.min(pf,res[p[v]][v]);for(let v=t;v!==s;v=p[v]){res[p[v]][v]-=pf;res[v][p[v]]+=pf;}f+=pf;}return f;}
+  const cap=[[0,16,13,0,0,0],[0,0,10,12,0,0],[0,4,0,0,14,0],[0,0,9,0,0,20],[0,0,0,7,0,4],[0,0,0,0,0,0]];
+  document.getElementById('result').textContent = `最大流 (0→5): ${mf(cap,0,5)}`;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>23-插值查找 (Interpolation Search)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; white-space: pre-wrap; }
+</style></head>
+<body>
+<div class="card">
+  <h2>插值查找 (Interpolation Search)</h2>
+  <p>插值查找是二分查找的改进版，基于数据分布均匀的假设，通过公式预测目标值的位置，而不是简单取中间值。</p>
+  <div class="note">
+    <strong>核心公式：</strong>pos = low + ((target - arr[low]) / (arr[high] - arr[low])) * (high - low)
+  </div>
+</div>
+
+<div class="card">
+  <h2>工作原理</h2>
+  <p>想象在字典中查找"西瓜"：你不会从中间翻起，而是根据拼音"X"的位置大致翻到靠后的部分。插值查找就是这种思想的算法实现。</p>
+  <ul>
+    <li>适用于<strong>有序</strong>且<strong>均匀分布</strong>的数据</li>
+    <li>平均时间复杂度 O(log log n)，比二分查找更快</li>
+    <li>最坏情况 O(n)（数据分布极度不均匀时）</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>代码实现</h2>
+  <pre>function interpolationSearch(arr, target) {
+  let low = 0, high = arr.length - 1;
+
+  while (low <= high && target >= arr[low] && target <= arr[high]) {
+    if (low === high) {
+      return arr[low] === target ? low : -1;
+    }
+
+    // 插值公式
+    const pos = low + Math.floor(
+      ((target - arr[low]) / (arr[high] - arr[low])) * (high - low)
+    );
+
+    if (arr[pos] === target) return pos;
+    if (arr[pos] < target) low = pos + 1;
+    else high = pos - 1;
+  }
+  return -1;
+}</pre>
+</div>
+
+<div class="card">
+  <h2>交互演示</h2>
+  <p>对比插值查找和二分查找的性能差异（使用均匀分布数据）：</p>
+  <button onclick="runComparison()">运行对比</button>
+  <div id="result"></div>
+</div>
+
+<script>
+function interpolationSearch(arr, target) {
+  let low = 0, high = arr.length - 1;
+  let comparisons = 0;
+  while (low <= high && target >= arr[low] && target <= arr[high]) {
+    comparisons++;
+    if (low === high) return { index: arr[low] === target ? low : -1, comparisons };
+    const pos = low + Math.floor(((target - arr[low]) / (arr[high] - arr[low])) * (high - low));
+    if (arr[pos] === target) return { index: pos, comparisons };
+    if (arr[pos] < target) low = pos + 1;
+    else high = pos - 1;
+  }
+  return { index: -1, comparisons };
+}
+
+function binarySearch(arr, target) {
+  let low = 0, high = arr.length - 1;
+  let comparisons = 0;
+  while (low <= high) {
+    comparisons++;
+    const mid = Math.floor((low + high) / 2);
+    if (arr[mid] === target) return { index: mid, comparisons };
+    if (arr[mid] < target) low = mid + 1;
+    else high = mid - 1;
+  }
+  return { index: -1, comparisons };
+}
+
+function runComparison() {
+  const size = 1000;
+  const arr = Array.from({length: size}, (_, i) => Math.floor(i * 1.5) + Math.floor(Math.random() * 3));
+  const targets = [
+    arr[0],                    // 开头
+    arr[Math.floor(size/2)],   // 中间
+    arr[size - 1],             // 末尾
+    arr[Math.floor(size/4)],   // 1/4处
+    arr[Math.floor(size*3/4)], // 3/4处
+    -1                         // 不存在
+  ];
+
+  let html = '<strong>数据规模：</strong>' + size + '<br><br>';
+  html += '<table style="border-collapse:collapse;width:100%"><tr><th>目标位置</th><th>插值查找(比较次数)</th><th>二分查找(比较次数)</th></tr>';
+
+  const locations = ['开头', '中间', '末尾', '1/4处', '3/4处', '不存在'];
+  for (let i = 0; i < targets.length; i++) {
+    const interp = interpolationSearch(arr, targets[i]);
+    const bin = binarySearch(arr, targets[i]);
+    const winner = interp.comparisons < bin.comparisons ? '插值胜' :
+                   interp.comparisons > bin.comparisons ? '二分胜' : '持平';
+    html += `<tr><td>${locations[i]}</td><td>${interp.comparisons}</td><td>${bin.comparisons}</td></tr>`;
+  }
+  html += '</table>';
+  html += '<br><strong>结论：</strong>数据均匀分布时，插值查找通常比二分查找更快。';
+
+  document.getElementById('result').innerHTML = html;
+}
+</script>
+</body></html>

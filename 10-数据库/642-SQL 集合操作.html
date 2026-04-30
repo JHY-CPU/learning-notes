@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 集合操作</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔗 SQL 集合操作</h2><p>UNION / UNION ALL、INTERSECT、EXCEPT / MINUS、集合操作与 JOIN 区别、集合操作排序、多集合组合、集合操作实战应用。</p></div>
+    <div class="card">
+        <h2>集合操作基础</h2>
+        <div class="code">// ========== 集合操作概念 ==========
+-- 集合操作: 将多个 SELECT 结果合并/比较
+-- 与 JOIN 不同: JOIN 横向连接,集合操作纵向堆叠
+
+-- 规则:
+-- 1. 每个 SELECT 必须有相同数量的列
+-- 2. 对应列的数据类型必须兼容
+-- 3. ORDER BY 只在最后使用
+-- 4. 列名取自第一个 SELECT
+
+-- 操作符:
+-- UNION:      合并结果并去重 (较慢)
+-- UNION ALL:  合并结果不去重 (更快)
+-- INTERSECT:  返回共同行
+-- EXCEPT:     返回在第一个但不在第二个中的行
+--   (MySQL 不支持 INTERSECT/EXCEPT 原生!)
+
+-- ========== 数据 ==========
+-- employees_current:
+-- id | name   | department
+-- 1  | Alice  | Engineering
+-- 2  | Bob    | Engineering
+-- 3  | Carol  | Sales
+
+-- employees_former:
+-- id | name   | department
+-- 2  | Bob    | Engineering
+-- 3  | Carol  | Sales
+-- 4  | Dave   | Marketing
+-- 5  | Eve    | Marketing</div>
+    </div>
+    <div class="card">
+        <h2>UNION / UNION ALL</h2>
+        <div class="code">// ========== UNION / UNION ALL ==========
+
+-- 1. UNION: 合并 + 去重
+SELECT name, department FROM employees_current
+UNION
+SELECT name, department FROM employees_former;
+-- 结果: Alice, Bob, Carol, Dave, Eve
+-- Bob 和 Carol 只出现一次 (去重)
+
+-- 2. UNION ALL: 合并, 不去重 (更快!)
+SELECT name, department FROM employees_current
+UNION ALL
+SELECT name, department FROM employees_former;
+-- 结果: Alice, Bob, Carol, Bob, Carol, Dave, Eve
+-- Bob 和 Carol 各出现两次
+
+-- 性能: UNION ALL 通常比 UNION 快很多
+-- 因为 UNION 需要额外的 DISTINCT 排序
+
+-- ========== 实际应用 ==========
+
+-- 1. 合并历史数据 (不同年份的订单)
+SELECT id, user_id, amount, created_at, '2023' AS year
+FROM orders_2023
+UNION ALL
+SELECT id, user_id, amount, created_at, '2024' AS year
+FROM orders_2024
+UNION ALL
+SELECT id, user_id, amount, created_at, '2025' AS year
+FROM orders_2025
+ORDER BY created_at DESC;
+
+-- 2. 合并相似表 (多店铺)
+SELECT 'store_a' AS store, id, product, price
+FROM store_a_products
+WHERE price > 100
+UNION ALL
+SELECT 'store_b', id, product, price
+FROM store_b_products
+WHERE price > 100
+ORDER BY price DESC;
+
+-- 3. 带标签的并集
+SELECT 'active' AS status, id, name FROM active_users
+UNION ALL
+SELECT 'inactive', id, name FROM inactive_users
+ORDER BY status, name;</div>
+    </div>
+    <div class="card">
+        <h2>INTERSECT / EXCEPT</h2>
+        <div class="code">// ========== INTERSECT ==========
+-- 返回两个结果集的共同行
+
+-- PostgreSQL / SQLite:
+SELECT name, department FROM employees_current
+INTERSECT
+SELECT name, department FROM employees_former;
+-- 结果: Bob, Carol (同时出现在两张表中)
+
+-- MySQL (不直接支持,用 EXISTS 替代):
+SELECT DISTINCT c.name, c.department
+FROM employees_current c
+WHERE EXISTS (
+    SELECT 1 FROM employees_former f
+    WHERE f.name = c.name AND f.department = c.department
+);
+
+-- 或用 INNER JOIN 替代:
+SELECT DISTINCT c.name, c.department
+FROM employees_current c
+JOIN employees_former f ON c.name = f.name
+                       AND c.department = f.department;
+
+-- ========== EXCEPT / MINUS ==========
+-- 返回在第一个结果集但不在第二个中的行
+
+-- PostgreSQL:
+SELECT name, department FROM employees_current
+EXCEPT
+SELECT name, department FROM employees_former;
+-- 结果: Alice (只在 current 中)
+
+-- Oracle: 用 MINUS 关键字
+-- SELECT name FROM employees_current
+-- MINUS
+-- SELECT name FROM employees_former;
+
+-- MySQL (用 LEFT JOIN + NULL):
+SELECT DISTINCT c.name, c.department
+FROM employees_current c
+LEFT JOIN employees_former f ON c.name = f.name
+                            AND c.department = f.department
+WHERE f.name IS NULL;
+-- 结果: Alice</div>
+    </div>
+    <div class="card">
+        <h2>集合操作实战</h2>
+        <div class="code">// ========== 实战 1: 数据同步对比 ==========
+-- 比较两个表的数据差异
+
+-- 源表 vs 目标表 差异分析
+-- 在源表不在目标表 (需要新增)
+SELECT id, 'to_insert' AS action FROM source_table
+EXCEPT
+SELECT id, 'to_insert' FROM target_table;
+
+-- MySQL 版本:
+SELECT s.id, 'to_insert' AS action
+FROM source_table s
+LEFT JOIN target_table t ON s.id = t.id
+WHERE t.id IS NULL;
+
+-- ========== 实战 2: 权限计算 ==========
+-- 用户的直接权限 + 角色继承的权限
+
+-- PostgreSQL:
+SELECT permission FROM user_permissions WHERE user_id = 1
+UNION
+SELECT p.permission FROM role_permissions p
+JOIN user_roles r ON p.role_id = r.role_id
+WHERE r.user_id = 1;
+
+-- ========== 实战 3: 漏斗分析 ==========
+-- 各阶段用户数
+SELECT '浏览' AS stage, COUNT(DISTINCT user_id) AS users
+FROM page_views WHERE page = '/product'
+UNION ALL
+SELECT '加购', COUNT(DISTINCT user_id)
+FROM cart_actions
+UNION ALL
+SELECT '下单', COUNT(DISTINCT user_id)
+FROM orders
+UNION ALL
+SELECT '付款', COUNT(DISTINCT user_id)
+FROM payments
+ORDER BY FIELD(stage, '浏览', '加购', '下单', '付款');
+
+-- ========== 实战 4: 排除重复 ==========
+-- 在 A 表中但不在 B 表中 (EXCEPT 模拟)
+-- MySQL 用 LEFT JOIN:
+SELECT DISTINCT a.*
+FROM table_a a
+LEFT JOIN table_b b ON a.id = b.id
+WHERE b.id IS NULL;
+
+-- 在 A 表和 B 表中都存在 (INTERSECT 模拟)
+SELECT DISTINCT a.*
+FROM table_a a
+INNER JOIN table_b b ON a.id = b.id;</div>
+    </div>
+    <div class="card">
+        <h2>集合操作注意事项</h2>
+        <div class="code">// ========== 性能考虑 ==========
+
+-- 1. UNION vs UNION ALL
+--    UNION ALL 不排序去重,快很多
+--    如果确定不会有重复,用 UNION ALL
+
+-- 2. ORDER BY 位置
+--    ORDER BY 应用于最终结果
+--    每个单独 SELECT 中不要用 ORDER BY
+
+-- 3. 排序 + LIMIT
+--    可以对整个结果排序和限制
+(SELECT id, name, 'current' AS source FROM employees_current
+ ORDER BY name LIMIT 5)  -- 括号内可以单独 ORDER BY
+UNION ALL
+(SELECT id, name, 'former' FROM employees_former
+ ORDER BY name LIMIT 5)
+ORDER BY source, name;  -- 最终排序
+
+-- 4. MySQL 对 INTERSECT/EXCEPT 的支持
+--    MySQL 8.0 不支持 INTERSECT/EXCEPT!
+--    需要用 JOIN/EXISTS 替代
+--    MariaDB 10.0+ 支持
+
+-- ========== UNION 限制 ==========
+-- 1. 列数必须相同
+--    ❌: SELECT id FROM a UNION SELECT id, name FROM b;
+-- 2. 列类型兼容
+--    ❌: SELECT id FROM a UNION SELECT name FROM b;  (int vs varchar)
+-- 3. 列名来自第一个 SELECT
+--    SELECT id AS user_id FROM a UNION SELECT id FROM b;  → user_id
+
+-- ========== 集合操作 vs JOIN ==========
+-- UNION:    竖着堆叠 (行增加)
+-- JOIN:     横着拼接 (列增加)
+-- INTERSECT: 找共同 (INNER JOIN 可替代)
+-- EXCEPT:   找差异 (LEFT JOIN + NULL 可替代)
+
+-- 选择:
+-- 同结构表合并 → UNION ALL
+-- 异结构表关联 → JOIN
+-- 数据对比     → EXCEPT / LEFT JOIN</div>
+        <div class="note">💡 集合操作: UNION 合并去重; UNION ALL 合并不去重 (更快); INTERSECT 找交集; EXCEPT 找差集; MySQL 用 JOIN 替代 INTERSECT/EXCEPT; 列数和类型必须匹配; 优先用 UNION ALL (除非需要去重)。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoUnion()">UNION 演示</button>
+        <button onclick="demoIntersect()">INTERSECT 演示</button>
+        <button onclick="demoExcept()">EXCEPT 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoUnion() {
+            result.innerHTML = '';
+            log('# UNION / UNION ALL');
+            log('');
+            log("SELECT name FROM current_employees");
+            log("UNION");
+            log("SELECT name FROM former_employees;");
+            log('→ 合并并去重');
+            log('');
+            log("SELECT name FROM current_employees");
+            log("UNION ALL");
+            log("SELECT name FROM former_employees;");
+            log('→ 合并不去重 (更快)');
+        }
+
+        function demoIntersect() {
+            result.innerHTML = '';
+            log('# INTERSECT (交集)');
+            log('');
+            log("-- PostgreSQL:");
+            log("SELECT name FROM current");
+            log("INTERSECT");
+            log("SELECT name FROM former;");
+            log('→ 共同行: Bob, Carol');
+            log('');
+            log("-- MySQL 替代:");
+            log("SELECT DISTINCT c.name");
+            log("FROM current c");
+            log("JOIN former f ON c.name = f.name;");
+        }
+
+        function demoExcept() {
+            result.innerHTML = '';
+            log('# EXCEPT (差集)');
+            log('');
+            log("-- PostgreSQL:");
+            log("SELECT name FROM current");
+            log("EXCEPT");
+            log("SELECT name FROM former;");
+            log('→ 在 current 不在 former: Alice');
+            log('');
+            log("-- MySQL 替代:");
+            log("SELECT DISTINCT c.name");
+            log("FROM current c");
+            log("LEFT JOIN former f ON c.name = f.name");
+            log("WHERE f.name IS NULL;");
+        }
+    </script>
+</body>
+</html>

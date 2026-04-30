@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>09-回溯三要素 (Backtracking Framework)</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 20px; color: #333; }
+h1 { text-align: center; color: #2c3e50; margin-bottom: 24px; font-size: 28px; }
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; font-size: 18px; }
+.card p { line-height: 1.7; color: #555; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; font-size: 14px; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; border-radius: 4px; margin: 10px 0; font-size: 14px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 14px; line-height: 1.5; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; font-size: 14px; transition: background 0.2s; }
+button:hover { opacity: 0.9; background: #2980b9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; white-space: pre-wrap; font-size: 14px; }
+.section-nav { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 24px; }
+.section-nav a { text-decoration: none; color: white; background: #7f8c8d; padding: 6px 14px; border-radius: 16px; font-size: 13px; transition: background 0.2s; }
+.section-nav a:hover { background: #3498db; }
+.input-group { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0; }
+.input-group label { font-weight: 600; font-size: 14px; }
+.input-group input[type="text"], .input-group input[type="number"] { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; width: 120px; }
+.tag { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 13px; font-weight: 600; margin: 4px 4px 4px 0; }
+.tag-blue { background: #e8f4fd; color: #2980b9; }
+.tag-green { background: #e8f8f0; color: #27ae60; }
+.tag-orange { background: #fef5e7; color: #e67e22; }
+</style></head>
+<body>
+<div class="section-nav">
+<a href="01-%E9%80%92%E5%BD%92%E5%9F%BA%E7%A1%80%20(Recursion%20Basics).html">01-递归基础</a>
+<a href="02-%E9%80%92%E5%BD%92%E4%B8%89%E8%A6%81%E7%B4%A0%20(Three%20Elements).html">02-三要素</a>
+<a href="03-%E9%80%92%E5%BD%92%E8%B0%83%E7%94%A8%E6%A0%88%20(Recursion%20Call%20Stack).html">03-调用栈</a>
+<a href="04-%E5%B0%BE%E9%80%92%E5%BD%92%E4%BC%98%E5%8C%96%20(Tail%20Recursion).html">04-尾递归</a>
+<a href="05-%E9%80%92%E5%BD%92%E8%BD%AC%E8%BF%AD%E4%BB%A3%20(Recursion%20to%20Iteration).html">05-转迭代</a>
+<a href="06-%E9%80%92%E6%8E%A8%E5%85%B3%E7%B3%BB%E5%BB%BA%E6%A8%A1%20(Recurrence%20Modeling).html">06-递推关系</a>
+<a href="07-%E9%80%92%E5%BD%92%E6%A0%91%E5%88%86%E6%9E%90%20(Recursion%20Tree).html">07-递归树</a>
+<a href="08-%E5%9B%9E%E6%BA%AF%E7%AE%97%E6%B3%95%E5%9F%BA%E7%A1%80%20(Backtracking%20Basics).html">08-回溯基础</a>
+<a href="09-%E5%9B%9E%E6%BA%AF%E4%B8%89%E8%A6%81%E7%B4%A0%20(Backtracking%20Framework).html">09-回溯框架</a>
+<a href="10-%E5%89%AA%E6%9E%9D%E4%BC%98%E5%8C%96%20(Pruning).html">10-剪枝</a>
+<a href="11-%E5%AD%90%E9%9B%86%E9%97%AE%E9%A2%98%20(Subsets).html">11-子集</a>
+<a href="12-%E7%BB%84%E5%90%88%E9%97%AE%E9%A2%98%20(Combinations).html">12-组合</a>
+<a href="13-%E6%8E%92%E5%88%97%E9%97%AE%E9%A2%98%20(Permutations).html">13-排列</a>
+<a href="14-%E7%BB%84%E5%90%88%E6%80%BB%E5%92%8C%20(Combination%20Sum).html">14-组合总和</a>
+<a href="15-N%E7%9A%87%E5%90%8E%E9%97%AE%E9%A2%98%20(N-Queens).html">15-N皇后</a>
+<a href="16-%E6%95%B0%E7%8B%AC%E6%B1%82%E8%A7%A3%20(Sudoku%20Solver).html">16-数独</a>
+<a href="17-%E6%8B%AC%E5%8F%B7%E7%94%9F%E6%88%90%20(Generate%20Parentheses).html">17-括号</a>
+<a href="18-%E5%8D%95%E8%AF%8D%E6%90%9C%E7%B4%A2%20(Word%20Search).html">18-单词搜索</a>
+<a href="19-%E5%88%86%E5%89%B2%E5%9B%9E%E6%96%87%E4%B8%B2%20(Palindrome%20Partitioning).html">19-回文串</a>
+<a href="20-%E5%A4%8D%E5%8E%9FIP%E5%9C%B0%E5%9D%80%20(Restore%20IP%20Addresses).html">20-IP地址</a>
+<a href="21-%E5%AD%90%E9%9B%86%E6%A0%91%E4%B8%8E%E6%8E%92%E5%88%97%E6%A0%91%20(Subset%20%26%20Permutation%20Tree).html">21-子集树</a>
+<a href="22-%E5%88%86%E6%94%AF%E9%99%90%E7%95%8C%E6%B3%95%20(Branch%20and%20Bound).html">22-分支限界</a>
+<a href="23-%E8%BF%AD%E4%BB%A3%E5%8A%A0%E6%B7%B1%E6%90%9C%E7%B4%A2%20(Iterative%20Deepening%20DFS).html">23-迭代加深</a>
+<a href="24-%E5%8F%8C%E5%90%91%E6%90%9C%E7%B4%A2%20(Bidirectional%20Search).html">24-双向搜索</a>
+<a href="25-%E9%80%92%E5%BD%92%E4%B8%8E%E5%9B%9E%E6%BA%AF%E7%BB%BC%E5%90%88%E7%BB%83%E4%B9%A0%20(Recursion%20%26%20Backtracking%20Practice).html">25-综合练习</a>
+</div>
+<h1>回溯三要素</h1>
+
+<div class="card">
+<h2>回溯算法三要素</h2>
+<p>编写回溯算法需要明确三个核心要素：</p>
+<p><span class="tag tag-blue">要素一：路径（Path）</span> - 已经做出的选择</p>
+<p><span class="tag tag-green">要素二：选择列表（Choice List）</span> - 当前可以做的选择</p>
+<p><span class="tag tag-orange">要素三：结束条件（End Condition）</span> - 何时应该结束</p>
+</div>
+
+<div class="card">
+<h2><span class="tag tag-blue">路径（Path）</span></h2>
+<p>记录从根节点到当前节点已做出的所有选择。通常用一个数组或字符串来维护。</p>
+<div class="code">// 在排列问题中，路径记录了已经选中的元素
+function backtrack(path, ...) {
+    // path 是已经选择的数字
+    // 例如: [1, 3] 表示已经选择了 1 和 3
+}</div>
+</div>
+
+<div class="card">
+<h2><span class="tag tag-green">选择列表（Choice List）</span></h2>
+<p>在当前状态下，还可以做的所有选择。通常通过约束条件过滤无效选择。</p>
+<div class="code">for (let i = 0; i < choices.length; i++) {
+    if (!isValid(choices[i], path)) continue;  // 剪枝
+    // 做选择
+    path.push(choices[i]);
+    backtrack(path, choices);
+    // 撤销选择
+    path.pop();
+}</div>
+</div>
+
+<div class="card">
+<h2><span class="tag tag-orange">结束条件（End Condition）</span></h2>
+<p>当路径满足问题的解条件时，记录结果并停止递归。</p>
+<div class="code">if (path.length === nums.length) {
+    result.push([...path]);  // 记录解
+    return;
+}</div>
+</div>
+
+<div class="card">
+<h2>三要素实战：组合问题</h2>
+<p>从 n 个数中选 k 个数的所有组合：</p>
+<div class="input-group">
+<label>n =</label>
+<input type="number" id="nInput" value="4" min="1" max="10">
+<label>k =</label>
+<input type="number" id="kInput" value="2" min="1" max="10">
+<button onclick="runCombine()">计算组合</button>
+</div>
+<div id="result"></div>
+</div>
+
+<script>
+function combine(n, k) {
+    const result = [];
+    function backtrack(start, path) {
+        if (path.length === k) {
+            result.push([...path]);
+            return;
+        }
+        for (let i = start; i <= n; i++) {
+            path.push(i);
+            backtrack(i + 1, path);
+            path.pop();
+        }
+    }
+    backtrack(1, []);
+    return result;
+}
+
+function runCombine() {
+    const n = parseInt(document.getElementById("nInput").value);
+    const k = parseInt(document.getElementById("kInput").value);
+    if (isNaN(n) || isNaN(k) || n < 1 || k < 1 || k > n) {
+        document.getElementById("result").textContent = "请确保 1 <= k <= n";
+        return;
+    }
+    const result = combine(n, k);
+    let out = "C(" + n + ", " + k + ") = " + result.length + " 种组合\n\n";
+    out += "三要素分析：\n";
+    out += "1. 路径（path）：已选数字的数组\n";
+    out += "2. 选择列表：从 start 到 n 的整数\n";
+    out += "3. 结束条件：path.length === " + k + "\n\n";
+    result.forEach((c, i) => {
+        out += (i + 1) + ": [" + c.join(", ") + "]\n";
+    });
+    document.getElementById("result").textContent = out;
+}
+</script>
+</body></html>

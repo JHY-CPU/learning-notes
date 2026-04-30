@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据响应式</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; max-height: 150px; overflow-y: auto; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        .reactive-panel { display: flex; gap: 20px; flex-wrap: wrap; margin: 10px 0; }
+        .reactive-card { background: white; border-radius: 8px; padding: 20px; flex: 1; min-width: 200px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); border: 2px solid #eee; }
+        .reactive-card h3 { margin: 0 0 15px 0; color: #2c3e50; font-size: 16px; }
+        .reactive-card .val { font-size: 32px; font-weight: bold; text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px; }
+        .reactive-card .val.blue { color: #3498db; }
+        .reactive-card .val.green { color: #27ae60; }
+        .reactive-card .val.red { color: #e74c3c; }
+        .reactive-card .val.orange { color: #f39c12; }
+        .input-group { display: flex; gap: 8px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>数据响应式 Reactive</h2><p>基于 Proxy 的响应式系统：当数据变化时，依赖数据的函数自动重新执行。Vue 3 响应式系统的核心原理。</p></div>
+    <div class="card"><h2>核心实现</h2><p><b>reactive(target)：</b> 返回 Proxy 代理对象，在 get 中收集依赖，set 中触发更新。<b>effect(fn)：</b> 注册副作用函数，首次执行时自动追踪依赖。依赖图：target → key → effects。</p></div>
+    <div class="card"><h2>computed & watch</h2><p><b>computed：</b> 基于响应式数据的派生值，延迟计算并缓存。<b>watch：</b> 监听特定数据变化执行回调。</p></div>
+    <div id="reactive-demo" class="reactive-panel"></div>
+    <div class="card"><h2>交互控制</h2><p>
+        <button onclick="demoReactive()">启动响应式</button>
+        <button onclick="demoComputed()">计算属性</button>
+        <button onclick="demoWatch()">watch 监听</button>
+        <button onclick="demoNested()">嵌套对象</button>
+    </p></div>
+    <pre id="output"></pre>
+    <script>
+        const output = document.getElementById('output');
+        const demoPanel = document.getElementById('reactive-demo');
+
+        function log(msg) {
+            const line = document.createElement('div');
+            line.style.cssText = 'padding:2px 0;font-size:13px;border-bottom:1px solid #333;';
+            line.textContent = msg;
+            output.appendChild(line);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearLog() {
+            output.innerHTML = '';
+        }
+
+        // ========== 响应式系统核心实现 ==========
+        let activeEffect = null;
+        const targetMap = new WeakMap(); // target → key → Set<effect>
+
+        // 依赖收集
+        function track(target, key) {
+            if (!activeEffect) return;
+
+            let depsMap = targetMap.get(target);
+            if (!depsMap) {
+                depsMap = new Map();
+                targetMap.set(target, depsMap);
+            }
+
+            let deps = depsMap.get(key);
+            if (!deps) {
+                deps = new Set();
+                depsMap.set(key, deps);
+            }
+
+            deps.add(activeEffect);
+        }
+
+        // 触发更新
+        function trigger(target, key) {
+            const depsMap = targetMap.get(target);
+            if (!depsMap) return;
+
+            const deps = depsMap.get(key);
+            if (deps) {
+                deps.forEach(effect => {
+                    // 避免在 effect 执行中重复触发导致死循环
+                    if (effect._scheduled) return;
+                    effect._scheduled = true;
+                    // 微任务调度（批量更新）
+                    Promise.resolve().then(() => {
+                        effect._scheduled = false;
+                        effect();
+                    });
+                });
+            }
+        }
+
+        // reactive
+        function reactive(target) {
+            if (target === null || typeof target !== 'object') return target;
+
+            const handler = {
+                get(target, key, receiver) {
+                    track(target, key);
+                    const result = Reflect.get(target, key, receiver);
+                    // 深层响应式：对嵌套对象递归 reactive
+                    if (result !== null && typeof result === 'object') {
+                        return reactive(result);
+                    }
+                    return result;
+                },
+                set(target, key, value, receiver) {
+                    const oldValue = target[key];
+                    const result = Reflect.set(target, key, value, receiver);
+                    if (oldValue !== value) {
+                        trigger(target, key);
+                    }
+                    return result;
+                },
+                deleteProperty(target, key) {
+                    const hadKey = key in target;
+                    const result = Reflect.deleteProperty(target, key);
+                    if (hadKey) {
+                        trigger(target, key);
+                    }
+                    return result;
+                }
+            };
+
+            return new Proxy(target, handler);
+        }
+
+        // effect（注册副作用函数）
+        function effect(fn) {
+            const wrapped = () => {
+                activeEffect = wrapped;
+                fn();
+                activeEffect = null;
+            };
+            wrapped._scheduled = false;
+            wrapped(); // 首次执行，自动收集依赖
+            return wrapped;
+        }
+
+        // computed
+        function computed(getter) {
+            let value;
+            let dirty = true;
+
+            const computedEffect = effect(() => {
+                if (dirty) {
+                    value = getter();
+                    dirty = false;
+                }
+            });
+
+            return {
+                get value() {
+                    dirty = true;
+                    computedEffect(); // 重新计算
+                    return value;
+                },
+                toString() { return String(this.value); }
+            };
+        }
+
+        // watch
+        function watch(source, callback) {
+            effect(() => {
+                // 读取值以收集依赖
+                const value = typeof source === 'function' ? source() : source;
+                callback(value);
+            });
+        }
+
+        // ========== 1. 响应式基础演示 ==========
+        function demoReactive() {
+            clearLog();
+            log('=== 基于 Proxy 的响应式系统 ===\n');
+
+            // 创建响应式数据
+            const data = reactive({
+                count: 0,
+                name: '张三',
+                age: 25
+            });
+
+            // 注册副作用
+            effect(() => {
+                log(`[渲染] count = ${data.count}`);
+            });
+
+            effect(() => {
+                log(`[渲染] name = ${data.name}, age = ${data.age}`);
+            });
+
+            // 创建 UI
+            demoPanel.innerHTML = `
+                <div class="reactive-card">
+                    <h3>计数器</h3>
+                    <div class="val blue" id="r-count">0</div>
+                    <div class="input-group">
+                        <button onclick="window.rd.count++">+1</button>
+                        <button onclick="window.rd.count--">-1</button>
+                        <button onclick="window.rd.count = 0">重置</button>
+                    </div>
+                </div>
+                <div class="reactive-card">
+                    <h3>用户信息</h3>
+                    <div class="val green" id="r-name">张三</div>
+                    <div class="input-group">
+                        <button onclick="window.rd.name = '李四'">改名: 李四</button>
+                        <button onclick="window.rd.name = '王五'">改名: 王五</button>
+                    </div>
+                </div>
+                <div class="reactive-card">
+                    <h3>年龄</h3>
+                    <div class="val orange" id="r-age">25</div>
+                    <div class="input-group">
+                        <button onclick="window.rd.age++">+1</button>
+                        <button onclick="window.rd.age--">-1</button>
+                    </div>
+                </div>
+            `;
+
+            window.rd = data;
+
+            // 响应式 UI 更新
+            effect(() => {
+                const el = document.getElementById('r-count');
+                if (el) el.textContent = data.count;
+            });
+            effect(() => {
+                const el = document.getElementById('r-name');
+                if (el) el.textContent = data.name;
+            });
+            effect(() => {
+                const el = document.getElementById('r-age');
+                if (el) el.textContent = data.age;
+            });
+
+            log('\n点击按钮修改数据，页面自动更新');
+            log('当前 count = ' + data.count);
+        }
+
+        // ========== 2. 计算属性 ==========
+        function demoComputed() {
+            clearLog();
+            log('=== 计算属性 (computed) ===\n');
+
+            const data = reactive({ price: 100, quantity: 2 });
+
+            // 计算属性：总价
+            const total = computed(() => {
+                const result = data.price * data.quantity;
+                log(`[computed] 重新计算: ${data.price} × ${data.quantity} = ${result}`);
+                return result;
+            });
+
+            log(`首次: total = ${total.value}`);
+            log(`total.value = ${total.value}（缓存，未重新计算）`);
+
+            log('\n修改 price:');
+            data.price = 200;
+            log(`total.value = ${total.value}（自动重新计算）`);
+
+            log('\n修改 quantity:');
+            data.quantity = 5;
+            log(`total.value = ${total.value}（自动重新计算）`);
+
+            log('\n计算属性特点：依赖不变时使用缓存，依赖变化时自动重新计算');
+        }
+
+        // ========== 3. watch ==========
+        function demoWatch() {
+            clearLog();
+            log('=== watch 监听 ===\n');
+
+            const data = reactive({ text: 'hello', count: 0 });
+
+            // watch 单个值
+            watch(() => data.text, (newVal) => {
+                log(`[watch] text 变化: "${newVal}"`);
+            });
+
+            watch(() => data.count, (newVal) => {
+                log(`[watch] count 变化: ${newVal}`);
+            });
+
+            log('修改数据触发 watch:');
+            data.text = 'world';
+            data.count = 1;
+            data.text = 'reactive';
+            data.count = 42;
+
+            log('\nwatch 特点：可以监听特定数据变化，执行异步操作或副作用');
+        }
+
+        // ========== 4. 嵌套对象 ==========
+        function demoNested() {
+            clearLog();
+            log('=== 嵌套对象响应式 ===\n');
+
+            const data = reactive({
+                user: {
+                    profile: {
+                        name: '张三',
+                        address: {
+                            city: '北京',
+                            street: '长安街'
+                        }
+                    },
+                    scores: [95, 87, 92]
+                },
+                settings: {
+                    theme: 'dark',
+                    notifications: true
+                }
+            });
+
+            effect(() => {
+                const city = data.user.profile.address.city;
+                const name = data.user.profile.name;
+                log(`[渲染] ${name} 住在 ${city}`);
+            });
+
+            effect(() => {
+                const avg = data.user.scores.reduce((a, b) => a + b, 0) / data.user.scores.length;
+                log(`[渲染] 平均分: ${avg.toFixed(1)}`);
+            });
+
+            log('\n修改深层嵌套属性:');
+            data.user.profile.name = '李四';
+            data.user.profile.address.city = '上海';
+            data.user.scores.push(98);
+
+            log('\n修改 settings:');
+            data.settings.theme = 'light';
+
+            log('\n嵌套对象同样支持响应式，Proxy 递归代理所有层级');
+        }
+
+        log('=== 数据响应式 演示 ===\n基于 Proxy 的响应式系统：reactive + effect + computed + watch。\n\n点击上方按钮查看不同功能。');
+    </script>
+</body>
+</html>

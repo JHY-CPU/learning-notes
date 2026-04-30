@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python迭代器协议</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔄 Python 迭代器协议</h2><p>可迭代对象 vs 迭代器、__iter__ / __next__、collections.abc.Iterable/Iterator、自定义迭代器、迭代器消费与重置。</p></div>
+    <div class="card">
+        <h2>迭代器协议</h2>
+        <div class="code">// ========== Python 迭代器协议 ==========
+// 任何对象,只要实现以下两个方法就是迭代器:
+// __iter__()  → 返回迭代器自身
+// __next__()  → 返回下一个值,没有时抛 StopIteration
+
+// ========== 可迭代 vs 迭代器 ==========
+// 可迭代对象 (Iterable):  能用在 for 循环中
+//   - 有 __iter__() 方法
+//   - 例如: list, str, tuple, dict, set, file
+
+// 迭代器 (Iterator):      能调用 next() 逐个取值
+//   - 有 __iter__() + __next__() 方法
+//   - 例如: 生成器, map, filter, zip, enumerate
+
+// 关系: 迭代器一定是可迭代对象
+//       可迭代对象不一定是迭代器
+
+from collections.abc import Iterable, Iterator
+
+print(isinstance([1, 2, 3], Iterable))   # True
+print(isinstance([1, 2, 3], Iterator))   # False (列表不是迭代器)
+
+print(isinstance(iter([1, 2, 3]), Iterator))  # True (列表迭代器是)
+
+// iter() 将可迭代对象转为迭代器:
+nums = [1, 2, 3]
+it = iter(nums)              # 获取迭代器
+print(next(it))              # 1
+print(next(it))              # 2
+print(next(it))              # 3
+print(next(it))              # StopIteration!</div>
+    </div>
+    <div class="card">
+        <h2>自定义迭代器</h2>
+        <div class="code">// ========== 自定义迭代器类 ==========
+// 实现 __iter__ 和 __next__
+
+class CountDown:
+    """倒计时迭代器"""
+    def __init__(self, start):
+        self.current = start
+
+    def __iter__(self):
+        return self          # 迭代器返回自身
+
+    def __next__(self):
+        if self.current <= 0:
+            raise StopIteration  # 结束信号
+        value = self.current
+        self.current -= 1
+        return value
+
+# 用法:
+for i in CountDown(5):
+    print(i, end=" ")        # 5 4 3 2 1
+
+// ========== 自定义可迭代对象 (非迭代器) ==========
+// 可迭代对象: 有 __iter__ 但返回新的迭代器
+
+class MyRange:
+    """自定义 range,可迭代但不是迭代器"""
+    def __init__(self, start, end):
+        self.start = start
+        self.end = end
+
+    def __iter__(self):
+        return MyRangeIterator(self)  # 返回新的迭代器
+
+class MyRangeIterator:
+    """迭代器 (支持多次迭代)"""
+    def __init__(self, range_obj):
+        self.current = range_obj.start
+        self.end = range_obj.end
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.current >= self.end:
+            raise StopIteration
+        value = self.current
+        self.current += 1
+        return value
+
+r = MyRange(0, 3)
+print(list(r))               # [0, 1, 2]
+print(list(r))               # [0, 1, 2] (可以重复迭代!)
+
+// 对比: CountDown 不能重置
+c = CountDown(3)
+print(list(c))               # [3, 2, 1]
+print(list(c))               # [] (已耗尽!)</div>
+    </div>
+    <div class="card">
+        <h2>迭代器的消耗与重置</h2>
+        <div class="code">// ========== 迭代器一次性 ==========
+// 迭代器只能被消费一次!
+// 消费完后,迭代器就"空了"
+
+nums = [1, 2, 3, 4, 5]
+it = iter(nums)
+
+print(list(it))              # [1, 2, 3, 4, 5]  (消费完)
+print(list(it))              # [] (已空!)
+
+// ========== 常见陷阱 ==========
+// 陷阱 1: 遍历时修改列表
+nums = [1, 2, 3, 4, 5]
+for n in nums:
+    if n % 2 == 0:
+        nums.remove(n)       # ❌ 迭代时修改!
+print(nums)                  # [1, 3, 5]  (但结果碰巧对了)
+
+// 正确做法: 复制一份
+for n in nums[:]:            # 用切片复制
+    if n % 2 == 0:
+        nums.remove(n)
+
+// 陷阱 2: zip/range 的惰性
+// zip 返回迭代器
+z = zip([1, 2], [3, 4])
+print(list(z))               # [(1, 3), (2, 4)]
+print(list(z))               # [] (已空!)
+
+// 陷阱 3: 迭代器不能 len()
+it = iter([1, 2, 3])
+# len(it)                   # TypeError!
+// 只能用 list() 转换再 len (但会消耗迭代器)
+
+// ========== 重置迭代器 ==========
+// 方法 1: 重新创建
+it = iter([1, 2, 3])        # 重新获取
+
+// 方法 2: 实现可重置的迭代器
+class ResettableIterator:
+    def __init__(self, data):
+        self.data = data
+        self.index = 0
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.index >= len(self.data):
+            raise StopIteration
+        value = self.data[self.index]
+        self.index += 1
+        return value
+
+    def reset(self):
+        self.index = 0
+
+it = ResettableIterator([1, 2, 3])
+print(list(it))              # [1, 2, 3]
+it.reset()
+print(list(it))              # [1, 2, 3] (重置后可用)</div>
+    </div>
+    <div class="card">
+        <h2>迭代器工具与 ABC</h2>
+        <div class="code">// ========== collections.abc 抽象基类 ==========
+// 正式的类型检查
+
+from collections.abc import Iterable, Iterator, Generator
+
+# Iterator 继承自 Iterable
+# Generator 继承自 Iterator
+
+print(issubclass(Iterator, Iterable))    # True
+print(issubclass(Generator, Iterator))   # True
+
+// 继承 Iterable 只需要实现 __iter__
+// 继承 Iterator 需要实现 __iter__ 和 __next__
+
+// ========== itertools 迭代器工具 ==========
+import itertools
+
+# count: 无限计数
+for i in itertools.count(10, 2):
+    if i > 20: break
+    print(i, end=" ")        # 10 12 14 16 18 20
+
+# cycle: 无限循环
+colors = itertools.cycle(["红", "绿", "蓝"])
+for _ in range(6):
+    print(next(colors), end=" ")  # 红 绿 蓝 红 绿 蓝
+
+# repeat: 重复
+print(list(itertools.repeat("A", 3)))  # ["A", "A", "A"]
+
+# chain: 串联
+print(list(itertools.chain([1, 2], [3, 4])))  # [1, 2, 3, 4]
+
+# product: 笛卡尔积
+print(list(itertools.product([1, 2], ["a", "b"])))
+# [(1, "a"), (1, "b"), (2, "a"), (2, "b")]
+
+# permutations: 排列
+print(list(itertools.permutations([1, 2, 3], 2)))
+# [(1, 2), (1, 3), (2, 1), (2, 3), (3, 1), (3, 2)]
+
+# combinations: 组合
+print(list(itertools.combinations([1, 2, 3], 2)))
+# [(1, 2), (1, 3), (2, 3)]
+
+# groupby: 分组 (需要先排序)
+data = [("A", 1), ("A", 2), ("B", 3)]
+for key, group in itertools.groupby(data, lambda x: x[0]):
+    print(key, list(group))  # A [("A",1),("A",2)]  B [("B",3)]
+
+// iter 的第二个参数: 哨兵模式
+with open("data.txt") as f:
+    for line in iter(f.readline, ""):  # 读到空行停止
+        print(line.strip())</div>
+        <div class="note">💡 迭代器要点: (1) 可迭代对象有 __iter__, 迭代器有 __iter__+__next__; (2) 迭代器一次性消耗,不能重置; (3) 自定义迭代器实现 __iter__+__next__+StopIteration; (4) itertools 提供丰富迭代器工具; (5) for 循环本质就是不断调用 next() 直到 StopIteration。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoIterator()">迭代器基础演示</button>
+        <button onclick="demoItertools()">itertools 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoIterator() {
+            result.innerHTML = '';
+            log('# 迭代器协议演示');
+            log('');
+            log('for 循环执行过程:');
+            log('1. 调用 iter(obj) 获取迭代器');
+            log('2. 反复调用 next(iterator)');
+            log('3. 捕获 StopIteration 结束');
+            log('');
+            log('自定义迭代器:');
+            log('  class CountDown:');
+            log('    def __iter__(self):');
+            log('      return self');
+            log('    def __next__(self):');
+            log('      if n <= 0: raise StopIteration');
+            log('      ...');
+            log('');
+            log('可迭代: __iter__  → 可 for');
+            log('迭代器: __iter__ + __next__  → 可 next');
+        }
+
+        function demoItertools() {
+            result.innerHTML = '';
+            log('# itertools 演示');
+            log('');
+            log('count(10, 2) → 10 12 14 16...');
+            log('cycle(["A","B"]) → A B A B...');
+            log('repeat("X", 3) → ["X","X","X"]');
+            log('chain([1,2], [3,4]) → [1,2,3,4]');
+            log('product([1,2], ["a","b"]) → (1,a)(1,b)(2,a)(2,b)');
+            log('permutations([1,2,3], 2) → 6 种排列');
+            log('combinations([1,2,3], 2) → 3 种组合');
+            log('groupby → 相邻元素分组');
+            log('');
+            log('惰性: 不 list() 就不计算!');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Security JWT</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔑 Spring Security JWT</h2><p>JWT 结构与签名、JWT 过滤器实现、登录端点签发 Token、Token 验证与刷新、黑名单机制、安全最佳实践。</p></div>
+    <div class="card">
+        <h2>JWT 结构</h2>
+        <div class="code">// ========== JWT (JSON Web Token) ==========
+// 无状态认证: 服务端不存储 Session
+// 结构: Header.Payload.Signature
+
+// ========== JWT 结构 ==========
+// Header (头部):
+// {
+//   "alg": "HS256",        // 签名算法
+//   "typ": "JWT"           // 类型
+// }
+//
+// Payload (载荷):
+// {
+//   "sub": "1234567890",   // 主题 (用户 ID)
+//   "username": "admin",   // 自定义字段
+//   "roles": ["ROLE_ADMIN"],
+//   "iat": 1516239022,     // 签发时间
+//   "exp": 1516242622      // 过期时间
+// }
+//
+// Signature (签名):
+// HMACSHA256(
+//   base64UrlEncode(header) + "." +
+//   base64UrlEncode(payload),
+//   secretKey
+// )
+
+// ========== 依赖 ==========
+// &lt;dependency&gt;
+//     &lt;groupId&gt;io.jsonwebtoken&lt;/groupId&gt;
+//     &lt;artifactId&gt;jjwt-api&lt;/artifactId&gt;
+//     &lt;version&gt;0.12.5&lt;/version&gt;
+// &lt;/dependency&gt;
+// &lt;dependency&gt;
+//     &lt;groupId&gt;io.jsonwebtoken&lt;/groupId&gt;
+//     &lt;artifactId&gt;jjwt-impl&lt;/artifactId&gt;
+//     &lt;version&gt;0.12.5&lt;/version&gt;
+//     &lt;scope&gt;runtime&lt;/scope&gt;
+// &lt;/dependency&gt;
+// &lt;dependency&gt;
+//     &lt;groupId&gt;io.jsonwebtoken&lt;/groupId&gt;
+//     &lt;artifactId&gt;jjwt-jackson&lt;/artifactId&gt;
+//     &lt;version&gt;0.12.5&lt;/version&gt;
+//     &lt;scope&gt;runtime&lt;/scope&gt;
+// &lt;/dependency&gt;
+
+// ========== JWT 工具类 ==========
+@Component
+public class JwtUtils {
+
+    @Value("${jwt.secret}")
+    private String jwtSecret;               // 签名密钥
+
+    @Value("${jwt.expiration}")
+    private long jwtExpirationMs;           // 过期时间 (毫秒)
+
+    // 生成 Token
+    public String generateToken(UserDetails userDetails) {
+        return Jwts.builder()
+            .subject(userDetails.getUsername())
+            .claim("roles", userDetails.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toList()))
+            .issuedAt(new Date())
+            .expiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
+            .signWith(getSigningKey())
+            .compact();
+    }
+
+    // 从 Token 提取用户名
+    public String getUsernameFromToken(String token) {
+        return extractClaims(token).getSubject();
+    }
+
+    // 验证 Token
+    public boolean validateToken(String token, UserDetails userDetails) {
+        final String username = getUsernameFromToken(token);
+        return username.equals(userDetails.getUsername()) && !isTokenExpired(token);
+    }
+
+    // 解析 Claims
+    private Claims extractClaims(String token) {
+        return Jwts.parser()
+            .verifyWith(getSigningKey())
+            .build()
+            .parseSignedClaims(token)
+            .getPayload();
+    }
+
+    // 检查是否过期
+    private boolean isTokenExpired(String token) {
+        return extractClaims(token).getExpiration().before(new Date());
+    }
+
+    // 获取签名密钥
+    private SecretKey getSigningKey() {
+        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+}
+
+// application.yml:
+// jwt:
+//   secret: bXktc2VjcmV0LWtleS1mb3Itand0LXNpZ25pbmctbWluaW11bS0zMjAtY2hhcnM=
+//   expiration: 86400000           # 24 小时</div>
+    </div>
+    <div class="card">
+        <h2>JWT 认证过滤器</h2>
+        <div class="code">// ========== JWT 认证过滤器 ==========
+// 拦截请求, 提取并验证 JWT, 设置 SecurityContext
+
+@Component
+@RequiredArgsConstructor
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private final JwtUtils jwtUtils;
+    private final UserDetailsService userDetailsService;
+
+    @Override
+    protected void doFilterInternal(
+            @NonNull HttpServletRequest request,
+            @NonNull HttpServletResponse response,
+            @NonNull FilterChain filterChain)
+            throws ServletException, IOException {
+
+        String token = extractToken(request);
+
+        if (token != null) {
+            try {
+                String username = jwtUtils.getUsernameFromToken(token);
+                UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+                if (jwtUtils.validateToken(token, userDetails)) {
+                    UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                            userDetails, null, userDetails.getAuthorities());
+                    authentication.setDetails(
+                        new WebAuthenticationDetailsSource().buildDetails(request));
+
+                    SecurityContextHolder.getContext().setAuthentication(authentication);
+                }
+            } catch (Exception e) {
+                log.warn("JWT 认证失败: {}", e.getMessage());
+                SecurityContextHolder.clearContext();
+            }
+        }
+
+        filterChain.doFilter(request, response);
+    }
+
+    // 从请求头提取 Token
+    private String extractToken(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (bearerToken != null && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
+        }
+        return null;
+    }
+}
+
+// ========== SecurityConfig 注册过滤器 ==========
+@Configuration
+@EnableWebSecurity
+@RequiredArgsConstructor
+public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthFilter;
+    private final UserDetailsService userDetailsService;
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(csrf -> csrf.disable())                      // REST API 禁用 CSRF
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/auth/**").permitAll()    // 登录/注册开放
+                .requestMatchers("/api/public/**").permitAll()
+                .anyRequest().authenticated()
+            )
+            .sessionManagement(session -> session
+                .sessionCreationPolicy(SessionCreationPolicy.STATELESS)  // 无状态
+            )
+            .authenticationProvider(authenticationProvider())
+            .addFilterBefore(jwtAuthFilter,
+                UsernamePasswordAuthenticationFilter.class);    // 在表单认证前
+
+        return http.build();
+    }
+
+    @Bean
+    public AuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setUserDetailsService(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder());
+        return provider;
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}
+
+// ========== 自定义 401/403 处理 ==========
+// 认证失败 (401)
+@Component
+public class JwtAuthenticationEntryPoint implements AuthenticationEntryPoint {
+
+    @Override
+    public void commence(HttpServletRequest request,
+            HttpServletResponse response,
+            AuthenticationException authException) throws IOException {
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setContentType("application/json");
+        response.getWriter().write("""
+            {"code":401,"message":"未认证, 请先登录"}
+            """);
+    }
+}
+
+// 授权不足 (403)
+@Component
+public class JwtAccessDeniedHandler implements AccessDeniedHandler {
+
+    @Override
+    public void handle(HttpServletRequest request,
+            HttpServletResponse response,
+            AccessDeniedException accessDeniedException) throws IOException {
+        response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+        response.setContentType("application/json");
+        response.getWriter().write("""
+            {"code":403,"message":"权限不足"}
+            """);
+    }
+}
+
+// 在 SecurityConfig 中添加:
+// .exceptionHandling(ex -> ex
+//     .authenticationEntryPoint(jwtAuthEntryPoint)
+//     .accessDeniedHandler(jwtAccessDeniedHandler)
+// )</div>
+    </div>
+    <div class="card">
+        <h2>登录与刷新</h2>
+        <div class="code">// ========== 认证控制器 ==========
+
+@RestController
+@RequestMapping("/api/auth")
+@RequiredArgsConstructor
+public class AuthController {
+
+    private final AuthenticationManager authenticationManager;
+    private final JwtUtils jwtUtils;
+    private final UserDetailsService userDetailsService;
+
+    // ========== 登录 ==========
+    @PostMapping("/login")
+    public ResponseEntity&lt;LoginResponse&gt; login(
+            @Valid @RequestBody LoginRequest request) {
+
+        // 1. 认证
+        Authentication authentication = authenticationManager.authenticate(
+            new UsernamePasswordAuthenticationToken(
+                request.getUsername(), request.getPassword()));
+
+        // 2. 生成 Token
+        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+        String accessToken = jwtUtils.generateToken(userDetails);
+        String refreshToken = jwtUtils.generateRefreshToken(userDetails);
+
+        return ResponseEntity.ok(new LoginResponse(
+            accessToken, refreshToken,
+            jwtUtils.getExpirationMs()));
+    }
+
+    // ========== 刷新 Token ==========
+    @PostMapping("/refresh")
+    public ResponseEntity&lt;LoginResponse&gt; refresh(
+            @RequestBody RefreshTokenRequest request) {
+
+        String refreshToken = request.getRefreshToken();
+        if (!jwtUtils.validateRefreshToken(refreshToken)) {
+            throw new RuntimeException("Refresh Token 无效或已过期");
+        }
+
+        String username = jwtUtils.getUsernameFromToken(refreshToken);
+        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+
+        String newAccessToken = jwtUtils.generateToken(userDetails);
+        String newRefreshToken = jwtUtils.generateRefreshToken(userDetails);
+
+        return ResponseEntity.ok(new LoginResponse(
+            newAccessToken, newRefreshToken,
+            jwtUtils.getExpirationMs()));
+    }
+
+    // ========== 登出 ==========
+    @PostMapping("/logout")
+    public ResponseEntity&lt;Void&gt; logout(
+            @RequestHeader("Authorization") String authHeader) {
+        // 将 Token 加入黑名单 (Redis)
+        String token = authHeader.substring(7);
+        jwtUtils.blacklistToken(token);
+        return ResponseEntity.noContent().build();
+    }
+}
+
+// ========== 请求/响应 DTO ==========
+@Data
+public class LoginRequest {
+    @NotBlank
+    private String username;
+    @NotBlank
+    private String password;
+}
+
+@Data
+@AllArgsConstructor
+public class LoginResponse {
+    private String accessToken;
+    private String refreshToken;
+    private long expiresIn;
+}
+
+@Data
+public class RefreshTokenRequest {
+    @NotBlank
+    private String refreshToken;
+}
+
+// ========== JwtUtils 扩展: Refresh Token ==========
+// Refresh Token: 长期 (7天), 用于获取新 Access Token
+// Access Token:  短期 (15分钟), 用于 API 请求
+
+public class JwtUtils {
+
+    @Value("${jwt.refresh-expiration}")
+    private long refreshExpirationMs;      // 7 天
+
+    // 生成 Refresh Token
+    public String generateRefreshToken(UserDetails userDetails) {
+        return Jwts.builder()
+            .subject(userDetails.getUsername())
+            .issuedAt(new Date())
+            .expiration(new Date(System.currentTimeMillis() + refreshExpirationMs))
+            .signWith(getRefreshSigningKey())
+            .compact();
+    }
+
+    public boolean validateRefreshToken(String token) {
+        try {
+            extractRefreshClaims(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public long getExpirationMs() {
+        return jwtExpirationMs;
+    }
+}
+
+// ========== 刷新 Token 轮换 ==========
+// 每次刷新时:
+// 1. 旧的 Refresh Token 失效
+// 2. 返回新的 Access Token + 新的 Refresh Token
+// 3. 可检测 Refresh Token 重用 (防盗用)</div>
+    </div>
+    <div class="card">
+        <h2>Token 黑名单与安全性</h2>
+        <div class="code">// ========== Token 黑名单 ==========
+// JWT 无状态, 无法主动失效
+// 通过维护黑名单实现登出/Token 撤销
+
+@Service
+public class TokenBlacklistService {
+
+    private final RedisTemplate&lt;String, Object&gt; redisTemplate;
+
+    private static final String BLACKLIST_PREFIX = "blacklist:token:";
+
+    // 加入黑名单
+    public void blacklist(String token, long expirationMs) {
+        String key = BLACKLIST_PREFIX + hashToken(token);
+        // 黑名单有效期 = Token 剩余有效期
+        redisTemplate.opsForValue()
+            .set(key, "true", expirationMs, TimeUnit.MILLISECONDS);
+    }
+
+    // 检查是否已黑名单
+    public boolean isBlacklisted(String token) {
+        return Boolean.TRUE.equals(
+            redisTemplate.hasKey(BLACKLIST_PREFIX + hashToken(token)));
+    }
+
+    // Hash Token 作为 key (避免原始 Token 过长)
+    private String hashToken(String token) {
+        return DigestUtils.sha256Hex(token);
+    }
+}
+
+// ========== JWT 过滤器增加黑名单检查 ==========
+@Component
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
+
+    private final TokenBlacklistService blacklistService;
+
+    @Override
+    protected void doFilterInternal(...) {
+        String token = extractToken(request);
+
+        if (token != null) {
+            // 检查黑名单
+            if (blacklistService.isBlacklisted(token)) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("{\"message\":\"Token 已失效\"}");
+                return;
+            }
+
+            // ... 正常验证流程
+        }
+
+        filterChain.doFilter(request, response);
+    }
+}
+
+// ========== JWT 安全最佳实践 ==========
+
+// ========== 1. 密钥安全 ==========
+// 使用足够长的密钥 (HS256 至少 256 位)
+// 生产环境密钥通过环境变量或密钥管理服务注入
+// 定期轮换密钥
+
+// ========== 2. Token 有效期 ==========
+// Access Token:  15-30 分钟 (短期)
+// Refresh Token: 7-30 天 (长期)
+// 根据安全等级调整
+
+// ========== 3. Token 存储 ==========
+// Web: HttpOnly Cookie (防 XSS)
+// 移动端: 安全存储 (Keychain/KeyStore)
+// 避免 localStorage (XSS 风险)
+
+// ========== 4. 重要操作二次验证 ==========
+// 修改密码/绑定手机需要再次输入密码
+// 敏感操作验证 Refresh Token
+
+// ========== 5. 防止 Token 盗用 ==========
+// HTTPS 传输
+// 绑定客户端信息 (IP/UserAgent)
+// 检测异常使用
+
+// ========== 6. 无状态 ==========
+// 禁用 Session: SessionCreationPolicy.STATELESS
+// 每个请求携带完整认证信息
+
+// ========== 7. 日志 ==========
+// 记录 Token 签发/刷新/失效事件
+// 监控异常认证行为
+
+// ========== 8. 重要: 不要在 JWT Payload 中放敏感信息 ==========
+// Payload 只 Base64 编码, 非加密!
+// 密码、身份证号等绝对不能放
+
+// ========== 完整 SecurityConfig ==========
+@Configuration
+@EnableWebSecurity
+@RequiredArgsConstructor
+public class SecurityConfig {
+
+    private final JwtAuthenticationFilter jwtAuthFilter;
+    private final UserDetailsService userDetailsService;
+    private final JwtAuthenticationEntryPoint authEntryPoint;
+    private final JwtAccessDeniedHandler accessDeniedHandler;
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(AbstractHttpConfigurer::disable)
+            .cors(Customizer.withDefaults())
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .anyRequest().authenticated()
+            )
+            .sessionManagement(session ->
+                session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(ex -> ex
+                .authenticationEntryPoint(authEntryPoint)
+                .accessDeniedHandler(accessDeniedHandler))
+            .authenticationProvider(authenticationProvider())
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+
+        return http.build();
+    }
+
+    @Bean
+    public AuthenticationProvider authenticationProvider() {
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider();
+        provider.setUserDetailsService(userDetailsService);
+        provider.setPasswordEncoder(passwordEncoder());
+        return provider;
+    }
+
+    @Bean
+    public AuthenticationManager authenticationManager(
+            AuthenticationConfiguration config) throws Exception {
+        return config.getAuthenticationManager();
+    }
+
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>最佳实践</h2>
+        <div class="code">// ========== JWT 最佳实践总结 ==========
+
+// ========== 1. 密钥管理 ==========
+// 使用 RS256 (非对称) 替代 HS256 (对称)
+// HS256: 同一个密钥签名和验证
+// RS256: 私钥签名, 公钥验证 (微服务友好)
+
+// RS256 生成:
+// keytool -genkeypair -alias jwt -keyalg RSA -keysize 2048
+//   -keystore jwt.jks -validity 365
+
+// 读取密钥:
+@Bean
+public KeyPair keyPair() {
+    KeyStoreKeyFactory factory = new KeyStoreKeyFactory(
+        new ClassPathResource("jwt.jks"), "password".toCharArray());
+    return factory.getKeyPair("jwt");
+}
+
+// ========== 2. Token 内容最小化 ==========
+// 只放必要字段: sub (用户 ID), roles
+// 避免放: 密码, 手机号, 身份证
+// 大的 Token 影响每次请求性能
+
+// ========== 3. 使用 Refresh Token 轮换 ==========
+// 每次刷新生成新的 Refresh Token
+// 旧的 Refresh Token 立即失效
+// 检测重用: 如被盗用的 Refresh Token 被使用
+
+// ========== 4. 黑名单 vs 白名单 ==========
+// 黑名单: 存储已失效的 Token (适用于短期 Token)
+// 白名单: 存储有效的 Token (适用于长期 Token)
+// 黑名单更常用
+
+// ========== 5. 防止暴力破解 ==========
+// 登录接口限流
+// 失败次数锁定
+// 验证码
+
+// ========== 6. CORS 配置 ==========
+@Bean
+public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration config = new CorsConfiguration();
+    config.setAllowedOrigins(List.of("https://your-frontend.com"));
+    config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+    config.setAllowedHeaders(List.of("*"));
+    config.setAllowCredentials(true);
+    config.setMaxAge(3600L);
+
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/api/**", config);
+    return source;
+}
+
+// 在 SecurityConfig 中添加:
+// .cors(cors -> cors.configurationSource(corsConfigurationSource()))</div>
+        <div class="note">💡 JWT 要点: JJWT 库签名/验证 Token; OncePerRequestFilter 实现 JWT 过滤器; 无状态 STATELESS 禁用 Session; Access Token 短期 + Refresh Token 长期; 黑名单 Redis 实现登出; RS256 非对称签名更安全; Payload 不存敏感信息; @AuthenticationManager 注入认证。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoJwt()">JWT 结构</button>
+        <button onclick="demoFlow()">认证流程</button>
+        <button onclick="demoSecurity()">安全实践</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoJwt() {
+            result.innerHTML = '';
+            log('# JWT 结构');
+            log('');
+            log('Header.Payload.Signature');
+            log('');
+            log('Header: {"alg":"HS256","typ":"JWT"}');
+            log('');
+            log('Payload:');
+            log('  sub: 用户 ID');
+            log('  roles: [ROLE_USER]');
+            log('  iat: 签发时间');
+            log('  exp: 过期时间');
+            log('');
+            log('Signature: 防止篡改');
+            log('  HMACSHA256(base64(header).base64(payload), secret)');
+        }
+
+        function demoFlow() {
+            result.innerHTML = '';
+            log('# JWT 认证流程');
+            log('');
+            log('① POST /api/auth/login');
+            log('   提交 username + password');
+            log('');
+            log('② 服务端验证');
+            log('   authenticationManager.authenticate()');
+            log('   生成 Access Token + Refresh Token');
+            log('');
+            log('③ 客户端存储 Token');
+            log('   Authorization: Bearer &lt;token&gt;');
+            log('');
+            log('④ 请求过滤器');
+            log('   JwtAuthenticationFilter 提取验证');
+            log('   SecurityContextHolder 设置认证');
+            log('');
+            log('⑤ Token 过期 → 使用 Refresh Token');
+            log('   POST /api/auth/refresh');
+        }
+
+        function demoSecurity() {
+            result.innerHTML = '';
+            log('# JWT 安全实践');
+            log('');
+            log('✅ 密钥足够长 (HS256 ≥ 256bit)');
+            log('✅ Access Token 15-30 分钟');
+            log('✅ Refresh Token 7 天轮换');
+            log('✅ Redis 黑名单实现登出');
+            log('✅ HTTPS 传输');
+            log('✅ Payload 不存敏感信息');
+            log('');
+            log('❌ 不在 URL 参数传 Token');
+            log('❌ 不存 localStorage (防 XSS)');
+            log('❌ 不过长有效期');
+        }
+    </script>
+</body>
+</html>

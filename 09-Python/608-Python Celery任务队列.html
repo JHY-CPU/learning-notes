@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Celery任务队列</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📨 Celery 任务队列</h2><p>Celery 架构 (Broker/Worker/Backend)、定义与调用任务、异步与同步结果、定时任务 Celery Beat、Flower 监控。</p></div>
+    <div class="card">
+        <h2>Celery 架构与安装</h2>
+        <div class="code">// ========== Celery 概念 ==========
+# Celery: 分布式任务队列
+# 架构:
+# ┌─────────┐   ┌──────────┐   ┌─────────┐
+# │ Producer│ → │  Broker  │ → │  Worker │
+# │ (app)   │   │ (Redis/  │   │ (执行)  │
+# │         │   │  RabbitMQ)│   │         │
+# └─────────┘   └──────────┘   └─────────┘
+#                      ↓
+#                ┌──────────┐
+#                │  Backend │
+#                │ (结果存储)│
+#                └──────────┘
+
+# 安装:
+# pip install celery[redis]    # Redis 作为 broker
+# pip install celery[rabbitmq] # RabbitMQ 作为 broker
+# pip install flower           # 监控面板
+
+# ========== 创建 Celery 应用 ==========
+# tasks.py:
+from celery import Celery
+
+app = Celery(
+    "myapp",
+    broker="redis://localhost:6379/0",       # 消息队列
+    backend="redis://localhost:6379/1",       # 结果存储
+)
+
+# 或者使用 RabbitMQ:
+# app = Celery(
+#     "myapp",
+#     broker="amqp://guest:guest@localhost:5672//",
+#     backend="rpc://",
+# )
+
+# ========== 配置方式 ==========
+# 方式 1: 直接配置
+app.conf.update(
+    task_serializer="json",
+    accept_content=["json"],
+    result_serializer="json",
+    timezone="Asia/Shanghai",
+    enable_utc=True,
+    task_track_started=True,        # 跟踪任务开始状态
+    task_soft_time_limit=300,       # 软超时 (秒)
+    task_time_limit=600,            # 硬超时 (秒)
+    task_max_retries=3,             # 最大重试次数
+)
+
+# 方式 2: 配置文件
+# app.config_from_object("celeryconfig")
+
+# celeryconfig.py:
+# broker_url = "redis://localhost:6379/0"
+# result_backend = "redis://localhost:6379/1"
+# task_serializer = "json"
+# ...</div>
+    </div>
+    <div class="card">
+        <h2>定义与调用任务</h2>
+        <div class="code">// ========== 定义任务 ==========
+from celery import Celery, Task
+
+app = Celery("myapp", broker="redis://localhost:6379/0")
+
+# 定义任务 (使用 @app.task 装饰器)
+@app.task
+def add(x, y):
+    """简单的加法任务"""
+    return x + y
+
+@app.task(bind=True)  # bind=True: self 参数访问任务实例
+def long_running_task(self, data):
+    """长时间运行的任务"""
+    try:
+        # 更新进度
+        self.update_state(state="PROGRESS", meta={"progress": 50})
+        # 实际工作...
+        result = process_data(data)
+        return result
+    except Exception as exc:
+        # 重试
+        raise self.retry(exc=exc, countdown=60)
+
+# ========== 调用任务 ==========
+# 1. delay() — 最简单的方式
+result = add.delay(4, 6)
+
+# 2. apply_async() — 更多控制
+result = add.apply_async(
+    args=(4, 6),
+    kwargs={"extra": "data"},
+    countdown=10,           # 10 秒后执行
+    expires=3600,           # 1 小时后过期
+    priority=5,             # 优先级 (0-9)
+    queue="high_priority",  # 指定队列
+)
+
+# 3. 同步调用 (阻塞,不推荐在生产使用)
+result = add(4, 6)  # 直接调用,不通过 worker
+
+# ========== 获取结果 ==========
+result = add.delay(4, 6)
+
+# 异步获取:
+print(result.ready())      # 是否完成
+print(result.successful()) # 是否成功
+print(result.failed())     # 是否失败
+print(result.status)       # 状态: PENDING/STARTED/SUCCESS/FAILURE/RETRY
+
+# 阻塞等待:
+print(result.get(timeout=10))       # 等待 10 秒获取结果
+print(result.get(propagate=False))  # 不传播异常,返回异常对象
+
+# 任务 ID:
+print(result.id)  # "a1b2c3d4-..."
+# 可以用 ID 在其他进程中获取结果
+from celery.result import AsyncResult
+result = AsyncResult(task_id, app=app)
+print(result.state, result.result)</div>
+    </div>
+    <div class="card">
+        <h2>运行 Worker</h2>
+        <div class="code">// ========== 启动 Worker ==========
+# 终端命令:
+# celery -A tasks worker --loglevel=info
+
+# 常用选项:
+# celery -A tasks worker -l info                    # 日志级别
+# celery -A tasks worker -c 4                       # 并发数 (默认 CPU 核心数)
+# celery -A tasks worker -P threads                 # 使用线程 (默认 prefork)
+# celery -A tasks worker -Q high_priority,default   # 监听特定队列
+# celery -A tasks worker --max-tasks-per-child=50   # 每个进程最多执行任务数
+# celery -A tasks worker --autoscale=10,3           # 自动伸缩 (最大,最小)
+
+# ========== 多 Worker ==========
+# 终端 1: celery -A tasks worker -Q high -c 2 -l info
+# 终端 2: celery -A tasks worker -Q default -c 4 -l info
+
+# 发布任务到不同队列:
+add.apply_async(args=(1, 2), queue="high")
+add.apply_async(args=(3, 4), queue="default")
+
+# ========== 启动 Beat (定时任务) ==========
+# celery -A tasks beat -l info           # 只启动 beat
+# celery -A tasks worker -B -l info      # worker + beat 一起
+
+# ========== 查看状态 ==========
+# celery -A tasks status                 # worker 状态
+# flower -A tasks --port=5555            # Web 监控 (http://localhost:5555)</div>
+    </div>
+    <div class="card">
+        <h2>任务绑定与重试</h2>
+        <div class="code">// ========== 任务绑定 ==========
+@app.task(bind=True, max_retries=5, default_retry_delay=30)
+def process_order(self, order_id):
+    """处理订单 (带重试)"""
+    try:
+        # 业务逻辑
+        payment = process_payment(order_id)
+        if not payment["success"]:
+            raise ValueError("支付失败")
+
+        send_email(order_id)
+        return {"status": "success", "order_id": order_id}
+
+    except ValueError as exc:
+        # 重试 (最多 5 次,间隔递增)
+        countdown = 2 ** self.request.retries  # 指数退避
+        raise self.retry(exc=exc, countdown=countdown)
+
+    except Exception as exc:
+        # 未知异常,不重试
+        notify_admin(order_id, str(exc))
+        return {"status": "failed", "error": str(exc)}
+
+# ========== 任务钩子 ==========
+@app.task
+def my_task():
+    print("执行中...")
+    return "done"
+
+@my_task.after_return
+def after_task(sender, **kwargs):
+    print("任务完成!")
+
+@my_task.on_success
+def on_success(sender, result, **kwargs):
+    print(f"成功: {result}")
+
+@my_task.on_failure
+def on_failure(sender, exc, **kwargs):
+    print(f"失败: {exc}")
+
+# ========== 任务链接 ==========
+# 任务链: 前一个的结果传给下一个
+from celery import chain, group, chord
+
+# chain: 顺序执行
+result = chain(add.s(1, 2), add.s(3))()  # add(1,2)=3 → add(3,3)=6
+# 或简写: (add.s(1, 2) | add.s(3))()
+
+# group: 并行执行
+result = group(add.s(i, i) for i in range(10))()  # 同时运行 10 个任务
+
+# chord: group + callback
+result = chord(
+    [add.s(i, i) for i in range(5)]  # 并行
+)(add.s(100).s())                     # 汇总</div>
+    </div>
+    <div class="card">
+        <h2>定时任务 Celery Beat</h2>
+        <div class="code">// ========== 周期性任务 ==========
+from celery import Celery
+from celery.schedules import crontab
+
+app = Celery("myapp", broker="redis://localhost:6379/0")
+
+# 配置定时任务:
+app.conf.beat_schedule = {
+    # 每 30 秒执行
+    "check-orders-every-30s": {
+        "task": "tasks.check_pending_orders",
+        "schedule": 30.0,  # 秒
+    },
+
+    # 每天凌晨 3 点清理
+    "cleanup-daily": {
+        "task": "tasks.cleanup_expired",
+        "schedule": crontab(hour=3, minute=0),
+    },
+
+    # 工作日早 9 点发送报告
+    "report-weekdays-9am": {
+        "task": "tasks.send_daily_report",
+        "schedule": crontab(hour=9, minute=0, day_of_week="1-5"),
+    },
+
+    # 每月 1 号凌晨执行
+    "monthly-billing": {
+        "task": "tasks.run_billing",
+        "schedule": crontab(day_of_month=1, hour=0, minute=0),
+    },
+}
+
+# 自定义调度选项:
+app.conf.beat_schedule["with-args"] = {
+    "task": "tasks.send_notification",
+    "schedule": crontab(minute="*/15"),
+    "args": ("提醒: 请完成打卡",),
+    "kwargs": {"priority": "high"},
+}
+
+@app.task
+def check_pending_orders():
+    """检查待处理订单"""
+    return "检查完成"
+
+@app.task
+def cleanup_expired():
+    """清理过期数据"""
+    return "清理完成"</div>
+    </div>
+    <div class="card">
+        <h2>Flower 监控与最佳实践</h2>
+        <div class="code">// ========== Flower 监控 ==========
+# 启动:
+# flower -A tasks --port=5555 --broker=redis://localhost:6379/0
+
+# 访问: http://localhost:5555
+# 功能:
+# - 查看 worker 状态和任务列表
+# - 任务历史、耗时、结果
+# - 撤销/重试任务
+# - 图表统计
+
+# 认证:
+# flower -A tasks --basic_auth=user:pass
+
+# ========== 最佳实践 ==========
+# 1. 任务应该幂等 (可重复执行无副作用)
+
+# 2. 任务参数保持简单 (传递 ID 而非对象)
+@app.task
+def process_user(user_id):  # 好: 传 ID
+    user = User.query.get(user_id)
+    ...
+
+@app.task
+def process_user(user):  # 不好: 传对象 (序列化问题)
+    ...
+
+# 3. 设置合理的超时和重试
+@app.task(
+    soft_time_limit=60,     # 60 秒后 SoftTimeLimitExceeded
+    time_limit=120,         # 120 秒后硬杀死
+    max_retries=3,
+    default_retry_delay=10,
+)
+
+# 4. 任务结果序列化
+app.conf.result_serializer = "json"
+app.conf.accept_content = ["json"]
+
+# 5. 任务分组
+@app.task(queue="email")
+def send_email(to, subject):
+    pass
+
+@app.task(queue="heavy")
+def process_video(path):
+    pass
+
+# 6. 任务 ETA 和过期
+send_email.apply_async(
+    args=["user@test.com", "欢迎"],
+    countdown=60,           # 60 秒后发送
+    expires=3600,           # 1 小时后未执行则丢弃
+)</div>
+        <div class="note">💡 Celery 要点: @app.task 定义任务; delay/apply_async 调用; worker -c 控制并发; beat 定时任务; bind=True + self.retry 重试; Flower 监控面板; 参数传递 ID 而非对象。</div>
+    </div>
+    <div class="card">
+        <h2>完整示例: Flask + Celery</h2>
+        <div class="code">// ========== Flask + Celery ==========
+# app.py:
+from flask import Flask, request, jsonify
+from celery import Celery
+import time
+
+app = Flask(__name__)
+app.config["CELERY_BROKER_URL"] = "redis://localhost:6379/0"
+app.config["CELERY_RESULT_BACKEND"] = "redis://localhost:6379/1"
+
+celery = Celery(app.name, broker=app.config["CELERY_BROKER_URL"])
+celery.conf.update(app.config)
+
+@celery.task(bind=True)
+def long_task(self, duration):
+    """模拟耗时任务"""
+    for i in range(duration):
+        time.sleep(1)
+        self.update_state(
+            state="PROGRESS",
+            meta={"current": i + 1, "total": duration}
+        )
+    return {"status": "完成", "total": duration}
+
+@app.route("/start", methods=["POST"])
+def start_task():
+    task = long_task.delay(duration=request.json.get("duration", 5))
+    return jsonify({"task_id": task.id}), 202
+
+@app.route("/status/<task_id>")
+def task_status(task_id):
+    task = long_task.AsyncResult(task_id)
+    if task.state == "PENDING":
+        response = {"state": task.state}
+    elif task.state == "PROGRESS":
+        response = {"state": task.state, "meta": task.info}
+    elif task.state == "SUCCESS":
+        response = {"state": task.state, "result": task.result}
+    else:
+        response = {"state": task.state}
+
+    return jsonify(response)
+
+# 启动:
+# celery -A app.celery worker -l info
+# flask run</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoTask()">任务定义演示</button>
+        <button onclick="demoCall()">调用方式演示</button>
+        <button onclick="demoBeat()">定时任务演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoTask() {
+            result.innerHTML = '';
+            log('# Celery 任务');
+            log('');
+            log('@app.task');
+            log('def add(x, y):');
+            log('    return x + y');
+            log('');
+            log('@app.task(bind=True)');
+            log('def long_task(self):');
+            log('    self.update_state(...)');
+            log('    self.retry(countdown=30)');
+        }
+
+        function demoCall() {
+            result.innerHTML = '';
+            log('# 调用任务');
+            log('');
+            log('add.delay(4, 6)      # 最简单');
+            log('add.apply_async(     # 更多控制');
+            log('    args=(4, 6),');
+            log('    countdown=10,');
+            log('    queue="high"');
+            log(')');
+            log('');
+            log('result.get(timeout=5)  # 等结果');
+            log('result.status          # 状态');
+        }
+
+        function demoBeat() {
+            result.innerHTML = '';
+            log('# 定时任务 Beat');
+            log('');
+            log('app.conf.beat_schedule = {');
+            log('    "every-30s": {');
+            log('        "task": "tasks.hello",');
+            log('        "schedule": 30.0,');
+            log('    },');
+            log('    "daily-3am": {');
+            log('        "schedule": crontab(hour=3),');
+            log('    },');
+            log('}');
+            log('');
+            log('celery -A tasks beat -l info');
+        }
+    </script>
+</body>
+</html>

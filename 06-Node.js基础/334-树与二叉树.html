@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>树与二叉树</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>树与二叉树</h2><p>树概念、二叉搜索树、遍历(前/中/后序/层序)、深度/高度。</p></div>
+    <div class="card">
+        <h2>二叉树实现</h2>
+        <div class="code">// ========== 二叉树节点 ==========
+class TreeNode {
+    constructor(val) {
+        this.val = val;
+        this.left = null;
+        this.right = null;
+    }
+}
+
+// ========== 二叉搜索树 ==========
+class BST {
+    constructor() { this.root = null; }
+
+    insert(val) {
+        const node = new TreeNode(val);
+        if (!this.root) { this.root = node; return; }
+        let curr = this.root;
+        while (true) {
+            if (val < curr.val) {
+                if (!curr.left) { curr.left = node; return; }
+                curr = curr.left;
+            } else {
+                if (!curr.right) { curr.right = node; return; }
+                curr = curr.right;
+            }
+        }
+    }
+
+    search(val) { /* ... */ }
+    delete(val) { /* ... */ }
+}
+
+// ========== 遍历 ==========
+// 前序: root → left → right
+// 中序: left → root → right (BST 有序)
+// 后序: left → right → root
+// 层序: 逐层遍历 (BFS)</div>
+    </div>
+    <div class="card">
+        <h2>演示：树与二叉树</h2>
+        <button onclick="demoBST()">二叉搜索树</button>
+        <button onclick="demoTraversal()">遍历方式</button>
+        <button onclick="demoDepth()">深度与高度</button>
+        <button onclick="demoAdvanced()">进阶操作</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        class TreeNode {
+            constructor(val) { this.val = val; this.left = null; this.right = null; }
+        }
+
+        class BST {
+            constructor() { this.root = null; }
+
+            insert(val) {
+                const node = new TreeNode(val);
+                if (!this.root) { this.root = node; return this; }
+                let curr = this.root;
+                while (true) {
+                    if (val < curr.val) {
+                        if (!curr.left) { curr.left = node; return this; }
+                        curr = curr.left;
+                    } else {
+                        if (!curr.right) { curr.right = node; return this; }
+                        curr = curr.right;
+                    }
+                }
+            }
+
+            search(val) {
+                let curr = this.root;
+                while (curr) {
+                    if (val === curr.val) return true;
+                    curr = val < curr.val ? curr.left : curr.right;
+                }
+                return false;
+            }
+
+            // 中序遍历 (有序)
+            inOrder(node = this.root, result = []) {
+                if (!node) return result;
+                this.inOrder(node.left, result);
+                result.push(node.val);
+                this.inOrder(node.right, result);
+                return result;
+            }
+
+            // 前序遍历
+            preOrder(node = this.root, result = []) {
+                if (!node) return result;
+                result.push(node.val);
+                this.preOrder(node.left, result);
+                this.preOrder(node.right, result);
+                return result;
+            }
+
+            // 后序遍历
+            postOrder(node = this.root, result = []) {
+                if (!node) return result;
+                this.postOrder(node.left, result);
+                this.postOrder(node.right, result);
+                result.push(node.val);
+                return result;
+            }
+
+            // 层序遍历
+            levelOrder() {
+                if (!this.root) return [];
+                const result = [];
+                const queue = [this.root];
+                while (queue.length) {
+                    const node = queue.shift();
+                    result.push(node.val);
+                    if (node.left) queue.push(node.left);
+                    if (node.right) queue.push(node.right);
+                }
+                return result;
+            }
+
+            getMin(node = this.root) {
+                while (node.left) node = node.left;
+                return node.val;
+            }
+
+            getMax(node = this.root) {
+                while (node.right) node = node.right;
+                return node.val;
+            }
+
+            getHeight(node = this.root) {
+                if (!node) return 0;
+                return 1 + Math.max(this.getHeight(node.left), this.getHeight(node.right));
+            }
+
+            toStr(node = this.root, prefix = '', isLeft = true) {
+                if (!node) return '';
+                let str = '';
+                str += this.toStr(node.right, prefix + (isLeft ? '│   ' : '    '), false);
+                str += prefix + (isLeft ? '└── ' : '┌── ') + node.val + '\n';
+                str += this.toStr(node.left, prefix + (isLeft ? '    ' : '│   '), true);
+                return str;
+            }
+        }
+
+        function demoBST() {
+            result.innerHTML = '';
+            log('🌳 二叉搜索树 (BST):');
+            log('');
+
+            const bst = new BST();
+            [8, 3, 10, 1, 6, 14, 4, 7, 13].forEach(v => bst.insert(v));
+
+            log('插入顺序: [8, 3, 10, 1, 6, 14, 4, 7, 13]');
+            log('');
+            log('树结构:');
+            log(bst.toStr());
+            log('');
+
+            log('中序遍历 (有序):');
+            log(`   [${bst.inOrder().join(', ')}]`);
+            log('');
+
+            log('搜索:');
+            log(`   search(6) → ${bst.search(6)}`);
+            log(`   search(11) → ${bst.search(11)}`);
+
+            log('');
+            log('最小值:', bst.getMin());
+            log('最大值:', bst.getMax());
+            log('高度:', bst.getHeight());
+        }
+
+        function demoTraversal() {
+            result.innerHTML = '';
+            log('🔄 四种遍历方式:');
+            log('');
+
+            const bst = new BST();
+            [8, 3, 10, 1, 6, 14, 4, 7, 13].forEach(v => bst.insert(v));
+
+            log('       8');
+            log('      / \\');
+            log('     3   10');
+            log('    / \\    \\');
+            log('   1   6    14');
+            log('      / \\  /');
+            log('     4   7 13');
+            log('');
+
+            log('1️⃣ 前序遍历 (根→左→右):');
+            log(`   [${bst.preOrder().join(', ')}]`);
+            log('   用途: 序列化树结构');
+            log('');
+
+            log('2️⃣ 中序遍历 (左→根→右):');
+            log(`   [${bst.inOrder().join(', ')}]`);
+            log('   用途: BST 输出有序序列');
+            log('');
+
+            log('3️⃣ 后序遍历 (左→右→根):');
+            log(`   [${bst.postOrder().join(', ')}]`);
+            log('   用途: 删除树, 表达式求值');
+            log('');
+
+            log('4️⃣ 层序遍历 (逐层 BFS):');
+            log(`   [${bst.levelOrder().join(', ')}]`);
+            log('   用途: 求最短路径, 层级相关');
+        }
+
+        function demoDepth() {
+            result.innerHTML = '';
+            log('📏 深度与高度:');
+            log('');
+
+            function maxDepth(root) {
+                if (!root) return 0;
+                return 1 + Math.max(maxDepth(root.left), maxDepth(root.right));
+            }
+
+            function minDepth(root) {
+                if (!root) return 0;
+                if (!root.left) return 1 + minDepth(root.right);
+                if (!root.right) return 1 + minDepth(root.left);
+                return 1 + Math.min(minDepth(root.left), minDepth(root.right));
+            }
+
+            function isBalanced(root) {
+                if (!root) return true;
+                const left = maxDepth(root.left);
+                const right = maxDepth(root.right);
+                return Math.abs(left - right) <= 1 && isBalanced(root.left) && isBalanced(root.right);
+            }
+
+            // 平衡树
+            const balanced = new BST();
+            [8, 4, 12, 2, 6, 10, 14].forEach(v => balanced.insert(v));
+
+            // 不平衡树
+            const unbalanced = new BST();
+            [1, 2, 3, 4, 5, 6, 7].forEach(v => unbalanced.insert(v));
+
+            log('1️⃣ 最大深度:');
+            log(`   平衡树深度: ${maxDepth(balanced.root)}`);
+            log(`   不平衡树深度: ${maxDepth(unbalanced.root)}`);
+            log('');
+
+            log('2️⃣ 最小深度:');
+            log(`   平衡树最小深度: ${minDepth(balanced.root)}`);
+            log('');
+
+            log('3️⃣ 是否平衡:');
+            log(`   平衡树: ${isBalanced(balanced.root)} (左右子树高度差 ≤ 1)`);
+            log(`   不平衡树: ${isBalanced(unbalanced.root)} (退化为链表)`);
+            log('');
+
+            log('4️⃣ 完全二叉树 vs 满二叉树:');
+            log('   满二叉树: 所有层节点数达到最大');
+            log('   完全二叉树: 除最后一层外全满, 节点靠左');
+            log('   二叉搜索树: left < root < right');
+            log('   平衡二叉树: 左右子树高度差 ≤ 1 (AVL)');
+        }
+
+        function demoAdvanced() {
+            result.innerHTML = '';
+            log('🔧 二叉树进阶操作:');
+            log('');
+
+            const bst = new BST();
+            [8, 3, 10, 1, 6, 14, 4, 7, 13].forEach(v => bst.insert(v));
+
+            log('1️⃣ 验证 BST:');
+            function isValidBST(node, min = -Infinity, max = Infinity) {
+                if (!node) return true;
+                if (node.val <= min || node.val >= max) return false;
+                return isValidBST(node.left, min, node.val) && isValidBST(node.right, node.val, max);
+            }
+            log(`   isValid: ${isValidBST(bst.root)}`);
+
+            log('');
+            log('2️⃣ 最近公共祖先 (LCA):');
+            function lowestCommonAncestor(root, p, q) {
+                if (!root) return null;
+                if (p < root.val && q < root.val) return lowestCommonAncestor(root.left, p, q);
+                if (p > root.val && q > root.val) return lowestCommonAncestor(root.right, p, q);
+                return root.val;
+            }
+            log(`   LCA(4, 7) = ${lowestCommonAncestor(bst.root, 4, 7)}`);
+            log(`   LCA(1, 14) = ${lowestCommonAncestor(bst.root, 1, 14)}`);
+
+            log('');
+            log('3️⃣ 树的序列化:');
+            function serialize(root) {
+                if (!root) return 'null';
+                return `${root.val},${serialize(root.left)},${serialize(root.right)}`;
+            }
+            const ser = serialize(bst.root);
+            log(`   序列化: ${ser}`);
+
+            log('');
+            log('4️⃣ 树的类型:');
+            log('   • 二叉树: 每个节点最多两个子节点');
+            log('   • 二叉搜索树: left < root < right');
+            log('   • AVL 树: 自平衡二叉搜索树');
+            log('   • 红黑树: 近似平衡的 BST (TreeMap)');
+            log('   • 堆: 完全二叉树 (最大堆/最小堆)');
+            log('   • Trie: 前缀树 (字符串搜索)');
+        }
+
+        console.log('=== 树与二叉树 ===');
+        document.getElementById('output').textContent = `树与二叉树: BST / 前中后序层序遍历 / 深度 / LCA / 序列化\n✅ 树与二叉树演示完成！`;
+    </script>
+</body>
+</html>

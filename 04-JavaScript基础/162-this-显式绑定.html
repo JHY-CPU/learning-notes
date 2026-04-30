@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>this-显式绑定</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e67e22; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>this — 显式绑定（call/apply/bind）</h2><p>手动指定函数的 this 指向。</p></div>
+    <div class="card">
+        <h2>call — 立即调用，参数逐个传入</h2>
+        <div class="code">function greet(greeting, punctuation) {
+    console.log(greeting + ', ' + this.name + punctuation);
+}
+
+const user = { name: 'Alice' };
+
+// call(thisArg, arg1, arg2, ...)
+greet.call(user, 'Hello', '!');   // 'Hello, Alice!'
+greet.call(user, 'Hi', '!!');     // 'Hi, Alice!!'
+
+// 借用数组方法
+const obj = { 0: 'a', 1: 'b', length: 2 };
+Array.prototype.push.call(obj, 'c');
+console.log(obj);  // { 0: 'a', 1: 'b', 2: 'c', length: 3 }
+
+// 借用 Math 方法
+const numbers = [3, 1, 4, 1, 5];
+Math.max.call(null, ...numbers);  // 5（等同于 Math.max(...numbers)）</div>
+    </div>
+    <div class="card">
+        <h2>apply — 立即调用，参数用数组传入</h2>
+        <div class="code">function greet(greeting, punctuation) {
+    console.log(greeting + ', ' + this.name + punctuation);
+}
+
+const user = { name: 'Bob' };
+
+// apply(thisArg, [arg1, arg2, ...])
+greet.apply(user, ['Hey', '.']);    // 'Hey, Bob.'
+
+// apply 经典用法：展开数组
+const nums = [3, 1, 4, 1, 5];
+Math.max.apply(null, nums);  // 5（不用 ... 展开语法）
+Math.min.apply(null, nums);  // 1
+
+// call vs apply
+// call: 参数逐个传，数量固定时用
+// apply: 参数数组传，数量不固定时用
+// 现代 JS 更多用 ... 展开运算符，所以 call/apply 用得少了</div>
+    </div>
+    <div class="card">
+        <h2>bind — 绑定 this，返回新函数（不立即调用）</h2>
+        <div class="code">function greet(greeting, punctuation) {
+    console.log(greeting + ', ' + this.name + punctuation);
+}
+
+const user = { name: 'Charlie' };
+
+// bind 返回新函数，this 被永久绑定
+const bindGreet = greet.bind(user);
+bindGreet('Hello', '!');  // 'Hello, Charlie!'
+
+// 也可以预绑定部分参数（偏函数）
+const sayHi = greet.bind(user, 'Hi');
+sayHi('!!');  // 'Hi, Charlie!!'
+
+// 经典用途：修复回调中的 this
+const btn = { text: 'Click me' };
+btn.addEventListener = function(event, handler) {
+    // 模拟事件绑定
+    handler();
+};
+
+const app = {
+    name: 'MyApp',
+    init() {
+        // ❌ 不加 bind，this 会丢失
+        // btn.addEventListener('click', this.handleClick);
+        // ✅ 用 bind 固定 this
+        btn.addEventListener('click', this.handleClick.bind(this));
+    },
+    handleClick() {
+        console.log(this.name + ' clicked');
+    }
+};
+app.init();  // 'MyApp clicked'
+
+// bind 后的 this 不能被 call/apply 覆盖
+const bound = greet.bind({ name: 'Fixed' });
+bound.call({ name: 'TryChange' }, 'Hi', '!');  // 'Hi, Fixed!'（绑定生效）</div>
+        <div class="note">💡 bind 最常用：修复回调函数中的 this 丢失。箭头函数出现后，很多人改用箭头函数替代 bind。</div>
+    </div>
+    <div class="card">
+        <h2>call / apply / bind 对比</h2>
+        <div class="code">function introduce(role, company) {
+    console.log(`${this.name} 是${role}，在${company}工作`);
+}
+
+const person = { name: '张三' };
+
+// call — 立即执行，参数列表
+introduce.call(person, '工程师', '阿里');
+
+// apply — 立即执行，参数数组
+introduce.apply(person, ['设计师', '腾讯']);
+
+// bind — 返回新函数
+const boundIntroduce = introduce.bind(person, '产品经理');
+boundIntroduce('字节');
+
+// | 方法   | 是否立即执行 | 参数形式     | 场景               |
+// |--------|-------------|-------------|--------------------|
+// | call   | ✅          | 逐个传入    | 参数少且固定        |
+// | apply  | ✅          | 数组传入    | 参数是数组          |
+// | bind   | ❌ 返回函数 | 逐个传入    | 固定 this/偏函数    |</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== call 演示 ===');
+        function introduce(job, company) {
+            console.log(this.name + ' 是' + job + '，在' + company + '工作');
+        }
+        const p1 = { name: '张三' };
+        introduce.call(p1, '工程师', '阿里');
+
+        console.log('=== apply 演示 ===');
+        introduce.apply(p1, ['设计师', '腾讯']);
+
+        console.log('=== bind 演示 ===');
+        const bound = introduce.bind(p1, '产品经理');
+        bound('字节');
+
+        console.log('=== 借用方法 ===');
+        function sum() {
+            // arguments 是类数组，借用数组方法
+            return Array.prototype.reduce.call(arguments, (a, b) => a + b, 0);
+        }
+        console.log('sum(1,2,3,4,5):', sum(1, 2, 3, 4, 5));
+
+        console.log('=== bind 修复 this ===');
+        const counter = {
+            count: 0,
+            start() {
+                setInterval(function() {
+                    this.count++;
+                    console.log('count:', this.count);
+                }.bind(this), 100);
+            }
+        };
+        // counter.start();  // 取消注释可运行（会无限输出）
+
+        console.log('=== bind 不会被覆盖 ===');
+        const fixed = introduce.bind({ name: '固定' });
+        fixed.call({ name: '想改' }, '测试', '公司');  // '固定 是测试，在公司工作'
+
+        document.getElementById('output').textContent =
+            `call: 张三 是工程师，在阿里工作\n` +
+            `apply: 张三 是设计师，在腾讯工作\n` +
+            `bind: 张三 是产品经理，在字节工作\n` +
+            `✅ this 显式绑定演示完成！`;
+    </script>
+</body>
+</html>

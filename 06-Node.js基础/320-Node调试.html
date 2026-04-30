@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Node调试</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #debug-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #3498db; color: white; }
+        tr:nth-child(even) { background: #f8f9fa; }
+        .highlight { background: #fff3cd; padding: 2px 6px; border-radius: 3px; font-family: monospace; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Node 调试</h2><p>--inspect 标志、Chrome DevTools、VSCode launch.json、debugger 语句。</p></div>
+    <div class="card">
+        <h2>Node 调试方式</h2>
+        <div class="code">// ========== debugger 语句 ==========
+function calculate(x) {
+    debugger; // 断点
+    return x * 2;
+}
+
+// ========== 启动调试 ==========
+// $ node --inspect app.js
+// $ node --inspect-brk app.js  (在第一行暂停)
+// $ node --inspect=0.0.0.0:9229 app.js
+
+// ========== Chrome DevTools ==========
+// chrome://inspect → 远程目标 → inspect
+
+// ========== VSCode launch.json ==========
+// {
+//   "type": "node",
+//   "request": "launch",
+//   "name": "调试程序",
+//   "program": "${workspaceFolder}/app.js"
+// }
+
+// ========== Console 调试 ==========
+console.log('值:', x);
+console.table(array);
+console.time('label');
+console.trace('堆栈');
+console.dir(obj, { depth: 3, colors: true });</div>
+    </div>
+    <div class="card">
+        <h2>演示：调试技术</h2>
+        <button onclick="demoDebugger()">debugger 模拟</button>
+        <button onclick="demoConsoleDebug()">Console 调试</button>
+        <button onclick="demoInspectFlags()">--inspect 标志</button>
+        <button onclick="demoVSCode()">VSCode 配置</button>
+        <div id="debug-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const debugResult = document.getElementById('debug-result');
+
+        function log(msg) {
+            debugResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // ========== 模拟调试器 ==========
+        class DebuggerSimulator {
+            constructor() {
+                this.breakpoints = new Set();
+                this.variables = {};
+                this.stepMode = false;
+            }
+
+            setBreakpoint(location) {
+                this.breakpoints.add(location);
+                log(`   🔴 设置断点: ${location}`);
+            }
+
+            inspect(vars) {
+                log(`   🔍 变量检查:`);
+                Object.entries(vars).forEach(([k, v]) => {
+                    const val = typeof v === 'object' ? JSON.stringify(v) : v;
+                    log(`      ${k} = ${val}`);
+                });
+            }
+
+            stepOver(func, ...args) {
+                log(`   👣 Step Over: ${func.name}(${args.join(', ')})`);
+                log(`   ⏸️  暂停在函数入口`);
+                return func(...args);
+            }
+
+            stepInto(func, ...args) {
+                log(`   🔽 Step Into: ${func.name}`);
+                const debugArgs = args.map(a => typeof a === 'object' ? JSON.stringify(a) : a);
+                log(`      参数: ${debugArgs.join(', ')}`);
+                const result = func(...args);
+                log(`      返回: ${typeof result === 'object' ? JSON.stringify(result) : result}`);
+                return result;
+            }
+        }
+
+        function demoDebugger() {
+            debugResult.innerHTML = '';
+            log('🐛 debugger 语句模拟:');
+            log('');
+
+            const debugger_ = new DebuggerSimulator();
+
+            // 模拟有 bug 的函数
+            function calculateTotal(items) {
+                // debugger; // 暂停执行
+                let total = 0;
+                for (let i = 0; i < items.length; i++) {
+                    total += items[i].price * (items[i].quantity || 1);
+                }
+                return total;
+            }
+
+            function findUser(users, id) {
+                // debugger;
+                return users.find(u => u.id === id);
+            }
+
+            log('1️⃣ 设置断点:');
+            debugger_.setBreakpoint('calculateTotal:2');
+            debugger_.setBreakpoint('findUser:2');
+            log('');
+
+            log('2️⃣ 检查变量:');
+            const cart = [
+                { name: 'Apple', price: 5, quantity: 3 },
+                { name: 'Banana', price: 3, quantity: 2 },
+                { name: 'Cherry', price: 8, quantity: 1 },
+            ];
+            debugger_.inspect({ cart, itemCount: cart.length });
+            log('');
+
+            log('3️⃣ Step Over 执行:');
+            const total = debugger_.stepOver(calculateTotal, cart);
+            log(`   total = ${total}`);
+            log('');
+
+            log('4️⃣ Step Into 函数:');
+            const users = [
+                { id: 1, name: 'Alice', role: 'admin' },
+                { id: 2, name: 'Bob', role: 'user' },
+            ];
+            const user = debugger_.stepInto(findUser, users, 2);
+            log(`   找到: ${JSON.stringify(user)}`);
+            log('');
+
+            log('5️⃣ 调用堆栈:');
+            function a() { b(); }
+            function b() { c(); }
+            function c() {
+                log('   📚 堆栈跟踪 (模拟):');
+                log('      at c (app.js:25:3)');
+                log('      at b (app.js:24:3)');
+                log('      at a (app.js:23:3)');
+                log('      at Object.<anonymous> (app.js:27:1)');
+            }
+            a();
+            log('');
+            log('📌 debugger 语句:');
+            log('   • 在代码中插入 debugger; 触发断点');
+            log('   • 当 DevTools 打开时自动暂停');
+            log('   • 生产环境应移除 debugger 语句');
+        }
+
+        function demoConsoleDebug() {
+            debugResult.innerHTML = '';
+            log('📋 Console 调试技巧:');
+            log('');
+
+            // 1. console.log
+            log('1️⃣ console.log 基础:');
+            log('   console.log 是最常用的调试方式');
+            log('');
+
+            // 2. console.table
+            log('2️⃣ console.table 表格输出:');
+            const users = [
+                { id: 1, name: 'Alice', role: 'admin', age: 28 },
+                { id: 2, name: 'Bob', role: 'user', age: 32 },
+                { id: 3, name: 'Charlie', role: 'user', age: 24 },
+                { id: 4, name: 'Diana', role: 'moderator', age: 30 },
+            ];
+            log('   数据:');
+            users.forEach(u => log(`   ${u.id}\t${u.name}\t${u.role}\t${u.age}`));
+            log('');
+
+            // 3. console.time
+            log('3️⃣ console.time 性能测量:');
+            log('   console.time("label") / console.timeEnd("label")');
+            log('   测量代码块执行时间');
+            log('');
+
+            // 4. console.trace
+            log('4️⃣ console.trace 堆栈追踪:');
+            function func1() { func2(); }
+            function func2() { func3(); }
+            function func3() {
+                log('   堆栈追踪 (模拟):');
+                log('      at func3 (app.js:12)');
+                log('      at func2 (app.js:11)');
+                log('      at func1 (app.js:10)');
+            }
+            func1();
+            log('');
+
+            // 5. console.dir
+            log('5️⃣ console.dir 对象深度:');
+            const deep = { a: { b: { c: { d: { e: 'deep' } } } } };
+            log(`   console.dir(obj, { depth: null, colors: true })`);
+            log(`   深度对象: ${JSON.stringify(deep)}`);
+            log('');
+
+            // 6. console.assert
+            log('6️⃣ console.assert 断言:');
+            log('   console.assert(condition, message)');
+            log('   条件不满足时输出错误');
+            log('');
+
+            // 7. 分组
+            log('7️⃣ console.group 分组:');
+            log('   group / groupCollapsed / groupEnd');
+            log('   控制台输出分组显示');
+            log('');
+
+            log('📌 调试最佳实践:');
+            log('   • 使用 labels 区分不同输出');
+            log('   • util.inspect(obj, {showHidden:true, depth:null})');
+            log('   • console.error 输出到 stderr');
+            log('   • 调试完成后移除调试代码');
+        }
+
+        function demoInspectFlags() {
+            debugResult.innerHTML = '';
+            log('🔬 --inspect 调试标志:');
+            log('');
+
+            log('1️⃣ 启动方式:');
+            log('');
+
+            const flags = [
+                { flag: 'node --inspect app.js', desc: '启动调试监听 (默认 127.0.0.1:9229)', break: '否' },
+                { flag: 'node --inspect-brk app.js', desc: '启动并在第一行暂停', break: '是' },
+                { flag: 'node --inspect=0.0.0.0:9229', desc: '监听所有网络接口', break: '否' },
+                { flag: 'node --inspect-port=9230 app.js', desc: '指定调试端口', break: '否' },
+                { flag: 'node inspect app.js', desc: '内置命令行调试器', break: '是' },
+            ];
+
+            log('   flag'.padEnd(42) + 'desc'.padEnd(28) + 'break');
+            log('   ' + '-'.repeat(90));
+            flags.forEach(({ flag, desc, break: b }) => {
+                log(`   ${flag.padEnd(44)} ${desc.padEnd(30)} ${b}`);
+            });
+
+            log('');
+            log('2️⃣ Chrome DevTools 调试步骤:');
+            const steps = [
+                'node --inspect-brk app.js  启动调试',
+                '打开 chrome://inspect',
+                '点击 "Open dedicated DevTools for Node"',
+                '在 Sources 面板设置断点',
+                '按 Resume (F8) 继续执行',
+                '在 Console 面板实时交互',
+            ];
+            steps.forEach((s, i) => log(`   ${i + 1}. ${s}`));
+
+            log('');
+            log('3️⃣ DevTools 调试功能:');
+            log('   • Sources — 源码断点');
+            log('   • Console — 实时表达式求值');
+            log('   • Scope — 变量作用域查看');
+            log('   • Call Stack — 调用堆栈');
+            log('   • Watch — 表达式监控');
+            log('   • DOM/Breakpoints — 事件断点');
+            log('');
+
+            log('4️⃣ 内置调试器命令:');
+            log('   cont / c — 继续执行');
+            log('   next / n — 下一步 (不进入函数)');
+            log('   step / s — 进入函数');
+            log('   out / o — 跳出函数');
+            log('   repl — 打开交互式求值');
+            log('   watch(expr) — 监控表达式');
+            log('   list(n) — 显示前后 n 行代码');
+        }
+
+        function demoVSCode() {
+            debugResult.innerHTML = '';
+            log('💻 VSCode 调试配置:');
+            log('');
+
+            log('1️⃣ launch.json 配置模板:');
+            log('');
+
+            const configs = [
+                {
+                    name: '启动程序',
+                    config: `{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "启动程序",
+            "skipFiles": ["<node_internals>/**"],
+            "program": "\${workspaceFolder}/app.js"
+        }`,
+                },
+                {
+                    name: '附加到进程',
+                    config: `        {
+            "type": "node",
+            "request": "attach",
+            "name": "附加到进程",
+            "processId": "\${command:PickProcess}",
+            "restart": true
+        }`,
+                },
+                {
+                    name: 'NPM 脚本',
+                    config: `        {
+            "type": "node",
+            "request": "launch",
+            "name": "NPM 启动",
+            "runtimeExecutable": "npm",
+            "runtimeArgs": ["run", "dev"],
+            "skipFiles": ["<node_internals>/**"]
+        }`,
+                },
+            ];
+
+            configs.forEach(({ name, config }) => {
+                log(`   📌 ${name}:`);
+                config.split('\n').forEach(l => log(`      ${l}`));
+                log('');
+            });
+
+            log('    ]');
+            log('}');
+            log('');
+
+            log('2️⃣ 常用调试操作:');
+            log('   F5 — 启动/继续调试');
+            log('   F9 — 设置/取消断点');
+            log('   F10 — 单步跳过');
+            log('   F11 — 单步进入');
+            log('   Shift+F11 — 跳出');
+            log('   Ctrl+Shift+F5 — 重启');
+            log('   Shift+F5 — 停止');
+            log('');
+
+            log('3️⃣ VSCode 调试面板:');
+            log('   VARIABLES — 查看变量值');
+            log('   WATCH — 监控表达式');
+            log('   CALL STACK — 调用堆栈');
+            log('   LOADED SCRIPTS — 已加载脚本');
+            log('   BREAKPOINTS — 断点管理');
+            log('');
+
+            log('4️⃣ 条件断点:');
+            log('   右键断点 → 添加条件');
+            log('   表达式: count > 10');
+            log('   命中次数: >= 5');
+            log('');
+
+            log('📌 日志断点 (Logpoint):');
+            log('   右键断点 → Logpoint');
+            log('   不暂停, 只输出日志');
+            log('   格式: hello, \${name} (值: 21)');
+        }
+
+        console.log('=== Node 调试 ===');
+
+        document.getElementById('output').textContent =
+            `Node 调试: --inspect / debugger / Chrome DevTools / VSCode\n` +
+            `调试技巧: Console / Source / Breakpoint / Logpoint / Profile\n` +
+            `✅ Node 调试演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,427 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python unittest.mock模拟</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🎭 unittest.mock 模拟</h2><p>Mock 与 MagicMock 对象、patch 装饰器/上下文管理器、side_effect 与 return_value、assert_called 断言、实战模拟网络/数据库。</p></div>
+    <div class="card">
+        <h2>Mock 对象基础</h2>
+        <div class="code">// ========== Mock ==========
+from unittest.mock import Mock, MagicMock
+
+# Mock: 通用模拟对象
+# 访问任意属性/方法自动创建子 Mock
+
+mock = Mock()
+
+# Mock 的任意属性都是 Mock
+print(mock.some_attribute)   # <Mock name='mock.some_attribute'>
+print(mock.any_method())     # <Mock name='mock.any_method()'>
+
+# 设置返回值:
+mock = Mock()
+mock.get_data.return_value = {"id": 1, "name": "Alice"}
+print(mock.get_data())  # {'id': 1, 'name': 'Alice'}
+
+# 设置属性:
+mock.name = "MockObject"
+print(mock.name)  # "MockObject"
+
+# ========== MagicMock ==========
+# MagicMock = Mock + 魔术方法支持
+# 推荐大多数场景使用
+
+magic = MagicMock()
+
+# 支持魔术方法:
+magic.__len__.return_value = 5
+print(len(magic))  # 5
+
+magic.__str__.return_value = "Magic!"
+print(str(magic))  # "Magic!"
+
+magic.__iter__.return_value = iter([1, 2, 3])
+print(list(magic))  # [1, 2, 3]
+
+# ========== spec 限定接口 ==========
+class Database:
+    def connect(self): pass
+    def query(self, sql): pass
+    def close(self): pass
+
+# spec: 限制 Mock 只能使用指定的接口
+mock_db = MagicMock(spec=Database)
+mock_db.connect()           # OK
+mock_db.query("SELECT 1")   # OK
+# mock_db.unknown_method()  # 抛出 AttributeError!</div>
+    </div>
+    <div class="card">
+        <h2>return_value 与 side_effect</h2>
+        <div class="code">// ========== 返回值控制 ==========
+from unittest.mock import MagicMock
+
+# return_value: 固定返回值
+mock = MagicMock()
+mock.fetch.return_value = {"status": "ok"}
+print(mock.fetch())  # {"status": "ok"}
+print(mock.fetch())  # {"status": "ok"}
+
+# ========== side_effect ==========
+# side_effect: 更灵活的行为控制
+
+# 1. 异常:
+mock = MagicMock()
+mock.save.side_effect = ValueError("数据无效")
+try:
+    mock.save()
+except ValueError as e:
+    print(e)  # "数据无效"
+
+# 2. 多返回值 (每次调用返回不同值):
+mock = MagicMock()
+mock.get_status.side_effect = ["pending", "running", "done"]
+print(mock.get_status())  # "pending"
+print(mock.get_status())  # "running"
+print(mock.get_status())  # "done"
+
+# 3. 函数 (根据参数动态返回):
+def process_request(url):
+    if "error" in url:
+        raise ConnectionError("连接失败")
+    return {"url": url, "status": 200}
+
+mock = MagicMock()
+mock.request.side_effect = process_request
+
+print(mock.request("https://ok.com"))   # {"url": "...", "status": 200}
+# mock.request("https://error.com")     # 抛出 ConnectionError
+
+# 4. iterable:
+mock.read_lines.side_effect = ["line1", "line2", "line3", StopIteration]
+print(mock.read_lines())  # "line1"
+print(mock.read_lines())  # "line2"</div>
+    </div>
+    <div class="card">
+        <h2>patch 装饰器/上下文管理器</h2>
+        <div class="code">// ========== @patch / with patch ==========
+from unittest.mock import patch, MagicMock
+import requests
+
+# patch: 临时替换对象
+# 3 种使用方式:
+
+# 方式 1: 装饰器 (注入参数)
+@patch("requests.get")
+def test_fetch_user(mock_get):
+    # 配置 mock
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"id": 1, "name": "Alice"}
+    mock_get.return_value = mock_response
+
+    # 调用实际函数 (会自动使用 mock)
+    resp = requests.get("https://api.example.com/user/1")
+    assert resp.json()["name"] == "Alice"
+
+    # 验证调用
+    mock_get.assert_called_once_with("https://api.example.com/user/1")
+
+# 方式 2: 上下文管理器
+def test_fetch_user():
+    with patch("requests.get") as mock_get:
+        mock_get.return_value.json.return_value = {"id": 1}
+        resp = requests.get("https://api.example.com/user/1")
+        assert resp.json()["id"] == 1
+
+# 方式 3: 手动 start/stop
+def test_manual():
+    patcher = patch("requests.get")
+    mock_get = patcher.start()
+    mock_get.return_value.json.return_value = {"success": True}
+    # ... 测试代码 ...
+    patcher.stop()
+
+# ========== 多层 patch ==========
+@patch("module.database")
+@patch("module.cache")
+@patch("module.queue")
+def test_full_flow(mock_queue, mock_cache, mock_database):
+    # 参数顺序: 从下到上 (离函数最近的先注入)
+    pass
+
+# ========== patch.object ==========
+class Config:
+    API_URL = "https://production.com"
+
+@patch.object(Config, "API_URL", "https://test.com")
+def test_config():
+    assert Config.API_URL == "https://test.com"
+
+# ========== patch.multiple ==========
+@patch.multiple("module",
+    database=MagicMock(),
+    cache=MagicMock(),
+    queue=MagicMock(),
+)
+def test_multi(mock_queue, mock_cache, mock_database):
+    pass</div>
+    </div>
+    <div class="card">
+        <h2>调用断言</h2>
+        <div class="code">// ========== 断言方法 ==========
+from unittest.mock import MagicMock
+
+mock = MagicMock()
+
+# 调用
+mock(1, 2, key="value")
+mock(3, 4)
+
+# 断言调用次数:
+mock.assert_called()                    # 至少被调用一次
+mock.assert_called_once()               # 恰好被调用一次
+mock.assert_called_once_with(1, 2, key="value")  # 特定参数
+mock.assert_called_with(3, 4)           # 最近一次调用的参数
+
+# 否定:
+mock.assert_not_called()                # 没有被调用
+
+# 更灵活的匹配:
+from unittest.mock import ANY, call
+
+# ANY: 匹配任意值
+mock.assert_called_with(ANY, 2, key=ANY)
+
+# call: 多个调用
+expected_calls = [
+    call(1, 2, key="value"),
+    call(3, 4),
+]
+mock.assert_has_calls(expected_calls)  # 包含顺序
+
+# ========== 调用属性 ==========
+print(mock.called)           # True (是否被调用)
+print(mock.call_count)       # 2 (调用次数)
+print(mock.call_args)        # 最近一次调用的参数
+print(mock.call_args_list)   # 所有调用的参数列表
+
+# 重置:
+mock.reset_mock()
+print(mock.called)           # False
+
+# ========== 实战: 验证调用 ==========
+def send_notification(email_service, user):
+    email_service.send(
+        to=user["email"],
+        subject="欢迎!",
+        body="感谢注册"
+    )
+
+def test_notification():
+    mock_email = MagicMock()
+    user = {"email": "alice@example.com"}
+
+    send_notification(mock_email, user)
+
+    mock_email.send.assert_called_once_with(
+        to="alice@example.com",
+        subject="欢迎!",
+        body="感谢注册"
+    )</div>
+    </div>
+    <div class="card">
+        <h2>wraps 与属性模拟</h2>
+        <div class="code">// ========== wraps ==========
+from unittest.mock import MagicMock
+
+# wraps: 包装真实对象,记录调用但保留原功能
+
+class RealCalculator:
+    def add(self, a, b):
+        return a + b
+
+    def multiply(self, a, b):
+        return a * b
+
+real = RealCalculator()
+mock = MagicMock(wraps=real)
+
+# 调用委托给真实对象:
+print(mock.add(2, 3))     # 5 (真实运算)
+print(mock.multiply(4, 5))  # 20
+
+# 同时记录调用:
+mock.add.assert_called_once_with(2, 3)
+
+# 可以覆盖特定方法:
+mock.multiply.return_value = 100  # 覆盖
+print(mock.multiply(4, 5))  # 100 (不委托真实)
+
+# ========== PropertyMock ==========
+from unittest.mock import PropertyMock, patch
+
+class User:
+    @property
+    def full_name(self):
+        return f"{self.first} {self.last}"
+
+    def __init__(self, first, last):
+        self.first = first
+        self.last = last
+
+# 模拟属性:
+user = User("Alice", "Wang")
+with patch.object(type(user), "full_name", new_callable=PropertyMock) as mock_prop:
+    mock_prop.return_value = "Mock Name"
+    print(user.full_name)  # "Mock Name"
+
+# ========== 模拟内置函数 ==========
+with patch("builtins.open") as mock_open:
+    mock_file = MagicMock()
+    mock_file.read.return_value = "模拟文件内容"
+    mock_open.return_value.__enter__.return_value = mock_file
+
+    with open("test.txt") as f:
+        print(f.read())  # "模拟文件内容"</div>
+    </div>
+    <div class="card">
+        <h2>完整示例: 模拟数据库和网络</h2>
+        <div class="code">// ========== 实战: 模拟数据库 ==========
+from unittest.mock import MagicMock, patch
+
+class UserService:
+    def __init__(self, db):
+        self.db = db
+
+    def get_user(self, user_id):
+        return self.db.query("SELECT * FROM users WHERE id = ?", [user_id])
+
+    def create_user(self, name, email):
+        self.db.execute("INSERT INTO users (name, email) VALUES (?, ?)", [name, email])
+        return self.db.last_insert_id
+
+def test_get_user():
+    mock_db = MagicMock()
+    mock_db.query.return_value = {"id": 1, "name": "Alice", "email": "alice@test.com"}
+
+    service = UserService(mock_db)
+    user = service.get_user(1)
+
+    assert user["name"] == "Alice"
+    mock_db.query.assert_called_once_with(
+        "SELECT * FROM users WHERE id = ?", [1]
+    )
+
+def test_create_user():
+    mock_db = MagicMock()
+    mock_db.last_insert_id = 42
+
+    service = UserService(mock_db)
+    user_id = service.create_user("Bob", "bob@test.com")
+
+    assert user_id == 42
+    mock_db.execute.assert_called_once()
+
+# ========== 实战: 模拟网络请求 ==========
+import requests
+
+class WeatherService:
+    def __init__(self):
+        self.api_key = "test-key"
+
+    def get_temperature(self, city):
+        resp = requests.get(
+            f"https://api.weather.com/v1/{city}",
+            params={"apikey": self.api_key}
+        )
+        data = resp.json()
+        return data["temperature"]
+
+@patch("requests.get")
+def test_get_temperature(mock_get):
+    # 配置 mock
+    mock_resp = MagicMock()
+    mock_resp.json.return_value = {"temperature": 25.5, "city": "Beijing"}
+    mock_get.return_value = mock_resp
+
+    service = WeatherService()
+    temp = service.get_temperature("Beijing")
+
+    assert temp == 25.5
+    mock_get.assert_called_once_with(
+        "https://api.weather.com/v1/Beijing",
+        params={"apikey": "test-key"}
+    )</div>
+        <div class="note">💡 unittest.mock: Mock/MagicMock 创建模拟对象; patch 临时替换依赖; return_value/side_effect 控制行为; assert_called 验证调用; wraps 保留原功能的同时记录调用。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoMock()">Mock 基础演示</button>
+        <button onclick="demoPatch()">Patch 演示</button>
+        <button onclick="demoAssert()">断言演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoMock() {
+            result.innerHTML = '';
+            log('# Mock 基础');
+            log('');
+            log('mock = MagicMock()');
+            log('mock.method.return_value = 42');
+            log('mock.method.side_effect = ValueError()');
+            log('mock.method.side_effect = ["a", "b", "c"]');
+            log('mock.method.side_effect = lambda x: x*2');
+            log('');
+            log('MagicMock 支持魔术方法:');
+            log('  __len__, __str__, __iter__');
+        }
+
+        function demoPatch() {
+            result.innerHTML = '';
+            log('# patch 使用');
+            log('');
+            log('@patch("module.function")');
+            log('def test(mock_func):');
+            log('    mock_func.return_value = 42');
+            log('    # 测试代码...');
+            log('');
+            log('# 上下文管理器:');
+            log('with patch("module.func") as m:');
+            log('    ...');
+            log('');
+            log('patch.object / patch.multiple');
+        }
+
+        function demoAssert() {
+            result.innerHTML = '';
+            log('# 调用断言');
+            log('');
+            log('mock.assert_called()');
+            log('mock.assert_called_once()');
+            log('mock.assert_called_with(a, b, key=v)');
+            log('mock.assert_called_once_with(a, b)');
+            log('mock.assert_has_calls([call(1), call(2)])');
+            log('mock.assert_not_called()');
+            log('');
+            log('mock.call_count / .call_args_list');
+        }
+    </script>
+</body>
+</html>

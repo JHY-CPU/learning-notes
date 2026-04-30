@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>系统设计面试高频题目</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📋 系统设计面试高频题目</h2><p>短链接系统、聊天系统、限流器、信息流 (Feed)、Key-Value 存储、设计面试框架 SNAKE。</p></div>
+    <div class="card">
+        <h2>设计面试框架 (SNAKE)</h2>
+        <div class="code">// ========== 系统设计面试框架 ==========
+// S - Scope (明确范围)
+// N - Non-functional (非功能需求)
+// A - Abstract (高/中/低级设计)
+// K - Key components (关键组件)
+// E - Evaluate (评估/权衡)
+
+// 1. 明确范围 (5分钟)
+//    - 功能需求: 什么功能必须有?
+//    - 非功能需求: DAU? 延迟? 可用性?
+//    - 不做: 边界在哪里?
+//    问清楚再开始!
+
+// 2. 非功能需求 (5分钟)
+//    - QPS: 读/写 QPS 估算
+//    - 存储: 数据总量估算
+//    - 延迟: P99 < 200ms?
+//    - 可用性: 99.9% / 99.99%?
+//    - 一致性: 强/最终?
+
+// 3. 抽象设计 (5分钟)
+//    - 画架构图: Client → LB → Server → DB
+//    - 数据流: 请求经过哪些组件
+//    - 网络画板/白板画清楚
+
+// 4. 详细设计 (15分钟)
+//    - 核心组件深入
+//    - 数据模型 (Schema)
+//    - 关键算法
+//    - 接口定义 (API)
+
+// 5. 评估 (5分钟)
+//    - 瓶颈在哪里?
+//    - 如何扩展?
+//    - 备选方案权衡
+
+// ========== 估算技巧 ==========
+// QPS 估算:
+//   1M DAU, 每个用户每天 10 次操作
+//   日操作 = 10M
+//   平均 QPS = 10M / 86400 ≈ 115
+//   峰值 QPS = 115 × 5 ≈ 575
+
+// 存储估算:
+//   每条 1KB, 日新增 10M 条
+//   日存储 = 10GB
+//   年存储 ≈ 3.6TB
+
+// 缓存估算:
+//   80% 读请求, 20% 写请求
+//   热点 20% 数据占 80% 流量
+//   缓存大小 = 总数据量 × 20%
+
+// 常用数字:
+//   1天 = 86400 秒 ≈ 100k 秒
+//   1月 = 2.5M 秒
+//   MySQL QPS ≈ 1000-5000
+//   Redis QPS ≈ 50000-100000
+//   网络延迟: 同机房 0.5ms / 跨区 50ms</div>
+    </div>
+    <div class="card">
+        <h2>短链接系统 (TinyURL)</h2>
+        <div class="code">// ========== 需求 ==========
+// 长URL → 短URL: https://tinyurl.com/abc123
+// 重定向: 访问短链接 → 301 到长URL
+// 可选: 过期时间, 统计点击
+
+// ========== 估算 ==========
+// 写 QPS: 100M URL/月 ≈ 40/s
+// 读 QPS: 写 × 100 = 4000/s
+// 存储: 每条 500B, 100M/月 ≈ 50GB/月
+
+// ========== 核心算法 ==========
+// 生成短码 (6-7位):
+//
+// 方案 1: Base62 编码
+//   62^6 ≈ 568 亿 组合
+//   func base62(id int64) string {
+//       chars := "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+//       var result []byte
+//       for id > 0 {
+//           result = append(result, chars[id%62])
+//           id /= 62
+//       }
+//       reverse(result)
+//       return string(result)
+//   }
+//   缺点: ID 递增, 可预测
+
+// 方案 2: 哈希 + 去重
+//   MD5(URL + salt) → Base62 前7位
+//   哈希碰撞 → 加盐重试
+
+// 方案 3: 预生成ID
+//   发号器预生成一批ID
+//   取 ID → Base62 → 存映射
+
+// ========== 架构 ==========
+// 写: POST /shorten
+//     Client → LB → Web → DB/REDIS
+//   → 返回 short_url
+//
+// 读: GET /:code
+//     Client → LB → Web → Cache check
+//   → 缓存命中 → 301 到 long_url
+//   → 缓存未命中 → DB → 回填缓存 → 301
+//
+// 数据模型:
+//   Table: url_mappings
+//     id        BIGINT PRIMARY KEY
+//     short_code VARCHAR(7) UNIQUE INDEX
+//     long_url   TEXT NOT NULL
+//     created_at DATETIME
+//     expires_at DATETIME (NULL = 永不过期)
+//
+// 缓存策略:
+//   Key: short:{code}
+//   Value: long_url
+//   TTL: 30天 (热点永不过期)</div>
+    </div>
+    <div class="card">
+        <h2>聊天系统与信息流</h2>
+        <div class="code">// ========== 聊天系统 ==========
+// 功能: 1对1聊天, 群聊, 在线状态, 消息历史
+
+// ========== 架构 ==========
+// 实时性: WebSocket 长连接
+// 持久化: 消息存数据库
+// 在线感知: Redis + 心跳
+
+// ┌──────────┐  WebSocket  ┌──────────┐
+// │ 用户 A    │────────────→│  Chat     │──→ 消息队列
+// └──────────┘             │  Service  │──→ (Kafka)
+//                          └────┬─────┘
+//                               │
+// ┌──────────┐  WebSocket  ┌────┴─────┐  ┌──────┐
+// │ 用户 B    │←────────────│  Push     │←│ DB   │
+// └──────────┘             │  Service  │  └──────┘
+//                          └──────────┘
+
+// 数据模型:
+//   messages: id, sender_id, chat_id, content, created_at
+//   chat_members: chat_id, user_id, last_read_at
+
+// 消息同步:
+//   推模式: 在线用户实时推送
+//   拉模式: 离线用户上线拉取未读
+//   混合: 在线推送 + 离线拉取
+
+// 有序消息:
+//   client_side_id: 客户端生成唯一有序ID
+//   服务端按 client_side_id 排序
+
+// ========== 信息流 (News Feed) ==========
+// 功能: 用户看到关注者的最新内容
+
+// 推模式 (Fanout-on-write):
+//   用户发帖 → 预写入所有粉丝的收件箱
+//   优点: 读时 O(1) (直接取收件箱)
+//   缺点: 大V发帖写放大 (百万粉丝)
+//   适合: 普通用户
+
+// 拉模式 (Fanout-on-read):
+//   用户刷feed → 拉取关注者最新内容
+//   优点: 大V发帖无写放大
+//   缺点: 读时 O(N) (需要聚合)
+//   适合: 大V, 低频用户
+
+// 混合模式:
+//   普通用户 (< 1000 粉丝) → 推模式
+//   大V用户 (> 1000 粉丝) → 拉模式
+//   粉丝聚合: 推 + 拉结果合并排序
+
+// 缓存热加载:
+//   每个用户维护一个 feed 缓存
+//   新内容推入 → 缓存淘汰旧的
+//   ClickHouse 存储历史 feed</div>
+    </div>
+    <div class="card">
+        <h2>Key-Value 存储与限流器</h2>
+        <div class="code">// ========== Key-Value 存储 (设计 Redis) ==========
+// 核心需求: get(key), set(key, value), del(key)
+// 持久化: 宕机不丢数据
+
+// 架构:
+//   API → WAL → MemTable → SSTable (LSM-Tree)
+//
+// 1. 写: 追加到 WAL (顺序写, 快)
+// 2. 写入 MemTable (内存跳表, 有序)
+// 3. MemTable 满 → 刷入 SSTable (磁盘)
+// 4. 读: 查 MemTable → 查 SSTable (bloom filter)
+//
+// 压缩 (Compaction):
+//   后台合并 SSTable, 删除旧数据
+//
+// 分区:
+//   一致性哈希分片
+//   每个节点负责一部分 key
+
+// ========== 限流器 (Rate Limiter) ==========
+// 需求: 用户/IP 每秒最多 N 次请求
+
+// 令牌桶 (Redis Lua):
+// -- KEYS[1] = rate:user:123
+// -- ARGV[1] = rate (5)
+// -- ARGV[2] = burst (10)
+// -- ARGV[3] = now
+// local key = KEYS[1]
+// local rate = tonumber(ARGV[1])
+// local burst = tonumber(ARGV[2])
+// local now = tonumber(ARGV[3])
+//
+// local info = redis.call('HMGET', key, 'tokens', 'last_refill')
+// local tokens = tonumber(info[1]) or burst
+// local last_refill = tonumber(info[2]) or now
+//
+// local elapsed = now - last_refill
+// tokens = math.min(burst, tokens + elapsed * rate)
+//
+// if tokens >= 1 then
+//     redis.call('HMSET', key, 'tokens', tokens - 1, 'last_refill', now)
+//     redis.call('EXPIRE', key, 10)
+//     return 1  -- 允许
+// else
+//     return 0  -- 拒绝
+// end
+
+// 滑动窗口 (更准确):
+//   使用 ZSET: ZREMRANGEBYSCORE(窗口外)
+//   ZCARD 判断是否超过限制
+//   时间戳作为 score + member</div>
+        <div class="note">💡 系统设计面试框架: SNAKE (Scope→Non-functional→Abstract→Key→Evaluate); 短链接: Base62/哈希, 301重定向; 聊天: WebSocket + 消息持久化, 推拉混合; Feed: 推模式写快读慢, 拉模式写慢读快; KV存储: LSM-Tree (WAL→MemTable→SSTable); 限流器: 令牌桶/滑动窗口 Redis Lua。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSNAKE()">SNAKE 框架</button>
+        <button onclick="demoTiny()">短链接</button>
+        <button onclick="demoChat()">聊天系统</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSNAKE() {
+            result.innerHTML = '';
+            log('# SNAKE 面试框架');
+            log('');
+            log('S - Scope 明确范围');
+            log('N - Non-functional 非功能需求');
+            log('A - Abstract 抽象设计');
+            log('K - Key 核心组件');
+            log('E - Evaluate 评估权衡');
+            log('');
+            log('估算:');
+            log('  1M DAU × 10次 = 10M 日操作');
+            log('  峰值 QPS = 平均 × 5');
+            log('  日存储 = 条数 × 单条大小');
+        }
+
+        function demoTiny() {
+            result.innerHTML = '';
+            log('# 短链接系统');
+            log('');
+            log('算法:');
+            log('  Base62: 62^6 ≈ 568亿');
+            log('  哈希: MD5 + Base62前7位');
+            log('');
+            log('读流程:');
+            log('  GET /:code → 查缓存');
+            log('  命中 → 301 重定向');
+            log('  未命中 → 查DB → 回填缓存');
+            log('');
+            log('写流程:');
+            log('  POST /shorten → 生成code');
+            log('  存 DB + 缓存');
+            log('  返回 short_url');
+        }
+
+        function demoChat() {
+            result.innerHTML = '';
+            log('# 聊天系统');
+            log('');
+            log('实时: WebSocket');
+            log('持久: Kafka + DB');
+            log('在线: Redis 心跳');
+            log('');
+            log('消息推拉:');
+            log('  在线 → 推 (实时推送)');
+            log('  离线 → 拉 (上线拉取)');
+            log('');
+            log('Feed 推拉:');
+            log('  推: 写预扩散, 读O(1)');
+            log('  拉: 读聚合, 大V友好');
+            log('  混合: 阈值区分');
+        }
+    </script>
+</body>
+</html>

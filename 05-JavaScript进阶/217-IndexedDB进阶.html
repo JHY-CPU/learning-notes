@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IndexedDB进阶</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #idb2-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; max-height: 200px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>IndexedDB 进阶</h2><p>游标、索引、范围查询、版本升级。</p></div>
+    <div class="card">
+        <h2>游标 (Cursor)</h2>
+        <div class="code">// 游标遍历
+const tx = db.transaction('store', 'readonly');
+const store = tx.objectStore('store');
+const request = store.openCursor(); // 或 store.openCursor(range, direction)
+
+request.onsuccess = (event) => {
+    const cursor = event.target.result;
+    if (cursor) {
+        console.log(cursor.key, cursor.value);  // 当前条目
+        cursor.continue();                      // 移动到下一条
+        // cursor.advance(5);                   // 跳过 5 条
+    } else {
+        console.log('遍历完成');
+    }
+};
+
+// direction 参数
+// 'next'           — 升序（默认）
+// 'prev'           — 降序
+// 'nextunique'     — 升序（去重）
+// 'prevunique'     — 降序（去重）
+
+// 使用索引游标
+const index = store.index('email');
+const idxReq = index.openCursor(IDBKeyRange.only('alice@test.com'));
+// 或者 index.openCursor() 按索引顺序遍历
+
+// 游标修改/删除
+cursor.update(newValue);   // 修改当前条目
+cursor.delete();           // 删除当前条目</div>
+    </div>
+    <div class="card">
+        <h2>索引与范围</h2>
+        <div class="code">// 创建索引
+store.createIndex('name', 'name', { unique: false });
+store.createIndex('email', 'email', { unique: true });
+store.createIndex('age_price', ['age', 'price'], { unique: false }); // 复合索引
+
+// IDBKeyRange — 范围查询
+IDBKeyRange.only(value);                            // 精确匹配
+IDBKeyRange.lowerBound(value, open);                // >= value (open=true 表示 >)
+IDBKeyRange.upperBound(value, open);                // <= value
+IDBKeyRange.bound(lower, upper, lowerOpen, upperOpen); // 范围内
+
+// 使用范围
+const range = IDBKeyRange.bound(18, 60);            // age 18-60
+store.index('age').openCursor(range);
+
+// 直接获取索引值
+store.index('email').get('alice@test.com');          // 通过索引获取
+store.index('email').getAll('@example.com');          // TODO: fix → getAll(range)</div>
+    </div>
+    <div class="card">
+        <h2>版本升级</h2>
+        <div class="code">// 修改数据库结构需要增加版本号
+const req = indexedDB.open('MyDB', 2); // 版本从 1 → 2
+
+req.onupgradeneeded = (event) => {
+    const db = event.target.result;
+    const oldVersion = event.oldVersion;  // 1
+    const newVersion = event.newVersion;  // 2
+
+    if (oldVersion < 2) {
+        // 创建新的对象仓库
+        const store = db.createObjectStore('newStore', { keyPath: 'id' });
+        // 创建新索引
+        store.createIndex('field', 'field', { unique: false });
+    }
+
+    // 删除对象仓库
+    if (db.objectStoreNames.contains('oldStore')) {
+        db.deleteObjectStore('oldStore');
+    }
+};</div>
+        <div class="note">⚠️ 版本号只能递增，不能回退。<br>
+        ⚠️ onupgradeneeded 中不能并行使用多个事务。<br>
+        💡 游标适合大数据量遍历（不会把所有数据加载到内存）。</div>
+    </div>
+    <div class="card">
+        <h2>演示：游标与索引</h2>
+        <button onclick="setupData()">初始化数据</button>
+        <button onclick="cursorAll()">游标遍历</button>
+        <button onclick="queryByIndex()">索引查询</button>
+        <div id="idb2-result">点击按钮操作</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const idb2Result = document.getElementById('idb2-result');
+        let db = null;
+
+        function log(msg) {
+            idb2Result.innerHTML += msg + '<br>';
+            idb2Result.scrollTop = idb2Result.scrollHeight;
+            console.log(msg);
+        }
+
+        function openDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open('AdvDB', 1);
+                req.onupgradeneeded = (e) => {
+                    const d = e.target.result;
+                    if (!d.objectStoreNames.contains('users')) {
+                        const store = d.createObjectStore('users', { keyPath: 'id' });
+                        store.createIndex('name', 'name', { unique: false });
+                        store.createIndex('age', 'age', { unique: false });
+                        store.createIndex('email', 'email', { unique: true });
+                    }
+                };
+                req.onsuccess = (e) => { db = e.target.result; resolve(db); };
+                req.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        async function setupData() {
+            idb2Result.innerHTML = '';
+            try {
+                await openDB();
+                const users = [
+                    { id: 1, name: 'Alice', age: 25, email: 'alice@test.com' },
+                    { id: 2, name: 'Bob', age: 30, email: 'bob@test.com' },
+                    { id: 3, name: 'Charlie', age: 35, email: 'charlie@test.com' },
+                    { id: 4, name: 'Diana', age: 28, email: 'diana@test.com' },
+                    { id: 5, name: 'Eve', age: 22, email: 'eve@test.com' },
+                ];
+                const tx = db.transaction('users', 'readwrite');
+                const store = tx.objectStore('users');
+                users.forEach(u => store.put(u));
+                tx.oncomplete = () => log(`✅ 已写入 ${users.length} 条用户数据`);
+                tx.onerror = (e) => log(`❌ 写入失败: ${e.target.error}`);
+            } catch (err) { log(`❌ ${err.message}`); }
+        }
+
+        async function cursorAll() {
+            idb2Result.innerHTML = '';
+            if (!db) await openDB();
+            const tx = db.transaction('users', 'readonly');
+            const store = tx.objectStore('users');
+            const req = store.openCursor(null, 'next');
+
+            log('📋 游标遍历所有用户 (按 id 升序):');
+            req.onsuccess = (e) => {
+                const cursor = e.target.result;
+                if (cursor) {
+                    log(`  #${cursor.key} ${cursor.value.name}, ${cursor.value.age}岁`);
+                    cursor.continue();
+                } else {
+                    log('✅ 遍历完成');
+                }
+            };
+        }
+
+        async function queryByIndex() {
+            idb2Result.innerHTML = '';
+            if (!db) await openDB();
+
+            // 按年龄范围查询
+            const tx = db.transaction('users', 'readonly');
+            const index = tx.objectStore('users').index('age');
+            const range = IDBKeyRange.bound(25, 35);
+            const req = index.openCursor(range);
+
+            log('🔍 查询年龄 25-35 岁的用户:');
+            req.onsuccess = (e) => {
+                const cursor = e.target.result;
+                if (cursor) {
+                    log(`  ${cursor.value.name}, ${cursor.value.age}岁 (email: ${cursor.value.email})`);
+                    cursor.continue();
+                } else {
+                    log('✅ 查询完成');
+                }
+            };
+        }
+
+        console.log('=== IndexedDB 进阶 ===');
+
+        document.getElementById('output').textContent =
+            `IndexedDB 进阶: 游标/索引/范围/版本升级\n` +
+            `openCursor/continue/advance + IDBKeyRange\n` +
+            `createIndex + index.openCursor 高效查询\n` +
+            `✅ IndexedDB 进阶演示完成！`;
+    </script>
+</body>
+</html>

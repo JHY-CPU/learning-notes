@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 并发安全数据结构</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🏗️ Go 并发安全数据结构</h2><p>并发安全 Map/List/Queue/Set/Heap 实现、分片优化、细粒度锁、Copy-on-Write 策略、读写锁 vs 原子操作选择。</p></div>
+    <div class="card">
+        <h2>并发安全切片</h2>
+        <div class="code">// ========== 并发安全 Slice ==========
+// 切片不是并发安全的, 需要同步
+
+// 方式 1: Mutex 保护
+type SafeSlice[T any] struct {
+    mu     sync.RWMutex
+    items  []T
+}
+
+func (s *SafeSlice[T]) Append(item T) {
+    s.mu.Lock()
+    defer s.mu.Unlock()
+    s.items = append(s.items, item)
+}
+
+func (s *SafeSlice[T]) Get(idx int) (T, bool) {
+    s.mu.RLock()
+    defer s.mu.RUnlock()
+    if idx < 0 || idx >= len(s.items) {
+        var zero T
+        return zero, false
+    }
+    return s.items[idx], true
+}
+
+func (s *SafeSlice[T]) Len() int {
+    s.mu.RLock()
+    defer s.mu.RUnlock()
+    return len(s.items)
+}
+
+func (s *SafeSlice[T]) Items() []T {
+    s.mu.RLock()
+    defer s.mu.RUnlock()
+    // 返回副本, 避免外部修改
+    result := make([]T, len(s.items))
+    copy(result, s.items)
+    return result
+}
+
+// 方式 2: Copy-on-Write (读不阻塞)
+type COWSlice[T any] struct {
+    items atomic.Pointer[[]T]
+}
+
+func NewCOWSlice[T any]() *COWSlice[T] {
+    s := make([]T, 0)
+    return &COWSlice[T]{items: atomic.Pointer[[]T]{}}
+}
+
+func (s *COWSlice[T]) Items() []T {
+    return *s.items.Load()  // 无锁读
+}
+
+func (s *COWSlice[T]) Append(item T) {
+    for {
+        oldPtr := s.items.Load()
+        old := *oldPtr
+        newSlice := make([]T, len(old)+1)
+        copy(newSlice, old)
+        newSlice[len(old)] = item
+        if s.items.CompareAndSwap(oldPtr, &newSlice) {
+            return
+        }
+    }
+}
+
+// COW 读不阻塞, 适合读多写少场景
+// 写需要复制全部, 适合小数据</div>
+    </div>
+    <div class="card">
+        <h2>并发安全 Map</h2>
+        <div class="code">// ========== 分片 Map (ShardedMap) ==========
+// 多个小 map + 分片锁, 减少锁竞争
+
+type ShardedMap[K comparable, V any] struct {
+    shards    []*shard[K, V]
+    shardMask uint32  // 取模优化
+}
+
+type shard[K comparable, V any] struct {
+    mu    sync.RWMutex
+    items map[K]V
+}
+
+func NewShardedMap[K comparable, V any](numShards int) *ShardedMap[K, V] {
+    // 确保是 2 的幂 (用于取模优化)
+    if numShards&(numShards-1) != 0 {
+        numShards = 16
+    }
+    sm := &ShardedMap[K, V]{
+        shards:    make([]*shard[K, V], numShards),
+        shardMask: uint32(numShards - 1),
+    }
+    for i := range sm.shards {
+        sm.shards[i] = &shard[K, V]{items: make(map[K]V)}
+    }
+    return sm
+}
+
+func (sm *ShardedMap[K, V]) getShard(key K) *shard[K, V] {
+    // fnv 哈希定位分片
+    h := fnv.New32a()
+    h.Write([]byte(fmt.Sprintf("%v", key)))
+    return sm.shards[h.Sum32()&sm.shardMask]
+}
+
+func (sm *ShardedMap[K, V]) Set(key K, val V) {
+    sh := sm.getShard(key)
+    sh.mu.Lock()
+    sh.items[key] = val
+    sh.mu.Unlock()
+}
+
+func (sm *ShardedMap[K, V]) Get(key K) (V, bool) {
+    sh := sm.getShard(key)
+    sh.mu.RLock()
+    v, ok := sh.items[key]
+    sh.mu.RUnlock()
+    return v, ok
+}
+
+func (sm *ShardedMap[K, V]) Delete(key K) {
+    sh := sm.getShard(key)
+    sh.mu.Lock()
+    delete(sh.items, key)
+    sh.mu.Unlock()
+}
+
+func (sm *ShardedMap[K, V]) Len() int {
+    total := 0
+    for _, sh := range sm.shards {
+        sh.mu.RLock()
+        total += len(sh.items)
+        sh.mu.RUnlock()
+    }
+    return total
+}
+
+// ========== 过期 Map (TTL) ==========
+type TTLMap[K comparable, V any] struct {
+    mu    sync.RWMutex
+    items map[K]ttlItem[V]
+}
+
+type ttlItem[V any] struct {
+    value    V
+    expiresAt time.Time
+}
+
+func NewTTLMap[K comparable, V any]() *TTLMap[K, V] {
+    tm := &TTLMap[K, V]{
+        items: make(map[K]ttlItem[V]),
+    }
+    // 定期清理 goroutine
+    go tm.cleanup()
+    return tm
+}
+
+func (tm *TTLMap[K, V]) Set(key K, val V, ttl time.Duration) {
+    tm.mu.Lock()
+    tm.items[key] = ttlItem[V]{
+        value:     val,
+        expiresAt: time.Now().Add(ttl),
+    }
+    tm.mu.Unlock()
+}
+
+func (tm *TTLMap[K, V]) Get(key K) (V, bool) {
+    tm.mu.RLock()
+    item, ok := tm.items[key]
+    tm.mu.RUnlock()
+    if !ok {
+        var zero V
+        return zero, false
+    }
+    if time.Now().After(item.expiresAt) {
+        tm.Delete(key)  // 惰性删除
+        var zero V
+        return zero, false
+    }
+    return item.value, true
+}
+
+func (tm *TTLMap[K, V]) Delete(key K) {
+    tm.mu.Lock()
+    delete(tm.items, key)
+    tm.mu.Unlock()
+}
+
+func (tm *TTLMap[K, V]) cleanup() {
+    ticker := time.NewTicker(time.Minute)
+    for range ticker.C {
+        tm.mu.Lock()
+        now := time.Now()
+        for k, v := range tm.items {
+            if now.After(v.expiresAt) {
+                delete(tm.items, k)
+            }
+        }
+        tm.mu.Unlock()
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>并发安全队列与堆</h2>
+        <div class="code">// ========== 并发安全队列 ==========
+type SafeQueue[T any] struct {
+    mu    sync.Mutex
+    items []T
+    cond  *sync.Cond
+}
+
+func NewSafeQueue[T any]() *SafeQueue[T] {
+    q := &SafeQueue[T]{}
+    q.cond = sync.NewCond(&q.mu)
+    return q
+}
+
+func (q *SafeQueue[T]) Enqueue(item T) {
+    q.mu.Lock()
+    q.items = append(q.items, item)
+    q.cond.Signal()  // 通知一个等待的消费者
+    q.mu.Unlock()
+}
+
+func (q *SafeQueue[T]) Dequeue() T {
+    q.mu.Lock()
+    defer q.mu.Unlock()
+
+    for len(q.items) == 0 {
+        q.cond.Wait()  // 等待直到有数据
+    }
+    item := q.items[0]
+    q.items = q.items[1:]
+    return item
+}
+
+// 带超时的 Dequeue
+func (q *SafeQueue[T]) DequeueTimeout(timeout time.Duration) (T, bool) {
+    q.mu.Lock()
+
+    if len(q.items) == 0 {
+        // 带超时等待
+        done := make(chan struct{})
+        go func() {
+            q.cond.Wait()
+            close(done)
+        }()
+
+        select {
+        case <-done:
+        case <-time.After(timeout):
+            q.mu.Unlock()
+            var zero T
+            return zero, false
+        }
+    }
+
+    item := q.items[0]
+    q.items = q.items[1:]
+    q.mu.Unlock()
+    return item, true
+}
+
+// ========== 并发安全优先级队列 ==========
+type PriorityQueue[T any] struct {
+    mu     sync.Mutex
+    items  []priorityItem[T]
+}
+
+type priorityItem[T any] struct {
+    value    T
+    priority int
+    index    int  // heap 索引
+}
+
+func NewPriorityQueue[T any]() *PriorityQueue[T] {
+    return &PriorityQueue[T]{}
+}
+
+// 实现 heap.Interface
+func (pq *PriorityQueue[T]) Len() int { return len(pq.items) }
+func (pq *PriorityQueue[T]) Less(i, j int) bool {
+    return pq.items[i].priority < pq.items[j].priority
+}
+func (pq *PriorityQueue[T]) Swap(i, j int) {
+    pq.items[i], pq.items[j] = pq.items[j], pq.items[i]
+    pq.items[i].index = i
+    pq.items[j].index = j
+}
+func (pq *PriorityQueue[T]) Push(x interface{}) {
+    n := len(pq.items)
+    item := x.(priorityItem[T])
+    item.index = n
+    pq.items = append(pq.items, item)
+}
+func (pq *PriorityQueue[T]) Pop() interface{} {
+    old := pq.items
+    n := len(old)
+    item := old[n-1]
+    old[n-1] = priorityItem[T]{}  // 避免内存泄漏
+    item.index = -1
+    pq.items = old[:n-1]
+    return item
+}
+
+func (pq *PriorityQueue[T]) Enqueue(value T, priority int) {
+    pq.mu.Lock()
+    heap.Push(pq, priorityItem[T]{value: value, priority: priority})
+    pq.mu.Unlock()
+}
+
+func (pq *PriorityQueue[T]) Dequeue() (T, bool) {
+    pq.mu.Lock()
+    if pq.Len() == 0 {
+        pq.mu.Unlock()
+        var zero T
+        return zero, false
+    }
+    item := heap.Pop(pq).(priorityItem[T])
+    pq.mu.Unlock()
+    return item.value, true
+}
+
+// ========== 并发安全 Ring Buffer ==========
+type RingBuffer[T any] struct {
+    buf  []T
+    size int
+    r    int  // 读位置
+    w    int  // 写位置
+    full bool
+    mu   sync.Mutex
+}
+
+func NewRingBuffer[T any](size int) *RingBuffer[T] {
+    return &RingBuffer[T]{buf: make([]T, size), size: size}
+}
+
+func (rb *RingBuffer[T]) Write(v T) bool {
+    rb.mu.Lock()
+    defer rb.mu.Unlock()
+    if rb.full {
+        return false
+    }
+    rb.buf[rb.w] = v
+    rb.w = (rb.w + 1) % rb.size
+    rb.full = rb.w == rb.r
+    return true
+}
+
+func (rb *RingBuffer[T]) Read() (T, bool) {
+    rb.mu.Lock()
+    defer rb.mu.Unlock()
+    if rb.r == rb.w && !rb.full {
+        var zero T
+        return zero, false
+    }
+    v := rb.buf[rb.r]
+    rb.r = (rb.r + 1) % rb.size
+    rb.full = false
+    return v, true
+}</div>
+        <div class="note">💡 并发安全数据结构: SafeSlice (RWMutex + 返回副本); COWSlice (atomic.Pointer, 读不阻塞, 写复制全部); ShardedMap (FNV 哈希分片 + 细粒度锁, 高并发); TTLMap (自动过期 + 惰性删除 + 定期清理 goroutine); SafeQueue (Mutex + Cond, Dequeue 阻塞等待); PriorityQueue (heap.Interface + Mutex); RingBuffer (无 GC 压力, 固定大小, 性能高)。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSlice()">并发切片</button>
+        <button onclick="demoMap()">分片Map</button>
+        <button onclick="demoQueue()">并发队列</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSlice() {
+            result.innerHTML = '';
+            log('# 并发安全切片');
+            log('');
+            log('SafeSlice[T]:');
+            log('  Append: Lock');
+            log('  Get:    RLock');
+            log('  Items:  RLock + 副本');
+            log('');
+            log('COWSlice[T] (Copy-on-Write):');
+            log('  Items: atomic.Load (无锁!)');
+            log('  Append: 复制全量 + CAS');
+            log('  适合读多写少, 小数据');
+        }
+
+        function demoMap() {
+            result.innerHTML = '';
+            log('# 分片 Map (ShardedMap)');
+            log('');
+            log('16 shards, FNV 哈希定位');
+            log('取模优化: h & (N-1)');
+            log('');
+            log('性能对比:');
+            log('  单 Mutex:  所有竞争一把锁');
+            log('  分片 16:   锁竞争降为 1/16');
+            log('  sync.Map: 读多写少优化');
+            log('');
+            log('TTLMap: 自动过期清理');
+            log('  惰性删除 (Get 时检查)');
+            log('  定期清理 (每分钟扫描)');
+        }
+
+        function demoQueue() {
+            result.innerHTML = '';
+            log('# 并发安全队列');
+            log('');
+            log('SafeQueue[T]:');
+            log('  Enqueue: Lock + cond.Signal');
+            log('  Dequeue: for 空 → cond.Wait');
+            log('  支持超时 DequeueTimeout');
+            log('');
+            log('PriorityQueue[T]:');
+            log('  heap.Interface 实现');
+            log('  Enqueue/Dequeue 加锁');
+            log('  优先级数值越小越优先');
+            log('');
+            log('RingBuffer[T]:');
+            log('  固定大小, 无 GC 压力');
+            log('  写覆盖需检查 full 标志');
+        }
+    </script>
+</body>
+</html>

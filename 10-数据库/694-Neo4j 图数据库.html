@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neo4j 图数据库</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🕸️ Neo4j 图数据库</h2><p>图数据库概念、Neo4j 模型（Node/Relationship/Property/Label）、Cypher 查询语言（MATCH/CREATE/WHERE/RETURN）、图遍历算法（最短路径/PageRank/社区发现）、社交关系建模、推荐系统、知识图谱。</p></div>
+    <div class="card">
+        <h2>图数据库概述</h2>
+        <div class="code">// ========== 图数据库 ==========
+// 用图结构存储数据: 节点 (Node) + 关系 (Relationship)
+// 关系是图数据库的核心优势
+
+// ========== 为什么需要图数据库? ==========
+// RDB 做多对多关系查询: N 张关联表 + 多次 JOIN
+// 图数据库: 直接从节点出发遍历关系
+//
+// 例: "朋友的朋友的朋友"
+// SQL: user JOIN friend JOIN friend JOIN friend (3 次 JOIN)
+// Neo4j: MATCH (u:User)-[:FRIEND*3]->(f) (一行)
+
+// ========== 核心概念 ==========
+// ┌──────────────┬─────────────────────────────┐
+// │ 图           │ 说明                       │
+// ├──────────────┼─────────────────────────────┤
+// │ Node (节点)  │ 实体 (人/商品/地点)        │
+// │ Relationship│ 关系 (朋友/购买/位于)      │
+// │ Property    │ 属性 (姓名/价格/坐标)      │
+// │ Label       │ 标签 (User/Product/City)   │
+// └──────────────┴─────────────────────────────┘
+
+// ========== 适用场景 ==========
+// ✅ 社交网络 (好友/关注/推荐)
+// ✅ 推荐系统 (商品/内容/用户)
+// ✅ 知识图谱 (实体关系)
+// ✅ 欺诈检测 (异常环/团伙)
+// ✅ 权限管理 (角色继承)
+// ✅ 路线规划 (最短路径)
+
+// ❌ 大量简单 CRUD (不如 RDB/NoSQL)
+// ❌ 大范围聚合统计
+// ❌ 作为主数据库</div>
+    </div>
+    <div class="card">
+        <h2>Cypher 基础</h2>
+        <div class="code">// ========== Cypher 查询语言 ==========
+// Neo4j 的图查询语言 (类 ASCII 艺术)
+
+// ========== 节点语法 ==========
+()              // 匿名节点
+(u:User)        // 带标签
+(u:User:Admin)  // 多标签
+(u {name: "Alice"})  // 带属性
+(u:User {name: "Alice", age: 30})
+
+// ========== 关系语法 ==========
+-->             // 有向关系
+-[r:KNOWS]->    // 命名 + 类型
+-[r:KNOWS {since: 2020}]->  // 带属性
+-[*1..3]->      // 可变长度 (1 到 3 跳)
+-[:FRIEND*]->   // 任意深度
+
+// ========== CREATE ==========
+// 创建节点:
+CREATE (u:User {name: "Alice", age: 30})
+CREATE (p:Product {name: "MacBook", price: 9999})
+
+// 创建关系:
+MATCH (u:User {name: "Alice"})
+MATCH (p:Product {name: "MacBook"})
+CREATE (u)-[:BOUGHT {date: "2024-01-01"}]->(p)
+
+// 简化版 (一条语句):
+CREATE (a:User {name: "Alice"})-[:KNOWS {since: 2020}]->(b:User {name: "Bob"})
+
+// ========== 批量创建 ==========
+UNWIND [
+    {name: "Alice", age: 30},
+    {name: "Bob", age: 25},
+    {name: "Charlie", age: 35}
+] AS user
+CREATE (u:User {name: user.name, age: user.age})</div>
+    </div>
+    <div class="card">
+        <h2>Cypher 查询</h2>
+        <div class="code">// ========== MATCH 查询 ==========
+// 查找 Alice 的朋友:
+MATCH (a:User {name: "Alice"})-[:KNOWS]->(friend:User)
+RETURN friend.name, friend.age
+
+// 查找 Alice 的朋友的朋友 (2 度):
+MATCH (a:User {name: "Alice"})-[:KNOWS*2]->(fof:User)
+RETURN DISTINCT fof.name
+
+// 查找 Alice 的朋友买过的商品:
+MATCH (a:User {name: "Alice"})-[:KNOWS]->(friend)-[:BOUGHT]->(product)
+RETURN friend.name, product.name
+
+// 最短路径:
+MATCH p = SHORTEST 1 (a:User {name: "Alice"})-[:KNOWS*]-(b:User {name: "David"})
+RETURN length(p) AS hops, [node IN nodes(p) | node.name] AS path
+
+// ========== WHERE 过滤 ==========
+MATCH (u:User)-[:BOUGHT]->(p:Product)
+WHERE u.age > 25 AND p.price > 5000
+RETURN u.name, p.name, p.price
+
+// ========== 聚合 ==========
+// 按商品统计购买人数:
+MATCH (u:User)-[:BOUGHT]->(p:Product)
+RETURN p.name, COUNT(u) AS buyers, AVG(u.age) AS avg_age
+ORDER BY buyers DESC
+
+// ========== DELETE ==========
+// 删除节点和关系:
+MATCH (u:User {name: "Alice"})
+DETACH DELETE u    // 删除节点及其所有关系</div>
+    </div>
+    <div class="card">
+        <h2>图算法与建模</h2>
+        <div class="code">// ========== 图算法 (Neo4j GDS) ==========
+// Graph Data Science 库
+
+// ========== 1. 社区发现 ==========
+// 标签传播 (Label Propagation):
+CALL gds.labelPropagation.write({
+  nodeProjection: 'User',
+  relationshipProjection: 'KNOWS',
+  writeProperty: 'community'
+})
+
+// 查询同一社区的成员:
+MATCH (u:User)
+WHERE u.community = 42
+RETURN u.name
+
+// ========== 2. 中心性 ==========
+// PageRank (网页/用户影响力):
+CALL gds.pageRank.write({
+  nodeProjection: 'User',
+  relationshipProjection: 'KNOWS',
+  writeProperty: 'pagerank'
+})
+
+// 最有影响力的用户:
+MATCH (u:User)
+RETURN u.name, u.pagerank
+ORDER BY u.pagerank DESC
+LIMIT 10
+
+// ========== 3. 路径发现 ==========
+// 最短路径:
+MATCH (a:User {name: "Alice"}), (b:User {name: "David"})
+CALL gds.shortestPath.dijkstra({
+  sourceNode: a,
+  targetNode: b,
+  relationshipProjection: 'KNOWS'
+})
+YIELD nodeIds, totalCost
+RETURN nodeIds, totalCost
+
+// ========== 社交网络建模 ==========
+// ┌────────────────────────────────────┐
+// │  (Alice) -[:KNOWS]-> (Bob)        │
+// │    ↓                  ↓           │
+// │  (Charlie) ←--[:KNOWS]--          │
+// │    ↓                              │
+// │  (David) -[:BOUGHT]-> MacBook     │
+// └────────────────────────────────────┘
+
+// 推荐: Alice 可能认识 David
+// (因为 Alice→Charlie→David)
+MATCH (a:User {name: "Alice"})-[:KNOWS*2]-(candidate:User)
+WHERE NOT (a)-[:KNOWS]-(candidate)
+RETURN candidate.name, COUNT(*) AS common_friends
+ORDER BY common_friends DESC</div>
+    </div>
+    <div class="card">
+        <h2>知识图谱与最佳实践</h2>
+        <div class="code">// ========== 知识图谱 ==========
+// 实体 - 关系 - 实体 三元组
+
+// 创建一个知识图谱:
+CREATE (e1:Entity {name: "秦始皇", type: "人物"})
+CREATE (e2:Entity {name: "中国", type: "国家"})
+CREATE (e3:Entity {name: "公元前221年", type: "年份"})
+CREATE (e1)-[:事件 {type: "统一"}]->(e2)
+CREATE (e2)-[:首都]->(c:City {name: "咸阳"})
+
+// 查询知识图谱:
+MATCH (p:Entity {type: "人物"})-[r]->(e:Entity)
+RETURN p.name, type(r), e.name
+
+// ========== 索引与约束 ==========
+// 唯一约束:
+CREATE CONSTRAINT unique_user_name
+FOR (u:User) REQUIRE u.name IS UNIQUE
+
+// 索引:
+CREATE INDEX user_age_index FOR (u:User) ON (u.age)
+
+// 全文索引:
+CREATE FULLTEXT INDEX fulltext_product
+FOR (p:Product) ON EACH [p.name, p.description]
+
+// 全文搜索:
+CALL db.index.fulltext.queryNodes('fulltext_product', 'iphone')
+YIELD node, score
+RETURN node.name, score
+
+// ========== 最佳实践 ==========
+// 1. 节点用 CamelCase 标签 (User, Product)
+// 2. 关系用大写蛇形 (KNOWS, BOUGHT)
+// 3. 属性用 snake_case
+// 4. 避免过多属性在关系上
+// 5. 用 WITH 管道传递结果
+// 6. 用 PROFILE 分析查询性能
+// 7. 合理使用索引</div>
+        <div class="note">💡 图数据库要点: 关系是一等公民, 遍历关系远比 RDB JOIN 高效; Cypher 语法直观 (ASCII 图); 适合社交/推荐/知识图谱/欺诈检测; 不擅长大量简单查询和聚合统计; 图算法 (PageRank/社区发现/最短路径) 提供高级分析能力; RDB + Neo4j 混合使用常见。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoGraph()">图模型</button>
+        <button onclick="demoCypher()">Cypher 查询</button>
+        <button onclick="demoSocial()">社交推荐</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoGraph() {
+            result.innerHTML = '';
+            log('# 图数据模型');
+            log('');
+            log('节点: User {name, age}');
+            log('关系: KNOWS {since}');
+            log('节点: Product {name, price}');
+            log('关系: BOUGHT {date}');
+            log('');
+            log('(Alice)-[:KNOWS]->(Bob)');
+            log('(Alice)-[:BOUGHT]->(MacBook)');
+        }
+
+        function demoCypher() {
+            result.innerHTML = '';
+            log('# Cypher 示例');
+            log('');
+            log('// 找朋友的朋友');
+            log('MATCH (a:User {name:"Alice"})');
+            log('  -[:KNOWS*2]->(fof)');
+            log('RETURN fof.name');
+            log('');
+            log('// 找买过商品的');
+            log('MATCH (u)-[:BOUGHT]->(p)');
+            log('WHERE p.price > 5000');
+            log('RETURN u.name, p.name');
+        }
+
+        function demoSocial() {
+            result.innerHTML = '';
+            log('# 社交推荐');
+            log('');
+            log('共同好友推荐:');
+            log('MATCH (a)-[:KNOWS*2]->(c)');
+            log('WHERE NOT (a)-[:KNOWS]->(c)');
+            log('RETURN c, count(*) AS common');
+            log('ORDER BY common DESC');
+            log('');
+            log('PageRank 影响力:');
+            log('CALL gds.pageRank.write');
+            log('RETURN name, pagerank');
+        }
+    </script>
+</body>
+</html>

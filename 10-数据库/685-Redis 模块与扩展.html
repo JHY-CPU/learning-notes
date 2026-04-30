@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redis 模块与扩展</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🧩 Redis 模块与扩展</h2><p>Redis 模块系统 (Redis Modules)、RediSearch 全文搜索、RedisJSON JSON 操作、RedisGraph 图数据库、RedisTimeSeries 时序、RedisBloom 布隆过滤器。</p></div>
+    <div class="card">
+        <h2>Redis 模块介绍</h2>
+        <div class="code">// ========== Redis 模块 ==========
+// 扩展 Redis 功能的插件系统 (Redis 4.0+)
+
+// ========== 模块加载 ==========
+// 配置文件加载:
+loadmodule /path/to/module.so
+
+// 运行时加载:
+MODULE LOAD /path/to/module.so
+
+// 查看已加载模块:
+MODULE LIST
+
+// 卸载模块:
+MODULE UNLOAD module_name
+
+// ========== 官方模块 ==========
+// Redis 官方维护的模块:
+// RediSearch: 全文搜索
+// RedisJSON: JSON 操作
+// RedisGraph: 图数据库
+// RedisTimeSeries: 时序数据
+// RedisBloom: 布隆过滤器/Count-min Sketch
+// RedisAI: 深度学习模型推理
+
+// ========== 第三方模块 ==========
+// RedisCell: 限流
+// Redis-ML: 机器学习
+// ReJSON: JSON (已被 RedisJSON 替代)
+// ZSet 扩展</div>
+    </div>
+    <div class="card">
+        <h2>RediSearch 全文搜索</h2>
+        <div class="code">// ========== RediSearch ==========
+// 基于 Redis 的全文搜索模块
+
+// ========== 创建索引 ==========
+FT.CREATE idx:products ON HASH PREFIX 1 product:
+    SCHEMA name TEXT WEIGHT 5.0
+    description TEXT
+    price NUMERIC
+    tags TAG
+
+// 说明:
+// ON HASH: 基于 Hash 数据类型
+// PREFIX 1 product:: 监视 product: 开头的 key
+// TEXT: 全文搜索字段 (可分词)
+// TAG: 精确匹配字段
+// NUMERIC: 数字范围查询
+
+// ========== 搜索 ==========
+// 全文搜索:
+FT.SEARCH idx:products "mongodb"
+FT.SEARCH idx:products "mongodb database"
+FT.SEARCH idx:products "%mongo%"   // 模糊搜索
+
+// 组合条件:
+FT.SEARCH idx:products "@name:redis @price:[0 100]"
+
+// 分页:
+FT.SEARCH idx:products "redis" LIMIT 0 10
+
+// ========== 聚合 ==========
+FT.AGGREGATE idx:products "*"
+    GROUPBY 1 @tags
+    REDUCE COUNT 0 AS num
+
+// ========== 自动补全 ==========
+FT.SUGADD autocomplete "redis database" 100
+FT.SUGGET autocomplete "red"  // 返回建议
+
+// ========== 管理 ==========
+FT.INFO idx:products         // 索引信息
+FT.DROPINDEX idx:products    // 删除索引
+
+// ========== 与传统全文搜索对比 ==========
+// 性能: Redis 内存搜索, 比 Elasticsearch 快 10x
+// 功能: 不如 ES 丰富 (无聚合/分析)
+// 适合: 轻量全文搜索, 自动补全</div>
+    </div>
+    <div class="card">
+        <h2>RedisJSON 与 RedisGraph</h2>
+        <div class="code">// ========== RedisJSON ==========
+// 原生 JSON 操作 (不需要序列化/反序列化)
+
+// 设置 JSON:
+JSON.SET user:1 $ '{"name":"Alice","age":28,"address":{"city":"Beijing"}}'
+
+// 获取:
+JSON.GET user:1 $             // 全部
+JSON.GET user:1 $.name        // "Alice"
+JSON.GET user:1 $.address.city  // "Beijing"
+
+// 更新:
+JSON.SET user:1 $.age 29
+JSON.NUMINCRBY user:1 $.age 1   // age +1
+
+// 数组操作:
+JSON.ARRAPPEND user:1 $.tags '"tech"'
+JSON.ARRPOP user:1 $.tags
+
+// 删除:
+JSON.DEL user:1 $.address
+
+// ========== RedisGraph ==========
+// 图数据库, 使用 Cypher 查询语言
+
+// 创建节点:
+GRAPH.QUERY social "CREATE (:Person {name:'Alice', age:28})"
+GRAPH.QUERY social "CREATE (:Person {name:'Bob', age:25})"
+
+// 创建关系:
+GRAPH.QUERY social
+    "MATCH (a:Person {name:'Alice'}), (b:Person {name:'Bob'})
+     CREATE (a)-[:KNOWS {since:2020}]->(b)"
+
+// 查询:
+GRAPH.QUERY social
+    "MATCH (a:Person)-[:KNOWS]->(b:Person)
+     WHERE a.name = 'Alice'
+     RETURN b.name, b.age"
+
+// ========== RedisTimeSeries ==========
+// 时序数据, 支持聚合和降采样
+
+// 创建时序:
+TS.CREATE sensor:temp RETENTION 86400000   // 保留 1 天
+TS.CREATE sensor:humidity LABELS type "humidity"
+
+// 添加数据点:
+TS.ADD sensor:temp 1696118400 23.5
+TS.MADD sensor:temp 1696118500 24.1 sensor:humidity 1696118500 60
+
+// 查询 (聚合):
+TS.RANGE sensor:temp 1696118400 1696204800
+    AGGREGATION AVG 60000   // 每分钟平均</div>
+    </div>
+    <div class="card">
+        <h2>RedisBloom 与 RedisCell</h2>
+        <div class="code">// ========== RedisBloom ==========
+// 概率性数据结构模块
+
+// ========== 布隆过滤器 ==========
+// 添加元素:
+BF.ADD bloom:users "alice@test.com"
+BF.MADD bloom:users "bob@test.com" "carol@test.com"
+
+// 检查存在:
+BF.EXISTS bloom:users "alice@test.com"   // 1 (可能存在)
+BF.EXISTS bloom:users "unknown"           // 0 (不存在)
+
+// 自定义参数:
+BF.RESERVE bloom:users 0.01 1000000
+// 0.01 = 1% 错误率
+// 1000000 = 预计元素数
+// 错误率越低, 占用内存越大
+
+// ========== Cuckoo Filter ==========
+// 类似布隆过滤器, 支持删除
+CF.ADD cf:users "alice@test.com"
+CF.EXISTS cf:users "alice@test.com"  // 1
+CF.DEL cf:users "alice@test.com"     // 支持删除!
+
+// ========== Count-Min Sketch ==========
+// 频率估计
+CMS.INITBYPROB cms:events 0.01 0.01
+CMS.INCR cms:events "page:42"        // 出现次数 +1
+CMS.QUERY cms:events "page:42"       // 估计出现次数
+
+// ========== RedisCell (第三方限流) ==========
+// 令牌桶限流
+CL.THROTTLE api:user:100 10 5 60
+// 10: 爆发限制 (burst)
+// 5: 每 60 秒 5 个请求
+// 返回: [0(允许)/1(拒绝), 总限制, 剩余, 重试秒数, 重置秒数]
+
+// ========== 模块选择指南 ==========
+// 全文搜索: RediSearch
+// JSON 操作: RedisJSON
+// 图数据: RedisGraph
+// 时序数据: RedisTimeSeries
+// 存在判断: RedisBloom
+// 限流: RedisCell 或 Lua</div>
+        <div class="note">💡 模块要点: Redis 模块扩展新功能; RediSearch 做轻量全文搜索; RedisJSON 原生 JSON 操作; RedisTimeSeries 处理时序; RedisBloom 做存在判断与去重; 模块加载 loadmodule; 官方模块比第三方更稳定。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoModules()">模块概览</button>
+        <button onclick="demoSearch()">RediSearch</button>
+        <button onclick="demoBloom()">布隆过滤器</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoModules() {
+            result.innerHTML = '';
+            log('# Redis 模块概览');
+            log('');
+            log('RediSearch — 全文搜索');
+            log('RedisJSON — JSON 操作');
+            log('RedisGraph — 图数据库');
+            log('RedisTimeSeries — 时序数据');
+            log('RedisBloom — 布隆过滤器');
+            log('RedisCell — 限流');
+        }
+
+        function demoSearch() {
+            result.innerHTML = '';
+            log('# RediSearch');
+            log('');
+            log('FT.CREATE idx:products');
+            log('  ON HASH PREFIX 1 product:');
+            log('  SCHEMA name TEXT price NUMERIC');
+            log('');
+            log('FT.SEARCH idx:products "redis"');
+            log('FT.SUGADD/SUGGET → 自动补全');
+        }
+
+        function demoBloom() {
+            result.innerHTML = '';
+            log('# 布隆过滤器');
+            log('');
+            log('BF.ADD bloom:users "alice"');
+            log('BF.EXISTS bloom:users "alice" → 1');
+            log('BF.EXISTS "unknown" → 0');
+            log('');
+            log('应用: 防缓存穿透');
+            log('不存在 → 直接返回');
+            log('可能存在 → 查缓存/DB');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>性能-Tree Shaking</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>性能-Tree Shaking</h2><p>ES 模块静态分析、sideEffects 标记、消除 dead code、打包优化。</p></div>
+    <div class="card">
+        <h2>Tree Shaking API</h2>
+        <div class="code">// ========== Tree Shaking 原理 ==========
+// 基于 ES Module 静态分析 (import/export)
+// 在打包时移除未使用的导出
+
+// ========== 前提条件 ==========
+// 1. ES Module (import/export)
+// 2. sideEffects: false (package.json)
+// 3. 生产模式 (mode: 'production')
+
+// ========== 支持 Tree Shaking 的导入方式 ==========
+import { debounce } from 'lodash-es';        // ✅ 按需
+import * as utils from './utils';            // ❌ 全部
+import _ from 'lodash';                      // ❌ 全部 (CJS)</div>
+    </div>
+    <div class="card">
+        <h2>演示：Tree Shaking</h2>
+        <button onclick="demoPrinciple()">原理</button>
+        <button onclick="demoSideEffects()">sideEffects</button>
+        <button onclick="demoBarrel()">Barrel 问题</button>
+        <button onclick="demoOptimize()">优化策略</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoPrinciple() {
+            result.innerHTML = '';
+            log('🌳 Tree Shaking 原理:');
+            log('');
+
+            log('1️⃣ 什么是 Tree Shaking?');
+            log('   打包时自动移除未使用的代码');
+            log('   "摇树" — 摇掉枯枝败叶 (dead code)');
+            log('');
+
+            log('2️⃣ 静态分析:');
+            log('   // 以下代码可以静态分析');
+            log('   import { a, b } from "./module";');
+            log('   // 打包工具知道只用 a 和 b');
+            log('');
+            log('   // 以下不可以 (动态)');
+            log('   const name = "a";');
+            log('   const module = await import(`./${name}`);');
+            log('');
+
+            log('3️⃣ 示例:');
+            log('   // utils.js');
+            log('   export function foo() { return "foo"; }');
+            log('   export function bar() { return "bar"; }');
+            log('   export function baz() { return "baz"; }');
+            log('');
+            log('   // app.js');
+            log('   import { foo } from "./utils";');
+            log('   console.log(foo());');
+            log('');
+            log('   // 打包后: bar 和 baz 被删除');
+            log('');
+
+            log('4️⃣ CommonJS 不支持:');
+            log('   const _ = require("lodash");');
+            log('   // require 是动态的, 无法静态分析');
+            log('   // 必须整体引入');
+            log('');
+
+            log('5️⃣ ES Module vs CJS:');
+            log('   ES Module: import/export (静态, 编译时)');
+            log('   CommonJS: require/module.exports (动态, 运行时)');
+            log('   Tree Shaking 只能用于 ES Module');
+        }
+
+        function demoSideEffects() {
+            result.innerHTML = '';
+            log('📦 sideEffects 标记:');
+            log('');
+
+            log('1️⃣ package.json 配置:');
+            log('   // package.json');
+            log('   {');
+            log('     "name": "my-library",');
+            log('     "sideEffects": false');
+            log('     // false = 所有模块无副作用');
+            log('   }');
+            log('');
+
+            log('2️⃣ sideEffects 含义:');
+            log('   副作用 = 导入时执行非导出代码:');
+            log('   import "./polyfill";  // 有副作用');
+            log('   import "styles.css";  // 有副作用');
+            log('');
+
+            log('3️⃣ 配置示例:');
+            log('   // 无副作用 (可安全 Tree Shaking)');
+            log('   "sideEffects": false');
+            log('');
+            log('   // 指定有副作用的文件');
+            log('   "sideEffects": [');
+            log('     "**/*.css",');
+            log('     "**/polyfill.js",');
+            log('     "./src/sideful.ts"');
+            log('   ]');
+            log('');
+
+            log('4️⃣ Webpack sideEffects 配置:');
+            log('   // webpack.config.js');
+            log('   module.exports = {');
+            log('     mode: "production",');
+            log('     optimization: {');
+            log('       sideEffects: true,  // 启用');
+            log('       usedExports: true,  // 标记未使用');
+            log('       minimize: true      // 压缩时删除');
+            log('     }');
+            log('   };');
+            log('');
+
+            log('5️⃣ 副作用示例:');
+            log('   // ❌ 有副作用: 修改全局对象');
+            log('   Array.prototype.myMethod = function() {};');
+            log('');
+            log('   // ✅ 无副作用: 只导出');
+            log('   export function add(a, b) { return a + b; }');
+        }
+
+        function demoBarrel() {
+            result.innerHTML = '';
+            log('🛢️ Barrel 文件问题:');
+            log('');
+
+            log('1️⃣ 什么是 Barrel?');
+            log('   // index.js (barrel 文件)');
+            log('   export { A } from "./A";');
+            log('   export { B } from "./B";');
+            log('   export { C } from "./C";');
+            log('   export { D } from "./D";');
+            log('   export { E } from "./E";');
+            log('');
+
+            log('2️⃣ Barrel 问题:');
+            log('   // app.js');
+            log('   import { A } from "./components";');
+            log('   // 看似只用了 A');
+            log('   // 但 B, C, D, E 都被加载 (但会被 Tree Shaking)');
+            log('   // 问题是: 打包工具仍需要解析所有模块');
+            log('');
+
+            log('3️⃣ Barrel 影响:');
+            log('   • 增加打包时间 (解析大量模块)');
+            log('   • Webpack 5 优化了这点');
+            log('   • 但仍建议避免深层次 barrel');
+            log('');
+
+            log('4️⃣ 不使用 Barrel 的方式:');
+            log('   // ❌ 通过 barrel');
+            log('   import { Button } from "./components";');
+            log('');
+            log('   // ✅ 直接导入');
+            log('   import { Button } from "./components/Button";');
+            log('');
+
+            log('5️⃣ 大型库的 Tree Shaking:');
+            log('   // 支持 Tree Shaking 的库:');
+            log('   import { debounce } from "lodash-es";  // ✅');
+            log('   import dayjs from "dayjs";             // ✅');
+            log('   import { Button } from "antd/es";      // ✅');
+            log('');
+            log('   // 不支持或需配置:');
+            log('   import _ from "lodash";       // ❌ CJS');
+            log('   import * as THREE from "three"; // 需插件');
+        }
+
+        function demoOptimize() {
+            result.innerHTML = '';
+            log('⚡ Tree Shaking 优化:');
+            log('');
+
+            log('1️⃣ 使用命名导出:');
+            log('   // ✅ 推荐: 多个命名导出');
+            log('   export function funcA() {}');
+            log('   export function funcB() {}');
+            log('');
+            log('   // ❌ 不推荐: 默认导出对象');
+            log('   export default { funcA, funcB };');
+            log('');
+
+            log('2️⃣ 导入方式对比:');
+            log('   // ✅ Tree Shaking 友好');
+            log('   import { map, filter } from "lodash-es";');
+            log('   import { Button } from "antd/es/button";');
+            log('');
+            log('   // ❌ 全部引入');
+            log('   import * as _ from "lodash-es";');
+            log('   import { Button } from "antd";');
+            log('');
+
+            log('3️⃣ package.json 配置:');
+            log('   {');
+            log('     "main": "dist/index.cjs",     // CJS 入口');
+            log('     "module": "dist/index.mjs",   // ESM 入口');
+            log('     "sideEffects": false,');
+            log('     "exports": {');
+            log('       ".": {');
+            log('         "import": "./dist/index.mjs",');
+            log('         "require": "./dist/index.cjs"');
+            log('       }');
+            log('     }');
+            log('   }');
+            log('');
+
+            log('4️⃣ 分析打包结果:');
+            log('   # Webpack Bundle Analyzer');
+            log('   npx webpack --profile --json > stats.json');
+            log('   npx webpack-bundle-analyzer stats.json');
+            log('');
+            log('   # Vite');
+            log('   npx vite-bundle-visualizer');
+            log('');
+
+            log('5️⃣ 优化清单:');
+            log('   ✅ 使用 ES Module (import/export)');
+            log('   ✅ 配置 sideEffects: false');
+            log('   ✅ 使用 lodash-es 替代 lodash');
+            log('   ✅ 按需导入 (非 barrel)');
+            log('   ✅ 生产构建 (mode: production)');
+            log('   ✅ 使用包分析工具定期检查');
+        }
+
+        console.log('=== Tree Shaking ===');
+        document.getElementById('output').textContent =
+            `Tree Shaking: 静态分析 / sideEffects / barrel问题 / ES Module / 打包优化\n` +
+            `✅ Tree Shaking 演示完成！`;
+    </script>
+</body>
+</html>

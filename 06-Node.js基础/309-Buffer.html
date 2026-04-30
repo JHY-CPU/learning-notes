@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buffer</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #buffer-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; margin: 5px 0; width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Buffer</h2><p>Buffer 创建、toString 编码转换、读写、concat、slice。</p></div>
+    <div class="card">
+        <h2>Buffer API</h2>
+        <div class="code">// ========== Buffer 创建 ==========
+Buffer.from('hello')              // 字符串 → Buffer
+Buffer.from([104, 101, 108, 108, 111]) // 字节数组 → Buffer
+Buffer.from('hello', 'hex')       // 十六进制字符串
+Buffer.alloc(1024)                // 分配 1KB (初始化为 0)
+Buffer.allocUnsafe(1024)          // 分配 1KB (可能含旧数据，更快)
+
+// ========== Buffer 读写 ==========
+const buf = Buffer.from('hello');
+buf[0]          // 104 (ASCII 'h')
+buf.length      // 5
+buf.byteOffset  // 0
+
+// ========== 编码转换 ==========
+buf.toString()           // 'hello' (默认 utf-8)
+buf.toString('hex')      // '68656c6c6f'
+buf.toString('base64')   // 'aGVsbG8='
+buf.toString('utf-8')    // 'hello'
+buf.toString('ascii')
+buf.toString('latin1')   // 或 'binary'
+
+// ========== 其他操作 ==========
+Buffer.concat([buf1, buf2])       // 合并
+buf.slice(0, 2)                   // 切片 (共享内存)
+buf.copy(target, 0, 0, 2)        // 复制到目标 Buffer
+Buffer.compare(buf1, buf2)        // 比较
+buf.indexOf('ll')                 // 搜索
+buf.includes('he')                // 是否包含
+
+// ========== 静态属性 ==========
+Buffer.poolSize        // 内存池大小 (8192)
+Buffer.isBuffer(obj)   // 是否 Buffer</div>
+        <div class="note">💡 Buffer 是 Node.js 中处理二进制数据的核心。<br>
+        ⚠️ allocUnsafe 更快但不安全（含有旧数据）。<br>
+        ⚠️ slice 返回的 Buffer 与原 Buffer 共享内存。</div>
+    </div>
+    <div class="card">
+        <h2>演示：Buffer 操作</h2>
+        <input id="bufferInput" value="Hello Node.js" placeholder="输入文本">
+        <button onclick="demoBuffer()">Buffer 演示</button>
+        <div id="buffer-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const bufferResult = document.getElementById('buffer-result');
+
+        function log(msg) {
+            bufferResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // 模拟 Buffer (使用 Uint8Array)
+        class MockBuffer {
+            static from(input, encoding) {
+                if (typeof input === 'string') {
+                    const encoder = new TextEncoder();
+                    const bytes = encoder.encode(input);
+                    const buf = new MockBuffer(bytes.length);
+                    buf._data.set(bytes);
+                    buf._stringCache = input;
+                    return buf;
+                }
+                if (Array.isArray(input)) {
+                    const buf = new MockBuffer(input.length);
+                    buf._data.set(input);
+                    return buf;
+                }
+                throw new Error('Unsupported input type');
+            }
+
+            static alloc(size) {
+                return new MockBuffer(size);
+            }
+
+            static concat(list) {
+                let totalLength = list.reduce((s, b) => s + b.length, 0);
+                const result = new MockBuffer(totalLength);
+                let offset = 0;
+                for (const b of list) {
+                    result._data.set(b._data, offset);
+                    offset += b.length;
+                }
+                return result;
+            }
+
+            constructor(size) {
+                this._data = new Uint8Array(size);
+                this.length = size;
+            }
+
+            toString(encoding = 'utf-8') {
+                if (encoding === 'hex') {
+                    return Array.from(this._data)
+                        .map(b => b.toString(16).padStart(2, '0'))
+                        .join('');
+                }
+                if (encoding === 'base64') {
+                    return btoa(String.fromCharCode(...this._data));
+                }
+                const decoder = new TextDecoder(encoding);
+                return decoder.decode(this._data);
+            }
+
+            slice(start, end) {
+                const sliced = this._data.slice(start, end);
+                const buf = new MockBuffer(sliced.length);
+                buf._data = sliced;
+                return buf;
+            }
+
+            [Symbol.iterator]() {
+                return this._data[Symbol.iterator]();
+            }
+        }
+
+        function demoBuffer() {
+            bufferResult.innerHTML = '';
+            const text = document.getElementById('bufferInput').value;
+            log('📦 Buffer 操作演示 (模拟):');
+            log('');
+
+            const buf = MockBuffer.from(text);
+            log(`1️⃣ 创建 Buffer:`);
+            log(`   Buffer.from("${text}")`);
+            log(`   长度: ${buf.length} 字节`);
+            log('');
+
+            log('2️⃣ 字节内容:');
+            const bytes = [];
+            for (const b of buf) bytes.push(b);
+            log(`   字节数组: [${bytes.slice(0, 15).join(', ')}${bytes.length > 15 ? ',...' : ''}]`);
+            log('');
+
+            log('3️⃣ 编码转换:');
+            log(`   toString("utf-8"): "${buf.toString('utf-8')}"`);
+            log(`   toString("hex"): "${buf.toString('hex')}"`);
+            log(`   toString("base64"): "${buf.toString('base64')}"`);
+            log('');
+
+            log('4️⃣ 切片 (slice):');
+            const sliced = buf.slice(0, 3);
+            log(`   slice(0, 3): "${sliced.toString()}"`);
+            log('');
+
+            log('5️⃣ 合并 (concat):');
+            const buf1 = MockBuffer.from('Hello ');
+            const buf2 = MockBuffer.from('World');
+            const combined = MockBuffer.concat([buf1, buf2]);
+            log(`   concat("Hello ", "World"): "${combined.toString()}"`);
+            log('');
+
+            log('6️⃣ alloc (分配):');
+            const allocated = MockBuffer.alloc(10);
+            log(`   alloc(10): 长度=${allocated.length}, 内容: [${Array.from(allocated._data)}]`);
+        }
+
+        console.log('=== Buffer ===');
+
+        document.getElementById('output').textContent =
+            `Buffer: from/alloc/toString/concat/slice/copy/compare/indexOf\n` +
+            `编码: utf-8 / hex / base64 / ascii / latin1\n` +
+            `✅ Buffer 演示完成！`;
+    </script>
+</body>
+</html>

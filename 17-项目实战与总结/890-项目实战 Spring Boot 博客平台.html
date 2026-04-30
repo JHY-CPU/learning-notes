@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>项目实战 Spring Boot 博客平台</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📦 项目实战 4: Spring Boot 博客平台</h2><p>Spring Initializr 项目生成、JPA 实体关联、REST 控制器分页、Spring Security + JWT、统一异常处理。</p></div>
+    <div class="card">
+        <h2>项目结构与依赖</h2>
+        <div class="code">// blog-api/
+// ├── src/main/java/com/blog/
+// │   ├── BlogApplication.java
+// │   ├── config/
+// │   │   ├── SecurityConfig.java
+// │   │   └── SwaggerConfig.java
+// │   ├── controller/
+// │   │   ├── AuthController.java
+// │   │   ├── PostController.java
+// │   │   └── CommentController.java
+// │   ├── model/
+// │   │   ├── User.java
+// │   │   ├── Post.java
+// │   │   └── Comment.java
+// │   ├── repository/
+// │   │   ├── UserRepository.java
+// │   │   ├── PostRepository.java
+// │   │   └── CommentRepository.java
+// │   ├── service/
+// │   │   ├── AuthService.java
+// │   │   ├── PostService.java
+// │   │   └── CommentService.java
+// │   ├── dto/
+// │   │   ├── LoginRequest.java
+// │   │   ├── PostRequest.java
+// │   │   └── PostResponse.java
+// │   └── exception/
+// │       └── GlobalExceptionHandler.java
+// ├── src/main/resources/
+// │   ├── application.yml
+// │   └── db/migration/
+// └── pom.xml
+
+// ========== Maven 依赖 (pom.xml) ==========
+// <dependencies>
+//     <dependency>
+//         <groupId>org.springframework.boot</groupId>
+//         <artifactId>spring-boot-starter-web</artifactId>
+//     </dependency>
+//     <dependency>
+//         <groupId>org.springframework.boot</groupId>
+//         <artifactId>spring-boot-starter-data-jpa</artifactId>
+//     </dependency>
+//     <dependency>
+//         <groupId>org.springframework.boot</groupId>
+//         <artifactId>spring-boot-starter-security</artifactId>
+//     </dependency>
+//     <dependency>
+//         <groupId>org.springframework.boot</groupId>
+//         <artifactId>spring-boot-starter-validation</artifactId>
+//     </dependency>
+//     <dependency>
+//         <groupId>org.postgresql</groupId>
+//         <artifactId>postgresql</artifactId>
+//     </dependency>
+//     <dependency>
+//         <groupId>io.jsonwebtoken</groupId>
+//         <artifactId>jjwt-api</artifactId>
+//         <version>0.12.3</version>
+//     </dependency>
+//     <dependency>
+//         <groupId>org.projectlombok</groupId>
+//         <artifactId>lombok</artifactId>
+//     </dependency>
+// </dependencies>
+
+// ========== 配置 ==========
+// application.yml:
+// spring:
+//   datasource:
+//     url: jdbc:postgresql://localhost:5432/blog
+//     username: postgres
+//     password: secret
+//   jpa:
+//     hibernate:
+//       ddl-auto: validate
+//     show-sql: false
+//   flyway:
+//     enabled: true
+//
+// jwt:
+//   secret: my-secret-key-must-be-at-least-256-bits-long
+//   expiration: 900000  # 15分钟</div>
+    </div>
+    <div class="card">
+        <h2>JPA 实体</h2>
+        <div class="code">// ========== 用户实体 ==========
+// model/User.java
+@Entity
+@Table(name = "users")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class User {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, unique = true, length = 50)
+    private String username;
+
+    @Column(nullable = false, unique = true)
+    private String email;
+
+    @Column(nullable = false)
+    private String password;
+
+    @Column(length = 200)
+    private String bio;
+
+    @CreatedDate
+    private LocalDateTime createdAt;
+}
+
+// ========== 文章实体 ==========
+// model/Post.java
+@Entity
+@Table(name = "posts")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class Post {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(nullable = false, length = 200)
+    private String title;
+
+    @Column(nullable = false, columnDefinition = "TEXT")
+    private String content;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "author_id", nullable = false)
+    private User author;
+
+    @OneToMany(mappedBy = "post", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Comment> comments = new ArrayList<>();
+
+    @CreatedDate
+    private LocalDateTime createdAt;
+
+    @LastModifiedDate
+    private LocalDateTime updatedAt;
+}
+
+// ========== 仓库 (Repository) ==========
+// repository/PostRepository.java
+public interface PostRepository extends JpaRepository<Post, Long> {
+    Page<Post> findByAuthorId(Long authorId, Pageable pageable);
+
+    @Query("SELECT p FROM Post p LEFT JOIN FETCH p.author ORDER BY p.createdAt DESC")
+    Page<Post> findAllWithAuthor(Pageable pageable);
+
+    // 搜索标题和内容
+    @Query("SELECT p FROM Post p WHERE " +
+           "LOWER(p.title) LIKE LOWER(CONCAT('%', :keyword, '%')) OR " +
+           "LOWER(p.content) LIKE LOWER(CONCAT('%', :keyword, '%'))")
+    Page<Post> search(@Param("keyword") String keyword, Pageable pageable);
+}</div>
+    </div>
+    <div class="card">
+        <h2>控制层与安全</h2>
+        <div class="code">// ========== 文章控制器 ==========
+// controller/PostController.java
+@RestController
+@RequestMapping("/api/v1/posts")
+@RequiredArgsConstructor
+public class PostController {
+
+    private final PostService postService;
+
+    @GetMapping
+    public ResponseEntity<Page<PostResponse>> listPosts(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(postService.findAll(page, size));
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<PostResponse> getPost(@PathVariable Long id) {
+        return ResponseEntity.ok(postService.findById(id));
+    }
+
+    @PostMapping
+    public ResponseEntity<PostResponse> createPost(
+            @Valid @RequestBody PostRequest request,
+            @AuthenticationPrincipal UserDetails user) {
+        PostResponse post = postService.create(request, user.getId());
+        return ResponseEntity.status(201).body(post);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<PostResponse> updatePost(
+            @PathVariable Long id,
+            @Valid @RequestBody PostRequest request,
+            @AuthenticationPrincipal UserDetails user) {
+        return ResponseEntity.ok(postService.update(id, request, user.getId()));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deletePost(
+            @PathVariable Long id,
+            @AuthenticationPrincipal UserDetails user) {
+        postService.delete(id, user.getId());
+        return ResponseEntity.noContent().build();
+    }
+}
+
+// ========== Spring Security + JWT ==========
+// config/SecurityConfig.java
+@Configuration
+@EnableWebSecurity
+@RequiredArgsConstructor
+public class SecurityConfig {
+
+    private final JwtAuthFilter jwtAuthFilter;
+
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        http
+            .csrf(AbstractHttpConfigurer::disable)
+            .sessionManagement(sm -> sm.sessionCreationPolicy(STATELESS))
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/v1/auth/**", "/health").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/posts/**").permitAll()
+                .anyRequest().authenticated()
+            )
+            .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
+        return http.build();
+    }
+}
+
+// ========== 全局异常处理 ==========
+// exception/GlobalExceptionHandler.java
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNotFound(ResourceNotFoundException ex) {
+        return ResponseEntity.status(404).body(
+            new ErrorResponse("NOT_FOUND", ex.getMessage()));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidation(
+            MethodArgumentNotValidException ex) {
+        List<FieldError> errors = ex.getBindingResult().getFieldErrors().stream()
+            .map(e -> new FieldError(e.getField(), e.getDefaultMessage()))
+            .toList();
+        return ResponseEntity.status(422).body(
+            new ErrorResponse("VALIDATION_ERROR", "参数验证失败", errors));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleGeneral(Exception ex) {
+        return ResponseEntity.status(500).body(
+            new ErrorResponse("INTERNAL_ERROR", "服务器内部错误"));
+    }
+}</div>
+        <div class="note">💡 Spring Boot 博客要点: JPA 实体关联 @ManyToOne/@OneToMany; Repository 分页 Page; Spring Security JWT 无状态; @ControllerAdvice 统一异常; DTO 隔离实体; @Valid 参数验证; Flyway 数据库迁移; Lombok @Data/@Builder 简化代码。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSB()">Spring Boot</button>
+        <button onclick="demoJPA()">JPA 实体</button>
+        <button onclick="demoSecurity()">安全配置</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSB() {
+            result.innerHTML = '';
+            log('# Spring Boot 博客平台');
+            log('');
+            log('技术栈:');
+            log('  Spring Boot + JPA + Security');
+            log('  PostgreSQL + Flyway 迁移');
+            log('  JWT 认证 + Lombok');
+            log('');
+            log('目录:');
+            log('  controller/ — REST 接口');
+            log('  service/ — 业务逻辑');
+            log('  repository/ — 数据访问');
+            log('  model/ — JPA 实体');
+            log('  dto/ — 数据传输');
+        }
+
+        function demoJPA() {
+            result.innerHTML = '';
+            log('# JPA 实体关系');
+            log('');
+            log('Post:');
+            log('  @ManyToOne → User (author)');
+            log('  @OneToMany → List<Comment>');
+            log('');
+            log('查询:');
+            log('  findAllWithAuthor()');
+            log('  findByAuthorId(id, pageable)');
+            log('  search(keyword, pageable)');
+            log('');
+            log('分页:');
+            log('  Page<Post> + Pageable');
+            log('  page, size, sort 参数');
+        }
+
+        function demoSecurity() {
+            result.innerHTML = '';
+            log('# Spring Security + JWT');
+            log('');
+            log('安全配置:');
+            log('  CSRF 禁用 (JWT 无状态)');
+            log('  Session: STATELESS');
+            log('  POST/GET 权限控制');
+            log('');
+            log('JWT 过滤器:');
+            log('  提取 Authorization header');
+            log('  验证签名 → 设置 SecurityContext');
+            log('');
+            log('异常处理:');
+            log('  404: ResourceNotFound');
+            log('  422: 参数验证失败');
+            log('  500: 服务器内部错误');
+        }
+    </script>
+</body>
+</html>

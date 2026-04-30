@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python数字类型与数学运算</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔢 Python 数字类型与数学运算</h2><p>int 无限精度、float 精度问题、complex 复数、Decimal 精确小数、Fraction 分数、math 模块。</p></div>
+    <div class="card">
+        <h2>整数 int</h2>
+        <div class="code">// ========== int 无限精度 ==========
+// Python 整数没有 32/64 位限制!
+tiny = -10**100         # 非常小的负数
+huge = 10**100           # 非常大的正数
+print(huge)             # 1000000000000000000000000000000...
+
+// 其他语言 (C/Java) 会溢出:
+// int:   -2^31 ~ 2^31-1
+// long:  -2^63 ~ 2^63-1
+// Python: 无限制! ✅
+
+// ========== 不同进制 ==========
+decimal = 42             # 十进制
+binary = 0b101010        # 42 (二进制 0b)
+octal = 0o52             # 42 (八进制 0o)
+hexadecimal = 0x2A       # 42 (十六进制 0x)
+
+// 进制转换:
+bin(42)                  # "0b101010"
+oct(42)                  # "0o52"
+hex(42)                  # "0x2a"
+int("101010", 2)         # 42 (字符串转整数)
+
+// ========== 千位分隔 ==========
+big = 1_000_000_000      # 10亿 (Python 3.6+)
+price = 99_99.99         # 支持小数 (但不常用)
+hex_mask = 0xFF_FF_FF_FF # 十六进制也可用
+
+// ========== 常用方法 ==========
+(42).bit_length()        # 6 (二进制位数: 101010)
+(-42).__abs__()          # 42 (绝对值)
+int.bit_count(0b101010)  # 3 (二进制中 1 的个数, Python 3.8+)</div>
+    </div>
+    <div class="card">
+        <h2>浮点数 float</h2>
+        <div class="code">// ========== float ==========
+// Python 浮点数 = 双精度浮点 (C double, 64位)
+// 遵循 IEEE 754 标准
+
+pi = 3.14159
+small = 1.5e-10          # 0.00000000015 (科学计数法)
+big = 1e308              # 接近 float 上限
+
+// ========== 特殊值 ==========
+float('inf')             # 正无穷大
+float('-inf')            # 负无穷大
+float('nan')             # Not a Number (非数字)
+
+inf = float('inf')
+inf > 999999999999999    # True
+inf == inf               # True
+nan = float('nan')
+nan == nan               # False! NaN ≠ NaN
+
+// 检查特殊值:
+import math
+math.isinf(inf)          # True
+math.isnan(nan)          # True
+
+// ========== 精度问题 ==========
+0.1 + 0.2                # 0.30000000000000004
+0.1 + 0.2 == 0.3         # False! ⚠️
+
+// 为什么? 二进制不能精确表示 0.1
+// 就像十进制不能精确表示 1/3
+
+// 解决方案:
+// 1. math.isclose()
+math.isclose(0.1 + 0.2, 0.3)  # True
+
+// 2. 容忍度比较:
+abs((0.1 + 0.2) - 0.3) < 1e-9  # True
+
+// 3. 用 Decimal (精确小数)
+from decimal import Decimal
+Decimal('0.1') + Decimal('0.2')  # Decimal('0.3')
+
+// ========== 四舍五入 ==========
+round(3.14159, 2)        # 3.14
+round(3.5)               # 4 (Python 3 银行家舍入)
+round(4.5)               # 4 (偶数舍入!) ⚠️
+// round() 用 "银行家舍入" (向偶取整)
+// 避免累积偏差，但可能不符合预期
+
+// 传统四舍五入:
+import math
+def round_half_up(n, decimals=0):
+    multiplier = 10 ** decimals
+    return math.floor(n * multiplier + 0.5) / multiplier</div>
+    </div>
+    <div class="card">
+        <h2>Decimal 与 Fraction</h2>
+        <div class="code">// ========== Decimal 精确小数 ==========
+from decimal import Decimal, getcontext, ROUND_HALF_UP
+
+// 创建: 用字符串! 不用浮点数
+Decimal('0.1')            # ✅ 正确
+Decimal(0.1)              # ❌ 会引入浮点误差!
+
+// 设置精度:
+getcontext().prec = 28    # 默认 28 位有效数字
+
+// 运算:
+Decimal('0.1') + Decimal('0.2')  # Decimal('0.3')
+Decimal('10') / Decimal('3')     # Decimal('3.333...')
+
+// 四舍五入控制:
+price = Decimal('19.995')
+quantized = price.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+# Decimal('20.00')
+
+// ========== Fraction 分数 ==========
+from fractions import Fraction
+
+f = Fraction(1, 3)        # 1/3
+print(f)                  # 1/3
+print(float(f))           # 0.3333333333333333
+
+// 运算保持精确:
+Fraction(1, 3) + Fraction(1, 6)  # Fraction(1, 2)
+Fraction(1, 2) * Fraction(2, 3)  # Fraction(1, 3)
+
+// 从字符串创建:
+Fraction('3/4')            # Fraction(3, 4)
+Fraction('0.75')           # Fraction(3, 4)
+
+// ========== 适用场景 ==========
+// float:     科学计算、图形处理、性能优先
+// Decimal:   金融计算、精确要求、货币金额
+// Fraction:  精确有理数、数学教育、比例计算</div>
+    </div>
+    <div class="card">
+        <h2>math 模块</h2>
+        <div class="code">// ========== 常用数学函数 ==========
+import math
+
+// 取整:
+math.ceil(3.2)            # 4  (向上取整)
+math.floor(3.8)           # 3  (向下取整)
+math.trunc(3.8)           # 3  (截断, 等价于 int())
+round(3.5)                # 4  (银行家舍入)
+
+// 幂与对数:
+math.pow(2, 10)           # 1024.0 (浮点数)
+2 ** 10                   # 1024   (整数,推荐)
+math.sqrt(16)             # 4.0 (平方根)
+math.exp(2)               # e² ≈ 7.389
+math.log(100, 10)         # 2.0 (以 10 为底)
+math.log(1024, 2)         # 10.0 (以 2 为底)
+math.log(2.71828)         # ≈ 1.0 (自然对数 ln)
+
+// 三角函数:
+math.sin(math.pi / 2)     # 1.0
+math.cos(0)               # 1.0
+math.tan(math.pi / 4)     # ≈ 1.0
+math.degrees(math.pi)     # 180.0 (弧度→角度)
+math.radians(180)         # π (角度→弧度)
+
+// 常量:
+math.pi                   # 3.141592653589793
+math.e                    # 2.718281828459045
+math.inf                  # inf
+math.nan                  # nan
+
+// 组合:
+math.gcd(12, 18)          # 6 (最大公约数)
+math.lcm(12, 18)          # 36 (最小公倍数, Python 3.9+)
+math.comb(5, 2)           # 10 (组合数 C(5,2))
+math.perm(5, 2)           # 20 (排列数 P(5,2))
+math.factorial(5)         # 120 (阶乘)
+math.fsum([0.1, 0.2, 0.3]) # 精确浮点求和
+
+// ========== random 模块 ==========
+import random
+
+random.random()            # [0.0, 1.0) 随机浮点数
+random.randint(1, 10)      # [1, 10] 随机整数
+random.uniform(1.0, 5.0)   # [1.0, 5.0) 随机浮点数
+random.choice(['a','b','c']) # 随机选一个
+random.choices(['a','b','c'], k=2) # 有放回选 k 个
+random.sample(['a','b','c','d'], 2) # 无放回选 k 个
+random.shuffle(['a','b','c']) # 原地打乱
+
+// ========== 复数 complex ==========
+z = 3 + 4j
+z.real                   # 3.0 (实部)
+z.imag                   # 4.0 (虚部)
+z.conjugate()            # (3-4j) (共轭)
+abs(z)                   # 5.0 (模长)
+complex(3, 4)            # (3+4j)</div>
+        <div class="note">💡 数字类型选择: (1) 日常用 int/float; (2) 金额用 Decimal('精确字符串'); (3) 精确有理数用 Fraction; (4) 复杂数学用 math; (5) 大数组用 numpy (第三方库); (6) 比较浮点用 math.isclose() 而非 ==。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoNumbers()">数字演示</button>
+        <button onclick="demoDecimal()">Decimal 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoNumbers() {
+            result.innerHTML = '';
+            log('# Python 数字演示');
+            log('');
+            log('整数无限精度:');
+            log('  huge = 10**100');
+            log('  →', '10**100 = ' + String(10n ** 100n).slice(0, 20) + '...');
+            log('');
+            log('进制:');
+            log('  bin(42) =', 0b101010, '(二进制 0b101010)');
+            log('  hex(42) =', 0x2A, '(十六进制 0x2A)');
+            log('');
+            log('浮点精度问题:');
+            log('  0.1 + 0.2 =', 0.1 + 0.2);
+            log('  0.1 + 0.2 == 0.3:', 0.1 + 0.2 == 0.3);
+            log('');
+            log('千位分隔:');
+            log('  big = 1_000_000_000');
+            log('  →', 1_000_000_000);
+        }
+
+        function demoDecimal() {
+            result.innerHTML = '';
+            log('# Decimal 精确小数演示');
+            log('');
+            log('浮点精度问题:');
+            log('  0.1 + 0.2 =', 0.1 + 0.2);
+            log('');
+            log('math.isclose 对比:');
+            log('  math.isclose(0.1+0.2, 0.3):',
+                  Math.abs((0.1 + 0.2) - 0.3) < 1e-10);
+            log('');
+            log('math 函数:');
+            log('  sqrt(16) =', Math.sqrt(16));
+            log('  ceil(3.2) =', Math.ceil(3.2));
+            log('  floor(3.8) =', Math.floor(3.8));
+            log('  PI =', Math.PI);
+        }
+    </script>
+</body>
+</html>

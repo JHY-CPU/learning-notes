@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSS Grid网格布局</title>
+    <style>
+        /* === CSS Grid 网格布局 === */
+        /* Grid是二维布局系统（同时控制行和列） */
+        /* 对比Flexbox是一维布局（要么行要么列） */
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background: #f0f2f5;
+        }
+
+        .section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .section h2 {
+            margin-bottom: 15px;
+            color: #2c3e50;
+            font-size: 18px;
+            border-bottom: 2px solid #9b59b6;
+            padding-bottom: 8px;
+        }
+
+        .grid-item {
+            background: linear-gradient(135deg, #9b59b6, #8e44ad);
+            color: white;
+            padding: 20px;
+            text-align: center;
+            border-radius: 4px;
+            font-size: 18px;
+        }
+
+        /* === grid 基础 === */
+        .grid-basic {
+            display: grid;
+            /* 定义3列，每列等宽 */
+            grid-template-columns: 1fr 1fr 1fr;
+            /* grid-template-columns: 100px 200px 1fr;   固定px + 弹性 */
+            /* grid-template-columns: repeat(3, 1fr);      repeat(次数, 尺寸) */
+            /* grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));  自动填充 */
+            /* 定义行高 */
+            grid-template-rows: 80px 80px;
+            /* grid-template-rows: 100px auto; */
+            gap: 10px;
+            /* gap: 10px 20px;  row-gap column-gap分开设置 */
+            /* row-gap: 10px; */
+            /* column-gap: 20px; */
+        }
+
+        /* === repeat + minmax === */
+        .grid-auto {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 10px;
+        }
+
+        /* === 网格线命名与跨越 === */
+        .grid-span {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        .grid-span .grid-item:first-child {
+            /* 从第1列线到第3列线，跨越2列 */
+            grid-column: 1 / 3;
+            /* grid-column: 1 / span 2;  同样效果 */
+            /* grid-column: span 2;  从当前位置跨2列 */
+        }
+        .grid-span .grid-item:nth-child(4) {
+            grid-column: 3 / 5;
+            /* grid-row: 1 / 3;  跨越行 */
+        }
+
+        /* === grid-area 区域命名 === */
+        .grid-area-layout {
+            display: grid;
+            /* 用命名区域定义布局模板 */
+            grid-template-areas:
+                "header  header  header"
+                "sidebar content content"
+                "footer  footer  footer";
+            grid-template-columns: 200px 1fr 1fr;
+            grid-template-rows: 60px 200px 60px;
+            gap: 10px;
+        }
+        .header  { grid-area: header; }
+        .sidebar { grid-area: sidebar; }
+        .content { grid-area: content; }
+        .footer  { grid-area: footer; }
+
+        /* === 对齐方式 === */
+        .grid-align {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            grid-template-rows: repeat(2, 100px);
+            height: 300px;
+            border: 2px dashed #bdc3c7;
+            border-radius: 4px;
+            /* 整体水平对齐 */
+            justify-content: center;
+            /* justify-content: start;      左对齐 */
+            /* justify-content: end;        右对齐 */
+            /* justify-content: space-between;  平分 */
+            /* justify-content: space-around;   平分+边缘 */
+            /* justify-content: space-evenly;   完全平分 */
+            /* 整体垂直对齐 */
+            align-content: center;
+            /* align-content: start; */
+            /* align-content: end; */
+            /* align-content: space-between; */
+            /* 网格项在单元格内的对齐 */
+            /* justify-items: center;    水平居中 */
+            /* align-items: center;      垂直居中 */
+            gap: 10px;
+        }
+        .grid-align .grid-item {
+            /* 单个项的对齐（覆盖 justify-items/align-items） */
+            /* align-self: center; */
+            /* justify-self: center; */
+        }
+        .grid-align .grid-item:nth-child(2) {
+            /* 单独设置这个项在单元格内的对齐 */
+            align-self: center;
+            justify-self: center;
+        }
+
+        /* === 隐式行与列 === */
+        .grid-implicit {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            grid-auto-rows: 80px;
+            /* grid-auto-rows: minmax(80px, auto);  内容撑高 */
+            /* grid-auto-columns: 100px;  隐式列宽 */
+            gap: 10px;
+        }
+
+        .code {
+            background: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 13px;
+            margin: 10px 0;
+            border-left: 3px solid #9b59b6;
+        }
+
+        .note {
+            background: #fef9e7;
+            border-left: 4px solid #f39c12;
+            padding: 10px 15px;
+            margin-top: 10px;
+            font-size: 14px;
+            color: #7f8c8d;
+        }
+    </style>
+</head>
+<body>
+    <div class="section">
+        <h2>1. Grid 基础 — 3列等宽</h2>
+        <div class="code">grid-template-columns: 1fr 1fr 1fr;</div>
+        <div class="grid-basic">
+            <div class="grid-item">1</div>
+            <div class="grid-item">2</div>
+            <div class="grid-item">3</div>
+            <div class="grid-item">4</div>
+            <div class="grid-item">5</div>
+            <div class="grid-item">6</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>2. repeat + auto-fit + minmax</h2>
+        <div class="code">grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));</div>
+        <p style="font-size:14px;color:#7f8c8d;margin-bottom:10px;">
+            自动填充列数，每列最小120px，最大化平分剩余空间
+        </p>
+        <div class="grid-auto">
+            <div class="grid-item">1</div>
+            <div class="grid-item">2</div>
+            <div class="grid-item">3</div>
+            <div class="grid-item">4</div>
+            <div class="grid-item">5</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>3. 网格跨越 — grid-column / grid-row</h2>
+        <div class="code">grid-column: 1 / 3;  /* 从第1条线到第3条线 */</div>
+        <div class="grid-span">
+            <div class="grid-item" style="background:linear-gradient(135deg,#e74c3c,#c0392b)">跨2列</div>
+            <div class="grid-item">2</div>
+            <div class="grid-item">3</div>
+            <div class="grid-item" style="background:linear-gradient(135deg,#2ecc71,#27ae60)">跨2列</div>
+            <div class="grid-item">5</div>
+            <div class="grid-item">6</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>4. grid-area 区域命名 — 页面布局</h2>
+        <div class="code">
+            grid-template-areas:<br>
+            &emsp;"header &emsp;header &emsp;header"<br>
+            &emsp;"sidebar content content"<br>
+            &emsp;"footer &emsp;footer &emsp;footer"
+        </div>
+        <div class="grid-area-layout" style="margin-top:10px;">
+            <div class="grid-item header" style="background:linear-gradient(135deg,#34495e,#2c3e50)">header</div>
+            <div class="grid-item sidebar" style="background:linear-gradient(135deg,#e67e22,#d35400)">sidebar</div>
+            <div class="grid-item content" style="background:linear-gradient(135deg,#3498db,#2980b9)">content</div>
+            <div class="grid-item footer" style="background:linear-gradient(135deg,#95a5a6,#7f8c8d)">footer</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>5. 对齐方式</h2>
+        <div class="code">justify-content: center;  align-content: center;</div>
+        <div class="grid-align">
+            <div class="grid-item">1</div>
+            <div class="grid-item" style="background:linear-gradient(135deg,#f1c40f,#f39c12);color:#333">① align-self:center<br>justify-self:center</div>
+            <div class="grid-item">3</div>
+            <div class="grid-item">4</div>
+            <div class="grid-item">5</div>
+            <div class="grid-item">6</div>
+        </div>
+        <div class="note">
+            justify-content(整体水平) / align-content(整体垂直)<br>
+            justify-items(项水平) / align-items(项垂直)<br>
+            justify-self(单项目) / align-self(单项目)
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>6. 隐式行 grid-auto-rows</h2>
+        <div class="code">grid-template-columns: repeat(3, 1fr);<br>grid-auto-rows: 80px;</div>
+        <div class="grid-implicit">
+            <div class="grid-item">1</div>
+            <div class="grid-item">2</div>
+            <div class="grid-item">3</div>
+            <div class="grid-item">4</div>
+            <div class="grid-item">5</div>
+            <div class="grid-item">6</div>
+            <div class="grid-item">7（隐式行）</div>
+            <div class="grid-item">8（隐式行）</div>
+        </div>
+        <div class="note">
+            超出 grid-template-rows 定义的行自动按 grid-auto-rows 渲染
+        </div>
+    </div>
+</body>
+</html>

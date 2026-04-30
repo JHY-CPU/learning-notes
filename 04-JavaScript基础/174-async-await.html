@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>async-await</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #16a085; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>async/await</h2><p>基于 Promise 的语法糖，让异步代码看起来像同步代码。</p></div>
+    <div class="card">
+        <h2>async 函数</h2>
+        <div class="code">// async 关键字将函数标记为异步函数
+// async 函数总是返回一个 Promise
+
+async function foo() {
+    return 42;  // 等价于 Promise.resolve(42)
+}
+foo().then(v => console.log(v));  // 42
+
+// 返回 Promise 则直接返回
+async function bar() {
+    return Promise.resolve('hello');
+}
+bar().then(v => console.log(v));  // 'hello'
+
+// 抛出错误 → 返回 rejected Promise
+async function fail() {
+    throw new Error('出错了');
+}
+fail().catch(e => console.log(e.message));  // '出错了'
+
+// async 函数表达式
+const fn = async function() { return 1; };
+
+// async 箭头函数
+const arrow = async () => 2;
+
+// async 作为对象方法
+const obj = {
+    async getData() { return 'data'; }
+};
+
+// async 函数 vs 普通函数
+// 普通函数返回非 Promise 值：调用者直接得到值
+// async 函数：调用者始终得到 Promise（需要 then/await）</div>
+    </div>
+    <div class="card">
+        <h2>await 关键字</h2>
+        <div class="code">// await 等待 Promise 完成
+// 只能在 async 函数内部使用
+
+const delay = ms => new Promise(r => setTimeout(r, ms));
+
+async function demo() {
+    console.log('开始');
+    await delay(1000);      // 等待 1 秒
+    console.log('1秒后');
+    await delay(500);       // 再等 500ms
+    console.log('500ms后');
+}
+// 输出（间隔出现）：
+// 开始
+// （1秒后）
+// 1秒后
+// （500ms后）
+// 500ms后
+
+// await 会暂停当前 async 函数的执行
+// 但不会阻塞线程（事件循环继续）
+
+// await 后面的值如果不是 Promise，会被转为 Promise
+async function example() {
+    const a = await 42;         // 等价 await Promise.resolve(42)
+    const b = await 'hello';
+    console.log(a, b);
+}
+
+// await 表达式的结果是 Promise 的 resolve 值
+async function getResult() {
+    const result = await Promise.resolve(100);
+    return result * 2;
+}
+getResult().then(v => console.log(v));  // 200</div>
+    </div>
+    <div class="card">
+        <h2>错误处理</h2>
+        <div class="code">// 方式1：try/catch（推荐）
+async function fetchData() {
+    try {
+        const response = await fetch('https://api.example.com/data');
+        const data = await response.json();
+        return data;
+    } catch (error) {
+        console.error('请求失败:', error.message);
+        return null;  // 默认值
+    }
+}
+
+// 方式2：catch 链式调用
+async function fetchData2() {
+    const data = await fetch('https://api.example.com/data')
+        .then(res => res.json())
+        .catch(err => {
+            console.error('错误:', err);
+            return null;
+        });
+    return data;
+}
+
+// 方式3：让错误传播（调用者处理）
+async function risky() {
+    // 不 try/catch，错误自动传播
+    const data = await JSON.parse('invalid');
+    return data;
+}
+risky().catch(e => console.log('调用者处理:', e.message));
+
+// await 后面 Promise.reject 会抛出错误
+async function test() {
+    try {
+        await Promise.reject(new Error('失败了'));
+    } catch (e) {
+        console.log('捕获:', e.message);
+    }
+}
+test();
+
+// 多个 await 分别 try/catch
+async function multiStep() {
+    let user;
+    try {
+        user = await fetchUser();
+    } catch (e) {
+        console.log('获取用户失败');
+        return;
+    }
+
+    try {
+        const posts = await fetchPosts(user.id);
+        return posts;
+    } catch (e) {
+        console.log('获取帖子失败');
+        return [];
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>并行请求</h2>
+        <div class="code">// ❌ 串行执行（慢）
+async function loadSerial() {
+    const user = await fetchUser();     // 1s
+    const posts = await fetchPosts();   // 1s
+    const comments = await fetchComments(); // 1s
+    // 总共 3 秒
+}
+
+// ✅ 并行执行（快）
+async function loadParallel() {
+    const [user, posts, comments] = await Promise.all([
+        fetchUser(),        // 1s
+        fetchPosts(),       // 1s
+        fetchComments()     // 1s
+    ]);
+    // 总共 1 秒
+}
+
+// 🌟 重要：区分 await 位置
+// ❌ 串行（等待上一个完成才发起下一个）
+async function serial(urls) {
+    const results = [];
+    for (const url of urls) {
+        const res = await fetch(url);
+        results.push(await res.json());
+    }
+    return results;
+}
+
+// ✅ 并行（一次性全部发起）
+async function parallel(urls) {
+    const promises = urls.map(url => fetch(url).then(r => r.json()));
+    return await Promise.all(promises);
+}
+
+// ⚠️ 不要对需要顺序的操作使用并行
+async function sequential() {
+    const result1 = await step1();
+    const result2 = await step2(result1);  // 依赖 step1 的结果
+    const result3 = await step3(result2);  // 依赖 step2 的结果
+    return result3;
+}</div>
+    </div>
+    <div class="card">
+        <h2>async/await 实际应用</h2>
+        <div class="code">// 实际场景：获取用户信息及关联数据
+const delay = ms => new Promise(r => setTimeout(r, ms));
+
+// 模拟 API
+function api(path) {
+    return delay(200).then(() => ({
+        ok: true,
+        json: () => Promise.resolve({ data: path })
+    }));
+}
+
+async function loadDashboard(userId) {
+    try {
+        // 并行获取不依赖的数据
+        const [user, notifications, config] = await Promise.all([
+            api(`/user/${userId}`).then(r => r.json()),
+            api(`/notifications/${userId}`).then(r => r.json()),
+            api('/config').then(r => r.json()),
+        ]);
+
+        // 串行获取依赖的数据
+        const posts = await api(`/user/${user.data}/posts`).then(r => r.json());
+        const firstPostComments = posts.data?.length
+            ? await api(`/posts/${posts.data[0]}/comments`).then(r => r.json())
+            : [];
+
+        return { user, notifications, config, posts, firstPostComments };
+    } catch (error) {
+        console.error('Dashboard 加载失败:', error);
+        throw error;
+    }
+}</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== async 函数 ===');
+        async function hello() {
+            return 'Hello, async!';
+        }
+        hello().then(v => console.log(v));
+
+        console.log('=== await 等待 ===');
+        const delay = ms => new Promise(r => setTimeout(r, ms));
+
+        async function demo() {
+            console.log('  await 前');
+            await delay(200);
+            console.log('  200ms 后');
+            return '完成';
+        }
+        demo().then(v => console.log('  返回值:', v));
+
+        console.log('=== try/catch 错误处理 ===');
+        async function safeFetch() {
+            try {
+                const data = await Promise.reject(new Error('网络错误'));
+                return data;
+            } catch (e) {
+                console.log('  捕获:', e.message);
+                return '默认值';
+            }
+        }
+        safeFetch().then(v => console.log('  返回:', v));
+
+        console.log('=== 并行请求 ===');
+        async function parallelDemo() {
+            const p1 = delay(300).then(() => '结果1');
+            const p2 = delay(300).then(() => '结果2');
+            const [r1, r2] = await Promise.all([p1, p2]);
+            console.log('  并行结果:', r1, r2);
+        }
+        parallelDemo();
+
+        console.log('=== 串行 vs 并行 ===');
+        async function compare() {
+            // 串行
+            console.time('serial');
+            await delay(100);
+            await delay(100);
+            console.timeEnd('serial');
+
+            // 并行
+            console.time('parallel');
+            await Promise.all([delay(100), delay(100)]);
+            console.timeEnd('parallel');
+        }
+        compare().then(() => console.log('并行比串行快一倍'));
+
+        document.getElementById('output').textContent =
+            `async 总是返回 Promise\n` +
+            `await 暂停 async 函数\n` +
+            `try/catch 处理错误\n` +
+            `✅ async/await 演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>13-AC自动机基础 (Aho-Corasick)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<h1>13 - AC 自动机基础 (Aho-Corasick)</h1>
+
+<div class="card">
+  <h2>什么是 AC 自动机？</h2>
+  <p>Aho-Corasick 自动机（AC 自动机）是 Alfred V. Aho 和 Margaret J. Corasick 于 1975 年提出的<strong>多模式字符串匹配算法</strong>。它结合了 Trie 树和 KMP 的思想，能在 O(n) 时间内同时查找多个模式串在文本中的出现位置。</p>
+  <div class="note">
+    <strong>核心思想：</strong>
+    <ol>
+      <li>将所有模式串构建成一棵 <strong>Trie 树</strong></li>
+      <li>在 Trie 树上添加<strong>失败指针</strong>（fail pointer），类似于 KMP 的 π 函数</li>
+      <li>在文本串上匹配时，当前字符失配时沿着失败指针跳转，而<strong>不需要回溯</strong>文本指针</li>
+    </ol>
+  </div>
+</div>
+
+<div class="card">
+  <h2>AC 自动机的三个组成部分</h2>
+  <table border="1" cellpadding="8" cellspacing="0" style="width:100%;border-collapse:collapse;">
+    <tr style="background:#3498db;color:white;"><th>组成部分</th><th>描述</th><th>类比</th></tr>
+    <tr><td><strong>Trie 树</strong></td><td>存储所有模式串的字典树</td><td>模式串的集合表示</td></tr>
+    <tr><td><strong>失败指针</strong></td><td>当某个节点匹配失败时，跳转到另一个节点继续匹配。指向的是当前节点代表的字符串的<strong>最长后缀</strong>，且该后缀是某个模式串的前缀</td><td>KMP 的 π 数组</td></tr>
+    <tr><td><strong>输出函数</strong></td><td>当到达某个节点时，输出所有匹配到的模式串。通常包括该节点本身的匹配和沿着失败指针链路上的匹配</td><td>模式串匹配结果</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>失败指针（Fail Pointer）详解</h2>
+  <p>失败指针是 AC 自动机的精髓。假设当前节点对应字符串 S，则 fail 指针指向：<strong>Trie 中存在的、S 的最长真后缀所对应的节点</strong>。</p>
+
+  <p><strong>构建过程（BFS）：</strong></p>
+  <ol>
+    <li>根节点的所有直接子节点的 fail 指针指向根节点</li>
+    <li>使用 BFS 遍历 Trie 树：对于当前节点 u 及其子节点 v（对应字符 c）：
+      <ul>
+        <li>如果 v 存在，则 <code>v.fail = u.fail.children[c]</code>（如果存在）否则继续沿着 fail 链查找，直到根节点</li>
+        <li>如果 v 不存在，则将 <code>u.children[c]</code> 指向 <code>u.fail.children[c]</code>（转移表优化）</li>
+      </ul>
+    </li>
+  </ol>
+
+  <div class="code">
+// 构建失败指针的伪代码（BFS）
+buildFailPointer():
+  queue = new Queue()
+  for each child of root:
+    child.fail = root
+    queue.push(child)
+
+  while queue is not empty:
+    u = queue.pop()
+    for each (c, v) in u.children:
+      // 计算 v 的失败指针
+      f = u.fail
+      while f != root and c not in f.children:
+        f = f.fail
+      if c in f.children:
+        v.fail = f.children[c]
+      else:
+        v.fail = root
+      // 合并输出（重要优化）
+      v.output = v.output ∪ v.fail.output
+      queue.push(v)
+  </div>
+</div>
+
+<div class="card">
+  <h2>匹配过程</h2>
+  <p>AC 自动机的匹配过程与 KMP 高度相似，只是从单模式推广到了多模式：</p>
+  <div class="code">
+// AC 自动机匹配过程
+match(text):
+  node = root
+  for i = 0 to text.length - 1:
+    c = text[i]
+    // 沿着失败指针查找可匹配的节点
+    while node != root and c not in node.children:
+      node = node.fail
+    if c in node.children:
+      node = node.children[c]
+    // 检查当前节点是否有输出（匹配到的模式串）
+    if node.output is not empty:
+      for each pattern in node.output:
+        print "位置", i - pattern.length + 1, ":", pattern
+    // 注意：即使当前节点没有输出，也需要检查 node.output
+    // 因为沿着 fail 链可能有其他匹配
+  </div>
+</div>
+
+<div class="card">
+  <h2>复杂度分析</h2>
+  <table border="1" cellpadding="8" cellspacing="0" style="width:100%;border-collapse:collapse;">
+    <tr style="background:#3498db;color:white;"><th>指标</th><th>值</th></tr>
+    <tr><td>构建 Trie 树</td><td>O(∑m) — 所有模式串的总长度</td></tr>
+    <tr><td>构建失败指针</td><td>O(∑m) — BFS 遍历所有节点</td></tr>
+    <tr><td>匹配时间</td><td>O(n + total_matches) — 线性于文本长度 + 匹配输出数</td></tr>
+    <tr><td>空间复杂度</td><td>O(∑m · Σ) — 节点数 × 字符集大小（可用哈希表优化）</td></tr>
+  </table>
+  <div class="note" style="margin-top:10px;">
+    匹配的总时间复杂度为 O(n + m + z)，其中 z 是匹配输出的总次数。在最坏情况下（如模式串都是单个字符），z 可能达到 O(n·k)。
+  </div>
+</div>
+
+<div class="card">
+  <h2>应用场景</h2>
+  <ul>
+    <li><strong>敏感词过滤</strong> — 内容审核系统（如评论过滤、聊天监控）</li>
+    <li><strong>入侵检测</strong> — Snort 等 IDS/IPS 系统中的特征匹配</li>
+    <li><strong>病毒扫描</strong> — 在文件中查找病毒特征码</li>
+    <li><strong>生物信息学</strong> — DNA 序列中查找多个基因片段</li>
+    <li><strong>自然语言处理</strong> — 词典分词（最大匹配法）</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>图示：AC 自动机示例</h2>
+  <p>模式串集合: {"he", "she", "his", "hers"}</p>
+  <pre>
+          root
+         /    \
+        h      s
+       /      / \
+      e      h   e
+     / \    /    |
+ (he)  r  (his) (she)
+      /    ↑
+     s    fail指针
+    /   (虚线箭头)
+ (hers)
+
+ 失败指针示例:
+   "she" → "he" (最长公共后缀)
+   "his" → "is"不存在 → "s"不存在 → root
+   "hers" → "ers"不存在 → "rs"不存在
+           → "s"不存在 → root
+  </pre>
+</div>
+
+<div class="card">
+  <h2>交互演示：概念理解</h2>
+  <div class="note">
+    AC 自动机的核心优势在于：
+    <ul>
+      <li>扫描一遍文本即可找出<strong>所有</strong>模式串的匹配</li>
+      <li>文本指针<strong>永不回退</strong></li>
+      <li>匹配时间与模式串数量<strong>无关</strong>（仅与总长度有关）</li>
+    </ul>
+    <p style="margin-top:10px;">具体实现和演示请见下一节：<strong>AC 自动机实现</strong></p>
+  </div>
+</div>
+<div class="card">
+  <h2>AC 自动机匹配演示</h2>
+  <p>模式串: he, she, his, hers &nbsp; 文本: "ushers"</p>
+  <button onclick="runDemo()">运行匹配演示</button>
+  <div id="result"></div>
+</div>
+<script>
+function runDemo() {
+  // Build trie
+  const patterns = ['he','she','his','hers'];
+  const text = 'ushers';
+  // Simple AC simulation
+  class Node {
+    constructor() { this.children = {}; this.fail = null; this.outputs = []; }
+  }
+  const root = new Node();
+  for (const p of patterns) {
+    let cur = root;
+    for (const ch of p) {
+      if (!cur.children[ch]) cur.children[ch] = new Node();
+      cur = cur.children[ch];
+    }
+    cur.outputs.push(p);
+  }
+  // BFS build fail pointers
+  const q = [];
+  for (const ch in root.children) {
+    root.children[ch].fail = root;
+    q.push(root.children[ch]);
+  }
+  while (q.length) {
+    const u = q.shift();
+    for (const ch in u.children) {
+      const v = u.children[ch];
+      let f = u.fail;
+      while (f && !f.children[ch]) f = f.fail;
+      v.fail = f ? f.children[ch] : root;
+      if (v.fail) v.outputs = v.outputs.concat(v.fail.outputs);
+      q.push(v);
+    }
+  }
+  // Match
+  let cur = root, matches = [];
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    while (cur !== root && !cur.children[ch]) cur = cur.fail;
+    cur = cur.children[ch] || root;
+    if (cur.outputs.length) {
+      for (const p of cur.outputs) {
+        matches.push(`位置 ${i - p.length + 1}: "${p}"`);
+      }
+    }
+  }
+  let out = '文本: "' + text + '"\n';
+  out += '模式串: ' + patterns.join(', ') + '\n\n';
+  if (matches.length) out += '匹配结果:\n' + matches.join('\n');
+  else out += '无匹配';
+  document.getElementById('result').textContent = out;
+}
+</script>
+</body></html>

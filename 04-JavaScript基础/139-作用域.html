@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>作用域</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #2c3e50; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>作用域（Scope）</h2><p>变量在程序中可访问的范围。</p></div>
+    <div class="card">
+        <h2>全局作用域</h2>
+        <div class="code">// 在函数或块外部声明的变量
+let globalVar = '我是全局的';
+
+function test() {
+    console.log(globalVar);  // ✅ 可以访问
+}
+
+// 浏览器中的 window 对象就是全局对象
+// var 声明的全局变量会成为 window 的属性
+var globalVar2 = 'hello';
+console.log(window.globalVar2); // 'hello'</div>
+    </div>
+    <div class="card">
+        <h2>函数作用域</h2>
+        <div class="code">function test() {
+    let x = '函数内';
+    console.log(x);  // ✅ 可以
+}
+// console.log(x);  // ❌ 报错！x is not defined
+
+// var 是函数作用域
+function varTest() {
+    if (true) {
+        var y = 'var无视块';
+    }
+    console.log(y);  // ✅ 可以（var 函数作用域）
+}</div>
+    </div>
+    <div class="card">
+        <h2>块级作用域 (let / const)</h2>
+        <div class="code">// let 和 const 是块级作用域
+if (true) {
+    let a = '块内';
+    const b = '也是块内';
+    var c = 'var是函数作用域';
+}
+// console.log(a);  // ❌ 报错
+// console.log(b);  // ❌ 报错
+console.log(c);      // ✅ 'var是函数作用域'
+
+for (let i = 0; i < 3; i++) {
+    // 每次循环 i 都是新的
+}
+// console.log(i);  // ❌ 报错</div>
+    </div>
+    <div class="card">
+        <h2>作用域链</h2>
+        <div class="code">// 内部作用域可以访问外部作用域
+let outer = '外部';
+
+function middle() {
+    let mid = '中间';
+
+    function inner() {
+        let innerVar = '内部';
+        console.log(outer);  // ✅ 向上查找
+        console.log(mid);    // ✅
+        console.log(innerVar); // ✅
+    }
+
+    inner();
+    // console.log(innerVar);  // ❌ 不能访问内部
+}
+
+// 查找顺序：当前作用域 → 父作用域 → ... → 全局</div>
+        <div class="note">💡 变量的查找沿作用域链向上，直到找到为止，找不到则报 ReferenceError。</div>
+    </div>
+    <div class="card">
+        <h2>词法作用域（静态作用域）</h2>
+        <div class="code">// JS 是词法作用域：作用域在写代码时就决定了
+let value = 'global';
+
+function outer() {
+    let value = 'outer';
+
+    function inner() {
+        console.log(value);  // 取决于定义时的位置
+    }
+
+    inner();  // 'outer'
+}
+
+outer();
+// inner 定义在 outer 内，所以 value 是 outer 的 value</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== 全局作用域 ===');
+        let globalMsg = '全局消息';
+        function testGlobal() {
+            console.log('访问全局:', globalMsg);
+        }
+        testGlobal();
+
+        console.log('=== 块级作用域 ===');
+        {
+            let blockVar = '块内变量';
+            const BLOCK = '块内常量';
+            var functionVar = 'var变量';
+            console.log('块内:', blockVar, BLOCK);
+        }
+        // console.log(blockVar);  // ❌
+        // console.log(BLOCK);     // ❌
+        console.log('var外部:', functionVar);  // ✅
+
+        console.log('=== 作用域链 ===');
+        let top = '顶层';
+        function level1() {
+            let mid = '中间层';
+            function level2() {
+                let bottom = '最内层';
+                console.log('作用域链:', top, mid, bottom);
+            }
+            level2();
+        }
+        level1();
+
+        console.log('=== 作用域链查找 ===');
+        let x = 1;
+        function f1() {
+            let x = 2;
+            function f2() {
+                let x = 3;
+                console.log('f2中的x:', x);  // 3
+            }
+            f2();
+            console.log('f1中的x:', x);  // 2
+        }
+        f1();
+
+        document.getElementById('output').textContent =
+            `全局作用域: ${globalMsg}\n` +
+            `var 在块外仍可访问: ${functionVar}\n` +
+            `作用域链: 内层可访问外层\n` +
+            `✅ 作用域演示完成！`;
+    </script>
+</body>
+</html>

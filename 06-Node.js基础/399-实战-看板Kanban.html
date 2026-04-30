@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实战-看板Kanban</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; max-width: 900px; margin: 0 auto; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        /* 看板布局 */
+        .kanban-board { display: flex; gap: 12px; min-height: 400px; overflow-x: auto; padding-bottom: 8px; }
+        .kanban-column { flex: 1; min-width: 220px; background: #f0f2f5; border-radius: 8px; padding: 12px; display: flex; flex-direction: column; }
+        .kanban-column .col-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; font-size: 14px; font-weight: bold; color: #2c3e50; }
+        .kanban-column .col-header .count { font-size: 12px; color: #95a5a6; font-weight: normal; background: #e0e0e0; padding: 1px 8px; border-radius: 10px; }
+        .kanban-column .col-header .add-btn { background: none; border: none; color: #95a5a6; cursor: pointer; font-size: 18px; padding: 0 4px; border-radius: 4px; }
+        .kanban-column .col-header .add-btn:hover { background: #e0e0e0; color: #2c3e50; }
+        /* 卡片 */
+        .kanban-cards { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 40px; }
+        .kanban-card { background: white; border-radius: 6px; padding: 10px 12px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); cursor: grab; transition: box-shadow 0.15s, transform 0.15s; border-left: 3px solid #3498db; }
+        .kanban-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.12); }
+        .kanban-card:active { cursor: grabbing; }
+        .kanban-card .card-title { font-size: 13px; color: #2c3e50; margin-bottom: 4px; }
+        .kanban-card .card-meta { display: flex; justify-content: space-between; font-size: 11px; color: #95a5a6; }
+        .kanban-card .card-meta .tag { padding: 1px 6px; border-radius: 4px; font-size: 10px; }
+        .kanban-card .card-meta .tag.frontend { background: #dbeafe; color: #1e40af; }
+        .kanban-card .card-meta .tag.backend { background: #fef3c7; color: #92400e; }
+        .kanban-card .card-meta .tag.design { background: #f3e8ff; color: #6b21a8; }
+        .kanban-card .card-meta .tag.bug { background: #fce4ec; color: #c62828; }
+        .kanban-card .card-actions { display: flex; gap: 4px; margin-top: 6px; }
+        .kanban-card .card-actions button { background: none; border: none; cursor: pointer; font-size: 12px; padding: 2px 6px; border-radius: 3px; color: #95a5a6; }
+        .kanban-card .card-actions button:hover { background: #f0f0f0; color: #e74c3c; }
+        .kanban-card.dragging { opacity: 0.5; transform: rotate(2deg); }
+        .kanban-column.drag-over { background: #e8f4fd; }
+        /* 空状态 */
+        .empty-col { text-align: center; color: #bbb; font-size: 12px; padding: 20px 0; }
+        /* 添加卡片弹窗 */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-overlay.open { display: flex; }
+        .modal-box { background: white; border-radius: 12px; padding: 24px; max-width: 360px; width: 90%; }
+        .modal-box h3 { margin: 0 0 12px 0; color: #2c3e50; }
+        .modal-box input, .modal-box select { width: 100%; padding: 8px 12px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 10px; font-size: 13px; box-sizing: border-box; }
+        .modal-box .modal-actions { display: flex; gap: 8px; justify-content: flex-end; }
+        .modal-box .modal-actions button { padding: 6px 16px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+        .modal-box .modal-actions button.primary { background: #3498db; color: white; }
+        .modal-box .modal-actions button.secondary { background: #95a5a6; color: white; }
+        .controls { display: flex; gap: 8px; margin-bottom: 12px; }
+        .controls button { padding: 6px 14px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-size: 12px; }
+        .controls button:hover { opacity: 0.9; }
+        .controls button.danger { background: #e74c3c; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>📋 看板 Kanban</h2>
+        <p style="color:#7f8c8d;font-size:13px;">任务看板、拖拽列/卡片、分类管理、添加/删除任务。</p>
+        <div class="controls">
+            <button onclick="openAddModal()">➕ 添加任务</button>
+            <button onclick="resetBoard()" class="danger">↺ 重置</button>
+        </div>
+        <div class="kanban-board" id="kanbanBoard">
+            <!-- 由 JS 动态渲染 -->
+        </div>
+    </div>
+    <div id="result"></div>
+
+    <!-- 添加卡片弹窗 -->
+    <div class="modal-overlay" id="addModal" onclick="if(event.target===this)closeAddModal()">
+        <div class="modal-box">
+            <h3>📝 新建任务</h3>
+            <input type="text" id="newCardTitle" placeholder="任务标题" onkeydown="if(event.key==='Enter') confirmAdd()">
+            <select id="newCardCol">
+                <option value="todo">待办</option>
+                <option value="doing">进行中</option>
+                <option value="review">审查中</option>
+                <option value="done">已完成</option>
+            </select>
+            <select id="newCardTag">
+                <option value="frontend">前端</option>
+                <option value="backend">后端</option>
+                <option value="design">设计</option>
+                <option value="bug">Bug</option>
+            </select>
+            <div class="modal-actions">
+                <button class="secondary" onclick="closeAddModal()">取消</button>
+                <button class="primary" onclick="confirmAdd()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('📋 看板演示:');
+        log('');
+
+        // ========== 数据 ==========
+        const columns = [
+            { id: 'todo', title: '📝 待办', color: '#3498db' },
+            { id: 'doing', title: '⚡ 进行中', color: '#f39c12' },
+            { id: 'review', title: '🔍 审查中', color: '#9b59b6' },
+            { id: 'done', title: '✅ 已完成', color: '#2ecc71' },
+        ];
+
+        let cards = [
+            { id: 1, title: '设计数据库模型', col: 'todo', tag: 'backend' },
+            { id: 2, title: '编写用户认证 API', col: 'todo', tag: 'backend' },
+            { id: 3, title: '实现登录页面', col: 'doing', tag: 'frontend' },
+            { id: 4, title: '搭建项目脚手架', col: 'done', tag: 'frontend' },
+            { id: 5, title: '修复导航栏样式', col: 'doing', tag: 'bug' },
+            { id: 6, title: 'Code Review: PR #42', col: 'review', tag: 'frontend' },
+            { id: 7, title: '设计系统组件库', col: 'todo', tag: 'design' },
+            { id: 8, title: '编写单元测试', col: 'review', tag: 'backend' },
+            { id: 9, title: '性能优化 - 首页', col: 'doing', tag: 'frontend' },
+            { id: 10, title: '部署文档更新', col: 'done', tag: 'backend' },
+        ];
+        let nextId = 100;
+        let draggedCard = null;
+
+        // ========== 渲染 ==========
+        function renderBoard() {
+            const board = document.getElementById('kanbanBoard');
+            board.innerHTML = columns.map(col => {
+                const colCards = cards.filter(c => c.col === col.id);
+                return `
+                    <div class="kanban-column" data-col="${col.id}" ondrop="onDrop(event)" ondragover="onDragOver(event)" ondragenter="onDragEnter(event)" ondragleave="onDragLeave(event)">
+                        <div class="col-header">
+                            <span>${col.title}</span>
+                            <span class="count">${colCards.length}</span>
+                            <button class="add-btn" onclick="openAddModal('${col.id}')" title="添加任务">+</button>
+                        </div>
+                        <div class="kanban-cards" id="cards-${col.id}">
+                            ${colCards.length === 0 ? '<div class="empty-col">拖拽任务到此处</div>' :
+                            colCards.map(c => `
+                                <div class="kanban-card" draggable="true" data-id="${c.id}" ondragstart="onDragStart(event)" ondragend="onDragEnd(event)">
+                                    <div class="card-title">${c.title}</div>
+                                    <div class="card-meta">
+                                        <span class="tag ${c.tag}">${c.tag === 'frontend' ? '前端' : c.tag === 'backend' ? '后端' : c.tag === 'design' ? '设计' : 'Bug'}</span>
+                                    </div>
+                                    <div class="card-actions">
+                                        <button onclick="moveCard(${c.id}, -1)" title="左移">◀</button>
+                                        <button onclick="moveCard(${c.id}, 1)" title="右移">▶</button>
+                                        <button onclick="deleteCard(${c.id})" title="删除">🗑️</button>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ========== 拖拽 ==========
+        function onDragStart(e) {
+            draggedCard = e.target.closest('.kanban-card');
+            if (!draggedCard) return;
+            draggedCard.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', draggedCard.dataset.id);
+        }
+
+        function onDragEnd(e) {
+            if (draggedCard) draggedCard.classList.remove('dragging');
+            document.querySelectorAll('.kanban-column.drag-over').forEach(el => el.classList.remove('drag-over'));
+            draggedCard = null;
+        }
+
+        function onDragOver(e) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = 'move';
+        }
+
+        function onDragEnter(e) {
+            const col = e.target.closest('.kanban-column');
+            if (col) col.classList.add('drag-over');
+        }
+
+        function onDragLeave(e) {
+            const col = e.target.closest('.kanban-column');
+            if (col && !col.contains(e.relatedTarget)) {
+                col.classList.remove('drag-over');
+            }
+        }
+
+        function onDrop(e) {
+            e.preventDefault();
+            const col = e.target.closest('.kanban-column');
+            if (!col || !draggedCard) return;
+
+            const cardId = parseInt(draggedCard.dataset.id);
+            const newCol = col.dataset.col;
+            const card = cards.find(c => c.id === cardId);
+            if (!card) return;
+
+            const oldCol = card.col;
+            card.col = newCol;
+            document.querySelectorAll('.kanban-column.drag-over').forEach(el => el.classList.remove('drag-over'));
+            renderBoard();
+            log(`📋 移动: "${card.title}" → ${columns.find(c => c.id === newCol).title}`);
+        }
+
+        // ========== CRUD ==========
+        function moveCard(id, dir) {
+            const card = cards.find(c => c.id === id);
+            if (!card) return;
+            const colIdx = columns.findIndex(c => c.id === card.col);
+            const newIdx = colIdx + dir;
+            if (newIdx < 0 || newIdx >= columns.length) return;
+            const newCol = columns[newIdx].id;
+            card.col = newCol;
+            renderBoard();
+            log(`📋 移动: "${card.title}" → ${columns[newIdx].title}`);
+        }
+
+        function deleteCard(id) {
+            const card = cards.find(c => c.id === id);
+            cards = cards.filter(c => c.id !== id);
+            renderBoard();
+            if (card) log(`🗑️ 删除: "${card.title}"`);
+        }
+
+        function openAddModal(prefillCol) {
+            if (prefillCol) document.getElementById('newCardCol').value = prefillCol;
+            document.getElementById('newCardTitle').value = '';
+            document.getElementById('addModal').classList.add('open');
+            setTimeout(() => document.getElementById('newCardTitle').focus(), 100);
+        }
+
+        function closeAddModal() {
+            document.getElementById('addModal').classList.remove('open');
+        }
+
+        function confirmAdd() {
+            const title = document.getElementById('newCardTitle').value.trim();
+            if (!title) return;
+            const col = document.getElementById('newCardCol').value;
+            const tag = document.getElementById('newCardTag').value;
+            cards.push({ id: nextId++, title, col, tag });
+            closeAddModal();
+            renderBoard();
+            log(`➕ 添加: "${title}" → ${columns.find(c => c.id === col).title}`);
+        }
+
+        function resetBoard() {
+            cards = [
+                { id: 1, title: '设计数据库模型', col: 'todo', tag: 'backend' },
+                { id: 2, title: '编写用户认证 API', col: 'todo', tag: 'backend' },
+                { id: 3, title: '实现登录页面', col: 'doing', tag: 'frontend' },
+                { id: 4, title: '搭建项目脚手架', col: 'done', tag: 'frontend' },
+                { id: 5, title: '修复导航栏样式', col: 'doing', tag: 'bug' },
+                { id: 6, title: 'Code Review: PR #42', col: 'review', tag: 'frontend' },
+                { id: 7, title: '设计系统组件库', col: 'todo', tag: 'design' },
+                { id: 8, title: '编写单元测试', col: 'review', tag: 'backend' },
+                { id: 9, title: '性能优化 - 首页', col: 'doing', tag: 'frontend' },
+                { id: 10, title: '部署文档更新', col: 'done', tag: 'backend' },
+            ];
+            renderBoard();
+            log('↺ 看板已重置');
+        }
+
+        // ========== 初始化 ==========
+        renderBoard();
+        log('✅ 看板就绪 (支持拖拽移动)');
+    </script>
+</body>
+</html>

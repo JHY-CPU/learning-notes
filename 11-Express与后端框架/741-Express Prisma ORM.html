@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express Prisma ORM</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔷 Express Prisma ORM</h2><p>Prisma ORM 基础、Schema 定义、Migration、CRUD 操作、关联查询 (include/select)、事务、中间件 (middleware)、分页/过滤/排序、Express 集成。</p></div>
+    <div class="card">
+        <h2>Prisma 基础</h2>
+        <div class="code">// ========== Prisma ORM ==========
+// 新一代 Node.js/TypeScript ORM
+// 自动生成类型安全的客户端
+
+// 安装:
+// npm install @prisma/client
+// npm install prisma --save-dev
+// npx prisma init
+
+// ========== schema.prisma ==========
+// prisma/schema.prisma:
+
+// generator client {
+//   provider = "prisma-client-js"
+// }
+//
+// datasource db {
+//   provider = "postgresql"   // postgresql | mysql | sqlite | mongodb
+//   url      = env("DATABASE_URL")
+// }
+//
+// model User {
+//   id        Int      @id @default(autoincrement())
+//   email     String   @unique
+//   name      String?
+//   role      Role     @default(USER)
+//   posts     Post[]
+//   createdAt DateTime @default(now())
+//   updatedAt DateTime @updatedAt
+// }
+//
+// model Post {
+//   id        Int      @id @default(autoincrement())
+//   title     String
+//   content   String?
+//   published Boolean  @default(false)
+//   author    User     @relation(fields: [authorId], references: [id])
+//   authorId  Int
+//   createdAt DateTime @default(now())
+// }
+//
+// enum Role {
+//   USER
+//   ADMIN
+// }
+
+// ========== 命令 ==========
+// npx prisma migrate dev --name init    # 创建迁移
+// npx prisma migrate deploy             # 生产迁移
+// npx prisma generate                   # 生成客户端
+// npx prisma studio                     # GUI 管理界面
+// npx prisma db seed                    # 种子数据
+
+// ========== 初始化客户端 ==========
+// lib/prisma.js:
+const { PrismaClient } = require('@prisma/client');
+
+const prisma = new PrismaClient({
+    log: process.env.NODE_ENV === 'development'
+        ? ['query', 'info', 'warn', 'error']
+        : ['error'],
+});
+
+process.on('SIGTERM', async () => {
+    await prisma.$disconnect();
+});
+
+module.exports = prisma;</div>
+    </div>
+    <div class="card">
+        <h2>CRUD 操作</h2>
+        <div class="code">// ========== Prisma CRUD ==========
+// 类型安全的链式 API
+
+const prisma = require('../lib/prisma');
+
+// ========== 创建 ==========
+const user = await prisma.user.create({
+    data: {
+        email: 'alice@test.com',
+        name: 'Alice',
+        role: 'USER',
+        // 同时创建关联 (嵌套写)
+        posts: {
+            create: [
+                { title: 'First Post', content: 'Hello!' },
+                { title: 'Second Post', content: 'World!' },
+            ],
+        },
+    },
+    select: { id: true, email: true, name: true },
+});
+
+// ========== 查询 ==========
+// 所有用户 (含文章)
+const users = await prisma.user.findMany({
+    where: { role: 'USER' },
+    include: {
+        posts: {
+            where: { published: true },
+            select: { id: true, title: true },
+            orderBy: { createdAt: 'desc' },
+            take: 5,
+        },
+    },
+    orderBy: { createdAt: 'desc' },
+    skip: 0,
+    take: 20,
+});
+
+// 单条
+const user = await prisma.user.findUnique({
+    where: { email: 'alice@test.com' },
+    include: { posts: true },
+});
+
+// 第一条匹配
+const firstUser = await prisma.user.findFirst({
+    where: { name: { contains: 'Ali' } },
+});
+
+// ========== 更新 ==========
+const updated = await prisma.user.update({
+    where: { id: 1 },
+    data: {
+        name: 'Alice Updated',
+        posts: {
+            // 新增关联文章
+            create: { title: 'New Post', content: '...' },
+        },
+    },
+    select: { id: true, name: true },
+});
+
+// 批量更新
+await prisma.post.updateMany({
+    where: { published: false },
+    data: { published: true },
+});
+
+// upsert (存在更新, 不存在创建)
+const upserted = await prisma.user.upsert({
+    where: { email: 'test@test.com' },
+    update: { name: 'Updated' },
+    create: { email: 'test@test.com', name: 'New' },
+});
+
+// ========== 删除 ==========
+await prisma.user.delete({
+    where: { id: 1 },
+});
+
+// 批量删除
+await prisma.post.deleteMany({
+    where: { published: false },
+});
+
+// ========== 计数 ==========
+const total = await prisma.user.count();
+const activeCount = await prisma.user.count({
+    where: { role: 'ADMIN' },
+});</div>
+    </div>
+    <div class="card">
+        <h2>关联与事务</h2>
+        <div class="code">// ========== 关联查询 ==========
+
+// ========== 1. include (加载关联) ==========
+const userWithPosts = await prisma.user.findUnique({
+    where: { id: 1 },
+    include: {
+        posts: {
+            include: {
+                categories: true,  // 嵌套关联
+            },
+            orderBy: { createdAt: 'desc' },
+        },
+        profile: true,
+    },
+});
+
+// ========== 2. select (选择字段 + 关联) ==========
+const user = await prisma.user.findUnique({
+    where: { id: 1 },
+    select: {
+        id: true,
+        name: true,
+        posts: {
+            select: {
+                title: true,
+                createdAt: true,
+            },
+            take: 5,
+        },
+        _count: {
+            select: { posts: true },  // 文章数
+        },
+    },
+});
+// 结果: { id, name, posts: [...], _count: { posts: 10 } }
+
+// ========== 3. 嵌套写入 ==========
+// 创建用户 + 文章 + 分类一次完成
+await prisma.user.create({
+    data: {
+        email: 'bob@test.com',
+        profile: {
+            create: { bio: 'Hello!', avatar: 'avatar.jpg' },
+        },
+        posts: {
+            create: [
+                {
+                    title: 'Post 1',
+                    categories: {
+                        connect: [{ id: 1 }, { id: 2 }],  // 关联已有
+                    },
+                },
+            ],
+        },
+    },
+});
+
+// ========== 事务 ==========
+// 方法 1: $transaction (批量)
+const [user, post] = await prisma.$transaction([
+    prisma.user.create({ data: { email: 't@t.com', name: 'T' } }),
+    prisma.post.create({ data: { title: 'Post', authorId: 1 } }),
+]);
+
+// 方法 2: $transaction (交互式)
+await prisma.$transaction(async (tx) => {
+    const user = await tx.user.findUnique({
+        where: { id: userId },
+    });
+
+    if (user.balance < amount) {
+        throw new Error('Insufficient funds');
+    }
+
+    await tx.user.update({
+        where: { id: fromId },
+        data: { balance: { decrement: amount } },
+    });
+
+    await tx.user.update({
+        where: { id: toId },
+        data: { balance: { increment: amount } },
+    });
+});
+
+// ========== Prisma 中间件 ==========
+// 拦截操作 (类似 Mongoose hooks)
+
+prisma.$use(async (params, next) => {
+    // 记录查询时间
+    const start = Date.now();
+    const result = await next(params);
+    const duration = Date.now() - start;
+
+    if (duration > 1000) {
+        logger.warn('Slow query', {
+            model: params.model,
+            action: params.action,
+            duration,
+        });
+    }
+
+    return result;
+});
+
+// 软删除中间件:
+prisma.$use(async (params, next) => {
+    if (params.model === 'User') {
+        if (params.action === 'findMany') {
+            // 自动过滤已删除
+            if (!params.args.where) params.args.where = {};
+            params.args.where.deletedAt = null;
+        }
+    }
+    return next(params);
+});</div>
+    </div>
+    <div class="card">
+        <h2>Express 集成</h2>
+        <div class="code">// ========== Prisma + Express ==========
+
+// ========== 用户路由 ==========
+// routes/users.js
+const prisma = require('../lib/prisma');
+
+router.get('/users', async (req, res) => {
+    const { page = 1, limit = 20, search, sort = 'createdAt' } = req.query;
+    const skip = (page - 1) * limit;
+
+    const where = {};
+
+    if (search) {
+        where.OR = [
+            { name: { contains: search, mode: 'insensitive' } },
+            { email: { contains: search, mode: 'insensitive' } },
+        ];
+    }
+
+    const [users, total] = await prisma.$transaction([
+        prisma.user.findMany({
+            where,
+            select: {
+                id: true,
+                name: true,
+                email: true,
+                role: true,
+                createdAt: true,
+                _count: { select: { posts: true } },
+            },
+            orderBy: { [sort]: 'desc' },
+            skip,
+            take: parseInt(limit),
+        }),
+        prisma.user.count({ where }),
+    ]);
+
+    res.paginated(users, total, { page: parseInt(page), limit: parseInt(limit) });
+});
+
+// ========== 创建用户 ==========
+router.post('/users', async (req, res) => {
+    const { email, name, role } = req.body;
+
+    const existing = await prisma.user.findUnique({ where: { email } });
+    if (existing) throw new ConflictError('Email already exists');
+
+    const user = await prisma.user.create({
+        data: { email, name, role },
+        select: { id: true, email: true, name: true, role: true, createdAt: true },
+    });
+
+    res.created(user);
+});
+
+// ========== Prisma vs Mongoose vs Knex ==========
+// ┌──────────┬──────────────────┬──────────────┬──────────────┐
+// │          │     Prisma       │   Mongoose   │    Knex      │
+// ├──────────┼──────────────────┼──────────────┼──────────────┤
+// │ 类型安全  │ ✅ 自动生成      │ ❌ 手动定义   │ ❌           │
+// │ 数据库   │ PostgreSQL/MySQL  │ MongoDB      │ 多数据库      │
+// │ 迁移     │ ✅ 内置           │ ❌           │ ✅ 内置       │
+// │ 关联     │ include/select   │ populate     │ JOIN         │
+// │ 学习曲线  │ 中               │ 低            │ 低           │
+// │ 性能     │ 中 (有抽象)       │ 高           │ 高 (原生)     │
+// │ TS 支持  │ 极好              │ 一般         │ 一般         │
+// └──────────┴──────────────────┴──────────────┴──────────────┘
+
+// ========== Prisma 最佳实践 ==========
+// 1. 所有数据库操作通过 Prisma Client
+// 2. 使用 select 只取需要字段
+// 3. 事务用 $transaction
+// 4. 复杂查询用 raw SQL + Prisma.$queryRaw
+// 5. 中间件不要修改 params.args
+// 6. 生产环境关闭 query 日志
+// 7. 迁移用 migrate deploy 而不是 dev</div>
+        <div class="note">💡 Prisma 要点: schema.prisma 声明模型; 自动生成类型安全客户端; include/select 关联查询; 嵌套写入 (create + connect); $transaction 交互式事务; $use 中间件 (慢查询/软删除); prisma studio GUI 管理; migrate dev/deploy 版本控制; _count 关联计数; upsert 存在更新/不存在创建。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSchema()">Schema 定义</button>
+        <button onclick="demoCRUD()">CRUD 操作</button>
+        <button onclick="demoRelation()">关联查询</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSchema() {
+            result.innerHTML = '';
+            log('# Prisma Schema');
+            log('');
+            log('model User {');
+            log('  id    Int    @id @default(autoincrement())');
+            log('  email String @unique');
+            log('  name  String?');
+            log('  posts Post[]');
+            log('  createdAt DateTime @default(now())');
+            log('}');
+            log('');
+            log('model Post {');
+            log('  id       Int');
+            log('  title    String');
+            log('  author   User @relation(fields: [authorId], refs: [id])');
+            log('  authorId Int');
+            log('}');
+            log('');
+            log('枚举: enum Role { USER ADMIN }');
+        }
+
+        function demoCRUD() {
+            result.innerHTML = '';
+            log('# Prisma CRUD');
+            log('');
+            log('创建: prisma.user.create({ data, select })');
+            log('查询: prisma.user.findMany({ where, include })');
+            log('单条: prisma.user.findUnique({ where: { id } })');
+            log('更新: prisma.user.update({ where, data })');
+            log('删除: prisma.user.delete({ where: { id } })');
+            log('批量: updateMany / deleteMany');
+            log('计数: prisma.user.count({ where })');
+            log('Upsert: update OR create');
+        }
+
+        function demoRelation() {
+            result.innerHTML = '';
+            log('# 关联查询');
+            log('');
+            log('include: 加载关联');
+            log('prisma.user.findMany({');
+            log('  include: {');
+            log('    posts: { where: { published: true } },');
+            log('  },');
+            log('});');
+            log('');
+            log('select: 选择特定字段');
+            log('  _count: { select: { posts: true } }');
+            log('  → 返回文章数量');
+            log('');
+            log('嵌套写入:');
+            log('  data: { posts: { create: { title } } }');
+            log('  data: { posts: { connect: { id } } }');
+        }
+    </script>
+</body>
+</html>

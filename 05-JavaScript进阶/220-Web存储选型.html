@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web存储选型</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 14px; }
+        th, td { padding: 8px 12px; border: 1px solid #ddd; text-align: left; }
+        th { background: #2c3e50; color: white; }
+        tr:nth-child(even) { background: #f8f9fa; }
+        .tag { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin: 2px; }
+        .tag-green { background: #d4edda; color: #155724; }
+        .tag-yellow { background: #fff3cd; color: #856404; }
+        .tag-red { background: #f8d7da; color: #721c24; }
+        #store-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Web 存储选型</h2><p>localStorage / sessionStorage / Cookie / IndexedDB / Cache-API 全对比与选型指南。</p></div>
+    <div class="card">
+        <h2>存储方案对比</h2>
+        <table>
+            <tr><th>特性</th><th>Cookie</th><th>localStorage</th><th>sessionStorage</th><th>IndexedDB</th><th>Cache-API</th></tr>
+            <tr><td>容量</td><td>4KB</td><td>5-10MB</td><td>5-10MB</td><td>~GB</td><td>~GB</td></tr>
+            <tr><td>类型</td><td>字符串</td><td>字符串</td><td>字符串</td><td>结构化</td><td>Request/Response</td></tr>
+            <tr><td>同步/异步</td><td>同步</td><td>同步</td><td>同步</td><td>异步</td><td>异步</td></tr>
+            <tr><td>持久化</td><td>可设过期</td><td>手动删除</td><td>标签关闭</td><td>手动删除</td><td>手动删除</td></tr>
+            <tr><td>跨标签</td><td>✅</td><td>✅</td><td>❌</td><td>✅</td><td>✅</td></tr>
+            <tr><td>HTTP 自动发送</td><td>✅</td><td>❌</td><td>❌</td><td>❌</td><td>❌</td></tr>
+            <tr><td>支持索引</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td><td>❌</td></tr>
+            <tr><td>Worker 可用</td><td>❌</td><td>❌</td><td>❌</td><td>✅</td><td>✅</td></tr>
+        </table>
+    </div>
+    <div class="card">
+        <h2>选型决策</h2>
+        <div class="code">// 选型决策树
+
+// 1. 需要 HTTP 自动发送？ → Cookie
+//    ✅ 适合: 会话标识、认证 Token
+//    ❌ 不适合: 大量数据、API 响应缓存
+
+// 2. 简单键值对，容量 &lt; 5MB？
+//   a) 仅当前标签页 → sessionStorage
+//      ✅ 适合: 表单草稿、临时状态
+//   b) 需要持久化 → localStorage
+//      ✅ 适合: 用户偏好、主题、语言设置
+
+// 3. 需要存储结构化/大量数据？
+//   a) 离线数据 &gt; 5MB → IndexedDB
+//      ✅ 适合: 离线数据、文件、日志、复杂查询
+//   b) HTTP 响应缓存 → Cache-API (SW)
+//      ✅ 适合: 离线页面、静态资源缓存
+
+// 4. 需要跨标签通信？
+//    → BroadcastChannel + localStorage/storage 事件
+
+// 5. 安全性需求
+//   敏感信息 → HttpOnly Cookie (服务器设置)
+//   非敏感 → localStorage 即可</div>
+    </div>
+    <div class="card">
+        <h2>各方案代码示例</h2>
+        <div class="code">// Cookie
+document.cookie = 'theme=dark; path=/; max-age=3600';
+document.cookie = 'token=abc; path=/; Secure; SameSite=Strict';
+
+// localStorage
+localStorage.setItem('prefs', JSON.stringify({ lang: 'zh' }));
+const prefs = JSON.parse(localStorage.getItem('prefs'));
+
+// sessionStorage
+sessionStorage.setItem('draft', '未保存的内容');
+const draft = sessionStorage.getItem('draft');
+
+// IndexedDB
+const db = await idb.openDB('MyDB', 1);
+await db.put('store', { id: 1, name: 'Alice' });
+const user = await db.get('store', 1);
+
+// Cache-API
+const cache = await caches.open('v1');
+await cache.put('/api/data', new Response(JSON.stringify(data)));</div>
+    </div>
+    <div class="card">
+        <h2>演示：存储容量估算</h2>
+        <button onclick="estimateSize()">估算各存储容量</button>
+        <button onclick="testWriteSpeed()">测试写入速度</button>
+        <div id="store-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const storeResult = document.getElementById('store-result');
+
+        function log(msg) {
+            storeResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function estimateSize() {
+            storeResult.innerHTML = '';
+            log('📊 Web 存储容量估算：');
+            log('');
+            log('Cookie:');
+            log('  单域名上限 ~4KB');
+            log('  每条 Cookie ~4KB');
+            log('  总数 ~50-150 条 (浏览器不同)');
+            log('');
+            log('localStorage / sessionStorage:');
+            log('  典型上限 5-10MB');
+            log('  超出会抛 QuotaExceededError');
+            log('  同步 API，大数据量会阻塞主线程');
+            log('');
+            log('IndexedDB:');
+            log('  取决于磁盘空间 (通常 ~GB 级别)');
+            log('  异步 API，不阻塞主线程');
+            log('  支持索引/游标/事务');
+            log('');
+            log('Cache-API:');
+            log('  取决于磁盘空间');
+            log('  专为 HTTP 响应设计');
+            log('  需配合 Service Worker 使用');
+
+            try {
+                let testKey = '__size_test__';
+                let total = 0;
+                const step = 1024 * 100; // 100KB
+                while (total < 10 * 1024 * 1024) {
+                    localStorage.setItem(testKey, 'x'.repeat(step));
+                    total += step;
+                }
+            } catch (e) {
+                log(`⚠️ localStorage 上限约: ${(total / 1024 / 1024).toFixed(1)}MB`);
+            }
+            localStorage.removeItem('__size_test__');
+        }
+
+        function testWriteSpeed() {
+            storeResult.innerHTML = '';
+            const data = 'x'.repeat(10000);
+
+            // localStorage
+            const t1 = performance.now();
+            for (let i = 0; i < 100; i++) {
+                localStorage.setItem('__speed_' + i, data);
+            }
+            const t2 = performance.now();
+            log(`localStorage 写入 100×10KB: ${(t2 - t1).toFixed(1)}ms`);
+
+            // 清理
+            for (let i = 0; i < 100; i++) {
+                localStorage.removeItem('__speed_' + i);
+            }
+
+            // IndexedDB 速度测试
+            const req = indexedDB.open('SpeedTest', 1);
+            req.onupgradeneeded = (e) => {
+                e.target.result.createObjectStore('data', { keyPath: 'id' });
+            };
+            req.onsuccess = (e) => {
+                const db = e.target.result;
+                const t3 = performance.now();
+                const tx = db.transaction('data', 'readwrite');
+                const store = tx.objectStore('data');
+                for (let i = 0; i < 100; i++) {
+                    store.put({ id: i, value: data });
+                }
+                tx.oncomplete = () => {
+                    const t4 = performance.now();
+                    log(`IndexedDB 写入 100×10KB: ${(t4 - t3).toFixed(1)}ms`);
+                    db.close();
+                    indexedDB.deleteDatabase('SpeedTest');
+                };
+            };
+        }
+
+        console.log('=== Web 存储选型 ===');
+
+        document.getElementById('output').textContent =
+            `Web 存储选型: Cookie / localStorage / sessionStorage / IndexedDB / Cache-API\n` +
+            `Cookie: 4KB, HTTP自动发送, 同步\n` +
+            `localStorage: 5-10MB, 持久化, 同步\n` +
+            `sessionStorage: 5-10MB, 标签关闭即失, 同步\n` +
+            `IndexedDB: ~GB, 结构化, 异步, 索引\n` +
+            `Cache-API: ~GB, HTTP响应, 异步, SW\n` +
+            `✅ Web 存储选型对比完成！`;
+    </script>
+</body>
+</html>

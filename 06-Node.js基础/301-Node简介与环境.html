@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Node简介与环境</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #node-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Node.js 简介与环境</h2><p>Node.js 运行时、版本管理、REPL、运行方式、浏览器环境差异。</p></div>
+    <div class="card">
+        <h2>Node.js 概述</h2>
+        <div class="code">// ========== Node.js 是什么 ==========
+// Node.js 是 JS 的服务器端运行环境
+// 基于 Chrome V8 引擎
+// 非阻塞 I/O + 事件驱动架构
+
+// ========== 版本管理 ==========
+// nvm (Node Version Manager)
+//   nvm install 18       # 安装 Node 18
+//   nvm use 18           # 切换版本
+//   nvm ls               # 查看版本列表
+
+// n (npm 包)
+//   n 18.0.0
+
+// ========== REPL (Read-Eval-Print Loop) ==========
+// 在终端输入 node 进入交互模式
+// $ node
+// > console.log('hello')
+// > .help     # 查看 REPL 命令
+// > .exit     # 退出
+
+// ========== 运行方式 ==========
+// $ node script.js           # 运行文件
+// $ node --watch script.js   # 热重载 (Node 18+)
+// $ node -e "console.log(1)" # 内联代码
+
+// ========== Node vs 浏览器 ==========
+// Node.js 特有:
+//   - global 全局对象
+//   - process, Buffer, __dirname
+//   - require/module.exports (CommonJS)
+//   - fs, path, http 等内置模块
+//   - 没有 DOM, window, document
+//   - 没有 Web API (fetch 在 Node 18+ 可用)
+
+// 浏览器特有:
+//   - window, document, DOM API
+//   - WebSocket, localStorage, IndexedDB
+//   - Canvas, WebGL
+//   - fetch, XMLHttpRequest</div>
+    </div>
+    <div class="card">
+        <h2>演示：Node.js 概念</h2>
+        <button onclick="demoNodeEnv()">Node 环境对比</button>
+        <button onclick="demoRuntime()">浏览器环境检测</button>
+        <div id="node-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const nodeResult = document.getElementById('node-result');
+
+        function log(msg) {
+            nodeResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoNodeEnv() {
+            nodeResult.innerHTML = '';
+            log('🌐 Node.js 环境概念:');
+            log('');
+
+            log('1️⃣ 运行环境检测:');
+            log(`   当前环境: 浏览器 (Browser)`);
+            log(`   是否 Node: ${typeof process !== 'undefined' && process.versions?.node ? '✅' : '❌'}`);
+            log(`   是否浏览器: ${typeof window !== 'undefined' ? '✅' : '❌'}`);
+            log('');
+
+            log('2️⃣ Node.js 特有特性 (浏览器中不可用):');
+            log('   • global — 全局对象');
+            log('   • process — 进程信息');
+            log('   • Buffer — 二进制数据');
+            log('   • __dirname — 当前目录');
+            log('   • require() — CommonJS 模块');
+            log('   • fs — 文件系统');
+            log('   • path — 路径操作');
+            log('   • http — HTTP 服务器');
+            log('');
+
+            log('3️⃣ 浏览器特有特性:');
+            log('   • window — 全局对象');
+            log('   • document — DOM 操作');
+            log('   • localStorage — 本地存储');
+            log('   • Canvas — 图形绘制');
+            log('   • WebSocket — 实时通信');
+            log('');
+
+            log('📌 版本信息:');
+            log(`   • JS 引擎: ${navigator.userAgent}`);
+        }
+
+        function demoRuntime() {
+            nodeResult.innerHTML = '';
+            log('⚡ 浏览器运行时检测:');
+            log('');
+
+            const features = {
+                'console': typeof console,
+                'setTimeout': typeof setTimeout,
+                'Promise': typeof Promise,
+                'fetch': typeof fetch,
+                'WebSocket': typeof WebSocket,
+                'localStorage': typeof localStorage,
+                'indexedDB': typeof indexedDB,
+                'Worker': typeof Worker,
+                'BroadcastChannel': typeof BroadcastChannel,
+                'Notification': typeof Notification,
+                'navigator.geolocation': typeof navigator?.geolocation,
+                'crypto.subtle': typeof crypto?.subtle,
+            };
+
+            log('浏览器 API 支持情况:');
+            Object.entries(features).forEach(([name, type]) => {
+                log(`   ${type !== 'undefined' ? '✅' : '❌'} ${name}`);
+            });
+
+            log('');
+            log('📌 Node.js 中添加了类似 API (Node 18+):');
+            log('   • fetch — 全局可用');
+            log('   • WebStreams — 全局可用');
+            log('   • WebSocket — 需要 ws 包');
+            log('   • crypto — 全局可用');
+        }
+
+        console.log('=== Node 简介与环境 ===');
+
+        document.getElementById('output').textContent =
+            `Node.js 简介: V8 引擎 / 非阻塞 I/O / 事件驱动\n` +
+            `REPL: node / node script.js / nvm 版本管理\n` +
+            `Node vs 浏览器: APIs / 模块系统 / 运行环境差异\n` +
+            `✅ Node 简介与环境完成！`;
+    </script>
+</body>
+</html>

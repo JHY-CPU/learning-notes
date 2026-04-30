@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express CRUD 控制器</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🎮 Express CRUD 控制器</h2><p>Controller-Service-Repository 分层模式、CRUD 控制器实现 (列表/详情/创建/更新/删除)、Mongoose CRUD 示例、Prisma CRUD 示例、分页/过滤/排序控制器、统一控制器工厂。</p></div>
+    <div class="card">
+        <h2>分层架构</h2>
+        <div class="code">// ========== 三层架构 ==========
+// Controller — 接收请求, 返回响应
+// Service — 业务逻辑
+// Repository — 数据访问
+
+// ┌────────────────────────────────────────┐
+// │  Controller (路由 + 请求/响应处理)     │
+// │      ↓                                  │
+// │  Service (业务逻辑)                    │
+// │      ↓                                  │
+// │  Repository / Model (数据访问)         │
+// └────────────────────────────────────────┘
+
+// ========== 目录结构 ==========
+// src/
+// ├── controllers/
+// │   ├── userController.js
+// │   └── postController.js
+// ├── services/
+// │   ├── userService.js
+// │   └── postService.js
+// ├── models/
+// │   ├── User.js
+// │   └── Post.js
+// ├── routes/
+// │   ├── userRoutes.js
+// │   └── postRoutes.js
+// ├── middleware/
+// │   ├── auth.js
+// │   ├── validate.js
+// │   └── errorHandler.js
+// └── app.js
+
+// ========== 路由层 (routes) ==========
+// routes/userRoutes.js:
+const router = require('express').Router();
+const userController = require('../controllers/userController');
+const { authenticate, authorize } = require('../middleware/auth');
+const { validate } = require('../middleware/validate');
+
+router.get('/', authenticate, userController.list);
+router.get('/:id', authenticate, userController.getById);
+router.post('/', authenticate, authorize('admin'), validate(createUserSchema), userController.create);
+router.put('/:id', authenticate, authorize('admin'), userController.update);
+router.delete('/:id', authenticate, authorize('admin'), userController.delete);
+
+module.exports = router;</div>
+    </div>
+    <div class="card">
+        <h2>User CRUD 控制器</h2>
+        <div class="code">// ========== 控制器 ==========
+// controllers/userController.js:
+const userService = require('../services/userService');
+
+// 列表 (带分页/过滤/排序)
+exports.list = asyncHandler(async (req, res) => {
+    const { page = 1, limit = 20, sort = '-createdAt', ...filters } = req.query;
+    const result = await userService.list({ page: +page, limit: +limit, sort, filters });
+    res.paginated(result.data, result.pagination);
+});
+
+// 详情
+exports.getById = asyncHandler(async (req, res) => {
+    const user = await userService.getById(req.params.id);
+    if (!user) throw new NotFoundError('User not found');
+    res.success(user);
+});
+
+// 创建
+exports.create = asyncHandler(async (req, res) => {
+    const user = await userService.create(req.body);
+    res.success(user, 'User created', 201);
+});
+
+// 更新
+exports.update = asyncHandler(async (req, res) => {
+    const user = await userService.update(req.params.id, req.body);
+    if (!user) throw new NotFoundError('User not found');
+    res.success(user, 'User updated');
+});
+
+// 删除
+exports.delete = asyncHandler(async (req, res) => {
+    const user = await userService.delete(req.params.id);
+    if (!user) throw new NotFoundError('User not found');
+    res.success(null, 'User deleted');
+});
+
+// ========== Service 层 ==========
+// services/userService.js:
+const User = require('../models/User');
+
+exports.list = async ({ page, limit, sort, filters }) => {
+    const query = {};
+    const sortObj = {};
+
+    // 过滤: ?role=admin&status=active
+    if (filters.role) query.role = filters.role;
+    if (filters.status) query.status = filters.status;
+    if (filters.search) {
+        query.name = { $regex: filters.search, $options: 'i' };
+    }
+
+    // 排序: ?sort=-createdAt,name
+    sort.split(',').forEach(field => {
+        if (field.startsWith('-')) {
+            sortObj[field.slice(1)] = -1;
+        } else {
+            sortObj[field] = 1;
+        }
+    });
+
+    const skip = (page - 1) * limit;
+    const [data, total] = await Promise.all([
+        User.find(query).sort(sortObj).skip(skip).limit(limit).lean(),
+        User.countDocuments(query),
+    ]);
+
+    return {
+        data,
+        pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit),
+        },
+    };
+};</div>
+    </div>
+    <div class="card">
+        <h2>Service 层完整实现</h2>
+        <div class="code">// ========== User Service ==========
+// services/userService.js (完整版):
+
+const User = require('../models/User');
+const { BadRequestError, NotFoundError } = require('../utils/errors');
+
+exports.getById = async (id) => {
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new BadRequestError('Invalid user ID');
+    }
+    return User.findById(id).lean();
+};
+
+exports.getByEmail = async (email) => {
+    return User.findOne({ email }).lean();
+};
+
+exports.create = async (data) => {
+    // 检查重复
+    const existing = await User.findOne({ email: data.email });
+    if (existing) {
+        throw new BadRequestError('Email already exists');
+    }
+
+    const user = await User.create(data);
+    return user.toObject();
+};
+
+exports.update = async (id, data) => {
+    // 不允许更新的字段
+    delete data.role;
+    delete data.password;
+
+    // 检查 email 唯一
+    if (data.email) {
+        const existing = await User.findOne({ email: data.email, _id: { $ne: id } });
+        if (existing) {
+            throw new BadRequestError('Email already in use');
+        }
+    }
+
+    return User.findByIdAndUpdate(id, data, {
+        new: true,           // 返回更新后文档
+        runValidators: true, // 运行验证
+    }).lean();
+};
+
+exports.delete = async (id) => {
+    return User.findByIdAndDelete(id).lean();
+};
+
+// ========== 批量操作控制器 ==========
+exports.bulkCreate = asyncHandler(async (req, res) => {
+    const users = await User.insertMany(req.body.users);
+    res.success(users, 'Users created', 201);
+});
+
+exports.bulkDelete = asyncHandler(async (req, res) => {
+    const { ids } = req.body;
+    const result = await User.deleteMany({ _id: { $in: ids } });
+    res.success({ deleted: result.deletedCount }, 'Users deleted');
+});</div>
+    </div>
+    <div class="card">
+        <h2>通用 CRUD 工厂</h2>
+        <div class="code">// ========== CRUD 工厂 ==========
+// 减少重复代码: 为多个资源生成标准 CRUD 控制器
+
+function createCrudController(service, options = {}) {
+    const {
+        listFields = [],
+        createSchema = null,
+        updateSchema = null,
+        populateFields = '',
+    } = options;
+
+    return {
+        // 列表
+        list: asyncHandler(async (req, res) => {
+            const { page = 1, limit = 20, sort = '-createdAt', ...filters } = req.query;
+            const result = await service.list({
+                page: +page,
+                limit: +limit,
+                sort,
+                filters,
+                populateFields,
+            });
+            res.paginated(result.data, result.pagination);
+        }),
+
+        // 详情
+        getById: asyncHandler(async (req, res) => {
+            const item = await service.getById(req.params.id, populateFields);
+            if (!item) throw new NotFoundError();
+            res.success(item);
+        }),
+
+        // 创建
+        create: asyncHandler(async (req, res) => {
+            const item = await service.create(req.body);
+            res.success(item, 'Created', 201);
+        }),
+
+        // 更新
+        update: asyncHandler(async (req, res) => {
+            const item = await service.update(req.params.id, req.body);
+            if (!item) throw new NotFoundError();
+            res.success(item, 'Updated');
+        }),
+
+        // 删除
+        delete: asyncHandler(async (req, res) => {
+            const item = await service.delete(req.params.id);
+            if (!item) throw new NotFoundError();
+            res.success(null, 'Deleted');
+        }),
+    };
+}
+
+// 使用工厂:
+const userController = createCrudController(userService, {
+    createSchema: createUserSchema,
+    updateSchema: updateUserSchema,
+    populateFields: 'profile settings',
+});
+
+// 路由:
+router.get('/', userController.list);
+router.post('/', validate(createUserSchema), userController.create);
+// 定制方法:
+router.post('/bulk', userController.bulkCreate);  // 叠加自定义方法</div>
+        <div class="note">💡 CRUD 要点: Controller-Service-Model 三层分离关注点; 控制器只处理请求/响应; Service 层封装业务逻辑; 验证在路由层用中间件; 错误统一抛出由 errorHandler 处理; CRUD 工厂减少重复代码; 分页/过滤/排序在 service 层实现; 每个函数只做一件事。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoLayers()">三层架构</button>
+        <button onclick="demoCRUD()">CRUD 示例</button>
+        <button onclick="demoFactory()">CRUD 工厂</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoLayers() {
+            result.innerHTML = '';
+            log('# 三层架构');
+            log('');
+            log('routes/ → URL 映射');
+            log('  ↓');
+            log('controllers/ → 请求/响应处理');
+            log('  ↓');
+            log('services/ → 业务逻辑');
+            log('  ↓');
+            log('models/ → 数据访问');
+            log('');
+            log('每层只做一件事, 职责清晰');
+        }
+
+        function demoCRUD() {
+            result.innerHTML = '';
+            log('# CRUD 控制器');
+            log('');
+            log('exports.list    = async (req, res) => {');
+            log('  const users = await User.find();');
+            log('  res.success(users);');
+            log('};');
+            log('');
+            log('exports.create  = async (req, res) => {');
+            log('  const user = await User.create(req.body);');
+            log('  res.success(user, "Created", 201);');
+            log('};');
+            log('');
+            log('其他: update, delete, getById');
+        }
+
+        function demoFactory() {
+            result.innerHTML = '';
+            log('# CRUD 工厂模式');
+            log('');
+            log('function createCrudController(service) {');
+            log('  return { list, getById,');
+            log('           create, update, delete };');
+            log('}');
+            log('');
+            log('const userCtrl = createCrudController(userService);');
+            log('const postCtrl = createCrudController(postService);');
+            log('');
+            log('减少重复, 统一行为');
+        }
+    </script>
+</body>
+</html>

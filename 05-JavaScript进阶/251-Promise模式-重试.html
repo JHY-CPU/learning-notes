@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Promise模式-重试</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #retry-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Promise 模式 — 重试</h2><p>Promise 重试工厂、最大重试次数、退避策略、可中止重试。</p></div>
+    <div class="card">
+        <h2>重试模式实现</h2>
+        <div class="code">// ========== 基础重试 ==========
+async function retry(fn, maxRetries = 3) {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            return await fn();
+        } catch (err) {
+            if (i === maxRetries - 1) throw err;
+            console.log(`重试 ${i + 1}/${maxRetries}`);
+        }
+    }
+}
+
+// ========== 指数退避 ==========
+async function retryWithBackoff(fn, maxRetries = 3) {
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            return await fn();
+        } catch (err) {
+            if (i === maxRetries - 1) throw err;
+            const delay = Math.min(1000 * Math.pow(2, i), 10000);
+            await new Promise(r => setTimeout(r, delay));
+        }
+    }
+}
+
+// ========== 完整重试工厂 ==========
+function createRetry(options = {}) {
+    const {
+        maxRetries = 3,
+        baseDelay = 1000,
+        maxDelay = 10000,
+        factor = 2,
+        jitter = true,        // 随机抖动
+        onRetry = null,       // 重试回调
+    } = options;
+
+    return async (fn) => {
+        let lastError;
+        for (let i = 0; i <= maxRetries; i++) {
+            try {
+                return await fn();
+            } catch (err) {
+                lastError = err;
+                if (i === maxRetries) break;
+                let delay = baseDelay * Math.pow(factor, i);
+                delay = Math.min(delay, maxDelay);
+                if (jitter) delay *= 0.5 + Math.random() * 0.5;
+                onRetry?.({ attempt: i + 1, error: err, delay });
+                await new Promise(r => setTimeout(r, delay));
+            }
+        }
+        throw lastError;
+    };
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：重试模式</h2>
+        <button onclick="demoRetry()">基础重试</button>
+        <button onclick="demoBackoff()">指数退避</button>
+        <div id="retry-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const retryResult = document.getElementById('retry-result');
+
+        function log(msg) {
+            retryResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // 模拟不稳定的 API
+        let callCount = 0;
+        function unstableAPI(succeedAfter = 3) {
+            return () => new Promise((resolve, reject) => {
+                callCount++;
+                const current = callCount;
+                log(`   📡 第 ${current} 次请求...`);
+                setTimeout(() => {
+                    if (current >= succeedAfter) {
+                        log(`   ✅ 第 ${current} 次成功`);
+                        resolve(`数据 (第${current}次尝试)`);
+                    } else {
+                        log(`   ❌ 第 ${current} 次失败 (网络错误)`);
+                        reject(new Error(`网络错误 #${current}`));
+                    }
+                }, 300);
+            });
+        }
+
+        // 基础重试
+        async function retryWithDelay(fn, maxRetries = 3, delay = 500) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    return await fn();
+                } catch (err) {
+                    if (i === maxRetries - 1) throw err;
+                    log(`   ⏳ 等待 ${delay}ms 后重试...`);
+                    await new Promise(r => setTimeout(r, delay));
+                }
+            }
+        }
+
+        // 指数退避重试
+        async function retryBackoff(fn, maxRetries = 3) {
+            for (let i = 0; i < maxRetries; i++) {
+                try {
+                    return await fn();
+                } catch (err) {
+                    if (i === maxRetries - 1) throw err;
+                    const delay = Math.min(200 * Math.pow(2, i), 3000);
+                    log(`   ⏳ 指数退避: 等待 ${delay}ms...`);
+                    await new Promise(r => setTimeout(r, delay));
+                }
+            }
+        }
+
+        async function demoRetry() {
+            retryResult.innerHTML = '';
+            callCount = 0;
+            log('🔄 基础重试模式 (固定延迟):');
+            log('');
+
+            try {
+                const result = await retryWithDelay(unstableAPI(3), 4, 300);
+                log(`\n🎉 最终结果: ${result}`);
+            } catch (err) {
+                log(`\n❌ 所有重试均失败: ${err.message}`);
+            }
+
+            log('');
+            log('📌 配置项:');
+            log('   • maxRetries: 最大重试次数');
+            log('   • delay: 重试间隔');
+            log('   • 适用于: 瞬时故障恢复');
+        }
+
+        async function demoBackoff() {
+            retryResult.innerHTML = '';
+            callCount = 0;
+            log('📈 指数退避重试 (Exponential Backoff):');
+            log('');
+
+            const startTime = Date.now();
+            try {
+                const result = await retryBackoff(unstableAPI(3), 4);
+                const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
+                log(`\n🎉 最终结果: ${result}`);
+                log(`⏱️ 总耗时: ${elapsed}s`);
+            } catch (err) {
+                log(`\n❌ 所有重试均失败: ${err.message}`);
+            }
+
+            log('');
+            log('📌 指数退避优势:');
+            log('   • 延迟递增: base × 2^n');
+            log('   • 避免服务器雪崩');
+            log('   • 可加 jitter 随机抖动');
+            log('   • 适用: API 限流 / 服务过载');
+        }
+
+        console.log('=== Promise 模式: 重试 ===');
+
+        document.getElementById('output').textContent =
+            `Promise 重试模式: 基础重试 / 指数退避 / Jitter / 可中止\n` +
+            `配置: maxRetries / baseDelay / factor / maxDelay\n` +
+            `✅ Promise 重试模式演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express 限流与安全</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🛡️ Express 限流与安全</h2><p>express-rate-limit 配置 (windowMs/max/message/skip)、分布式限流 (Redis)、限流头 (RateLimit-Remaining)、CORS + Helmet 安全检查清单、XSS/SQL 注入防御、express-mongo-sanitize。</p></div>
+    <div class="card">
+        <h2>express-rate-limit</h2>
+        <div class="code">// ========== Rate Limiting ==========
+// 限制单个 IP 在一定时间内的请求次数
+// 防止暴力破解/DDoS/爬虫
+
+npm install express-rate-limit
+
+// ========== 基本配置 ==========
+const rateLimit = require('express-rate-limit');
+
+// 全局限流: 15 分钟 100 次
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,    // 15 分钟
+    max: 100,                      // 最多 100 次
+    standardHeaders: true,         // 返回 RateLimit-* 头
+    legacyHeaders: false,          // 禁用 X-RateLimit-* 头
+    message: {
+        code: 'RATE_LIMIT_EXCEEDED',
+        message: 'Too many requests, please try again later',
+    },
+});
+
+app.use(limiter);
+
+// ========== 按路由区分 ==========
+// 严格的认证路由限流:
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,                          // 登录尝试仅 5 次
+    message: { message: 'Too many login attempts' },
+    skipSuccessfulRequests: true,    // 成功请求不计
+});
+
+app.use('/auth/login', authLimiter);
+
+// API 路由 (宽松):
+const apiLimiter = rateLimit({
+    windowMs: 1 * 60 * 1000,        // 1 分钟
+    max: 60,                          // 60 次/分钟
+});
+
+app.use('/api', apiLimiter);
+
+// ========== 动态限流 ==========
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: (req, res) => {
+        // 登录用户比匿名更高额度
+        if (req.user?.role === 'premium') return 200;
+        if (req.user) return 100;
+        return 20;  // 匿名
+    },
+    keyGenerator: (req) => {
+        // 用用户 ID 替代 IP (登录用户)
+        return req.user?.id || req.ip;
+    },
+});</div>
+    </div>
+    <div class="card">
+        <h2>分布式限流 (Redis)</h2>
+        <div class="code">// ========== 分布式限流 ==========
+// 多实例部署时, rate-limit 默认基于内存
+// 需要共享状态 → 使用 Redis
+
+npm install rate-limit-redis ioredis
+
+// ========== Redis 限流 ==========
+const RedisStore = require('rate-limit-redis').default;
+const Redis = require('ioredis');
+
+const redisClient = new Redis({
+    host: process.env.REDIS_HOST || 'localhost',
+    port: 6379,
+    enableOfflineQueue: false,
+});
+
+const limiter = rateLimit({
+    store: new RedisStore({
+        client: redisClient,
+        prefix: 'rate-limit:',      // Redis key 前缀
+        // sendCommand: (...args) => redisClient.call(...args),
+    }),
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+});
+
+app.use(limiter);
+
+// ========== 自定义限流响应 ==========
+const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+    handler: (req, res, next) => {
+        res.status(429).json({
+            code: 'RATE_LIMIT_EXCEEDED',
+            message: 'Too many requests',
+            retryAfter: Math.ceil(req.rateLimit.resetTime / 1000 - Date.now() / 1000),
+        });
+    },
+    // 超出限制时的响应
+    statusCode: 429,
+});
+
+// ========== 限流头信息 ==========
+// standardHeaders: true (draft-7):
+// RateLimit-Limit: 100
+// RateLimit-Remaining: 99
+// RateLimit-Reset: 1712345678
+
+// legacyHeaders: true (旧格式):
+// X-RateLimit-Limit: 100
+// X-RateLimit-Remaining: 99
+// X-RateLimit-Reset: 1712345678</div>
+    </div>
+    <div class="card">
+        <h2>其他安全实践</h2>
+        <div class="code">// ========== XSS 防御 ==========
+// 1. Helmet CSP 头
+// 2. 输出编码 (模板引擎自动转义)
+// 3. 输入验证 (Joi/Zod 白名单)
+// 4. Cookie httpOnly (防止 JS 读取)
+
+// ========== NoSQL 注入防御 ==========
+// MongoDB 查询注入示例:
+// ❌ 危险: { username: req.body.username, password: req.body.password }
+//    如果传入 { "$gt": "" }, 会匹配所有用户!
+
+// ✅ 防御: 用 Joi/Zod 验证类型
+const loginSchema = Joi.object({
+    username: Joi.string().alphanum().required(),
+    password: Joi.string().required(),
+});
+
+// ✅ 或使用 express-mongo-sanitize:
+npm install express-mongo-sanitize
+
+const mongoSanitize = require('express-mongo-sanitize');
+app.use(mongoSanitize());
+// 移除请求中的 $ 和 . 操作符
+
+// ========== 通用安全清单 ==========
+// ✅ helmet() — 安全头
+// ✅ cors() — 跨域控制
+// ✅ rateLimit() — 限流
+// ✅ express.json({ limit: '1mb' }) — body 大小限制
+// ✅ 验证输入 (Joi/Zod)
+// ✅ 参数化数据库查询
+// ✅ 密码 bcrypt 哈希
+// ✅ httpOnly Cookie
+// ✅ 禁用 X-Powered-By
+// ✅ HTTPS (生产必需)
+// ✅ 依赖定期更新 (npm audit)
+// ✅ 环境变量 (.env) 不提交
+
+// ========== npm audit ==========
+// 定期检查依赖安全漏洞:
+npm audit
+npm audit fix          // 自动修复
+npm audit fix --force  // 强制修复 (可能破坏兼容)</div>
+    </div>
+    <div class="card">
+        <h2>安全头验证</h2>
+        <div class="code">// ========== 安全头检查器 ==========
+// 编写一个安全头检查端点 (仅内部使用):
+
+app.get('/debug/security-headers', (req, res) => {
+    const headers = {
+        'X-Powered-By': res.get('X-Powered-By'),
+        'X-Frame-Options': res.get('X-Frame-Options'),
+        'X-Content-Type-Options': res.get('X-Content-Type-Options'),
+        'Strict-Transport-Security': res.get('Strict-Transport-Security'),
+        'Content-Security-Policy': res.get('Content-Security-Policy'),
+        'X-XSS-Protection': res.get('X-XSS-Protection'),
+        'Referrer-Policy': res.get('Referrer-Policy'),
+    };
+
+    const checks = {
+        'X-Powered-By': !headers['X-Powered-By'] ? '✅' : '❌ 应禁用',
+        'X-Frame-Options': headers['X-Frame-Options'] === 'DENY' ? '✅' : '❌ 应为 DENY',
+        'X-Content-Type-Options': headers['X-Content-Type-Options'] === 'nosniff' ? '✅' : '❌',
+        'Strict-Transport-Security': headers['Strict-Transport-Security'] ? '✅' : '❌ 缺失',
+        'Content-Security-Policy': headers['Content-Security-Policy'] ? '✅' : '❌ 缺失',
+        'X-XSS-Protection': headers['X-XSS-Protection'] ? '✅' : '⚠️ 建议启用',
+    };
+
+    res.json({ headers, checks });
+});
+
+// ========== 生产安全依赖 ==========
+// package.json 建议:
+{
+  "dependencies": {
+    "helmet": "^7.x",
+    "cors": "^2.x",
+    "express-rate-limit": "^7.x",
+    "express-mongo-sanitize": "^2.x",
+    "hpp": "^0.2.x"           // HTTP 参数污染防护
+  }
+}
+
+// hpp (HTTP Parameter Pollution):
+const hpp = require('hpp');
+app.use(hpp({
+    whitelist: ['sort', 'filter']  // 允许重复的参数
+}));</div>
+        <div class="note">💡 限流要点: express-rate-limit 防止暴力破解; 不同路由不同限额 (认证 5 次/15min); 多实例用 Redis 共享状态; 限流头告知客户端限额。安全要点: 输入验证白名单; 参数化查询防注入; helmet + cors + rateLimit 三层防护; 定期 npm audit; HTTPS 强制。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoRateLimit()">限流配置</button>
+        <button onclick="demoRedis()">分布式限流</button>
+        <button onclick="demoSecurity()">安全清单</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoRateLimit() {
+            result.innerHTML = '';
+            log('# 限流配置');
+            log('');
+            log('// 全局: 15分钟100次');
+            log('rateLimit({ windowMs: 15*60*1000, max: 100 })');
+            log('');
+            log('// 登录: 15分钟5次');
+            log('rateLimit({ windowMs: 15*60*1000, max: 5 })');
+            log('');
+            log('// API: 1分钟60次');
+            log('rateLimit({ windowMs: 60*1000, max: 60 })');
+        }
+
+        function demoRedis() {
+            result.innerHTML = '';
+            log('# 分布式限流');
+            log('');
+            log('const RedisStore = require("rate-limit-redis");');
+            log('const Redis = require("ioredis");');
+            log('');
+            log('const limiter = rateLimit({');
+            log('  store: new RedisStore({');
+            log('    client: redisClient,');
+            log('    prefix: "rate-limit:"');
+            log('  }),');
+            log('  max: 100,');
+            log('});');
+        }
+
+        function demoSecurity() {
+            result.innerHTML = '';
+            log('# 安全检查清单');
+            log('');
+            log('✅ helmet 安全头');
+            log('✅ cors 跨域');
+            log('✅ rateLimit 限流');
+            log('✅ 输入验证 (Joi/Zod)');
+            log('✅ body 大小限制');
+            log('✅ 参数化查询');
+            log('✅ bcrypt 哈希密码');
+            log('✅ httpOnly Cookie');
+            log('✅ 禁用 X-Powered-By');
+            log('✅ HTTPS 启用');
+            log('✅ npm audit 定期检查');
+        }
+    </script>
+</body>
+</html>

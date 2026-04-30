@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>项目实战 Go + S3 文件分享</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📦 项目实战 9: Go + S3 文件分享</h2><p>文件上传 API + multipart 处理、AWS SDK 上传 (PutObject)、PostgreSQL 元数据存储、预签名 URL 下载、上传/下载限流。</p></div>
+    <div class="card">
+        <h2>项目结构</h2>
+        <div class="code">// file-share/
+// ├── main.go
+// ├── config/
+// │   └── config.go
+// ├── handler/
+// │   └── file.go          # HTTP 处理器
+// ├── service/
+// │   └── storage.go        # S3 存储服务
+// ├── store/
+// │   └── postgres.go       # PostgreSQL 元数据
+// ├── middleware/
+// │   ├── auth.go
+// │   ├── rate_limit.go
+// │   └── upload_limit.go
+// ├── migrations/
+// │   └── 001_create_tables.sql
+// ├── Dockerfile
+// └── docker-compose.yml
+
+// ========== 数据模型 ==========
+// -- migrations/001_create_tables.sql
+// CREATE TABLE files (
+//     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+//     user_id     INTEGER NOT NULL REFERENCES users(id),
+//     filename    VARCHAR(500) NOT NULL,
+//     size        BIGINT NOT NULL,           -- 字节
+//     content_type VARCHAR(200),
+//     s3_key      VARCHAR(500) NOT NULL,      -- S3 对象键
+//     upload_ip   VARCHAR(45),
+//     downloads   INTEGER DEFAULT 0,
+//     max_downloads INTEGER DEFAULT 0,        -- 0 = 不限
+//     expires_at  TIMESTAMPTZ,
+//     created_at  TIMESTAMPTZ DEFAULT NOW(),
+//     deleted_at  TIMESTAMPTZ                -- 软删除
+// );
+//
+// CREATE INDEX idx_files_user_id ON files(user_id);
+// CREATE INDEX idx_files_expires ON files(expires_at)
+//     WHERE deleted_at IS NULL;
+
+// ========== S3 客户端 ==========
+// service/storage.go
+type S3Client struct {
+    client    *s3.Client
+    bucket    string
+    presigner *s3.NewPresignClient
+}
+
+func NewS3Client(cfg *config.Config) (*S3Client, error) {
+    client := s3.NewFromConfig(aws.Config{
+        Region: cfg.AWSRegion,
+        Credentials: credentials.NewStaticCredentialsProvider(
+            cfg.AWSAccessKey, cfg.AWSSecretKey, "",
+        ),
+    })
+
+    return &S3Client{
+        client:    client,
+        bucket:    cfg.S3Bucket,
+        presigner: s3.NewPresignClient(client),
+    }, nil
+}
+
+// 上传文件
+func (s *S3Client) Upload(ctx context.Context, key, contentType string, body io.Reader) error {
+    _, err := s.client.PutObject(ctx, &s3.PutObjectInput{
+        Bucket:      &s.bucket,
+        Key:         &key,
+        Body:        body,
+        ContentType: &contentType,
+    })
+    return err
+}
+
+// 生成预签名 URL (下载)
+func (s *S3Client) GenerateDownloadURL(ctx context.Context, key string, expiry time.Duration) (string, error) {
+    req, err := s.presigner.PresignGetObject(ctx, &s3.GetObjectInput{
+        Bucket: &s.bucket,
+        Key:    &key,
+    }, s3.WithPresignExpires(expiry))
+    if err != nil {
+        return "", err
+    }
+    return req.URL, nil
+}
+
+// 删除对象
+func (s *S3Client) Delete(ctx context.Context, key string) error {
+    _, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{
+        Bucket: &s.bucket,
+        Key:    &key,
+    })
+    return err
+}</div>
+    </div>
+    <div class="card">
+        <h2>文件上传与下载</h2>
+        <div class="code">// ========== HTTP 处理器 ==========
+// handler/file.go
+type FileHandler struct {
+    svc    *service.FileService
+    maxSize int64 // 最大上传大小
+}
+
+// POST /api/files/upload — 上传文件
+func (h *FileHandler) Upload(c *gin.Context) {
+    // 限制上传大小 (100MB)
+    c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, h.maxSize)
+
+    file, header, err := c.Request.FormFile("file")
+    if err != nil {
+        c.JSON(400, gin.H{"error": "无效的文件"})
+        return
+    }
+    defer file.Close()
+
+    // 验证文件类型
+    allowedTypes := []string{"image/", "video/", "application/pdf", "text/"}
+    valid := false
+    for _, t := range allowedTypes {
+        if strings.HasPrefix(header.Header.Get("Content-Type"), t) {
+            valid = true
+            break
+        }
+    }
+    if !valid {
+        c.JSON(400, gin.H{"error": "不支持的文件类型"})
+        return
+    }
+
+    // 上传到 S3 + 记录元数据
+    result, err := h.svc.UploadFile(c.Request.Context(),
+        c.GetInt("userId"),
+        header.Filename,
+        header.Header.Get("Content-Type"),
+        file,
+    )
+    if err != nil {
+        c.JSON(500, gin.H{"error": "上传失败"})
+        return
+    }
+
+    c.JSON(201, gin.H{
+        "file_id":  result.FileID,
+        "filename": result.Filename,
+        "size":     result.Size,
+        "url":      result.URL,
+    })
+}
+
+// GET /api/files/:id/download — 下载文件 (预签名 URL)
+func (h *FileHandler) Download(c *gin.Context) {
+    fileID := c.Param("id")
+
+    // 获取文件元数据
+    meta, err := h.svc.GetFileMeta(c.Request.Context(), fileID)
+    if err != nil {
+        c.JSON(404, gin.H{"error": "文件不存在或已过期"})
+        return
+    }
+
+    // 检查权限 (创建者或公开)
+    ownerID := c.GetInt("userId")
+    if meta.UserID != ownerID {
+        c.JSON(403, gin.H{"error": "无权访问"})
+        return
+    }
+
+    // 生成预签名 URL
+    url, err := h.svc.GenerateURL(c.Request.Context(), meta.S3Key, 15*time.Minute)
+    if err != nil {
+        c.JSON(500, gin.H{"error": "生成下载链接失败"})
+        return
+    }
+
+    // 增加下载计数
+    go h.svc.IncrementDownloads(c.Request.Context(), fileID)
+
+    c.JSON(200, gin.H{
+        "download_url": url,
+        "expires_in":   "15m",
+        "filename":     meta.Filename,
+        "size":         meta.Size,
+    })
+}
+
+// ========== 上传限流中间件 ==========
+// middleware/upload_limit.go
+func UploadRateLimit(ratePerMin int) gin.HandlerFunc {
+    limiter := rate.NewLimiter(rate.Limit(ratePerMin)/60, ratePerMin)
+    return func(c *gin.Context) {
+        if c.Request.Method == "POST" && strings.Contains(c.Request.URL.Path, "/upload") {
+            if !limiter.Allow() {
+                c.JSON(429, gin.H{"error": "上传太频繁, 请稍后再试"})
+                c.Abort()
+                return
+            }
+        }
+        c.Next()
+    }
+}
+
+// ========== 限流下载 ==========
+// middleware/rate_limit.go
+// 每 IP 每分钟 100 次下载
+func DownloadRateLimit() gin.HandlerFunc {
+    // 使用 sliding window / token bucket
+    // 参考 881 缓存策略或 875 限流算法
+}</div>
+    </div>
+    <div class="card">
+        <h2>业务服务与配置</h2>
+        <div class="code">// ========== 业务服务 ==========
+// service/file.go
+type FileService struct {
+    s3     *S3Client
+    db     *store.FileStore
+    cfg    *config.Config
+}
+
+func (s *FileService) UploadFile(ctx context.Context, userID int, filename, contentType string, body io.Reader) (*FileResult, error) {
+    // 1. 生成唯一 S3 key
+    ext := filepath.Ext(filename)
+    s3Key := fmt.Sprintf("uploads/%d/%s%s",
+        userID, uuid.New().String(), ext)
+
+    // 2. 上传到 S3
+    if err := s.s3.Upload(ctx, s3Key, contentType, body); err != nil {
+        return nil, fmt.Errorf("s3 upload failed: %w", err)
+    }
+
+    // 3. 记录元数据到数据库
+    fileID, err := s.db.Create(ctx, &store.FileRecord{
+        UserID:      userID,
+        Filename:    filename,
+        ContentType: contentType,
+        S3Key:       s3Key,
+        ExpiresAt:   time.Now().Add(7 * 24 * time.Hour), // 7天过期
+    })
+    if err != nil {
+        // 上传成功但 DB 失败 → 清理 S3
+        go s.s3.Delete(ctx, s3Key)
+        return nil, fmt.Errorf("db insert failed: %w", err)
+    }
+
+    return &FileResult{
+        FileID:   fileID,
+        Filename: filename,
+        Size:     0, // 从 S3 HeadObject 获取
+        URL:      fmt.Sprintf("%s/api/files/%s/download", s.cfg.BaseURL, fileID),
+    }, nil
+}
+
+// ========== Docker Compose ==========
+// docker-compose.yml:
+// version: '3.8'
+// services:
+//   api:
+//     build: .
+//     ports: ["8080:8080"]
+//     environment:
+//       AWS_ACCESS_KEY: ${AWS_ACCESS_KEY}
+//       AWS_SECRET_KEY: ${AWS_SECRET_KEY}
+//       S3_BUCKET: myapp-uploads
+//       DB_DSN: postgres://app:secret@db:5432/fileshare
+//     depends_on:
+//       db:
+//         condition: service_healthy
+//
+//   db:
+//     image: postgres:16-alpine
+//     environment:
+//       POSTGRES_PASSWORD: secret
+//       POSTGRES_DB: fileshare
+//     volumes:
+//       - pgdata:/var/lib/postgresql/data
+//       - ./migrations:/docker-entrypoint-initdb.d
+//     healthcheck:
+//       test: pg_isready -U postgres
+//
+// volumes:
+//   pgdata:</div>
+        <div class="note">💡 Go + S3 文件分享要点: AWS SDK PutObject 上传; 预签名 URL PresignGetObject 临时下载; UUID + 目录隔离 S3 key; 文件类型/大小限制; PostgreSQL 元数据 + 软删除; 上传/下载限流; 上传失败回滚清理; 7天过期自动清理; 最大 100MB 限制。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoUpload()">上传流程</button>
+        <button onclick="demoS3()">S3 操作</button>
+        <button onclick="demoSecurity()">安全措施</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoUpload() {
+            result.innerHTML = '';
+            log('# 文件上传流程');
+            log('');
+            log('1. 客户端 POST multipart/form-data');
+            log('2. 验证文件类型 + 大小限制');
+            log('3. 生成 S3 key: uploads/{user}/{uuid}.{ext}');
+            log('4. PutObject 上传到 S3');
+            log('5. 记录元数据到 PostgreSQL');
+            log('6. 返回 file_id + URL');
+            log('');
+            log('上传失败:');
+            log('  DB 失败 → 清理 S3 已上传文件');
+        }
+
+        function demoS3() {
+            result.innerHTML = '';
+            log('# S3 存储操作');
+            log('');
+            log('操作:');
+            log('  PutObject: 上传');
+            log('  GetObject: 下载');
+            log('  DeleteObject: 删除');
+            log('');
+            log('预签名 URL:');
+            log('  临时授权下载');
+            log('  默认 15 分钟有效');
+            log('  无需公开文件');
+            log('');
+            log('S3 key:');
+            log('  uploads/{userId}/{uuid}.ext');
+        }
+
+        function demoSecurity() {
+            result.innerHTML = '';
+            log('# 安全措施');
+            log('');
+            log('上传:');
+            log('  MaxBytesReader 100MB');
+            log('  文件类型白名单');
+            log('  UploadRateLimit 限流');
+            log('');
+            log('下载:');
+            log('  权限检查 (owner)');
+            log('  预签名 URL 临时');
+            log('  DownloadRateLimit');
+            log('');
+            log('存储:');
+            log('  S3 非公开桶');
+            log('  软删除保留记录');
+            log('  7天自动过期');
+        }
+    </script>
+</body>
+</html>

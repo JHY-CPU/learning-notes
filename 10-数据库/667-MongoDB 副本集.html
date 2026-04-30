@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MongoDB 副本集</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔄 MongoDB 副本集</h2><p>副本集架构 (Primary/Secondary/Arbiter)、选举机制、读写关注 (readConcern/writeConcern)、故障转移、部署配置、连接字符串。</p></div>
+    <div class="card">
+        <h2>副本集架构</h2>
+        <div class="code">// ========== 副本集 (Replica Set) ==========
+// 一组 MongoDB 服务器, 维护同一份数据
+// 提供高可用和数据冗余
+
+// ========== 角色 ==========
+// ┌─────────────────────────────────────────┐
+// │          副本集 (Replica Set)            │
+// ├─────────────────────────────────────────┤
+// │  Primary (主)                            │
+// │  ├── 接收所有写操作                      │
+// │  ├── 默认也处理读操作                    │
+// │  └── 唯一可写节点                       │
+// ├─────────────────────────────────────────┤
+// │  Secondary (从)                          │
+// │  ├── 从 Primary 同步数据 (oplog)         │
+// │  ├── 可配置为可读 (读扩展)              │
+// │  ├── 可用于备份                         │
+// │  └── Primary 故障时参与选举             │
+// ├─────────────────────────────────────────┤
+// │  Arbiter (仲裁者)                        │
+// │  ├── 只参与选举, 不存数据               │
+// │  ├── 用于奇数节点投票                   │
+// │  └── 资源占用小                         │
+// └─────────────────────────────────────────┘
+
+// ========== 推荐部署模式 ==========
+// 生产环境: 3 个数据节点 (1 Primary + 2 Secondary)
+// 最小高可用: 1 Primary + 1 Secondary + 1 Arbiter
+
+// ========== 保障措施 ==========
+// 冷备（cold backup）
+// 主从复制（replication）
+// 延迟节点
+// 隐藏节点（对客户端不可见）</div>
+    </div>
+    <div class="card">
+        <h2>选举机制</h2>
+        <div class="code">// ========== 选举过程 ==========
+
+// 触发条件:
+// 1. Primary 心跳超时 (默认 10 秒)
+// 2. 新节点加入
+// 3. 手动 stepDown
+
+// 选举过程:
+// 1. Secondary 检测到 Primary 失联
+// 2. 节点发起选举 (成为候选者)
+// 3. 其他节点投票
+// 4. 获得多数票的节点成为新 Primary
+
+// 选举规则:
+// - 节点优先级: priority 越高越容易当选
+// - 数据最新优先 (oplog 位置)
+// - 需要多数节点在线 (防止脑裂)
+
+// 配置优先级:
+cfg = rs.conf()
+cfg.members[0].priority = 2    // 优先成为 Primary
+cfg.members[1].priority = 1
+cfg.members[2].priority = 0    // 永远不当 Primary
+rs.reconfig(cfg)
+
+// ========== 心跳 ==========
+// 每 2 秒互相发送心跳
+// 选举超时: electionTimeoutMillis (默认 10 秒)
+
+// 配置心跳:
+cfg.settings.electionTimeoutMillis = 5000  // 5 秒
+rs.reconfig(cfg)
+
+// ========== 回滚 ==========
+// 新 Primary 当选后, 旧 Primary 有未同步的写操作会被回滚
+// 回滚数据写入 rollback 目录, 可手动恢复</div>
+    </div>
+    <div class="card">
+        <h2>读写关注</h2>
+        <div class="code">// ========== readConcern (读关注) ==========
+// 控制读取数据的隔离级别
+
+// local: 从本地节点读取 (默认)
+//        可能读取到未复制到多数节点的数据
+db.orders.find().readConcern("local")
+
+// majority: 读取已同步到多数节点的数据
+//           保证读取的数据已被确认
+db.orders.find().readConcern("majority")
+
+// linearizable: 线性一致读
+//               保证读取最新写入的数据 (性能最慢)
+db.orders.find().readConcern("linearizable")
+
+// ========== writeConcern (写关注) ==========
+// 控制写操作的确认级别
+
+// { w: 1 } (默认): Primary 确认即返回
+db.orders.insertOne({...}, { writeConcern: { w: 1 } })
+
+// { w: "majority" }: 多数节点确认后才返回
+db.orders.insertOne({...}, { writeConcern: { w: "majority" } })
+
+// { w: 0 }: 不等待确认 (性能最快, 可能丢数据)
+db.orders.insertOne({...}, { writeConcern: { w: 0 } })
+
+// { w: 2 }: 等待 2 个节点 (Primary + 1 Secondary)
+db.orders.insertOne({...}, { writeConcern: { w: 2 } })
+
+// j: true — 等待写入磁盘日志
+db.orders.insertOne({...}, {
+    writeConcern: { w: "majority", j: true }
+})
+
+// ========== 读偏好 (readPreference) ==========
+// 控制读操作发往哪个节点
+
+// primary: 只读 Primary (默认)
+// primaryPreferred: 优先 Primary, 不可用时读 Secondary
+// secondary: 只读 Secondary
+// secondaryPreferred: 优先 Secondary
+// nearest: 最近节点 (最低延迟)
+
+// 读偏好设置:
+// MongoDB 驱动连接字符串:
+// mongodb://host1:27017,host2:27017/mydb?replicaSet=rs0&readPreference=secondaryPreferred</div>
+    </div>
+    <div class="card">
+        <h2>部署与连接</h2>
+        <div class="code">// ========== 部署副本集 ==========
+
+// ========== 1. 启动各节点 ==========
+// 每个节点的配置文件:
+// replication:
+//   replSetName: "rs0"
+// net:
+//   bindIp: localhost,<hostname>
+
+// 启动三个实例:
+// mongod --config rs0-1.conf (端口 27017)
+// mongod --config rs0-2.conf (端口 27018)
+// mongod --config rs0-3.conf (端口 27019)
+
+// ========== 2. 初始化副本集 ==========
+// 连接任一节点, 执行:
+rs.initiate({
+    _id: "rs0",
+    members: [
+        { _id: 0, host: "localhost:27017" },
+        { _id: 1, host: "localhost:27018" },
+        { _id: 2, host: "localhost:27019" }
+    ]
+})
+
+// ========== 3. 检查状态 ==========
+rs.status()
+
+// 输出显示每个节点的:
+// - stateStr: PRIMARY / SECONDARY / ARBITER
+// - health: 1 (正常) / 0 (异常)
+// - optime: oplog 同步位置
+// - lastHeartbeat: 最后心跳时间
+
+// ========== 管理命令 ==========
+rs.conf()                        // 查看配置
+rs.status()                      // 查看状态
+rs.add("localhost:27020")        // 添加节点
+rs.remove("localhost:27020")     // 移除节点
+rs.stepDown(60)                  // 让 Primary 降级 (60秒内不重新选举)
+
+// ========== 连接字符串 ==========
+// 驱动连接 (自动发现 Primary):
+// mongodb://host1:27017,host2:27018,host3:27019/mydb?replicaSet=rs0
+
+// ========== 副本集注意事项 ==========
+// 1. 最少 3 个节点 (或 2 节点 + 1 仲裁)
+// 2. 节点数奇数 (避免选举平局)
+// 3. 多数节点可用才能选举 Primary
+// 4. 网络隔离会引起选举风暴
+// 5. Secondary 可用于读扩展 (接受一定程度延迟)</div>
+        <div class="note">💡 副本集要点: Primary 负责写, Secondary 同步复制; 多数节点选举新 Primary; writeConcern 控制写确认级别; readPreference 控制读方向; 生产最少 3 节点; 节点数保持奇数; 延迟节点用于时间点恢复。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoRole()">角色说明</button>
+        <button onclick="demoElection()">选举过程</button>
+        <button onclick="demoConcern()">读写关注</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoRole() {
+            result.innerHTML = '';
+            log('# 副本集角色');
+            log('');
+            log('Primary: 读写节点 (一个)');
+            log('Secondary: 只读从节点 (多个)');
+            log('Arbiter: 投票不存数据');
+            log('');
+            log('推荐: 1 Primary + 2 Secondary');
+            log('最小: 1 Primary + 1 Secondary + 1 Arbiter');
+        }
+
+        function demoElection() {
+            result.innerHTML = '';
+            log('# 选举机制');
+            log('');
+            log('1. Primary 心跳超时 (10s)');
+            log('2. Secondary 发起选举');
+            log('3. 多数节点投票');
+            log('4. 优先级高+数据新的当选');
+            log('');
+            log('需要多数节点在线');
+            log('防止脑裂');
+        }
+
+        function demoConcern() {
+            result.innerHTML = '';
+            log('# 读写关注');
+            log('');
+            log('readConcern:');
+            log('  local → 本地读 (快)');
+            log('  majority → 多数确认 (一致)');
+            log('');
+            log('writeConcern:');
+            log('  w:1 → Primary 确认');
+            log('  w:majority → 多数确认');
+            log('');
+            log('权衡: 一致性 vs 性能');
+        }
+    </script>
+</body>
+</html>

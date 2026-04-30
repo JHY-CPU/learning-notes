@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python模块与包综合</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📦 Python 模块与包综合</h2><p>模块与包知识全景、综合实战: 从零搭建 Python 项目、模块设计原则、导入性能优化、标准库推荐、完整项目模板。</p></div>
+    <div class="card">
+        <h2>模块与包知识全景</h2>
+        <div class="code">// ========== 模块与包知识点结构 ==========
+// 554 模块基础
+// ├── import 6 种语法
+// ├── sys.path 模块搜索路径
+// ├── __name__ == "__main__"
+// ├── sys.modules 模块缓存
+// └── 导入陷阱 (循环/命名冲突)
+//
+// 555 包结构
+// ├── __init__.py 作用
+// ├── __all__ 控制导出
+// ├── __main__.py 入口
+// ├── 命名空间包
+// └── 相对导入 vs 绝对导入
+//
+// 556 pip
+// ├── install/uninstall/list/show
+// ├── freeze > requirements.txt
+// ├── 国内镜像源
+// └── pip vs pipenv vs poetry
+//
+// 557 虚拟环境
+// ├── python -m venv .venv
+// ├── activate/deactivate
+// ├── 项目隔离
+// └── 工具对比
+//
+// 558 依赖管理
+// ├── 版本锁定策略
+// ├── pip-compile / pip-sync
+// ├── pyproject.toml
+// └── 安全审计 pip-audit</div>
+    </div>
+    <div class="card">
+        <h2>综合实战: 项目脚手架</h2>
+        <div class="code">// ========== 从零搭建 Python 项目 ==========
+# myproject/
+# ├── pyproject.toml         # 项目配置
+# ├── README.md              # 项目说明
+# ├── .gitignore             # Git 忽略
+# ├── .venv/                 # 虚拟环境 (不提交)
+# ├── src/
+# │   └── myproject/
+# │       ├── __init__.py
+# │       ├── __main__.py
+# │       ├── config.py
+# │       ├── models.py
+# │       └── utils.py
+# ├── tests/
+# │   ├── __init__.py
+# │   ├── test_config.py
+# │   └── test_models.py
+# └── requirements/
+#     ├── base.txt
+#     ├── dev.txt
+#     └── prod.txt
+
+// ========== 搭建步骤 ==========
+# 1. 创建项目目录
+mkdir myproject && cd myproject
+
+# 2. 创建虚拟环境
+python -m venv .venv
+source .venv/bin/activate     # Windows: .venv\Scripts\activate
+
+# 3. 创建项目结构
+mkdir -p src/myproject tests requirements
+
+# 4. 创建 pyproject.toml
+cat > pyproject.toml << 'EOF'
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "myproject"
+version = "0.1.0"
+dependencies = []
+EOF
+
+# 5. 安装项目 (可编辑模式)
+pip install -e .
+
+# 6. 初始化 git
+git init
+echo ".venv/" >> .gitignore
+echo "__pycache__/" >> .gitignore
+echo "*.pyc" >> .gitignore</div>
+    </div>
+    <div class="card">
+        <h2>模块设计原则</h2>
+        <div class="code">// ========== 模块设计原则 ==========
+// 1. 单一职责: 一个模块只做一件事
+// 2. 接口清晰: 明确导出的内容
+// 3. 最小依赖: 减少 import 数量
+// 4. 稳定接口: 公共 API 保持向后兼容
+
+// ========== __init__.py 的设计 ==========
+# ✅ 好的 __init__.py:
+"""mypackage - 简洁的包说明"""
+
+from .models import User, Product
+from .utils import format_date, validate_email
+
+__all__ = ["User", "Product", "format_date", "validate_email"]
+__version__ = "0.1.0"
+
+# ❌ 不好的 __init__.py:
+# 耗时操作
+# import 过多非必要模块
+# 全局副作用
+
+// ========== 导入性能优化 ==========
+# 1. 延迟导入 (需要时才导入)
+def process_file(filename):
+    from json import load      # 函数内导入
+    with open(filename) as f:
+        return load(f)
+
+# 2. 只导入需要的
+# ✅ from os.path import join
+# ❌ import os (然后 os.path.join)
+
+# 3. 用 __all__ 控制导入
+# 4. 避免 import *
+# 5. 了解 import 的耗时
+
+# 测量导入时间:
+import timeit
+# python -m timeit "import requests"</div>
+    </div>
+    <div class="card">
+        <h2>标准库推荐与项目结构</h2>
+        <div class="code">// ========== 常用标准库推荐 ==========
+# 路径处理: pathlib (优先), os.path
+# 系统接口: os, sys, platform
+# 日期时间: datetime, time, calendar
+# 数学: math, random, statistics
+# 文本: re, string, textwrap
+# 数据: json, csv, pickle
+# 集合: collections, heapq, bisect
+# 迭代: itertools, functools
+# 加密: hashlib, secrets
+# 网络: urllib, http, socket
+# 并发: threading, multiprocessing, asyncio
+# 测试: unittest, doctest
+# 日志: logging
+# 配置: configparser, argparse
+# 开发: pdb, cProfile, venv
+
+// ========== 项目模板总结 ==========
+# 小脚本 (< 100 行):
+#   single_file.py
+#
+# 小项目 (1-5 文件):
+#   project/
+#   ├── main.py
+#   ├── utils.py
+#   └── requirements.txt
+#
+# 中项目 (> 5 文件):
+#   project/
+#   ├── src/project/
+#   │   ├── __init__.py
+#   │   ├── __main__.py
+#   │   └── *.py
+#   ├── tests/
+#   ├── requirements/
+#   └── pyproject.toml
+#
+# 库 (发布到 PyPI):
+#   project/
+#   ├── src/project/   # 源码
+#   ├── tests/         # 测试
+#   ├── docs/          # 文档
+#   ├── pyproject.toml # 构建配置
+#   └── README.md
+
+// ========== 模块导出的最佳实践 ==========
+# 每个模块应该明确定义它的公共接口
+
+def public_function():
+    """公共函数 (在 __all__ 中)"""
+    pass
+
+def _private_helper():
+    """私有函数 (以下划线开头,不应被外部使用)"""
+    pass
+
+# 用户应该通过 __init__.py 的便捷导入使用
+# 而不是直接导入深层模块</div>
+        <div class="note">💡 模块与包总结: (1) 好的项目结构 = 清晰的模块划分 + 明确的接口; (2) __init__.py 提供便捷导入,不要写耗时逻辑; (3) 私有函数用 _ 开头,__all__ 控制导出; (4) 用 pyproject.toml 替代 setup.py; (5) 每个项目创建虚拟环境 + requirements.txt。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoProject()">项目结构演示</button>
+        <button onclick="demoModule()">模块设计演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoProject() {
+            result.innerHTML = '';
+            log('# 项目结构演示');
+            log('');
+            log('myproject/');
+            log('├── pyproject.toml');
+            log('├── .gitignore');
+            log('├── README.md');
+            log('├── src/myproject/');
+            log('│   ├── __init__.py');
+            log('│   ├── __main__.py');
+            log('│   ├── config.py');
+            log('│   └── models.py');
+            log('├── tests/');
+            log('└── requirements/');
+            log('');
+            log('搭建:');
+            log('  python -m venv .venv');
+            log('  pip install -e .');
+        }
+
+        function demoModule() {
+            result.innerHTML = '';
+            log('# 模块设计原则');
+            log('');
+            log('1. 单一职责 — 一个模块只做一件事');
+            log('2. 接口清晰 — ✅ __all__ 控制导出');
+            log('3. 最小依赖 — ✅ from X import Y');
+            log('4. 稳定接口 — ✅ 保持向后兼容');
+            log('');
+            log('命名约定:');
+            log('  public_func    — 公共 API');
+            log('  _private_func  — 模块内部');
+            log('  __internal     — 名称修饰');
+            log('');
+            log('导入优化:');
+            log('  延迟导入: 函数内 import');
+            log('  from X import Y  >  import X');
+        }
+    </script>
+</body>
+</html>

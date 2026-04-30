@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>屏幕捕获</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        video { width: 100%; max-width: 480px; border-radius: 8px; background: #000; margin: 10px 0; }
+        #capture-status { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>屏幕捕获 getUserMedia</h2><p>获取摄像头/麦克风/屏幕的媒体流。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 获取摄像头 + 麦克风
+const stream = await navigator.mediaDevices.getUserMedia({
+    video: {
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        facingMode: 'user',     // 'user'前置 | 'environment'后置
+        frameRate: { ideal: 30 },
+    },
+    audio: true,
+});
+
+// 获取屏幕共享
+const stream = await navigator.mediaDevices.getDisplayMedia({
+    video: { cursor: 'always' },  // 'always' | 'motion' | 'never'
+    audio: true,                   // 是否包含系统音频
+});
+
+// 枚举设备
+const devices = await navigator.mediaDevices.enumerateDevices();
+// device.kind: 'videoinput' | 'audioinput' | 'audiooutput'
+// device.label: 设备名称（需授权后才有）
+
+// 显示到 video 元素
+const video = document.getElementById('video');
+video.srcObject = stream;
+video.play();
+
+// 停止所有轨道
+stream.getTracks().forEach(track => track.stop());
+
+// 截图（canvas）
+const canvas = document.createElement('canvas');
+canvas.width = video.videoWidth;
+canvas.height = video.videoHeight;
+canvas.getContext('2d').drawImage(video, 0, 0);
+const screenshot = canvas.toDataURL('image/png');</div>
+        <div class="note">⚠️ getUserMedia 需要 HTTPS（localhost 可以）。<br>
+        ⚠️ 必须由用户手势触发（click 等）。<br>
+        ⚠️ 移动端需要用户授予摄像头/麦克风权限。<br>
+        💡 enumerateDevices() 在授权前返回的 label 为空。</div>
+    </div>
+    <div class="card">
+        <h2>演示：摄像头</h2>
+        <button onclick="startCamera()" id="cam-btn">📷 开启摄像头</button>
+        <button onclick="takeSnapshot()">📸 拍照</button>
+        <button onclick="stopMedia()">⏹ 停止</button>
+        <video id="video" autoplay playsinline muted></video>
+        <canvas id="canvas" style="display:none;"></canvas>
+        <img id="snapshot" style="max-width:100%;border-radius:4px;margin:5px 0;">
+        <div id="capture-status">点击开启摄像头</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const snapshot = document.getElementById('snapshot');
+        const captureStatus = document.getElementById('capture-status');
+        let stream = null;
+
+        async function startCamera() {
+            try {
+                if (!navigator.mediaDevices?.getUserMedia) {
+                    captureStatus.textContent = '❌ getUserMedia 不可用';
+                    return;
+                }
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: { width: { ideal: 640 }, height: { ideal: 480 } },
+                    audio: false,
+                });
+                video.srcObject = stream;
+                captureStatus.textContent = '✅ 摄像头已开启';
+                console.log('摄像头已启动, 设备:', stream.getVideoTracks()[0].label);
+            } catch (err) {
+                captureStatus.textContent = '❌ 摄像头开启失败: ' + err.message;
+                if (err.name === 'NotAllowedError') {
+                    captureStatus.textContent += '（请授权摄像头权限）';
+                }
+                console.error('getUserMedia error:', err);
+            }
+        }
+
+        function takeSnapshot() {
+            if (!stream) { captureStatus.textContent = '请先开启摄像头'; return; }
+            canvas.width = video.videoWidth || 640;
+            canvas.height = video.videoHeight || 480;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            const dataUrl = canvas.toDataURL('image/png');
+            snapshot.src = dataUrl;
+            captureStatus.textContent = '📸 已拍照';
+            console.log('拍照成功');
+        }
+
+        function stopMedia() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+                stream = null;
+                captureStatus.textContent = '⏹ 已停止';
+                console.log('媒体流已停止');
+            }
+        }
+
+        console.log('=== 媒体捕获 ===');
+        console.log('getUserMedia 支持:', !!navigator.mediaDevices?.getUserMedia);
+
+        // 枚举设备
+        if (navigator.mediaDevices?.enumerateDevices) {
+            navigator.mediaDevices.enumerateDevices().then(devices => {
+                devices.forEach(d => console.log(`设备: ${d.kind} - ${d.label || '(未授权)'}`));
+            });
+        }
+
+        document.getElementById('output').textContent =
+            `媒体捕获: getUserMedia / getDisplayMedia / enumerateDevices\n` +
+            `视频约束: width/height/facingMode/frameRate\n` +
+            `截图: canvas.drawImage + toDataURL\n` +
+            `✅ 屏幕捕获演示完成！`;
+    </script>
+</body>
+</html>

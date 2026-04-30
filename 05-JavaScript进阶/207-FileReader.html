@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FileReader</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        #file-preview { max-width: 200px; max-height: 200px; border-radius: 4px; margin: 5px 0; display: none; }
+        #file-info { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        #file-content { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 12px; max-height: 150px; overflow-y: auto; font-family: monospace; white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>FileReader</h2><p>读取文件内容（文本/DataURL/ArrayBuffer）。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 创建
+const reader = new FileReader();
+
+// 读取方法
+reader.readAsText(file, encoding);        // 读取为文本（encoding 默认 'UTF-8'）
+reader.readAsDataURL(file);               // 读取为 Data URL（base64）
+reader.readAsArrayBuffer(file);           // 读取为 ArrayBuffer（二进制）
+reader.readAsBinaryString(file);          // 读取为二进制字符串（已弃用）
+
+// 事件
+reader.onload = () => {
+    reader.result;   // 读取结果（根据读取方法不同）
+    reader.readyState; // 0=EMPTY, 1=LOADING, 2=DONE
+};
+reader.onerror = () => {
+    reader.error;    // DOMException
+};
+reader.onprogress = (e) => {
+    e.loaded;  // 已读取
+    e.total;   // 总大小
+};
+reader.onloadstart = () => {};  // 开始
+reader.onloadend = () => {};    // 完成（无论成功/失败）
+
+// 中止
+reader.abort();
+
+// 注意：FileReader 只能读取用户选择的文件（安全限制）
+// 通常通过 &lt;input type="file"&gt; 或拖放获得 File 对象</div>
+    </div>
+    <div class="card">
+        <h2>演示：文件读取</h2>
+        <input type="file" id="file-input" onchange="handleFile(this.files[0])">
+        <button onclick="document.getElementById('file-input').click()">选择文件</button>
+        <div id="file-info">选择文件查看内容</div>
+        <img id="file-preview">
+        <div id="file-content"></div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        function handleFile(file) {
+            if (!file) return;
+            const info = document.getElementById('file-info');
+            const preview = document.getElementById('file-preview');
+            const content = document.getElementById('file-content');
+
+            info.innerHTML = `文件名: ${file.name}<br>大小: ${(file.size / 1024).toFixed(2)}KB<br>类型: ${file.type}`;
+            content.textContent = '';
+            preview.style.display = 'none';
+
+            console.log('文件:', file.name, file.size, file.type);
+
+            // 图片预览
+            if (file.type.startsWith('image/')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                    info.innerHTML += '<br>✅ 图片已加载为 DataURL';
+                };
+                reader.readAsDataURL(file);
+            }
+
+            // 文本文件显示内容
+            if (file.type.startsWith('text/') || file.name.endsWith('.txt') || file.name.endsWith('.js') || file.name.endsWith('.html')) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const text = e.target.result;
+                    content.textContent = text.substring(0, 500);
+                    if (text.length > 500) content.textContent += '\n\n... (截断)';
+                    info.innerHTML += `<br>✅ 文本已加载 (${text.length} 字符)`;
+                };
+                reader.readAsText(file, 'UTF-8');
+            }
+
+            // 一般文件显示基本信息
+            if (!file.type.startsWith('image/') && !file.type.startsWith('text/') && !file.name.endsWith('.txt')) {
+                const reader = new FileReader();
+                reader.onprogress = (e) => {
+                    if (e.lengthComputable) {
+                        const pct = (e.loaded / e.total * 100).toFixed(0);
+                        info.innerHTML += `<br>📥 读取中: ${pct}%`;
+                    }
+                };
+                reader.onloadend = () => {
+                    info.innerHTML += `<br>✅ 文件读取完成 (${reader.result.length} 字符)`;
+                    content.textContent = reader.result.substring(0, 200);
+                };
+                reader.readAsText(file);
+            }
+        }
+
+        console.log('=== FileReader ===');
+        console.log('FileReader 支持:', typeof FileReader === 'function');
+
+        document.getElementById('output').textContent =
+            `FileReader: 读取文件内容\n` +
+            `readAsText / readAsDataURL / readAsArrayBuffer\n` +
+            `onload / onprogress / onerror / abort\n` +
+            `✅ FileReader 演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot 日志</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📝 Spring Boot 日志</h2><p>SLF4J + Logback 日志体系、日志级别、配置格式、文件输出与轮转、MDC 追踪、日志最佳实践。</p></div>
+    <div class="card">
+        <h2>日志体系</h2>
+        <div class="code">// ========== Spring Boot 日志 ==========
+// 默认: SLF4J (门面) + Logback (实现)
+// SLF4J — 日志门面 (提供统一 API)
+// Logback — 实现 (Spring Boot 默认)
+// Log4j2 — 可选替代 (性能更高)
+
+// ========== 使用日志 ==========
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+public class UserService {
+    // 方式 1: 声明 Logger
+    private static final Logger log = LoggerFactory.getLogger(UserService.class);
+
+    public void createUser(String name) {
+        log.trace("开始创建用户: {}", name);  // 跟踪 (最低)
+        log.debug("处理参数: {}", name);      // 调试
+        log.info("用户创建成功: {}", name);   // 信息 (默认)
+        log.warn("用户名过长: {}", name);     // 警告
+        log.error("创建用户失败", exception); // 错误
+    }
+}
+
+// ========== Lombok @Slf4j ==========
+// 更简洁的日志声明
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j                              // 自动生成 log 字段
+@Service
+public class UserService {
+
+    public void createUser(String name) {
+        log.info("创建用户: {}", name);  // 直接用 log
+    }
+}
+
+// 其他 Lombok 日志注解:
+// @Log       — java.util.logging
+// @Log4j2    — Log4j2
+// @XSlf4j    — 扩展 SLF4J
+
+// ========== {} 占位符 ==========
+// 使用 {} 避免字符串拼接 (性能更好)
+log.info("User {} logged in at {}", username, LocalDateTime.now());
+// 等价于: log.info("User " + username + " logged in at " + ...);
+// 区别: {} 方式只在日志级别启用时才构建字符串</div>
+    </div>
+    <div class="card">
+        <h2>application.yml 日志配置</h2>
+        <div class="code">// ========== application.yml 日志配置 ==========
+
+logging:
+  # ========== 日志级别 ==========
+  level:
+    root: INFO                          # 全局级别 (默认 INFO)
+    com.example: DEBUG                  # 特定包 DEBUG
+    org.springframework: WARN           # Spring 框架 WARN
+    org.hibernate: ERROR               # Hibernate 只显示 ERROR
+    org.springframework.security: TRACE # 安全模块 TRACE
+
+  # ========== 文件输出 ==========
+  file:
+    name: logs/myapp.log                # 日志文件路径
+    path: logs/                         # 日志目录 (默认: 项目根目录)
+    max-size: 100MB                     # 单个文件最大 (Logback)
+    max-history: 30                    # 保留天数
+    total-size-cap: 1GB                 # 总容量上限
+
+  # ========== 控制台格式 ==========
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file:    "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+  # ========== 日志分组 ==========
+  group:
+    myapp: com.example.myapp,com.example.common
+    db: org.hibernate,org.springframework.jdbc
+
+  level:
+    myapp: DEBUG                        # 组级别
+    db: WARN
+
+// ========== 常用格式模式 ==========
+// %d{pattern}     — 日期时间
+// %thread         — 线程名
+// %-5level        — 日志级别 (左对齐 5 字符)
+// %logger{36}     — Logger 名 (缩写最多 36 字符)
+// %msg            — 日志消息
+// %n              — 换行
+// %class          — 类名
+// %method         — 方法名
+// %line           — 行号
+// %X{key}         — MDC 值
+// %highlight      — 高亮级别 (控制台)
+// %clr(..., ...)  — 彩色输出
+
+// ========== 彩色控制台 ==========
+// Spring Boot 默认启用彩色输出
+// 可在 application.yml 中控制:
+spring:
+  output:
+    ansi:
+      enabled: always                   # ALWAYS/NEVER/DETECT</div>
+    </div>
+    <div class="card">
+        <h2>Logback 高级配置</h2>
+        <div class="code">// ========== logback-spring.xml ==========
+// 如果需要更细致的配置, 使用 logback-spring.xml
+// 放在 src/main/resources/ 下
+// 支持 Spring Profile 扩展
+
+&lt;?xml version="1.0" encoding="UTF-8"?&gt;
+&lt;configuration&gt;
+
+    &lt;!-- 引入 Spring Boot 默认配置 --&gt;
+    &lt;include resource="org/springframework/boot/logging/logback/base.xml"/&gt;
+
+    &lt;!-- ========== 控制台输出 ========== --&gt;
+    &lt;appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender"&gt;
+        &lt;encoder&gt;
+            &lt;pattern&gt;
+                %d{HH:mm:ss.SSS} %highlight(%-5level) [%thread] %cyan(%logger{36}) - %msg%n
+            &lt;/pattern&gt;
+        &lt;/encoder&gt;
+    &lt;/appender&gt;
+
+    &lt;!-- ========== 滚动文件输出 ========== --&gt;
+    &lt;appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender"&gt;
+        &lt;file&gt;logs/myapp.log&lt;/file&gt;
+        &lt;rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy"&gt;
+            &lt;!-- 每天滚动 + 压缩 --&gt;
+            &lt;fileNamePattern&gt;logs/myapp.%d{yyyy-MM-dd}.%i.gz&lt;/fileNamePattern&gt;
+            &lt;timeBasedFileNamingAndTriggeringPolicy class=
+                "ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP"&gt;
+                &lt;maxFileSize&gt;100MB&lt;/maxFileSize&gt;
+            &lt;/timeBasedFileNamingAndTriggeringPolicy&gt;
+            &lt;maxHistory&gt;30&lt;/maxHistory&gt;
+        &lt;/rollingPolicy&gt;
+        &lt;encoder&gt;
+            &lt;pattern&gt;%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n&lt;/pattern&gt;
+        &lt;/encoder&gt;
+    &lt;/appender&gt;
+
+    &lt;!-- ========== 异步 Appender (高性能) ========== --&gt;
+    &lt;appender name="ASYNC" class="ch.qos.logback.classic.AsyncAppender"&gt;
+        &lt;appender-ref ref="FILE"/&gt;
+        &lt;queueSize&gt;512&lt;/queueSize&gt;              &lt;!-- 队列大小 --&gt;
+        &lt;discardingThreshold&gt;0&lt;/discardingThreshold&gt;
+        &lt;neverBlock&gt;true&lt;/neverBlock&gt;           &lt;!-- 不阻塞主线程 --&gt;
+    &lt;/appender&gt;
+
+    &lt;!-- ========== Profile 特定配置 ========== --&gt;
+    &lt;springProfile name="dev"&gt;
+        &lt;root level="INFO"&gt;
+            &lt;appender-ref ref="CONSOLE"/&gt;
+        &lt;/root&gt;
+        &lt;logger name="com.example" level="DEBUG"/&gt;
+    &lt;/springProfile&gt;
+
+    &lt;springProfile name="prod"&gt;
+        &lt;root level="WARN"&gt;
+            &lt;appender-ref ref="ASYNC"/&gt;
+        &lt;/root&gt;
+        &lt;logger name="com.example" level="INFO"/&gt;
+    &lt;/springProfile&gt;
+
+&lt;/configuration&gt;</div>
+    </div>
+    <div class="card">
+        <h2>MDC 与跟踪</h2>
+        <div class="code">// ========== MDC (Mapped Diagnostic Context) ==========
+// 在日志中关联请求上下文
+// 如: 请求 ID, 用户 ID, 会话 ID
+
+// ========== 1. 拦截器设置 MDC ==========
+@Component
+public class MdcFilter implements Filter {
+
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response,
+                         FilterChain chain) throws IOException, ServletException {
+
+        try {
+            // 生成请求 ID 并放入 MDC
+            String requestId = UUID.randomUUID().toString().substring(0, 8);
+            MDC.put("requestId", requestId);
+
+            // 如果有用户认证信息
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null) {
+                MDC.put("userId", auth.getName());
+            }
+
+            chain.doFilter(request, response);
+        } finally {
+            // 必须清理 MDC!
+            MDC.clear();
+        }
+    }
+}
+
+// ========== 2. 日志配置中引用 MDC ==========
+// pattern 中使用 %X{key}
+%X{requestId}  → 输出 MDC 中的 requestId
+%X{userId}     → 输出 MDC 中的 userId
+
+// 完整模式:
+"%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level [%X{requestId}] %logger{36} - %msg%n"
+
+// 输出示例:
+// 2026-04-29 14:30:00 [http-nio-8080] INFO [a1b2c3d4] com.example.UserService - 创建用户成功
+
+// ========== 3. Spring Boot 3.x 自动跟踪 ID ==========
+// 添加依赖: micrometer-tracing
+// &lt;dependency&gt;
+//     &lt;groupId&gt;io.micrometer&lt;/groupId&gt;
+//     &lt;artifactId&gt;micrometer-tracing-bridge-brave&lt;/artifactId&gt;
+// &lt;/dependency&gt;
+
+// 配置文件:
+logging:
+  pattern:
+    level: "%5p [%X{traceId:-},%X{spanId:-}]"
+// 输出: INFO [traceId,spanId]
+
+// ========== 4. 异步任务 MDC 传递 ==========
+// 异步线程 MDC 不会自动传递
+// 需要手动包装:
+
+@Bean
+public Executor taskExecutor() {
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setTaskDecorator(runnable -> {
+        Map&lt;String, String&gt; contextMap = MDC.getCopyOfContextMap();
+        return () -> {
+            try {
+                MDC.setContextMap(contextMap);
+                runnable.run();
+            } finally {
+                MDC.clear();
+            }
+        };
+    });
+    return executor;
+}</div>
+    </div>
+    <div class="card">
+        <h2>日志最佳实践</h2>
+        <div class="code">// ========== 日志最佳实践 ==========
+
+// ========== 1. 使用 SLF4J API ==========
+// 不直接依赖 Logback/Log4j
+// 保持实现可替换
+
+// ========== 2. 使用 {} 占位符 ==========
+// log.info("User: {}", name);          // ✅ 正确
+// log.info("User: " + name);           // ❌ 字符串拼接
+
+// ========== 3. 级别使用指南 ==========
+// ERROR — 需要立即处理的错误 (系统不可用, 操作失败)
+// WARN  — 潜在问题 (配置降级, 重试, 不常见情况)
+// INFO  — 重要业务事件 (创建/删除/启动/停止)
+// DEBUG — 开发调试信息 (SQL, 请求参数, 状态变化)
+// TRACE — 最详细跟踪 (循环内, 非常频繁)
+
+// ========== 4. 避免重复日志 ==========
+// ❌ 错误:
+try {
+    // ...
+} catch (Exception e) {
+    log.error("操作失败", e);              // 上层又抛异常
+    throw new RuntimeException("操作失败", e); // 上层又记录一次!
+}
+
+// ✅ 正确: 在最终捕获处记录
+// 或抛出自定义异常, 由全局异常处理器统一记录
+
+// ========== 5. 保护敏感信息 ==========
+// ❌ log.info("用户密码: {}", password);
+// ✅ log.info("用户认证成功");
+// 不记录: 密码, 令牌, 支付信息, 个人身份信息
+
+// ========== 6. 记录关键上下文 ==========
+// 包含足够的上下文信息以便排查
+log.warn("支付失败 userId={} orderId={} reason={}",
+    userId, orderId, errorReason);
+
+// 不够:
+log.warn("支付失败");  // 无法排查!
+
+// ========== 7. 使用 MDC 关联请求 ==========
+// 将请求 ID/用户 ID 自动注入到所有日志
+
+// ========== 8. 切面日志 ==========
+// 使用 AOP 统一记录 Controller 日志
+@Aspect
+@Component
+public class LoggingAspect {
+
+    @Before("execution(* com.example..*Controller.*(..))")
+    public void logRequest(JoinPoint joinPoint) {
+        log.info("方法: {} 参数: {}",
+            joinPoint.getSignature().toShortString(),
+            joinPoint.getArgs());
+    }
+}
+
+// ========== 9. 条件日志 ==========
+// 高频日志增加采样
+if (log.isDebugEnabled()) {           // 避免不必要的参数计算
+    log.debug("处理大数据: {}", computeExpensive());
+}
+
+// ========== 10. 统一异常日志 ==========
+// 使用 @ControllerAdvice 统一记录异常
+@ControllerAdvice
+public class GlobalExceptionHandler {
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity&lt;?&gt; handleException(Exception e, HttpServletRequest request) {
+        log.error("请求 {} 异常", request.getRequestURI(), e);
+        return ResponseEntity.internalServerError().body("系统异常");
+    }
+}</div>
+        <div class="note">💡 日志要点: Spring Boot 默认 SLF4J + Logback; 级别 TRACE &lt; DEBUG &lt; INFO &lt; WARN &lt; ERROR; {} 占位符避免拼接; application.yml 配置 logging.level/pattern/file; logback-spring.xml 高级配置; MDC 关联请求 ID; AsyncAppender 高性能; 保护敏感信息; 记录关键上下文便于排查。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoLevel()">日志级别</button>
+        <button onclick="demoMdc()">MDC 跟踪</button>
+        <button onclick="demoPractice()">最佳实践</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoLevel() {
+            result.innerHTML = '';
+            log('# 日志级别 (低→高)');
+            log('');
+            log('TRACE — 最详细跟踪');
+            log('DEBUG — 开发调试');
+            log('INFO  — 业务事件 (默认)');
+            log('WARN  — 潜在问题');
+            log('ERROR — 需要立即处理');
+            log('');
+            log('配置:');
+            log('  logging.level.com.example=DEBUG');
+            log('  logging.level.root=WARN');
+        }
+
+        function demoMdc() {
+            result.innerHTML = '';
+            log('# MDC 关联请求');
+            log('');
+            log('拦截器设置 MDC:');
+            log('  MDC.put("requestId", UUID)');
+            log('  MDC.put("userId", auth.getName())');
+            log('');
+            log('日志模式:');
+            log('  %X{requestId} 输出请求 ID');
+            log('');
+            log('输出:');
+            log('  INFO [a1b2c3d4] UserService - 创建用户');
+        }
+
+        function demoPractice() {
+            result.innerHTML = '';
+            log('# 日志最佳实践');
+            log('');
+            log('✅ 用 {} 占位符: log.info("user: {}", name)');
+            log('❌ 不用拼接:   log.info("user: " + name)');
+            log('');
+            log('✅ 记录关键上下文: userId/orderId/reason');
+            log('❌ 不记录敏感信息: 密码/令牌/PII');
+            log('');
+            log('✅ 捕获处统一记录日志');
+            log('❌ 每个 catch 都记录 (重复)');
+            log('');
+            log('使用 MDC 关联请求 ID');
+            log('异步线程注意传递 MDC');
+        }
+    </script>
+</body>
+</html>

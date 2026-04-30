@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express 路由</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🚂 Express 路由</h2><p>路由路径模式、路由参数 (req.params)、查询参数 (req.query)、请求体 (req.body)、HTTP 方法 (GET/POST/PUT/DELETE/PATCH)、app.route() 链式路由、Router 模块化、路由前缀。</p></div>
+    <div class="card">
+        <h2>路由路径</h2>
+        <div class="code">// ========== 路由路径 ==========
+// 路径匹配支持字符串、字符串模式、正则
+
+// ========== 字符串路径 ==========
+// 精确匹配:
+app.get('/', handler);                    // GET /
+app.get('/about', handler);              // GET /about
+
+// ========== 路径参数 ==========
+// :name 捕获 URL 片段:
+app.get('/users/:userId', (req, res) => {
+    const userId = req.params.userId;
+    // GET /users/123 → req.params.userId = "123"
+});
+
+// 多参数:
+app.get('/users/:userId/posts/:postId', (req, res) => {
+    // GET /users/123/posts/456
+    // req.params = { userId: "123", postId: "456" }
+});
+
+// ========== 模式匹配 ==========
+// 可选参数:
+app.get('/users/:userId?', handler);
+// 匹配 /users 和 /users/123
+
+// 通配符:
+app.get('/users/*', handler);
+// 匹配 /users/xxx/yyy
+
+// ========== 正则路径 ==========
+// 匹配 /user 或 /users:
+app.get(/^\/users?$/, handler);
+
+// 匹配 .md 结尾:
+app.get(/\.md$/, handler);
+
+// ========== 查询参数 ==========
+// req.query 获取 ?key=val
+app.get('/search', (req, res) => {
+    // GET /search?q=express&page=1
+    const { q, page, limit } = req.query;
+    // req.query = { q: "express", page: "1" }
+});</div>
+    </div>
+    <div class="card">
+        <h2>HTTP 方法与全路由</h2>
+        <div class="code">// ========== HTTP 方法 ==========
+
+// GET - 获取资源:
+app.get('/users', (req, res) => {
+    res.json({ users: [...] });
+});
+
+// POST - 创建资源:
+app.post('/users', (req, res) => {
+    const newUser = req.body;
+    // 创建用户...
+    res.status(201).json(newUser);
+});
+
+// PUT - 完全替换资源:
+app.put('/users/:id', (req, res) => {
+    const { id } = req.params;
+    const data = req.body;
+    // 替换整个用户
+    res.json({ id, ...data });
+});
+
+// PATCH - 部分更新:
+app.patch('/users/:id', (req, res) => {
+    const { id } = req.params;
+    const updates = req.body;
+    // 只更新提供的字段
+    res.json({ ...updates });
+});
+
+// DELETE - 删除资源:
+app.delete('/users/:id', (req, res) => {
+    const { id } = req.params;
+    // 删除用户...
+    res.status(204).send();     // 无内容返回
+});
+
+// ========== app.all() ==========
+// 匹配所有 HTTP 方法:
+app.all('/secret', (req, res, next) => {
+    // 鉴权逻辑...
+    console.log('Accessing /secret');
+    next();     // 传递给下一个处理函数
+});
+
+// ========== app.route() 链式 ==========
+app.route('/users/:id')
+    .get((req, res) => {
+        // 获取用户
+    })
+    .put((req, res) => {
+        // 更新用户
+    })
+    .delete((req, res) => {
+        // 删除用户
+    });
+
+// 链式路由优势: 相同路径只写一次, 代码更简洁</div>
+    </div>
+    <div class="card">
+        <h2>Router 模块化</h2>
+        <div class="code">// ========== express.Router() ==========
+// 模块化路由: 将路由拆分到独立文件
+
+// routes/users.js — 用户路由模块:
+const express = require('express');
+const router = express.Router();
+
+// 中间件 (只对此路由生效):
+router.use((req, res, next) => {
+    console.log('Users 路由中间件');
+    next();
+});
+
+// 定义路由 (/users 前缀自动添加):
+router.get('/', (req, res) => {
+    // GET /users
+    res.json({ users: [] });
+});
+
+router.get('/:id', (req, res) => {
+    // GET /users/123
+    const { id } = req.params;
+    res.json({ id, name: 'Alice' });
+});
+
+router.post('/', (req, res) => {
+    // POST /users
+    const user = req.body;
+    res.status(201).json(user);
+});
+
+router.put('/:id', (req, res) => {
+    // PUT /users/123
+    const { id } = req.params;
+    res.json({ id, ...req.body });
+});
+
+router.delete('/:id', (req, res) => {
+    // DELETE /users/123
+    res.status(204).send();
+});
+
+module.exports = router;
+
+// ========== 主应用 app.js ==========
+const express = require('express');
+const app = express();
+
+// 中间件 (全局)
+app.use(express.json());
+
+// 注册 Router 模块 (带前缀):
+app.use('/users', require('./routes/users'));
+app.use('/posts', require('./routes/posts'));
+app.use('/auth', require('./routes/auth'));
+
+// 路由前缀:
+// /users    → routes/users.js
+// /posts    → routes/posts.js
+// /auth     → routes/auth.js
+
+// ========== 嵌套路由 ==========
+// routes/posts.js:
+router.get('/', handler);               // GET /posts
+router.get('/:postId', handler);        // GET /posts/:postId
+router.get('/:postId/comments', handler); // GET /posts/:postId/comments</div>
+    </div>
+    <div class="card">
+        <h2>路径参数高级用法</h2>
+        <div class="code">// ========== 路径参数处理 ==========
+
+// ========== 参数验证 ==========
+app.get('/users/:userId(\\d+)', (req, res) => {
+    // 只匹配数字: /users/123 ✅  /users/abc ❌
+    const userId = parseInt(req.params.userId, 10);
+});
+
+// ========== 多个同名参数 ==========
+app.get('/filter/:tags+', (req, res) => {
+    // + 表示一个或多个: /filter/js/node
+    // req.params.tags = ["js", "node"]
+});
+
+// ========== RESTful 路由设计 ==========
+// ┌──────────┬──────────────────┬──────────────────┐
+// │ 方法      │ 路径             │ 用途             │
+// ├──────────┼──────────────────┼──────────────────┤
+// │ GET      │ /users           │ 列表             │
+// │ GET      │ /users/:id       │ 详情             │
+// │ POST     │ /users           │ 创建             │
+// │ PUT      │ /users/:id       │ 完整更新         │
+// │ PATCH    │ /users/:id       │ 部分更新         │
+// │ DELETE   │ /users/:id       │ 删除             │
+// ├──────────┼──────────────────┼──────────────────┤
+// │ GET      │ /users/:id/posts │ 用户帖子列表     │
+// │ POST     │ /users/:id/posts │ 创建用户帖子     │
+// └──────────┴──────────────────┴──────────────────┘
+
+// ========== 最佳实践 ==========
+// 1. 路由参数用 :param 语法
+// 2. 查询参数用 req.query
+// 3. 请求体用 req.body (需要 body parser)
+// 4. Router 模块化拆分
+// 5. RESTful 命名: 复数名词
+// 6. 路由顺序重要! 具体在前, 通配在后
+// 7. 路径参数永远为字符串, 需类型转换</div>
+        <div class="note">💡 Express 路由要点: :param 捕获 URL 片段; req.query 获取查询参数; req.body 获取请求体(需 JSON 中间件); app.route() 链式组织相同路径; express.Router() 模块化路由; 路径顺序敏感 — 具体路由在前, 带参数路由在后。RESTful 设计用复数名词 + HTTP 方法表达 CRUD。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoParams()">路由参数</button>
+        <button onclick="demoRouter()">Router 模块</button>
+        <button onclick="demoREST()">RESTful 设计</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoParams() {
+            result.innerHTML = '';
+            log('# 路由参数');
+            log('');
+            log('路径: /users/:userId/posts/:postId');
+            log('URL:  /users/123/posts/456');
+            log('req.params: { userId: "123", postId: "456" }');
+            log('');
+            log('路径: /search?q=express&page=1');
+            log('req.query: { q: "express", page: "1" }');
+        }
+
+        function demoRouter() {
+            result.innerHTML = '';
+            log('# Router 模块化');
+            log('');
+            log('// routes/users.js');
+            log('const router = express.Router();');
+            log('router.get("/", listUsers);');
+            log('router.post("/", createUser);');
+            log('module.exports = router;');
+            log('');
+            log('// app.js');
+            log('app.use("/users", require("./routes/users"));');
+        }
+
+        function demoREST() {
+            result.innerHTML = '';
+            log('# RESTful 路由设计');
+            log('');
+            log('GET    /users         列表');
+            log('GET    /users/:id     详情');
+            log('POST   /users         创建');
+            log('PUT    /users/:id     完整更新');
+            log('PATCH  /users/:id     部分更新');
+            log('DELETE /users/:id     删除');
+            log('');
+            log('GET    /users/:id/posts   子资源');
+        }
+    </script>
+</body>
+</html>

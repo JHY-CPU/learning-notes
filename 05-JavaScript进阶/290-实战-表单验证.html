@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实战-表单验证</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #validation-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; margin: 5px 0; width: 280px; }
+        .valid { color: green; }
+        .invalid { color: red; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>实战：表单验证</h2><p>邮箱/手机号/URL/IP地址/密码强度/身份证号的正则验证。</p></div>
+    <div class="card">
+        <h2>常用验证正则</h2>
+        <div class="code">// ========== 邮箱 ==========
+/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/
+
+// ========== 手机号 (中国大陆) ==========
+/^1[3-9]\d{9}$/
+
+// ========== URL ==========
+/^https?:\/\/[^\s/$.?#].[^\s]*$/i
+
+// ========== IP 地址 (IPv4) ==========
+/^(\d{1,3}\.){3}\d{1,3}$/
+// 更严格: /^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$/
+
+// ========== 身份证号 (中国大陆 18 位) ==========
+/^[1-9]\d{5}(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]$/
+
+// ========== 密码强度 ==========
+// 弱: 6位以上
+/^.{6,}$/
+// 中: 字母+数字
+/^(?=.*[a-zA-Z])(?=.*\d).{6,}$/
+// 强: 大写+小写+数字+特殊字符
+/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/</div>
+    </div>
+    <div class="card">
+        <h2>演示：正则验证</h2>
+        <p>邮箱: <input id="vEmail" value="test@example.com"></p>
+        <p>手机: <input id="vPhone" value="13812345678"></p>
+        <p>URL: <input id="vUrl" value="https://example.com"></p>
+        <p>IP: <input id="vIp" value="192.168.1.1"></p>
+        <p>密码: <input id="vPwd" value="Pass123!@#"></p>
+        <button onclick="validateForm()">验证所有</button>
+        <div id="validation-result">点击按钮验证</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const validationResult = document.getElementById('validation-result');
+
+        function log(msg) {
+            validationResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function validateForm() {
+            validationResult.innerHTML = '';
+            const email = document.getElementById('vEmail').value;
+            const phone = document.getElementById('vPhone').value;
+            const url = document.getElementById('vUrl').value;
+            const ip = document.getElementById('vIp').value;
+            const pwd = document.getElementById('vPwd').value;
+
+            log('📋 正则验证结果:');
+            log('');
+
+            // 邮箱
+            const emailRe = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+            log(`📧 邮箱 "${email}": ${emailRe.test(email) ? '✅ 有效' : '❌ 无效'}`);
+            log(`   正则: ${emailRe}`);
+            log('');
+
+            // 手机号
+            const phoneRe = /^1[3-9]\d{9}$/;
+            log(`📱 手机 "${phone}": ${phoneRe.test(phone) ? '✅ 有效' : '❌ 无效'}`);
+            log(`   正则: ${phoneRe}`);
+            log('');
+
+            // URL
+            const urlRe = /^https?:\/\/[^\s/$.?#].[^\s]*$/i;
+            log(`🔗 URL "${url}": ${urlRe.test(url) ? '✅ 有效' : '❌ 无效'}`);
+            log(`   正则: ${urlRe}`);
+            log('');
+
+            // IP
+            const ipRe = /^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
+            log(`🌐 IP "${ip}": ${ipRe.test(ip) ? '✅ 有效' : '❌ 无效'}`);
+            log(`   正则: 严格 IPv4`);
+            log('');
+
+            // 密码强度
+            const weakRe = /^.{6,}$/;
+            const mediumRe = /^(?=.*[a-zA-Z])(?=.*\d).{6,}$/;
+            const strongRe = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,}$/;
+
+            let strength = '❌ 太短';
+            if (strongRe.test(pwd)) strength = '💪 强';
+            else if (mediumRe.test(pwd)) strength = '👍 中';
+            else if (weakRe.test(pwd)) strength = '👎 弱';
+
+            log(`🔑 密码 "${pwd}": ${strength}`);
+            log(`   要求: 8位+大写+小写+数字+特殊字符`);
+
+            log('');
+            log('📌 常用验证模式:');
+            log('   邮箱: ^[\\w.%+-]+@[\\w.-]+\\.[a-zA-Z]{2,}$');
+            log('   手机: ^1[3-9]\\d{9}$');
+            log('   URL: ^https?://[^\\s/$.?#].[^\\s]*$');
+            log('   IP: 严格四位范围检查');
+            log('   密码: 正向预查组合');
+        }
+
+        console.log('=== 实战: 表单验证 ===');
+
+        document.getElementById('output').textContent =
+            `实战表单验证: 邮箱/手机/URL/IP/密码强度/身份证\n` +
+            `正则: 正向预查 / 字符类 / 边界 / 量词组合\n` +
+            `✅ 表单验证实战完成！`;
+    </script>
+</body>
+</html>

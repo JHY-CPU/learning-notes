@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>进程优先级与资源限制</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚡ 进程优先级与资源限制</h2><p>nice/renice、进程优先级、ulimit、cgroups 资源控制、ionice。</p></div>
+    <div class="card">
+        <h2>进程优先级 (nice)</h2>
+        <div class="code">// ========== nice 值 ==========
+// nice 值范围: -20 (最高优先级) 到 19 (最低优先级)
+// 默认: 0
+// 普通用户只能调高 nice 值 (让出 CPU)
+// root 可以调低 nice 值 (更高优先级)
+
+// nice 值越高 → 优先级越低 → 更"友好" (谦让 CPU)
+// nice 值越低 → 优先级越高 → 更"不友好" (抢占 CPU)
+
+// ========== nice — 启动时设置 ==========
+nice -n 10 ./long_task       # 低优先级运行
+nice -10 ./long_task         # 同上 (简写)
+nice --10 ./urgent_task      # 高优先级 (需要 root)
+nice -n -20 ./critical       # 最高优先级 (需要 root)
+
+// 默认 nice 值:
+nice                        # 查看默认 nice (通常是 0)
+
+// ========== renice — 调整运行中的进程 ==========
+renice -n 5 -p 1234         # 将 PID 1234 的 nice 设为 5
+renice -n 10 -u alice       # 设置 alice 所有进程的 nice
+renice -n 15 -g group1      # 按进程组设置
+
+// root 降低 nice 值:
+sudo renice -n -10 -p 1234  # 提高优先级
+sudo renice -n -20 -p 1234  # 最高优先级
+
+// ========== 查看 nice 值 ==========
+ps -eo pid,nice,comm        # 查看 nice
+ps -l                       # NI 列
+top                         # NI 列
+htop                        # 按 F6 选择 NI 列
+
+// ========== 优先级公式 ==========
+// 实际优先级 (priority) = nice + 20 (内核调度)
+// priority 范围: 0 (最高) ~ 39 (最低)
+// nice -20 → priority 0  (实时类)
+// nice   0 → priority 20
+// nice  19 → priority 39  (后台类)
+
+// ========== 何时调整 nice ==========
+// 调高 nice (让出 CPU):
+// - 后台批处理任务 (日志处理、数据备份)
+// - 编译任务 (不干扰交互)
+// - 文件索引
+
+// 调低 nice (抢占 CPU):
+// - 用户交互进程
+// - 音频/视频处理 (需 root)
+// - 实时任务 (需 root)</div>
+    </div>
+    <div class="card">
+        <h2>ulimit — 用户资源限制</h2>
+        <div class="code">// ========== ulimit ==========
+// 限制当前 Shell 及其子进程的资源使用
+// soft limit: 软限制 (可动态提升至硬限制)
+// hard limit: 硬限制 (普通用户不可提升)
+
+// ========== 查看限制 ==========
+ulimit -a              # 查看所有限制
+ulimit -n              # 最大文件打开数
+ulimit -u              # 最大用户进程数
+ulimit -s              # 栈大小 (KB)
+ulimit -c              # core 文件大小
+
+// 查看硬限制:
+ulimit -Hn             # 最大文件打开的硬限制
+ulimit -Sa             # 所有软限制
+ulimit -Ha             # 所有硬限制
+
+// ========== 设置限制 ==========
+ulimit -n 65536        # 设置最大文件打开数
+ulimit -c 0            # 禁止生成 core 文件
+ulimit -c unlimited    # 允许任意大小 core 文件
+ulimit -v unlimited    # 无虚拟内存限制
+
+// ========== 典型服务端设置 ==========
+// 在启动脚本中:
+ulimit -n 65536        # 文件描述符 (高并发必需)
+ulimit -u 4096         # 用户进程数
+ulimit -c 0            # 关掉 core dump
+ulimit -s 8192         # 栈大小
+
+// ========== 持久配置 ==========
+// 系统级: /etc/security/limits.conf
+// *    soft    nofile    65536
+// *    hard    nofile    65536
+// @app hard    nproc     4096
+
+// systemd 服务: 在 service unit 中
+// [Service]
+// LimitNOFILE=65536
+// LimitNPROC=4096
+
+// ========== 常用限制项 ==========
+// core        core 文件大小 (KB)
+// data       数据段大小 (KB)
+// fsize      文件大小 (KB)
+// memlock    锁定内存大小 (KB)
+// nofile     文件描述符数
+// nproc      进程数
+// stack      栈大小 (KB)
+// cpu        CPU 时间 (秒)
+// nice       nice 值
+// rtprio     实时优先级</div>
+    </div>
+    <div class="card">
+        <h2>cgroups — 控制组</h2>
+        <div class="code">// ========== cgroups 概述 ==========
+// cgroups (Control Groups) 是 Linux 内核功能
+// 用于限制、隔离、统计进程组的资源使用
+// 是现代容器技术的核心基础 (Docker/LXC)
+
+// cgroups v1: 每个控制器独立层级
+// cgroups v2: 统一层级 (systemd 默认)
+
+// ========== cgroups 子系统 ==========
+// cpu         CPU 时间分配
+// memory      内存限制
+// cpuset      CPU 核心绑定
+// blkio       I/O 带宽
+// devices     设备访问
+// net_prio    网络优先级
+// hugetlb     大页内存
+// pids        进程数限制
+
+// ========== 使用 cgroups (v2) ==========
+// 通过 systemd slice 管理:
+// systemd-cgls                # 查看 cgroups 树
+// systemd-cgtop               # cgroups 资源监控
+
+// 创建控制组:
+sudo systemd-run --unit=limited --slice=limited.slice \
+    --property=MemoryMax=500M \
+    --property=CPUQuota=50% \
+    /usr/bin/node server.js
+
+// ========== 容器中的 cgroups ==========
+// Docker 利用 cgroups 实现资源限制:
+docker run --memory=512m --cpus=0.5 nginx
+
+// 对应 cgroups 配置:
+// /sys/fs/cgroup/memory/docker/<container-id>/memory.max
+// /sys/fs/cgroup/cpu/docker/<container-id>/cpu.max
+
+// ========== ionice — I/O 优先级 ==========
+// 设置 I/O 调度优先级 (CFQ/bfq 调度器)
+
+// 三种 class:
+// 1. Idle:    只有空闲时才做 I/O (备份)
+// 2. Best-effort: 默认, 0-7 优先级 (0 最高)
+// 3. Realtime: 高优先级 (慎用)
+
+ionice -c 3 -p 1234        # I/O 空闲 (备份任务)
+ionice -c 2 -n 0 ./app     # 最高 Best-effort
+ionice -c 2 -n 7 ./app     # 最低 Best-effort
+
+// 同时设置 CPU 和 I/O:
+nice -n 19 ionice -c 3 ./backup.sh  # 后台备份,不干扰服务</div>
+        <div class="note">💡 ulimit -n 65536 是后端开发最常用的调优:高并发服务器需要大量文件描述符。systemd service 中配置 LimitNOFILE 是持久化方式。cgroups 是更强大的资源隔离手段,容器的资源限制就基于此。</div>
+    </div>
+    <div class="card">
+        <h2>实际场景</h2>
+        <div class="code">// ========== 场景: 编译时保留交互响应 ==========
+// 编译消耗大量 CPU,调低优先级
+nice -n 19 make -j4
+
+// ========== 场景: 数据库高优先级 ==========
+// 数据库需要快速响应
+sudo renice -n -5 -p $(pgrep mysqld)
+
+// ========== 场景: 备份不干扰服务 ==========
+// CPU 和 I/O 都设为最低
+nice -n 19 ionice -c 3 tar czf backup.tar.gz /data
+
+// ========== 场景: 高并发服务优化 ==========
+# /etc/security/limits.conf
+webapp hard nofile 1048576
+webapp hard nproc unlimited
+
+// ========== 场景: systemd 资源限制 ==========
+[Service]
+User=webapp
+LimitNOFILE=1048576
+LimitNPROC=65536
+CPUQuota=80%
+MemoryMax=1G
+TasksMax=512</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoNice()">nice 演示</button>
+        <button onclick="demoUlimit()">ulimit 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoNice() {
+            result.innerHTML = '';
+            log('# nice/renice 演示');
+            log('');
+            log('nice 值范围: -20 (最高) 到 +19 (最低)');
+            log('默认 nice: 0');
+            log('');
+            log('$ nice -n 5 ./batch_process.sh');
+            log('  → 低优先级运行批处理');
+            log('');
+            log('$ nice -n 19 ionice -c 3 ./backup.sh');
+            log('  → 最低 CPU + I/O 优先级,完美后台');
+            log('');
+            log('$ ps -eo pid,nice,comm | head -5');
+            log('  PID  NI  COMMAND');
+            log(' 1234   0  bash');
+            log(' 2345   0  nginx');
+            log(' 3456  19  backup.sh');
+            log(' 4567  -5  mysqld');
+        }
+
+        function demoUlimit() {
+            result.innerHTML = '';
+            log('# ulimit 资源限制演示');
+            log('');
+            log('$ ulimit -a');
+            log('  open files                    (-n) 1024');
+            log('  max user processes            (-u) 4096');
+            log('  stack size (kbytes)           (-s) 8192');
+            log('  core file size (blocks)       (-c) 0');
+            log('  virtual memory (kbytes)       (-v) unlimited');
+            log('');
+            log('# 设置大文件描述符 (Nginx/Redis 优化)');
+            log('$ ulimit -n 65536');
+            log('$ ulimit -n  # 验证');
+            log('  65536');
+            log('');
+            log('# 持久配置 /etc/security/limits.conf:');
+            log('  *      soft    nofile    65536');
+            log('  *      hard    nofile    65536');
+            log('  *      soft    nproc     4096');
+            log('  @app   hard    nproc     65536');
+        }
+    </script>
+</body>
+</html>

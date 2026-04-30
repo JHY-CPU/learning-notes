@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数字格式化</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>数字格式化</h2><p>千分位(多种实现)、中文数字、货币格式化、科学计数法。</p></div>
+    <div class="card">
+        <h2>数字格式化方法</h2>
+        <div class="code">// ========== toLocaleString (推荐) ==========
+(1234567.89).toLocaleString('zh-CN');
+// '1,234,567.89'
+
+// ========== Intl.NumberFormat ==========
+new Intl.NumberFormat('zh-CN').format(1234567.89);
+// '1,234,567.89'
+
+// ========== 正则千分位 ==========
+'1234567'.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+// '1,234,567'
+
+// ========== 手动循环 ==========
+function formatThousands(n) {
+    const parts = n.toString().split('.');
+    parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    return parts.join('.');
+}
+
+// ========== 中文数字 ==========
+function toChineseNum(n) {
+    const units = ['', '十', '百', '千', '万'];
+    const digits = '零一二三四五六七八九';
+    // ... 完整实现较复杂
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：数字格式化</h2>
+        <button onclick="demoThousands()">千分位格式化</button>
+        <button onclick="demoIntl()">Intl 数字格式</button>
+        <button onclick="demoChinese()">中文数字</button>
+        <button onclick="demoCurrency()">货币格式</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoThousands() {
+            result.innerHTML = '';
+            log('📝 千分位格式化:');
+            log('');
+
+            const numbers = [1234, 12345, 1234567, 12345678.9, 1000000, 0.1234];
+
+            log('1️⃣ toLocaleString (推荐):');
+            numbers.forEach(n => log(`   ${n} → ${n.toLocaleString('zh-CN')}`));
+            log('');
+
+            log('2️⃣ 正则替换:');
+            function formatReg(n) {
+                const parts = n.toString().split('.');
+                parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                return parts.join('.');
+            }
+            numbers.forEach(n => log(`   ${n} → ${formatReg(n)}`));
+            log('');
+
+            log('3️⃣ 手动循环:');
+            function formatLoop(n) {
+                const [intPart, decPart] = n.toString().split('.');
+                let result = '';
+                const s = intPart;
+                for (let i = s.length - 1, count = 0; i >= 0; i--, count++) {
+                    if (count > 0 && count % 3 === 0) result = ',' + result;
+                    result = s[i] + result;
+                }
+                return decPart ? `${result}.${decPart}` : result;
+            }
+            numbers.forEach(n => log(`   ${n} → ${formatLoop(n)}`));
+            log('');
+
+            log('4️⃣ 补零对齐:');
+            function padNum(n, width = 8) {
+                const s = n.toString();
+                return s.length >= width ? s : '0'.repeat(width - s.length) + s;
+            }
+            [42, 123, 5678].forEach(n => log(`   "${padNum(n, 8)}"`));
+        }
+
+        function demoIntl() {
+            result.innerHTML = '';
+            log('🌐 Intl.NumberFormat:');
+            log('');
+
+            const num = 1234567.8912;
+
+            log('小数位数:');
+            const styles = [
+                { label: '默认', opts: {} },
+                { label: '2 位小数', opts: { minimumFractionDigits: 2, maximumFractionDigits: 2 } },
+                { label: '3 位有效数字', opts: { minimumSignificantDigits: 3, maximumSignificantDigits: 3 } },
+                { label: '整数', opts: { maximumFractionDigits: 0 } },
+            ];
+            styles.forEach(({ label, opts }) => {
+                const f = new Intl.NumberFormat('zh-CN', opts).format(num);
+                log(`   ${label.padEnd(12)} ${f}`);
+            });
+
+            log('');
+            log('百分比:');
+            const pct = 0.8567;
+            log(`   ${new Intl.NumberFormat('zh-CN', { style: 'percent', maximumFractionDigits: 1 }).format(pct)}`);
+            log('');
+
+            log('单位:');
+            const units = [
+                { val: 1024, unit: 'kilobyte' },
+                { val: 50, unit: 'kilometer' },
+                { val: 100, unit: 'kilogram' },
+            ];
+            units.forEach(({ val, unit }) => {
+                const f = new Intl.NumberFormat('zh-CN', { style: 'unit', unit });
+                log(`   ${val}${unit} → ${f.format(val)}`);
+            });
+            log('');
+
+            log('科学计数法:');
+            log(`   ${(1234567).toExponential(2)}`);
+            log(`   ${(0.0001234).toExponential(3)}`);
+        }
+
+        function demoChinese() {
+            result.innerHTML = '';
+            log('🇨🇳 中文数字:');
+            log('');
+
+            const digits = '零一二三四五六七八九';
+            const units = ['', '十', '百', '千'];
+            const bigUnits = ['', '万', '亿', '万亿'];
+
+            function toChineseNum(n) {
+                if (n === 0) return '零';
+                let result = '';
+                let num = n;
+                let unitIdx = 0;
+
+                while (num > 0) {
+                    let part = num % 10000;
+                    if (part === 0) {
+                        if (result && !result.startsWith('零')) {
+                            result = '零' + result;
+                        }
+                    } else {
+                        let partStr = '';
+                        let p = part;
+                        for (let i = 0; i < 4; i++) {
+                            const d = p % 10;
+                            if (d === 0) {
+                                if (partStr && !partStr.startsWith('零')) {
+                                    partStr = '零' + partStr;
+                                }
+                            } else {
+                                partStr = digits[d] + (i > 0 ? units[i] : '') + partStr;
+                            }
+                            p = Math.floor(p / 10);
+                        }
+                        result = partStr + bigUnits[unitIdx] + result;
+                    }
+                    num = Math.floor(num / 10000);
+                    unitIdx++;
+                }
+
+                return result;
+            }
+
+            const tests = [0, 5, 10, 11, 20, 100, 101, 110, 111, 1000, 1001, 1234, 10000, 12345, 100000000];
+            log('阿拉伯数字 → 中文数字:');
+            tests.forEach(n => log(`   ${n.toString().padStart(10)} → ${toChineseNum(n)}`));
+            log('');
+
+            log('中文大写 (财务用):');
+            const capitals = '零壹贰叁肆伍陆柒捌玖';
+            log(`   1234.56 → 壹仟贰佰叁拾肆元伍角陆分 (示例)`);
+            log(`   注意: 中文大写有完整规范, 此处仅演示概念`);
+        }
+
+        function demoCurrency() {
+            result.innerHTML = '';
+            log('💰 货币格式化:');
+            log('');
+
+            const amounts = [1234.5, 999.99, 1000000, 0.99, -500.75];
+
+            log('1️⃣ toLocaleString 货币:');
+            amounts.forEach(n => log(`   ${n} → ${n.toLocaleString('zh-CN', { style: 'currency', currency: 'CNY' })}`));
+            log('');
+
+            log('2️⃣ Intl.NumberFormat 货币:');
+            const currencies = ['CNY', 'USD', 'EUR', 'JPY', 'GBP'];
+            const num = 1234567.89;
+            currencies.forEach(c => {
+                const f = new Intl.NumberFormat('zh-CN', { style: 'currency', currency: c }).format(num);
+                log(`   ${c.padEnd(6)} ${f}`);
+            });
+            log('');
+
+            log('3️⃣ 不同 locale 格式:');
+            const locales = [
+                { label: '中国', locale: 'zh-CN' },
+                { label: '美国', locale: 'en-US' },
+                { label: '德国', locale: 'de-DE' },
+                { label: '日本', locale: 'ja-JP' },
+            ];
+            locales.forEach(({ label, locale }) => {
+                const f = new Intl.NumberFormat(locale, { style: 'currency', currency: 'USD' }).format(1234567.89);
+                log(`   ${label.padEnd(6)} ${f}`);
+            });
+            log('');
+
+            log('4️⃣ 自定义货币格式:');
+            function formatMoney(n, symbol = '¥') {
+                const s = n.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                return n < 0 ? `-${symbol}${s.slice(1)}` : `${symbol}${s}`;
+            }
+            amounts.forEach(n => log(`   ${n} → ${formatMoney(n)}`));
+        }
+
+        console.log('=== 数字格式化 ===');
+        document.getElementById('output').textContent = `数字格式化: 千分位 / Intl / 中文数字 / 货币格式 / 科学计数\n✅ 数字格式化演示完成！`;
+    </script>
+</body>
+</html>

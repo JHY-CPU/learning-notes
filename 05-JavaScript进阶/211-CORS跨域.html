@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS跨域</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #cors-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>CORS 跨域</h2><p>跨域资源共享 — 浏览器安全策略与跨域解决方案。</p></div>
+    <div class="card">
+        <h2>同源策略</h2>
+        <div class="code">// 同源 = 协议 + 域名 + 端口 完全相同
+// https://example.com:443
+//  协议: https://
+//  域名: example.com
+//  端口: 443
+
+// 同源示例:
+// https://example.com/page1  → 同源
+// https://example.com/page2  → 同源
+
+// 跨域示例:
+// https://api.example.com     → ❌ 不同域名
+// http://example.com          → ❌ 不同协议
+// https://example.com:8080    → ❌ 不同端口
+// https://www.example.com     → ❌ 不同子域名
+
+// 浏览器限制:
+// ❌ 跨域请求的响应数据默认不可读
+// ✅ 允许跨域嵌入: &lt;script src&gt;, &lt;img src&gt;, &lt;link href&gt;, &lt;iframe&gt;
+// ✅ 允许跨域提交: &lt;form action&gt;</div>
+    </div>
+    <div class="card">
+        <h2>CORS 机制</h2>
+        <div class="code">// 服务器通过响应头告知浏览器允许跨域
+
+// 简单请求（GET/POST + 简单 Content-Type）
+// 浏览器自动添加 Origin 头
+// 服务器返回 Access-Control-Allow-Origin
+
+// 预检请求（OPTIONS）
+// 触发条件: 非简单方法(PUT/DELETE) / 自定义头 / 非简单 Content-Type
+// 浏览器先发 OPTIONS 请求（预检）
+// 服务器返回允许的方法和头
+// 浏览器再发实际请求
+
+// 关键响应头
+Access-Control-Allow-Origin: https://example.com  // 允许的源
+Access-Control-Allow-Origin: *                     // 允许所有（不能带 credentials）
+Access-Control-Allow-Methods: GET, POST, PUT       // 允许的方法
+Access-Control-Allow-Headers: Content-Type, Auth   // 允许的请求头
+Access-Control-Allow-Credentials: true             // 允许携带 Cookie
+Access-Control-Max-Age: 86400                      // 预检结果缓存时间
+
+// 请求头
+Origin: https://example.com                        // 请求来源
+Access-Control-Request-Method: PUT                 // 预检时声明的方法
+Access-Control-Request-Headers: Authorization       // 预检时声明的头</div>
+    </div>
+    <div class="card">
+        <h2>跨域解决方案</h2>
+        <div class="code">// 1. CORS（推荐）
+fetch('https://api.example.com/data', {
+    mode: 'cors',                             // 默认
+    credentials: 'include',                    // 携带 Cookie（需要服务器返回 specific origin）
+});
+
+// 2. 代理服务器（开发常用）
+// 前端 → 代理(同源) → 目标API
+// Vite proxy:  server.proxy
+// Webpack proxy: devServer.proxy
+
+// 3. JSONP（只能 GET，已不推荐）
+// &lt;script src="https://api.example.com/data?callback=handleData"&gt;&lt;/script&gt;
+
+// 4. postMessage（跨窗口通信）
+otherWindow.postMessage(data, targetOrigin);
+window.addEventListener('message', (e) => {
+    if (e.origin !== 'https://trusted.com') return;
+    console.log(e.data);
+});
+
+// 5. WebSocket（不受同源策略限制）
+const ws = new WebSocket('wss://api.example.com');</div>
+        <div class="note">💡 credentials: 'include' 时，服务器必须指定具体的 origin（不能是 *）。<br>
+        ⚠️ 跨域请求不会发送 Cookie（除非 credentials: 'include'）。<br>
+        💡 开发中常用代理解决跨域，生产环境配置 CORS 头。</div>
+    </div>
+    <div class="card">
+        <h2>演示：跨域请求检测</h2>
+        <button onclick="testCORS()">测试跨域请求</button>
+        <div id="cors-result">点击按钮测试</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const corsResult = document.getElementById('cors-result');
+
+        function log(msg) {
+            corsResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function testCORS() {
+            corsResult.innerHTML = '';
+            log('🔄 发送跨域请求...');
+
+            // 使用公共 API 测试 CORS（jsonplaceholder 支持 CORS）
+            fetch('https://jsonplaceholder.typicode.com/posts/1', {
+                mode: 'cors',
+            })
+                .then(res => {
+                    log(`状态: ${res.status}`);
+                    log(`CORS 响应头:`);
+                    log(`  Access-Control-Allow-Origin: ${res.headers.get('access-control-allow-origin') || 'N/A'}`);
+                    log(`  Content-Type: ${res.headers.get('content-type')}`);
+                    return res.json();
+                })
+                .then(data => log(`✅ 跨域请求成功! title: ${data.title}`))
+                .catch(err => log(`❌ 跨域失败: ${err.message}`));
+
+            log('\n📋 常见跨域方案:');
+            log('1. CORS (服务器配置)');
+            log('2. 代理服务器 (开发代理)');
+            log('3. JSONP (仅 GET, 已弃用)');
+            log('4. postMessage (跨窗口)');
+            log('5. WebSocket (不受同源限制)');
+        }
+
+        console.log('=== CORS 跨域 ===');
+        console.log('同源策略: 协议 + 域名 + 端口');
+
+        document.getElementById('output').textContent =
+            `CORS: 跨域资源共享\n` +
+            `简单请求 vs 预检请求(OPTIONS)\n` +
+            `响应头: Access-Control-Allow-Origin/Methods/Headers/Credentials\n` +
+            `解决方案: CORS/代理/JSONP/postMessage/WebSocket\n` +
+            `✅ CORS 演示完成！`;
+    </script>
+</body>
+</html>

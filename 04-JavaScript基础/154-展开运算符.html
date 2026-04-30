@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>展开运算符</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #f39c12; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>展开运算符（Spread Operator）</h2><p>用 `...` 将数组/对象"展开"。</p></div>
+    <div class="card">
+        <h2>数组展开</h2>
+        <div class="code">const arr1 = [1, 2, 3];
+const arr2 = [4, 5, 6];
+
+// 合并数组
+const merged = [...arr1, ...arr2];
+// [1, 2, 3, 4, 5, 6]
+
+// 在中间插入
+const withMiddle = [...arr1, 99, ...arr2];
+// [1, 2, 3, 99, 4, 5, 6]
+
+// 复制数组（浅拷贝）
+const copy = [...arr1];</div>
+    </div>
+    <div class="card">
+        <h2>对象展开</h2>
+        <div class="code">const obj1 = { a: 1, b: 2 };
+const obj2 = { c: 3, d: 4 };
+
+// 合并对象
+const merged = { ...obj1, ...obj2 };
+// { a: 1, b: 2, c: 3, d: 4 }
+
+// 覆盖属性
+const withOverride = { ...obj1, b: 99, c: 100 };
+// { a: 1, b: 99, c: 100 }
+
+// 复制对象（浅拷贝）
+const copy = { ...obj1 };
+
+// 添加新属性
+const withExtra = { ...obj1, extra: 'new' };</div>
+        <div class="note">💡 展开对象的顺序很重要！后面的属性会覆盖前面的同名属性。</div>
+    </div>
+    <div class="card">
+        <h2>实际应用</h2>
+        <div class="code">// 1. 函数参数展开
+const nums = [3, 1, 4, 1, 5];
+Math.max(...nums);  // 5
+
+// 2. 字符串转数组
+const chars = [...'hello'];
+// ['h', 'e', 'l', 'l', 'o']
+
+// 3. Set/Map 转数组
+const unique = [...new Set([1,2,2,3])];
+// [1, 2, 3]
+
+// 4. 不可变更新
+const todos = [
+    { id: 1, text: '学习JS', done: false },
+    { id: 2, text: '学习React', done: false }
+];
+// 添加
+const added = [...todos, { id: 3, text: '学习Vue', done: false }];
+// 更新
+const updated = todos.map(t =>
+    t.id === 1 ? { ...t, done: true } : t
+);
+// 删除
+const deleted = todos.filter(t => t.id !== 2);</div>
+    </div>
+    <div class="card">
+        <h2>展开 vs rest</h2>
+        <div class="code">// 展开：在赋值/传参时展开数组/对象
+const arr = [1, 2, 3];
+console.log(...arr);           // 1 2 3（展开）
+
+// Rest：在解构时收集剩余项
+const [first, ...rest] = arr;  // first=1, rest=[2,3]（收集）
+
+// 函数参数
+function sum(...nums) {        // rest（收集参数）
+    return nums.reduce((a,c)=>a+c, 0);
+}
+const nums = [1, 2, 3];
+sum(...nums);                  // spread（展开数组）</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== 数组展开 ===');
+        const arr1 = [1, 2, 3];
+        const arr2 = [4, 5, 6];
+        console.log('合并:', [...arr1, ...arr2]);
+        console.log('中间插入:', [0, ...arr1, 99, ...arr2]);
+
+        console.log('=== 对象展开 ===');
+        const obj1 = { a: 1, b: 2 };
+        const obj2 = { c: 3, d: 4 };
+        console.log('合并对象:', { ...obj1, ...obj2 });
+        console.log('覆盖:', { ...obj1, b: 99 });
+
+        console.log('=== 实际用法 ===');
+        console.log('Math.max:', Math.max(...[10, 3, 8, 1]));
+        console.log('字符串转数组:', [...'hello']);
+
+        // 不可变更新
+        const todos = [
+            { id: 1, text: '学习JS', done: false },
+            { id: 2, text: '学习CSS', done: false }
+        ];
+        const newTodos = [
+            ...todos,
+            { id: 3, text: '学习HTML', done: false }
+        ];
+        console.log('添加后数量:', newTodos.length);
+
+        const updated = todos.map(t =>
+            t.id === 1 ? { ...t, done: true } : t
+        );
+        console.log('更新后:', updated.find(t => t.id === 1));
+
+        document.getElementById('output').textContent =
+            `数组合并: [${[...arr1, ...arr2]}]\n` +
+            `对象合并: ${JSON.stringify({...obj1, ...obj2})}\n` +
+            `Math.max(...[10,3,8,1]) = ${Math.max(...[10, 3, 8, 1])}\n` +
+            `✅ 展开运算符演示完成！`;
+    </script>
+</body>
+</html>

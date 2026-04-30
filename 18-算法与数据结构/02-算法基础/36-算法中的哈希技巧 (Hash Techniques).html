@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>36-算法中的哈希技巧 (Hash Techniques)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Hash Techniques</h2>
+  <div class="code">哈希技巧包括字符串哈希、滚动哈希、双哈希、一致性哈希。</div>
+  <pre>// 一致性哈希（简化版）
+class ConsistentHash {
+  constructor(nodes, replicas=3) {
+    this.replicas = replicas;
+    this.ring = {};
+    this.keys = [];
+    for (const node of nodes) this.addNode(node);
+  }
+  addNode(node) {
+    for (let i = 0; i < this.replicas; i++) {
+      const hash = this._hash(`${node}:${i}`);
+      this.ring[hash] = node;
+      this.keys.push(hash);
+    }
+    this.keys.sort((a,b) => a-b);
+  }
+  _hash(s) { let h=0; for (const c of s) h = (h*31 + c.charCodeAt(0)) % 10000; return h; }
+  get(key) {
+    if (!this.keys.length) return null;
+    const hash = this._hash(key);
+    for (const k of this.keys) if (k >= hash) return this.ring[k];
+    return this.ring[this.keys[0]];
+  }
+}</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  class CH{
+    constructor(nodes,r=3){this.r=r;this.ring={};this.keys=[];for(const n of nodes)this.addNode(n);}
+    _h(s){let h=0;for(const c of s)h=(h*31+c.charCodeAt(0))%10000;return h;}
+    addNode(node){for(let i=0;i<this.r;i++){const h=this._h(node+':'+i);this.ring[h]=node;this.keys.push(h);}this.keys.sort((a,b)=>a-b);}
+    get(key){if(!this.keys.length)return null;const h=this._h(key);for(const k of this.keys)if(k>=h)return this.ring[k];return this.ring[this.keys[0]];}
+  }
+  const ch=new CH(['A','B','C']);
+  document.getElementById('result').textContent = `key1 → ${ch.get('key1')}\nkey2 → ${ch.get('key2')}\nkey3 → ${ch.get('key3')}`;
+}
+</script>
+</body>
+</html>

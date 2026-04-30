@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>process对象</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #process-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>process 对象</h2><p>process.argv 命令行参数、env 环境变量、cwd/chdir、exit、nextTick。</p></div>
+    <div class="card">
+        <h2>process 核心属性和方法</h2>
+        <div class="code">// ========== 命令行参数 ==========
+// process.argv — 返回数组
+// $ node script.js --name Alice --verbose
+// argv[0] = node 路径
+// argv[1] = 脚本路径
+// argv[2+] = 参数
+
+// ========== 环境变量 ==========
+process.env.NODE_ENV        // 'development' / 'production'
+process.env.PATH            // 系统 PATH
+// .env 文件通常通过 dotenv 加载
+// require('dotenv').config()
+// process.env.DB_HOST
+
+// ========== 工作目录 ==========
+process.cwd()    // 当前工作目录
+process.chdir('/path')  // 切换工作目录
+
+// ========== 进程控制 ==========
+process.exit(0)      // 正常退出
+process.exit(1)      // 异常退出
+process.exitCode = 1 // 设置退出码但不退出
+process.kill(pid)    // 发送信号
+
+// ========== 事件 ==========
+process.on('exit', (code) => {
+    // 进程退出时
+});
+process.on('uncaughtException', (err) => {
+    // 未捕获的异常
+});
+process.on('unhandledRejection', (reason) => {
+    // 未处理的 Promise 拒绝
+});
+
+// ========== process.nextTick ==========
+// 在当前操作完成后、下一事件循环前执行
+process.nextTick(() => {
+    console.log('下一 tick');
+});
+// nextTick 优先级高于 Promise.then</div>
+    </div>
+    <div class="card">
+        <h2>演示：process 功能</h2>
+        <button onclick="demoProcessInfo()">process 信息</button>
+        <button onclick="demoNextTick()">nextTick 顺序</button>
+        <div id="process-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const processResult = document.getElementById('process-result');
+
+        function log(msg) {
+            processResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoProcessInfo() {
+            processResult.innerHTML = '';
+            log('⚙️ process 对象模拟:');
+            log('');
+
+            // 模拟 process 信息
+            const mockProcess = {
+                argv: ['/usr/bin/node', '/home/user/app.js', '--port', '3000', '--env', 'production'],
+                env: {
+                    NODE_ENV: 'development',
+                    PORT: '3000',
+                    DB_HOST: 'localhost',
+                    DB_USER: 'admin',
+                    DB_PASS: '****',
+                },
+                cwd: () => '/home/user/project',
+                pid: Math.floor(Math.random() * 10000),
+                ppid: 1234,
+                platform: navigator.platform || 'unknown',
+                arch: 'x64',
+                version: 'v20.11.0',
+                versions: { node: '20.11.0', v8: '12.0.267.16' },
+                uptime: () => process.uptime ? Math.floor(process.uptime()) : 12345,
+                memoryUsage: () => ({
+                    rss: 35 * 1024 * 1024,
+                    heapTotal: 25 * 1024 * 1024,
+                    heapUsed: 18 * 1024 * 1024,
+                    external: 2 * 1024 * 1024,
+                }),
+            };
+
+            log('1️⃣ 命令行参数 (argv):');
+            log(`   ${mockProcess.argv.join(' ')}`);
+            log('');
+
+            log('2️⃣ 环境变量 (env):');
+            log(`   NODE_ENV: ${mockProcess.env.NODE_ENV}`);
+            log(`   PORT: ${mockProcess.env.PORT}`);
+            log(`   DB_HOST: ${mockProcess.env.DB_HOST}`);
+            log('');
+
+            log('3️⃣ 进程信息:');
+            log(`   pid: ${mockProcess.pid}`);
+            log(`   ppid: ${mockProcess.ppid}`);
+            log(`   platform: ${mockProcess.platform}`);
+            log(`   arch: ${mockProcess.arch}`);
+            log(`   version: ${mockProcess.version}`);
+            log(`   cwd: ${mockProcess.cwd()}`);
+            log(`   uptime: ${mockProcess.uptime()}s`);
+            log('');
+
+            log('4️⃣ 内存使用:');
+            const mem = mockProcess.memoryUsage();
+            log(`   RSS: ${(mem.rss / 1024 / 1024).toFixed(1)} MB`);
+            log(`   Heap Total: ${(mem.heapTotal / 1024 / 1024).toFixed(1)} MB`);
+            log(`   Heap Used: ${(mem.heapUsed / 1024 / 1024).toFixed(1)} MB`);
+        }
+
+        function demoNextTick() {
+            processResult.innerHTML = '';
+            log('🔄 执行顺序 (nextTick vs Promise vs setTimeout):');
+            log('');
+
+            log('注册回调...');
+            log('');
+
+            // 模拟 Node.js 执行顺序
+            const queue = [];
+
+            function nextTick(fn) {
+                queue.push({ type: 'nextTick', fn });
+            }
+
+            log('执行顺序模拟:');
+            log('   1: 同步代码');
+
+            nextTick(() => log('   2: process.nextTick #1'));
+            nextTick(() => {
+                log('   3: process.nextTick #2');
+                nextTick(() => log('   4: process.nextTick #3 (嵌套)'));
+            });
+
+            // 模拟 Promise
+            const microtask = Promise.resolve();
+            // (Promise 已完成)
+
+            log('   5: Promise.then (微任务)');
+
+            // 模拟 setTimeout
+            log('   6: setTimeout (宏任务)');
+
+            log('');
+
+            // 实际执行演示
+            log('📌 实际浏览器执行顺序:');
+            setTimeout(() => log('   🔴 setTimeout'), 0);
+            Promise.resolve().then(() => log('   🟡 Promise.then'));
+            queueMicrotask(() => log('   🟡 queueMicrotask'));
+            log('   🟢 同步代码 (最后)');
+
+            log('');
+            log('📌 Node.js 顺序: nextTick > Promise > setTimeout');
+            log('📌 process.nextTick 优先级最高');
+        }
+
+        console.log('=== process 对象 ===');
+
+        document.getElementById('output').textContent =
+            `process 对象: argv / env / cwd / exit / nextTick / 事件\n` +
+            `nextTick: 当前操作后、事件循环前执行\n` +
+            `✅ process 对象演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot WebSocket</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔌 Spring Boot WebSocket</h2><p>原生 WebSocket 处理器、STOMP 协议消息代理、@MessageMapping 注解处理、广播与点对点消息、SocketJS 兼容、Session 管理。</p></div>
+    <div class="card">
+        <h2>WebSocket 基础</h2>
+        <div class="code">// ========== WebSocket ==========
+// 全双工通信: 服务端可主动推送消息
+// 场景: 聊天/通知/实时数据/协作编辑/游戏
+
+// ========== WebSocket  vs HTTP ==========
+// HTTP: 请求-响应, 单向, 短连接
+// WebSocket: 双向, 持久连接, 低延迟
+// WS 协议: ws://  (HTTP 升级握手后切换协议)
+// WSS 协议: wss:// (TLS 加密)
+
+// ========== 依赖 ==========
+// &lt;dependency&gt;
+//     &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+//     &lt;artifactId&gt;spring-boot-starter-websocket&lt;/artifactId&gt;
+// &lt;/dependency&gt;
+
+// ========== 方式 1: 原生 WebSocket 处理器 ==========
+// 最底层, 灵活性最高
+
+public class MyWebSocketHandler extends TextWebSocketHandler {
+
+    // 保存所有连接
+    private static final Set&lt;WebSocketSession&gt; sessions =
+        new CopyOnWriteArraySet&lt;&gt;();
+
+    @Override
+    public void afterConnectionEstablished(WebSocketSession session) {
+        sessions.add(session);
+        log.info("新连接: {}", session.getId());
+    }
+
+    @Override
+    protected void handleTextMessage(WebSocketSession session,
+            TextMessage message) throws Exception {
+        String payload = message.getPayload();
+        log.info("收到消息: {}", payload);
+
+        // 广播给所有客户端
+        for (WebSocketSession s : sessions) {
+            if (s.isOpen()) {
+                s.sendMessage(new TextMessage("服务端: " + payload));
+            }
+        }
+    }
+
+    @Override
+    public void afterConnectionClosed(WebSocketSession session,
+            CloseStatus status) {
+        sessions.remove(session);
+        log.info("连接关闭: {}", session.getId());
+    }
+
+    @Override
+    public void handleTransportError(WebSocketSession session,
+            Throwable exception) {
+        log.error("传输错误: {}", session.getId(), exception);
+        sessions.remove(session);
+    }
+}
+
+// ========== WebSocket 配置 ==========
+@Configuration
+@EnableWebSocket
+public class WebSocketConfig implements WebSocketConfigurer {
+
+    @Override
+    public void registerWebSocketHandlers(
+            WebSocketHandlerRegistry registry) {
+        registry.addHandler(myHandler(), "/ws/chat")
+            .setAllowedOrigins("*")          // CORS 跨域
+            .addInterceptors(new HttpSessionHandshakeInterceptor());
+            // 拦截器可做认证
+    }
+
+    @Bean
+    public WebSocketHandler myHandler() {
+        return new MyWebSocketHandler();
+    }
+}
+
+// ========== WebSocket 拦截器 (认证) ==========
+public class AuthHandshakeInterceptor implements HandshakeInterceptor {
+
+    @Override
+    public boolean beforeHandshake(ServerHttpRequest request,
+            ServerHttpResponse response,
+            WebSocketHandler wsHandler,
+            Map&lt;String, Object&gt; attributes) throws Exception {
+
+        // 从查询参数获取 Token
+        String token = ((ServletServerHttpRequest) request)
+            .getServletRequest().getParameter("token");
+
+        if (token == null || !validateToken(token)) {
+            response.setStatusCode(HttpStatus.UNAUTHORIZED);
+            return false;                    // 拒绝连接
+        }
+
+        // 存储用户信息到 session attributes
+        attributes.put("userId", extractUserId(token));
+        attributes.put("username", extractUsername(token));
+        return true;
+    }
+
+    @Override
+    public void afterHandshake(ServerHttpRequest request,
+            ServerHttpResponse response,
+            WebSocketHandler wsHandler, Exception exception) {
+        // 握手后处理
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>STOMP 协议</h2>
+        <div class="code">// ========== STOMP ==========
+// Simple/Streaming Text Oriented Message Protocol
+// 在 WebSocket 之上的消息协议
+// 提供: 目的地 (Destination) / 订阅 / 发布
+
+// STOMP 帧格式:
+// COMMAND
+// header1:value1
+// header2:value2
+//
+// Body^@
+
+// ========== STOMP 配置 ==========
+@Configuration
+@EnableWebSocketMessageBroker
+public class StompWebSocketConfig implements WebSocketMessageBrokerConfigurer {
+
+    @Override
+    public void configureMessageBroker(MessageBrokerRegistry config) {
+        // 应用前缀: 客户端发送到 /app/**
+        // 服务端 @MessageMapping 处理 /app/xxx
+        config.setApplicationDestinationPrefixes("/app");
+
+        // 代理前缀: 广播给所有订阅者
+        // 服务端发送到 /topic/xxx → 所有订阅者收到
+        // 点对点: /user/xxx → 指定用户
+        config.enableSimpleBroker("/topic", "/queue", "/user");
+
+        // 点对点前缀
+        config.setUserDestinationPrefix("/user");
+    }
+
+    @Override
+    public void registerStompEndpoints(StompEndpointRegistry registry) {
+        // WebSocket 连接端点
+        registry.addEndpoint("/ws")           // 连接 URL: ws://host/ws
+            .setAllowedOriginPatterns("*")    // CORS
+            .withSockJS();                   // SockJS 降级支持
+
+        // 纯 WebSocket 端点 (无 SockJS)
+        registry.addEndpoint("/ws")
+            .setAllowedOriginPatterns("*");
+    }
+}
+
+// ========== application.yml 配置 ==========
+// spring:
+//   webSocket:
+//     message:
+//       max-size: 8192                     # 消息最大字节
+//   task:
+//     execution:
+//       pool:
+//         core-size: 8                     # 消息线程池
+
+// ========== 前端连接示例 (JavaScript) ==========
+// const stompClient = new StompJs.Client({
+//     brokerURL: 'ws://localhost:8080/ws',
+//     connectHeaders: {
+//         Authorization: 'Bearer ' + token
+//     }
+// });
+//
+// stompClient.onConnect = function(frame) {
+//     console.log('已连接');
+//
+//     // 订阅广播主题
+//     stompClient.subscribe('/topic/public', message => {
+//         console.log(JSON.parse(message.body));
+//     });
+//
+//     // 订阅个人消息
+//     stompClient.subscribe('/user/queue/notifications', msg => {
+//         console.log('个人通知:', msg.body);
+//     });
+//
+//     // 发送消息
+//     stompClient.publish({
+//         destination: '/app/chat.send',
+//         body: JSON.stringify({content: 'Hello'})
+//     });
+// };
+//
+// stompClient.activate();</div>
+    </div>
+    <div class="card">
+        <h2>@MessageMapping 处理</h2>
+        <div class="code">// ========== 消息控制器 ==========
+// 使用 @MessageMapping 处理客户端发来的消息
+
+@Controller
+@RequiredArgsConstructor
+public class ChatController {
+
+    private final SimpMessagingTemplate messagingTemplate;
+
+    // ========== 广播消息 ==========
+    // 客户端发送到 /app/chat.send
+    // 结果广播到 /topic/public (所有订阅者)
+    @MessageMapping("/chat.send")
+    @SendTo("/topic/public")
+    public ChatMessage sendMessage(@Payload ChatMessage message) {
+        log.info("收到聊天消息: {}", message);
+        message.setTimestamp(LocalDateTime.now().toString());
+        return message;
+    }
+
+    // ========== 点对点消息 ==========
+    // SimpMessagingTemplate 发送给指定用户
+    @MessageMapping("/chat.private")
+    public void sendPrivateMessage(@Payload PrivateMessage message,
+            SimpMessageHeaderAccessor headerAccessor) {
+
+        // 获取发送者
+        String sender = headerAccessor.getUser().getName();
+        message.setFrom(sender);
+
+        // 发送给指定用户 → /user/{userId}/queue/private
+        messagingTemplate.convertAndSendToUser(
+            message.getToUserId(),      // 接收方用户 ID
+            "/queue/private",           // 目的地
+            message);
+    }
+
+    // ========== 带返回地址 ==========
+    @MessageMapping("/chat.typing")
+    public void typingIndicator(@Payload TypingIndicator indicator) {
+        // 只在特定用户间发送
+        messagingTemplate.convertAndSendToUser(
+            indicator.getTo(),
+            "/queue/typing",
+            indicator);
+    }
+
+    // ========== 处理错误 ==========
+    @MessageExceptionHandler
+    @SendToUser("/queue/errors")
+    public String handleException(Throwable exception) {
+        return "错误: " + exception.getMessage();
+    }
+
+    // ========== 连接事件 ==========
+    @EventListener
+    public void handleSessionConnected(
+            SessionConnectEvent event) {
+        StompHeaderAccessor headers =
+            StompHeaderAccessor.wrap(event.getMessage());
+        String sessionId = headers.getSessionId();
+        log.info("STOMP 连接: {}", sessionId);
+    }
+
+    @EventListener
+    public void handleSessionDisconnected(
+            SessionDisconnectEvent event) {
+        StompHeaderAccessor headers =
+            StompHeaderAccessor.wrap(event.getMessage());
+        String sessionId = headers.getSessionId();
+        String username = (String) headers.getSessionAttributes()
+            .get("username");
+        log.info("STOMP 断开: {} ({})", username, sessionId);
+    }
+}
+
+// ========== 服务端主动推送 ==========
+@Service
+@RequiredArgsConstructor
+public class NotificationService {
+
+    private final SimpMessagingTemplate messagingTemplate;
+
+    // 广播通知
+    public void broadcast(String message) {
+        messagingTemplate.convertAndSend(
+            "/topic/notifications",
+            new Notification("公告: " + message));
+    }
+
+    // 指定用户通知
+    public void notifyUser(String userId, String message) {
+        messagingTemplate.convertAndSendToUser(
+            userId,
+            "/queue/notifications",
+            new Notification(message));
+    }
+
+    // 全站系统通知
+    public void systemAlert(String level, String content) {
+        messagingTemplate.convertAndSend(
+            "/topic/system",
+            new SystemAlert(level, content));
+    }
+}
+
+// ========== 消息 DTO ==========
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class ChatMessage {
+    private String sender;
+    private String content;
+    private String timestamp;
+    private MessageType type;             // CHAT, JOIN, LEAVE
+
+    public enum MessageType { CHAT, JOIN, LEAVE }
+}
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class PrivateMessage {
+    private String from;
+    private String toUserId;
+    private String content;
+}
+
+@Data
+@AllArgsConstructor
+public class Notification {
+    private String message;
+}</div>
+    </div>
+    <div class="card">
+        <h2>WebSocket 安全与 Session 管理</h2>
+        <div class="code">// ========== WebSocket 认证 ==========
+// 在握手时认证 + STOMP 头认证
+
+// ========== 方式 1: 拦截器认证 ==========
+// 在 HandshakeInterceptor 中验证 Token
+
+public class JwtHandshakeInterceptor implements HandshakeInterceptor {
+
+    private final JwtUtils jwtUtils;
+
+    @Override
+    public boolean beforeHandshake(ServerHttpRequest request,
+            ServerHttpResponse response,
+            WebSocketHandler wsHandler,
+            Map&lt;String, Object&gt; attributes) {
+
+        // 从请求头或参数获取 Token
+        String token = null;
+        if (request instanceof ServletServerHttpRequest) {
+            HttpServletRequest servletRequest =
+                ((ServletServerHttpRequest) request).getServletRequest();
+            token = servletRequest.getParameter("token");
+            if (token == null) {
+                token = servletRequest.getHeader("Authorization");
+                if (token != null && token.startsWith("Bearer ")) {
+                    token = token.substring(7);
+                }
+            }
+        }
+
+        if (token == null || !jwtUtils.validateToken(token)) {
+            return false;
+        }
+
+        // 存储用户信息到 session
+        attributes.put("username", jwtUtils.getUsernameFromToken(token));
+        attributes.put("userId", jwtUtils.getUserIdFromToken(token));
+        return true;
+    }
+
+    @Override
+    public void afterHandshake(...) {}
+}
+
+// ========== 方式 2: STOMP 头认证 ==========
+// 客户端在 CONNECT 帧中发送 Token
+
+@Component
+public class StompAuthChannelInterceptor implements ChannelInterceptor {
+
+    @Override
+    public Message&lt;?&gt; preSend(Message&lt;?&gt; message, MessageChannel channel) {
+        StompHeaderAccessor accessor =
+            StompHeaderAccessor.wrap(message);
+
+        // 只在 CONNECT 时验证
+        if (StompCommand.CONNECT.equals(accessor.getCommand())) {
+            String token = accessor.getFirstNativeHeader("Authorization");
+            if (token == null || !validateToken(token)) {
+                throw new AuthenticationException("认证失败") {};
+            }
+
+            // 设置认证用户
+            String username = extractUsername(token);
+            accessor.setUser(() -> username);
+            accessor.getSessionAttributes()
+                .put("username", username);
+        }
+        return message;
+    }
+}
+
+// ========== Session 管理 ==========
+// 追踪在线用户
+
+@Component
+public class WebSocketSessionManager {
+
+    // userId → sessionId 映射
+    private final Map&lt;String, String&gt; userSessions =
+        new ConcurrentHashMap&lt;&gt;();
+
+    // sessionId → userId 映射
+    private final Map&lt;String, String&gt; sessionUsers =
+        new ConcurrentHashMap&lt;&gt;();
+
+    public void registerSession(String userId, String sessionId) {
+        userSessions.put(userId, sessionId);
+        sessionUsers.put(sessionId, userId);
+    }
+
+    public void removeSession(String sessionId) {
+        String userId = sessionUsers.remove(sessionId);
+        if (userId != null) {
+            userSessions.remove(userId);
+        }
+    }
+
+    public boolean isUserOnline(String userId) {
+        return userSessions.containsKey(userId);
+    }
+
+    public int getOnlineCount() {
+        return userSessions.size();
+    }
+
+    public Set&lt;String&gt; getOnlineUsers() {
+        return userSessions.keySet();
+    }
+}
+
+// ========== 监听连接事件维护 Session ==========
+@Component
+@RequiredArgsConstructor
+public class WebSocketEventListener {
+
+    private final WebSocketSessionManager sessionManager;
+    private final SimpMessagingTemplate messagingTemplate;
+
+    @EventListener
+    public void handleConnectListener(SessionConnectedEvent event) {
+        StompHeaderAccessor headers = StompHeaderAccessor.wrap(event.getMessage());
+        String username = (String) headers.getSessionAttributes().get("username");
+        sessionManager.registerSession(username, headers.getSessionId());
+
+        // 广播在线人数
+        messagingTemplate.convertAndSend("/topic/online",
+            Map.of("count", sessionManager.getOnlineCount(),
+                   "users", sessionManager.getOnlineUsers()));
+    }
+
+    @EventListener
+    public void handleDisconnectListener(SessionDisconnectEvent event) {
+        StompHeaderAccessor headers = StompHeaderAccessor.wrap(event.getMessage());
+        String username = (String) headers.getSessionAttributes().get("username");
+        sessionManager.removeSession(headers.getSessionId());
+
+        messagingTemplate.convertAndSend("/topic/online",
+            Map.of("count", sessionManager.getOnlineCount(),
+                   "users", sessionManager.getOnlineUsers()));
+    }
+}
+
+// ========== 心跳配置 ==========
+// STOMP 心跳保持连接
+@Override
+public void configureMessageBroker(MessageBrokerRegistry config) {
+    config.enableSimpleBroker("/topic", "/queue")
+        .setHeartbeatValue(new long[]{10000, 10000})   // 10 秒心跳
+        .setTaskScheduler(heartbeatScheduler());
+}</div>
+    </div>
+    <div class="card">
+        <h2>最佳实践</h2>
+        <div class="code">// ========== WebSocket 最佳实践 ==========
+
+// ========== 1. 选择合适的方案 ==========
+// 原生 WebSocket: 简单场景, 少量连接
+// STOMP: 复杂消息路由, 广播/点对点, 推荐
+// SockJS: 兼容不支持 WS 的浏览器 (IE)
+
+// ========== 2. 认证 ==========
+// 在握手阶段完成认证 (减少消息处理逻辑)
+// JWT 放在连接请求头或参数
+// 不要在消息体中传递 Token
+
+// ========== 3. 消息大小 ==========
+// 控制单条消息大小
+// 大消息拆分发送
+// 配置 maxTextMessageBufferSize
+
+// ========== 4. 连接管理 ==========
+// 限制最大连接数 (防资源耗尽)
+// 心跳保活 (检测死连接)
+// 优雅关闭 (onClose 清理资源)
+
+// ========== 5. 集群 ==========
+// 多实例需要消息共享
+// RabbitMQ / Kafka 作为 STOMP Broker Relay
+
+// 配置外部 Broker:
+@Override
+public void configureMessageBroker(MessageBrokerRegistry config) {
+    config.enableStompBrokerRelay("/topic", "/queue")
+        .setRelayHost("rabbitmq.example.com")
+        .setRelayPort(61613)               // STOMP 端口
+        .setClientLogin("guest")
+        .setClientPasscode("guest");
+}
+
+// ========== 6. 错误处理 ==========
+// @MessageExceptionHandler 处理消息异常
+// 连接断开重试机制
+// 客户端指数退避重连
+
+// ========== 7. 性能 ==========
+// 异步消息处理 (@Async)
+// 避免在消息处理器中做耗时操作
+// 使用外部 Broker 而非 SimpleBroker
+
+// ========== 8. 安全 ==========
+// WSS (WebSocket Secure) 加密
+// 验证来源 Origin
+// 限制订阅目的地
+// 心跳防止连接泄漏</div>
+        <div class="note">💡 WebSocket 要点: @EnableWebSocketMessageBroker STOMP; @MessageMapping/@SendTo 处理消息; SimpMessagingTemplate 服务端推送; /topic 广播; /user 点对点; SockJS 降级; HandshakeInterceptor 认证; StompAuthChannelInterceptor Token; Session 管理在线状态; 外部 Broker RabbitMQ/Kafka; WSS 加密。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoStomp()">STOMP 配置</button>
+        <button onclick="demoMapping()">消息映射</button>
+        <button onclick="demoSession()">Session 管理</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoStomp() {
+            result.innerHTML = '';
+            log('# STOMP WebSocket 配置');
+            log('');
+            log('@EnableWebSocketMessageBroker');
+            log('');
+            log('configureMessageBroker:');
+            log('  setApplicationDestinationPrefixes("/app")');
+            log('  enableSimpleBroker("/topic", "/queue")');
+            log('  setUserDestinationPrefix("/user")');
+            log('');
+            log('registerStompEndpoints:');
+            log('  addEndpoint("/ws").withSockJS()');
+            log('');
+            log('客户端:');
+            log('  连接: ws://host/ws');
+            log('  订阅: /topic/public');
+            log('  发送: /app/chat.send');
+        }
+
+        function demoMapping() {
+            result.innerHTML = '';
+            log('# @MessageMapping 消息处理');
+            log('');
+            log('@MessageMapping("/chat.send")');
+            log('@SendTo("/topic/public")');
+            log('  → 广播给所有订阅者');
+            log('');
+            log('@MessageMapping("/chat.private")');
+            log('  → messagingTemplate.convertAndSendToUser()');
+            log('  → 发送给指定用户');
+            log('');
+            log('服务端推送:');
+            log('  convertAndSend("/topic/xxx", data)');
+            log('  convertAndSendToUser("uid", "/queue", data)');
+        }
+
+        function demoSession() {
+            result.innerHTML = '';
+            log('# WebSocket Session 管理');
+            log('');
+            log('SessionConnectEvent — 连接事件');
+            log('SessionDisconnectEvent — 断开事件');
+            log('');
+            log('Session 映射:');
+            log('  userId → sessionId (ConcurrentHashMap)');
+            log('  isUserOnline(userId)');
+            log('  getOnlineCount()');
+            log('');
+            log('在线用户广播:');
+            log('  /topic/online → {count, users}');
+            log('');
+            log('认证:');
+            log('  HandshakeInterceptor');
+            log('  ChannelInterceptor (STOMP)');
+        }
+    </script>
+</body>
+</html>

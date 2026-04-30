@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 原子操作与内存模型</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚡ Go 原子操作与内存模型</h2><p>atomic 包全类型、CAS 与 ABA 问题、内存屏障、Happens-Before 规则、无锁数据结构、sync/atomic 性能分析。</p></div>
+    <div class="card">
+        <h2>atomic 包全景</h2>
+        <div class="code">// ========== atomic 类型化操作 (Go 1.19+) ==========
+// 所有原子类型:
+// atomic.Int32, atomic.Int64, atomic.Uint32, atomic.Uint64
+// atomic.Uintptr, atomic.Bool, atomic.Pointer[T]
+// atomic.Value (任意类型)
+
+func atomicTypes() {
+    // Int64
+    var counter atomic.Int64
+    counter.Store(100)
+    old := counter.Swap(200)
+    swapped := counter.CompareAndSwap(200, 300)
+    v := counter.Add(10)
+    fmt.Println(old, swapped, v)  // 100 true 310
+
+    // Bool
+    var flag atomic.Bool
+    flag.Store(true)
+    wasSwapped := flag.CompareAndSwap(true, false)
+
+    // Pointer
+    type Config struct { Host string; Port int }
+    var cfg atomic.Pointer[Config]
+    cfg.Store(&Config{Host: "localhost", Port: 8080})
+    c := cfg.Load()
+    fmt.Println(c.Host, wasSwapped)
+}
+
+// ========== 旧版 atomic 函数 (兼容) ==========
+func oldAtomic() {
+    var counter int64
+    atomic.AddInt64(&counter, 1)
+    atomic.StoreInt64(&counter, 100)
+    v := atomic.LoadInt64(&counter)
+    atomic.CompareAndSwapInt64(&counter, 100, 200)
+    _ = v
+}
+
+// ========== CAS (Compare And Swap) ==========
+// CAS 是原子指令: 如果 *addr == old, 则 *addr = new
+// 返回 true 表示交换成功
+
+func casSpin() {
+    var v atomic.Int64
+
+    // 自旋 CAS — 乐观锁
+    for {
+        old := v.Load()
+        newVal := old + 1
+        if v.CompareAndSwap(old, newVal) {
+            break  // 成功
+        }
+        // 失败: 其他 goroutine 修改了值, 重试
+    }
+}
+
+// ========== ABA 问题 ==========
+// CAS 仅检查值是否相等, 不检查是否被修改过又改回
+// 场景: 链表 A→B→C, 删除 B:
+// 1. 读取 head = A
+// 2. 准备 CAS(A, A.next)
+// 3. 但 A 被释放后重用, 指向了 B
+// 4. CAS 成功但链表已变
+
+// 解决: 版本号 (atomic.Value 存 struct{ptr, version})
+type Node struct {
+    value   int
+    next    unsafe.Pointer  // *Node
+}
+
+type safeList struct {
+    head atomic.Pointer[Node]
+}
+
+// 非 ABA 安全
+func (l *safeList) Pop() *Node {
+    for {
+        head := l.head.Load()
+        next := (*Node)(atomic.LoadPointer(&head.next))
+        if l.head.CompareAndSwap(head, next) {
+            return head
+        }
+    }
+}
+
+// ABA 安全: 用版本号
+type versionedPtr struct {
+    ptr     unsafe.Pointer
+    version uint64
+}
+
+// 实践中: 使用 sync.Mutex 保护链表更简单</div>
+    </div>
+    <div class="card">
+        <h2>Go 内存模型</h2>
+        <div class="code">// ========== Happens-Before ==========
+// Go 内存模型定义操作之间的偏序关系
+
+// 核心规则:
+// 1. 同一 goroutine: 操作的源码顺序 = happens-before
+// 2. sync.Mutex: Unlock() happens-before 下一个 Lock()
+// 3. sync.RWMutex: RUnlock happens-before 下一个 Lock
+// 4. sync.WaitGroup: Add/ Done happens-before Wait 返回
+// 5. sync.Once: Do 内函数 happens-before 所有 Do 返回
+// 6. atomic: Store happens-before 同一变量的 Load
+// 7. channel: 发送 happens-before 接收
+
+// ========== 数据竞争示例 ==========
+var data int
+var ready atomic.Bool
+
+// ✅ 正确: 使用 atomic 保证顺序
+func producer() {
+    data = 42           // (1) 写 data
+    ready.Store(true)   // (2) 写 ready (Store happens-before Load)
+}
+
+func consumer() {
+    for !ready.Load() { // (3) 读 ready
+        runtime.Gosched()
+    }
+    fmt.Println(data)   // (4) 读 data — 始终看到 42!
+}
+// (1) happens-before (2) happens-before (3) happens-before (4)
+// 所以 data = 42 对 consumer 可见
+
+// ❌ 错误: 没有同步保证
+var badData int
+var badReady bool
+
+func badProducer() {
+    badData = 42
+    badReady = true  // 编译器可能重排!
+}
+
+// 编译器和 CPU 可能重排指令:
+// 实际执行: badReady = true; badData = 42
+// consumer 看到 ready=true 但 data 可能还是 0!
+
+// ========== 内存屏障 ==========
+// atomic 操作隐含内存屏障 (memory barrier)
+// 屏障防止编译器和CPU重排:
+// - Store-Store barrier: 屏障前的写都完成
+// - Load-Load barrier: 屏障前的读都完成
+
+// sync.Mutex 内部包含完整的内存屏障
+// atomic 操作包含 acquire/release 语义
+
+// ========== 编译器重排 ==========
+// func compilerReordering() {
+//     a := 1
+//     b := true  // 编译器可能把 b=true 移到 a=1 之前!
+// }
+
+// atomic 防止重排:
+func noReordering() {
+    var a atomic.Int64
+    var b atomic.Bool
+    a.Store(1)       // release barrier
+    b.Store(true)    // release barrier
+    // 保证: a.Store 在 b.Store 之前完成
+}</div>
+    </div>
+    <div class="card">
+        <h2>无锁数据结构</h2>
+        <div class="code">// ========== 无锁栈 ==========
+// 基于 CAS 的无锁数据结构
+
+type LockFreeStack struct {
+    top atomic.Pointer[node]
+}
+
+type node struct {
+    value interface{}
+    next  *node
+}
+
+func (s *LockFreeStack) Push(v interface{}) {
+    n := &node{value: v}
+    for {
+        n.next = s.top.Load()
+        if s.top.CompareAndSwap(n.next, n) {
+            return  // 成功
+        }
+        // 失败: 重试 (其他 goroutine 修改了 top)
+    }
+}
+
+func (s *LockFreeStack) Pop() (interface{}, bool) {
+    for {
+        top := s.top.Load()
+        if top == nil {
+            return nil, false
+        }
+        if s.top.CompareAndSwap(top, top.next) {
+            return top.value, true
+        }
+    }
+}
+
+// ========== 无锁计数器 (rate limiter) ==========
+type LockFreeCounter struct {
+    value atomic.Int64
+    max   int64
+}
+
+func NewLockFreeCounter(max int64) *LockFreeCounter {
+    return &LockFreeCounter{max: max}
+}
+
+func (c *LockFreeCounter) TryIncrement() bool {
+    for {
+        v := c.value.Load()
+        if v >= c.max {
+            return false
+        }
+        if c.value.CompareAndSwap(v, v+1) {
+            return true
+        }
+        // 重试
+    }
+}
+
+func (c *LockFreeCounter) Decrement() {
+    c.value.Add(-1)
+}
+
+// ========== 无锁单生产者单消费者队列 ==========
+type SPSCQueue struct {
+    buf  []interface{}
+    size int
+    head atomic.Int64  // 写位置
+    tail atomic.Int64  // 读位置
+}
+
+func NewSPSCQueue(size int) *SPSCQueue {
+    return &SPSCQueue{
+        buf:  make([]interface{}, size),
+        size: size,
+    }
+}
+
+// 生产者 (单 goroutine)
+func (q *SPSCQueue) Enqueue(v interface{}) bool {
+    head := q.head.Load()
+    next := (head + 1) % int64(q.size)
+    if next == q.tail.Load() {
+        return false  // 满
+    }
+    q.buf[head] = v
+    q.head.Store(next)
+    return true
+}
+
+// 消费者 (单 goroutine)
+func (q *SPSCQueue) Dequeue() (interface{}, bool) {
+    tail := q.tail.Load()
+    if tail == q.head.Load() {
+        return nil, false  // 空
+    }
+    v := q.buf[tail]
+    q.tail.Store((tail + 1) % int64(q.size))
+    return v, true
+}
+
+// ========== atomic.Value 的限制 ==========
+// atomic.Value 存储的值必须始终保持同一类型
+// Store(nil) 如果之前存储的是非指针类型, panic!
+// 建议: 用 atomic.Pointer[T] 替代
+
+func atomicValueLimit() {
+    var v atomic.Value
+    v.Store(42)
+    // v.Store("hello")  // panic! 类型不同
+
+    var p atomic.Pointer[Config]
+    p.Store(&Config{})
+    // p.Store(nil)  // OK! nil 指针
+}</div>
+    </div>
+    <div class="card">
+        <h2>性能分析</h2>
+        <div class="code">// ========== 原子操作性能 ==========
+// atomic vs Mutex: 原子操作快 5-20x
+
+func BenchmarkAtomic(b *testing.B) {
+    var counter atomic.Int64
+    b.RunParallel(func(pb *testing.PB) {
+        for pb.Next() {
+            counter.Add(1)
+        }
+    })
+}
+
+func BenchmarkMutex(b *testing.B) {
+    var mu sync.Mutex
+    var counter int64
+    b.RunParallel(func(pb *testing.PB) {
+        for pb.Next() {
+            mu.Lock()
+            counter++
+            mu.Unlock()
+        }
+    })
+}
+
+// 结果 (估算):
+// BenchmarkAtomic-8  200M  8 ns/op
+// BenchmarkMutex-8   100M  45 ns/op
+
+// ========== 原子操作使用指南 ==========
+// 1. 简单计数器 → atomic.Int64
+// 2. 共享标志 → atomic.Bool
+// 3. 配置热更新 → atomic.Pointer[Config]
+// 4. 无锁链表/栈 → CAS 循环
+// 5. 复杂状态 → sync.Mutex (简单正确 > 无锁复杂)
+
+// ========== go-mem 检测 ==========
+// go test -race 检测数据竞争
+// 如果检测失败, 至少加 sync.Mutex
+
+// go test -race -count=1 ./...
+// 输出: WARNING: DATA RACE 表示存在数据竞争
+
+// ========== 总结 ==========
+// 1. atomic 比 Mutex 快, 但只适用于简单操作
+// 2. atomic 操作隐含内存屏障, 保证顺序
+// 3. CAS 循环可能 ABA 问题 (加版本号)
+// 4. 无锁数据结构难正确实现, 优先用 Mutex
+// 5. atomic.Pointer[T] 替代 atomic.Value
+// 6. -race 检测数据竞争 (CI 中必加)</div>
+        <div class="note">💡 原子与内存模型: atomic 类型化操作 (Int64/Bool/Pointer) 简单安全; CAS (CompareAndSwap) 乐观锁; ABA 问题 (值被 A→B→A, CAS 误判); Go 内存模型: Store happens-before Load, Mutex Unlock → Lock, atomic 隐含内存屏障; 编译器/CPU 重排可能破坏预期; 无锁数据结构 (LockFreeStack/SPSCQueue) 用 CAS 循环; atomic.Value 要求类型一致; atomic 比 Mutex 快 5-20x; 复杂状态还是用 Mutex。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoAtomic()">原子操作</button>
+        <button onclick="demoMemory()">内存模型</button>
+        <button onclick="demoLockFree()">无锁结构</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoAtomic() {
+            result.innerHTML = '';
+            log('# atomic 原子操作');
+            log('');
+            log('类型化原子 (Go 1.19+):');
+            log('  atomic.Int64, atomic.Bool');
+            log('  atomic.Pointer[T], atomic.Value');
+            log('');
+            log('操作:');
+            log('  Load/Store      — 读写');
+            log('  Add             — 加减');
+            log('  Swap            — 交换(返回旧值)');
+            log('  CompareAndSwap  — CAS');
+            log('');
+            log('性能: atomic(1x) < Mutex(5-20x)');
+        }
+
+        function demoMemory() {
+            result.innerHTML = '';
+            log('# Go 内存模型');
+            log('');
+            log('Happens-Before 规则:');
+            log('  1. 同一 goroutine: 源码顺序');
+            log('  2. Mutex: Unlock → Lock');
+            log('  3. Once: Do → 所有返回');
+            log('  4. Atomic: Store → Load');
+            log('  5. Channel: 发送 → 接收');
+            log('');
+            log('atomic 隐含内存屏障:');
+            log('  Store → release barrier');
+            log('  Load → acquire barrier');
+            log('  防止编译器/CPU 重排');
+        }
+
+        function demoLockFree() {
+            result.innerHTML = '';
+            log('# 无锁数据结构');
+            log('');
+            log('LockFreeStack:');
+            log('  Push: CAS(top, n) 循环');
+            log('  Pop:  CAS(top, top.next)');
+            log('');
+            log('SPSCQueue:')
+            log('  单生产者 + 单消费者');
+            log('  atomic.Int64 head/tail');
+            log('  无锁, 高性能');
+            log('');
+            log('⚠ 无锁难正确实现!');
+            log('ABA 问题需版本号解决');
+            log('优先用 Mutex 保持简单');
+        }
+    </script>
+</body>
+</html>

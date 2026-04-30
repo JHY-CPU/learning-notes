@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MongoDB 更新与删除</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔄 MongoDB 更新与删除</h2><p>updateOne/updateMany/replaceOne、更新运算符 ($set/$unset/$inc/$push/$pull)、数组更新、findOneAndUpdate、deleteOne/deleteMany、批量写入 bulkWrite。</p></div>
+    <div class="card">
+        <h2>更新文档</h2>
+        <div class="code">// ========== 更新操作 ==========
+
+// 更新单条
+db.users.updateOne(
+    { name: "Alice" },      // 过滤条件
+    { $set: { age: 29 } }   // 更新操作
+)
+
+// 更新多条
+db.users.updateMany(
+    { age: { $lt: 25 } },
+    { $set: { status: "junior" } }
+)
+
+// ========== 字段更新运算符 ==========
+
+// $set — 设置字段值
+db.users.updateOne(
+    { name: "Alice" },
+    { $set: { age: 29, city: "Beijing" } }  // 新增或覆盖字段
+)
+
+// $unset — 删除字段
+db.users.updateOne(
+    { name: "Bob" },
+    { $unset: { phone: "" } }  // 移除 phone 字段
+)
+
+// $inc — 自增/自减
+db.users.updateOne(
+    { name: "Charlie" },
+    { $inc: { login_count: 1, points: -10 } }  // login_count+1, points-10
+)
+
+// $mul — 乘以
+db.users.updateOne(
+    { name: "Dave" },
+    { $mul: { salary: 1.1 } }  // 工资涨 10%
+)
+
+// $min / $max — 条件更新
+db.users.updateOne(
+    { name: "Eve" },
+    { $min: { discount: 0.8 } }  // 只降低, 不升高
+)
+db.users.updateOne(
+    { name: "Eve" },
+    { $max: { score: 100 } }     // 不超过 100
+)
+
+// $rename — 重命名字段
+db.users.updateOne(
+    { name: "Frank" },
+    { $rename: { "phone": "mobile" } }
+)</div>
+    </div>
+    <div class="card">
+        <h2>数组更新运算符</h2>
+        <div class="code">// ========== 数组更新 ==========
+
+// $push — 追加元素
+db.users.updateOne(
+    { name: "Alice" },
+    { $push: { tags: "photography" } }
+)
+
+// 一次追加多个
+db.users.updateOne(
+    { name: "Alice" },
+    { $push: { tags: { $each: ["sports", "travel"] } } }
+)
+
+// $push + $sort + $slice (固定长度数组)
+db.scores.updateOne(
+    { user_id: ObjectId("...") },
+    {
+        $push: {
+            recent_scores: {
+                $each: [95],
+                $sort: -1,       // 降序排列
+                $slice: 10       // 只保留前 10 个
+            }
+        }
+    }
+)
+
+// $addToSet — 追加 (不重复)
+db.users.updateOne(
+    { name: "Alice" },
+    { $addToSet: { tags: "music" } }  // 已存在则不添加
+)
+
+// $pull — 删除匹配元素
+db.users.updateOne(
+    { name: "Alice" },
+    { $pull: { tags: "music" } }      // 删除所有 "music"
+)
+
+// $pullAll — 删除多个指定值
+db.users.updateOne(
+    { name: "Alice" },
+    { $pullAll: { tags: ["tech", "music"] } }
+)
+
+// $pop — 删除首/尾元素
+db.users.updateOne(
+    { name: "Alice" },
+    { $pop: { tags: 1 } }     // 删除最后一个 (1 = 尾, -1 = 首)
+)
+
+// 更新数组特定位置
+db.users.updateOne(
+    { name: "Alice" },
+    { $set: { "tags.1": "reading" } }  // 更新索引 1 的元素
+)
+
+// 更新匹配条件的数组元素 (位置运算符 $)
+db.students.updateOne(
+    { name: "Alice", "scores.subject": "Math" },
+    { $set: { "scores.$.score": 96 } }  // 更新第一个匹配元素
+)
+
+// 更新所有匹配数组元素 ($[])
+db.students.updateOne(
+    { name: "Alice" },
+    { $set: { "scores.$[].status": "reviewed" } }  // 更新全部
+)</div>
+    </div>
+    <div class="card">
+        <h2>替换与 findAndModify</h2>
+        <div class="code">// ========== replaceOne ==========
+// 替换整个文档 (除 _id 外)
+
+db.users.replaceOne(
+    { name: "Bob" },
+    {
+        name: "Bob",
+        age: 26,
+        email: "bob_new@test.com",
+        updated_at: new Date()
+    }
+    // 原文档的未指定字段会丢失!
+)
+
+// ========== findOneAndUpdate ==========
+// 更新并返回文档 (原子操作)
+
+// 返回更新前的文档 (默认)
+const oldDoc = db.users.findOneAndUpdate(
+    { name: "Alice" },
+    { $inc: { points: 10 } }
+)
+
+// 返回更新后的文档
+const newDoc = db.users.findOneAndUpdate(
+    { name: "Alice" },
+    { $inc: { points: 10 } },
+    { returnDocument: "after" }
+)
+
+// ========== findOneAndReplace ==========
+db.users.findOneAndReplace(
+    { name: "Bob" },
+    { name: "Bob", age: 27, status: "active" }
+)
+
+// ========== findOneAndDelete ==========
+const deleted = db.users.findOneAndDelete(
+    { name: "Charlie" }
+)
+
+// ========== upsert 选项 ==========
+// 如果没找到匹配, 则插入新文档
+db.users.updateOne(
+    { email: "new@test.com" },
+    { $set: { name: "New User", age: 20 } },
+    { upsert: true }
+)
+
+// upsert 会返回新文档的 _id</div>
+    </div>
+    <div class="card">
+        <h2>删除文档</h2>
+        <div class="code">// ========== 删除操作 ==========
+
+// 删除单条
+db.users.deleteOne({ name: "Bob" })
+
+// 删除多条
+db.users.deleteMany({ status: "inactive" })
+
+// 删除所有文档 (保留集合)
+db.users.deleteMany({})
+
+// 删除集合 (包括索引)
+db.users.drop()
+
+// ========== 批量写入 ==========
+// 在一次操作中执行多个写操作
+
+db.users.bulkWrite([
+    // 插入
+    { insertOne: { document: { name: "New1", age: 20 } } },
+    { insertOne: { document: { name: "New2", age: 21 } } },
+
+    // 更新
+    { updateOne: {
+        filter: { name: "Alice" },
+        update: { $set: { age: 30 } }
+    }},
+
+    // 更新多条
+    { updateMany: {
+        filter: { age: { $lt: 20 } },
+        update: { $set: { status: "junior" } }
+    }},
+
+    // 替换
+    { replaceOne: {
+        filter: { name: "Bob" },
+        replacement: { name: "Bob", age: 25 }
+    }},
+
+    // 删除
+    { deleteOne: { filter: { name: "Charlie" } } },
+    { deleteMany: { filter: { status: "inactive" } } }
+])
+
+// bulkWrite 选项
+db.users.bulkWrite([...], { ordered: false })  // 无序执行
+
+// ========== 更新与删除注意事项 ==========
+// 1. updateOne vs updateMany: 确认范围!
+// 2. 批量删除大集合: 考虑分批 + 索引
+// 3. findOneAndUpdate: 原子操作, 适合队列/计数器
+// 4. upsert: 用唯一键避免重复
+// 5. replaceOne: 会丢失未指定字段! 注意检查</div>
+        <div class="note">💡 更新要点: $set/$unset 管理字段; $inc 计数器; $push/$pull 操作数组; $addToSet 防重复; 位置运算符 $ 更新匹配数组元素; findOneAndUpdate 原子更新; upsert 插入或更新; bulkWrite 批量替代逐个操作。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoUpdate()">更新操作</button>
+        <button onclick="demoArray()">数组更新</button>
+        <button onclick="demoBulk()">批量写入</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoUpdate() {
+            result.innerHTML = '';
+            log('# 更新运算符');
+            log('');
+            log('$set   — 设置字段值');
+            log('$unset — 删除字段');
+            log('$inc   — 自增/自减');
+            log('$mul   — 乘以');
+            log('$min   — 条件降低');
+            log('$rename — 重命名字段');
+            log('');
+            log('updateOne vs updateMany');
+        }
+
+        function demoArray() {
+            result.innerHTML = '';
+            log('# 数组更新');
+            log('');
+            log('$push  — 追加元素');
+            log('$addToSet — 追加(不重复)');
+            log('$pull  — 删除匹配元素');
+            log('$pop   — 删除首/尾');
+            log('$      — 位置运算符');
+            log('');
+            log('$push + $sort + $slice');
+            log('= 固定长度排行榜');
+        }
+
+        function demoBulk() {
+            result.innerHTML = '';
+            log('# 批量写入');
+            log('');
+            log('db.users.bulkWrite([');
+            log('  { insertOne: ... },');
+            log('  { updateOne: ... },');
+            log('  { deleteOne: ... }');
+            log('])');
+            log('');
+            log('一次网络往返, 多个操作');
+            log('ordered: false 提升性能');
+        }
+    </script>
+</body>
+</html>

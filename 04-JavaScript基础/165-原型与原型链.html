@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>原型与原型链</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #2c3e50; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>原型与原型链</h2><p>JavaScript 的继承机制：对象通过 prototype 链共享属性和方法。</p></div>
+    <div class="card">
+        <h2>prototype — 构造函数的原型</h2>
+        <div class="code">function Person(name) {
+    this.name = name;
+}
+
+// 在 prototype 上定义共享方法
+Person.prototype.sayHi = function() {
+    console.log('Hi, 我是' + this.name);
+};
+
+Person.prototype.species = '人类';
+
+const p1 = new Person('Alice');
+const p2 = new Person('Bob');
+
+p1.sayHi();  // 'Hi, 我是Alice'
+p2.sayHi();  // 'Hi, 我是Bob'
+
+// ❗ p1 和 p2 共享同一个方法（内存省了）
+console.log(p1.sayHi === p2.sayHi);  // true
+
+// 对比：在构造函数里定义的方法每个实例单独创建
+function Person2(name) {
+    this.name = name;
+    this.sayHi = function() { /* ... */ };
+}
+const p3 = new Person2('Charlie');
+const p4 = new Person2('Dave');
+console.log(p3.sayHi === p4.sayHi);  // false（不共享）</div>
+    </div>
+    <div class="card">
+        <h2>__proto__ — 对象的原型链接</h2>
+        <div class="code">function Person(name) {
+    this.name = name;
+}
+Person.prototype.sayHi = function() {
+    console.log('Hi');
+};
+
+const p = new Person('Alice');
+
+// 每个对象都有 __proto__ 指向它的构造函数的 prototype
+p.__proto__ === Person.prototype;  // true
+
+// 原型链
+Person.prototype.__proto__ === Object.prototype;    // true
+Object.prototype.__proto__ === null;                // true
+
+// 属性查找机制（原型链）：
+// p.name → 在 p 上找到 → 返回
+// p.sayHi → 在 p 上没找到 → 去 p.__proto__ 找 → 找到 → 返回
+// p.toString → 在 p 上没找到 → 去 p.__proto__ 找 → 没找到
+//            → 去 p.__proto__.__proto__ (Object.prototype) 找 → 找到 → 返回
+
+// hasOwnProperty — 检查是否自身属性（不是原型链上的）
+p.hasOwnProperty('name');   // true
+p.hasOwnProperty('sayHi');  // false（在原型上）
+
+// 推荐用 Object.getPrototypeOf（而不是 __proto__）
+Object.getPrototypeOf(p) === Person.prototype;  // true</div>
+        <div class="note">💡 __proto__ 是浏览器实现的非标准属性，推荐用 Object.getPrototypeOf() / Object.setPrototypeOf()。</div>
+    </div>
+    <div class="card">
+        <h2>原型链图解</h2>
+        <div class="code">// 原型链（假设 function Person 和实例 p）
+//
+// p ──__proto__──→ Person.prototype ──__proto__──→ Object.prototype ──__proto__──→ null
+//                      ↑                                ↑
+//                  Person.prototype                Object.prototype
+//                      │                                │
+//                  Person构造函数                   Object构造函数
+//
+// 所有函数的 __proto__ 指向 Function.prototype
+// Function.prototype.__proto__ === Object.prototype
+//
+// instanceof 检查：
+// p instanceof Person → true（在原型链上找到 Person.prototype）
+// p instanceof Object → true（在原型链上找到 Object.prototype）
+// p instanceof Array  → false（没找到 Array.prototype）
+
+// constructor 属性
+function Foo() {}
+const f = new Foo();
+f.constructor === Foo;              // true
+f.constructor === Foo.prototype.constructor;  // true
+Foo.prototype.constructor === Foo;  // true</div>
+    </div>
+    <div class="card">
+        <h2>原型方法操作</h2>
+        <div class="code">// 添加方法到原型
+Person.prototype.walk = function() {
+    console.log(this.name + ' 在走路');
+};
+
+// 覆盖原型方法
+Person.prototype.sayHi = function() {
+    console.log('你好，我是' + this.name);
+};
+
+// 删除原型方法
+delete Person.prototype.walk;
+
+// 获取原型
+Object.getPrototypeOf(p);
+p.__proto__;
+
+// 设置原型（⚠️ 性能差，尽量别用）
+Object.setPrototypeOf(obj, newProto);
+
+// 检查原型
+Person.prototype.isPrototypeOf(p);  // true
+
+// 创建对象并指定原型
+const child = Object.create(Person.prototype);
+child.name = 'Child';
+child.sayHi();  // '你好，我是Child'
+
+// 整个替换 prototype（注意 constructor）
+function Animal(name) {
+    this.name = name;
+}
+Animal.prototype = {
+    constructor: Animal,  // 修复 constructor 引用
+    eat() { console.log('吃'); },
+    sleep() { console.log('睡'); }
+};</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== prototype 共享方法 ===');
+        function Person(name) {
+            this.name = name;
+        }
+        Person.prototype.sayHi = function() {
+            return 'Hi, 我是' + this.name;
+        };
+        Person.prototype.species = '人类';
+
+        const p1 = new Person('Alice');
+        const p2 = new Person('Bob');
+        console.log(p1.sayHi());
+        console.log(p2.sayHi());
+        console.log('方法共享:', p1.sayHi === p2.sayHi);
+
+        console.log('=== 原型链 ===');
+        console.log('p1.__proto__ === Person.prototype:', p1.__proto__ === Person.prototype);
+        console.log('Person.prototype.__proto__ === Object.prototype:', Person.prototype.__proto__ === Object.prototype);
+        console.log('Object.prototype.__proto__:', Object.prototype.__proto__);
+
+        console.log('=== hasOwnProperty ===');
+        console.log('自身 name:', p1.hasOwnProperty('name'));
+        console.log('原型 species:', p1.hasOwnProperty('species'));
+        console.log('原型 sayHi:', p1.hasOwnProperty('sayHi'));
+
+        console.log('=== constructor ===');
+        console.log('p1.constructor:', p1.constructor.name);
+        console.log('p1.constructor === Person:', p1.constructor === Person);
+
+        console.log('=== 修改原型 ===');
+        Person.prototype.greet = function() {
+            return 'Hello!';
+        };
+        console.log('动态添加方法:', p1.greet());
+
+        document.getElementById('output').textContent =
+            `p1: ${p1.sayHi()}\n` +
+            `方法共享: ${p1.sayHi === p2.sayHi}\n` +
+            `自身属性name: ${p1.hasOwnProperty('name')}\n` +
+            `✅ 原型与原型链演示完成！`;
+    </script>
+</body>
+</html>

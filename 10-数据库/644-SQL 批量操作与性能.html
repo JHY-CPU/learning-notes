@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 批量操作与性能</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚡ SQL 批量操作与性能</h2><p>批量 INSERT 优化、LOAD DATA INFILE、批量 UPDATE/DELETE 策略、事务批量处理、Chunking 分批处理、批量操作注意事项与最佳实践。</p></div>
+    <div class="card">
+        <h2>批量 INSERT</h2>
+        <div class="code">// ========== 批量 INSERT 优化 ==========
+
+-- 1. 多行 INSERT (最快!)
+-- ❌ 逐行插入 (N 次网络往返):
+INSERT INTO users (name, email) VALUES ('Alice', 'a@test.com');
+INSERT INTO users (name, email) VALUES ('Bob', 'b@test.com');
+INSERT INTO users (name, email) VALUES ('Carol', 'c@test.com');
+
+-- ✅ 一次插入多行 (1 次网络往返):
+INSERT INTO users (name, email) VALUES
+    ('Alice', 'a@test.com'),
+    ('Bob', 'b@test.com'),
+    ('Carol', 'c@test.com'),
+    ('Dave', 'd@test.com'),
+    ('Eve', 'e@test.com');
+
+-- 2. INSERT ... SELECT (批量从其他表导入)
+INSERT INTO users_archive (id, username, email, created_at)
+SELECT id, username, email, created_at
+FROM users
+WHERE created_at < '2023-01-01';
+
+-- 3. 批量大小建议
+-- MySQL: 500-1000 行/批 (太大可能超 max_allowed_packet)
+-- PostgreSQL: 1000-5000 行/批
+
+-- ========== LOAD DATA INFILE (MySQL) ==========
+-- 最快的数据导入方式! (比 INSERT 快 20 倍)
+
+-- CSV 文件导入
+LOAD DATA INFILE '/tmp/users.csv'
+INTO TABLE users
+FIELDS TERMINATED BY ','
+ENCLOSED BY '"'
+LINES TERMINATED BY '\n'
+IGNORE 1 ROWS          -- 跳过 CSV 标题行
+(id, username, email, @var1, created_at)
+SET password_hash = SHA2(@var1, 256);
+
+-- 参数说明:
+-- FIELDS TERMINATED BY: 字段分隔符
+-- ENCLOSED BY:         字段包围符
+-- LINES TERMINATED BY: 行分隔符
+-- IGNORE n ROWS:       跳过前 n 行
+-- @var:                临时变量 (可转换)
+-- SET:                 设置/转换列值
+
+-- PostgreSQL COPY:
+-- COPY users FROM '/tmp/users.csv' DELIMITER ',' CSV HEADER;</div>
+    </div>
+    <div class="card">
+        <h2>批量 UPDATE / DELETE</h2>
+        <div class="code">// ========== 批量 UPDATE ==========
+
+-- 1. 条件批量更新
+UPDATE products
+SET price = price * 0.9
+WHERE category_id = 1
+  AND stock > 100;
+
+-- 2. 分批更新 (避免大事务)
+-- 每次更新 1000 行
+UPDATE products
+SET price = price * 0.9
+WHERE category_id = 1
+  AND stock > 100
+  AND id > 0
+  AND id <= 1000;
+
+-- 循环执行,直到影响行数为 0
+
+-- 3. 基于其他表的批量更新 (MySQL)
+UPDATE products p
+JOIN categories c ON p.category_id = c.id
+SET p.price = CASE
+    WHEN c.name = 'Electronics' THEN p.price * 0.9
+    WHEN c.name = 'Clothing'    THEN p.price * 0.8
+    ELSE p.price
+END
+WHERE c.is_active = TRUE;
+
+-- ========== 批量 DELETE ==========
+
+-- 1. 分批删除 (防止锁表)
+DELETE FROM logs
+WHERE created_at < '2023-01-01'
+LIMIT 1000;
+-- 循环执行直到影响行数为 0
+
+-- 2. 使用 JOIN 删除
+DELETE oi FROM order_items oi
+JOIN orders o ON oi.order_id = o.id
+WHERE o.status = 'cancelled'
+  AND o.created_at < '2023-01-01';
+
+-- 3. 快速清空大量数据
+-- ❌ DELETE FROM logs;  -- 逐行删除,慢!
+-- ✅ TRUNCATE TABLE logs;  -- 直接删除文件,快!
+
+-- 4. 删除分区 (比 DELETE 快得多!)
+-- ALTER TABLE logs DROP PARTITION p2022;
+
+-- ========== 批量操作注意事项 ==========
+-- 1. 大事务风险: 批量操作在单个事务中可能锁很多行
+-- 2. 分批执行: 每批加 COMMIT,避免事务过大
+-- 3. 复制延迟: 主从复制场景下批量操作会加大延迟
+-- 4. 监控: 观察 innodb_rows_inserted 等指标</div>
+    </div>
+    <div class="card">
+        <h2>事务批量处理策略</h2>
+        <div class="code">// ========== 事务批量处理 ==========
+
+-- 1. 使用事务包装批量 INSERT
+-- 将多条 INSERT 放在一个事务中
+
+-- 应用层伪代码:
+-- BEGIN;
+-- INSERT INTO ... (1000 rows)
+-- INSERT INTO ... (1000 rows)
+-- COMMIT;
+
+-- 2. 分块处理 (Chunking)
+-- 将大数据集分成小块,每块一个事务
+
+-- 示例: 每 1000 行一个事务
+SET @batch_size = 1000;
+SET @offset = 0;
+
+-- 应用层循环:
+-- WHILE (true) {
+--   BEGIN;
+--   UPDATE products SET price = price * 0.9
+--   WHERE category_id = 1
+--   ORDER BY id
+--   LIMIT 1000;
+--   COMMIT;
+--   IF (rows_affected == 0) BREAK;
+-- }
+
+-- 3. 事务大小控制
+-- 太小: 事务开销占比大
+-- 太大: 锁冲突, 回滚时间长
+-- 建议: 1000-10000 行/事务
+
+-- ========== 批量插入性能对比 ==========
+-- MySQL:
+
+-- 逐行 INSERT (10000 行): ~20 秒
+-- 多行 INSERT (1000/批):   ~0.5 秒
+-- LOAD DATA INFILE:         ~0.1 秒
+
+-- 优化建议:
+-- 1. 使用多行 INSERT
+-- 2. 事务包裹 (commit 每 1000-5000 行)
+-- 3. 临时关闭索引检查: SET unique_checks=0;
+-- 4. 临时关闭外键检查: SET foreign_key_checks=0;
+-- 5. 使用批量导入工具 (LOAD DATA, pg_bulkload)
+
+-- ========== 批量操作注意陷阱 ==========
+-- 1. 事务太大 → binlog 暴涨, 复制延迟
+-- 2. 锁范围 → 影响线上查询
+-- 3. 死锁 → 批量 UPDATE 按相同顺序
+-- 4. 回滚代价 → 大事务回滚很慢
+-- 5. 内存 → 批量操作消耗内存</div>
+    </div>
+    <div class="card">
+        <h2>MySQL 配置优化</h2>
+        <div class="code">// ========== 批量操作相关配置 ==========
+
+-- MySQL 配置参数:
+
+-- 1. max_allowed_packet
+--   最大允许的数据包大小
+--   影响: 多行 INSERT 的最大大小
+--   建议: 64M-256M
+--   SET GLOBAL max_allowed_packet = 64 * 1024 * 1024;
+
+-- 2. innodb_flush_log_at_trx_commit
+--   控制事务日志刷新策略
+--   0: 每秒刷新 (最快,可能丢 1 秒数据)
+--   1: 每次提交刷新 (默认,最安全)
+--   2: 每秒刷新 (操作系统级别)
+--   批量导入时设为 0 或 2 可大幅加速
+
+-- 3. innodb_autoinc_lock_mode
+--   AUTO_INCREMENT 锁模式
+--   2: 交错模式 (最高并发)
+--   批量插入时设为 2
+
+-- 4. bulk_insert_buffer_size
+--   MyISAM 批量插入缓冲区
+--   对 InnoDB 无效 (从 MySQL 8.0 移除)
+
+-- ========== 批量操作最佳实践 ==========
+
+-- 1. 导入前调整配置
+SET unique_checks = 0;        -- 关闭唯一性检查
+SET foreign_key_checks = 0;    -- 关闭外键检查
+SET autocommit = 0;           -- 关闭自动提交
+
+-- 执行批量插入...
+
+-- 完成后恢复:
+SET unique_checks = 1;
+SET foreign_key_checks = 1;
+COMMIT;
+
+-- 2. 监控批量操作进度
+-- SHOW PROCESSLIST;
+-- SHOW ENGINE INNODB STATUS\G
+
+-- 3. 恢复后重建索引
+-- 如果关闭了唯一检查,需要重建索引
+-- ALTER TABLE users ENGINE=InnoDB;
+
+-- 4. 主从复制延迟
+-- 批量操作前评估数据量
+-- 考虑在从库追上后再继续</div>
+        <div class="note">💡 批量操作: 多行 INSERT 比逐行快 N 倍; LOAD DATA INFILE 最快导入; 分批 UPDATE/DELETE 避免大事务; 每 1000-5000 行 commit; 导入前关闭约束检查; 注意主从复制延迟。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoBatch()">批量 INSERT</button>
+        <button onclick="demoChunk()">分块处理</button>
+        <button onclick="demoPerf()">性能对比</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoBatch() {
+            result.innerHTML = '';
+            log('# 批量 INSERT');
+            log('');
+            log('-- 多行插入 (推荐):');
+            log('INSERT INTO users (name, email) VALUES');
+            log("    ('Alice', 'a@test.com'),");
+            log("    ('Bob', 'b@test.com'),");
+            log("    ('Carol', 'c@test.com');");
+            log('');
+            log('-- 从查询插入:');
+            log('INSERT INTO archive SELECT * FROM users WHERE ...;');
+        }
+
+        function demoChunk() {
+            result.innerHTML = '';
+            log('# 分块处理 (Chunking)');
+            log('');
+            log('-- 分批删除 (每批 1000)');
+            log('DELETE FROM logs');
+            log("WHERE created_at < '2023-01-01'");
+            log('LIMIT 1000;  -- 循环执行');
+            log('');
+            log('优点:');
+            log('- 避免大事务 (锁少)');
+            log('- 可监控进度');
+            log('- 减少主从延迟');
+        }
+
+        function demoPerf() {
+            result.innerHTML = '';
+            log('# 批量插入性能 (10000 行)');
+            log('');
+            log('逐行 INSERT        ~20 秒');
+            log('多行 INSERT(1000)   ~0.5 秒');
+            log('LOAD DATA INFILE    ~0.1 秒');
+            log('');
+            log('加速技巧:');
+            log('  SET unique_checks=0;');
+            log('  SET foreign_key_checks=0;');
+            log('  SET autocommit=0;');
+        }
+    </script>
+</body>
+</html>

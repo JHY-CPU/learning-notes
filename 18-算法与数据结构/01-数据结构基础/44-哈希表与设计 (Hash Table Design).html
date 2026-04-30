@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>44-哈希表与设计 (Hash Table Design)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Hash Table Design</h2>
+  <div class="code">设计哈希表时需要考虑哈希函数、冲突解决、动态扩容和负载因子。</div>
+  <pre>// 可扩容的哈希表
+class DynamicHashTable {
+  constructor() { this.capacity = 4; this.buckets = new Array(this.capacity).fill(null).map(()=>[]); this.size = 0; this.loadFactor = 0.75; }
+  _hash(k) { return k.toString().split('').reduce((a,c)=>a+c.charCodeAt(0),0) % this.capacity; }
+  set(k,v) {
+    const idx = this._hash(k);
+    const bucket = this.buckets[idx];
+    for (const p of bucket) { if (p[0] === k) { p[1] = v; return; } }
+    bucket.push([k,v]); this.size++;
+    if (this.size > this.capacity * this.loadFactor) this._resize();
+  }
+  get(k) { const idx = this._hash(k); for (const p of this.buckets[idx]) { if (p[0] === k) return p[1]; } return undefined; }
+  _resize() {
+    const old = this.buckets;
+    this.capacity *= 2;
+    this.buckets = new Array(this.capacity).fill(null).map(()=>[]);
+    this.size = 0;
+    for (const b of old) for (const [k,v] of b) this.set(k,v);
+  }
+}</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  class DHT {
+    constructor(){this.c=4;this.b=new Array(this.c).fill(null).map(()=>[]);this.s=0;}
+    _h(k){return k.toString().split('').reduce((a,c)=>a+c.charCodeAt(0),0)%this.c;}
+    set(k,v){const i=this._h(k);const b=this.b[i];for(const p of b){if(p[0]===k){p[1]=v;return;}}b.push([k,v]);this.s++;}
+    get(k){const i=this._h(k);for(const p of this.b[i]){if(p[0]===k)return p[1];}return undefined;}
+  }
+  const h = new DHT();
+  h.set('a',1);h.set('b',2);h.set('c',3);h.set('d',4);
+  document.getElementById('result').textContent = `size: ${h.s}, capacity: ${h.c}, b: ${h.get('b')}`;
+}
+</script>
+</body>
+</html>

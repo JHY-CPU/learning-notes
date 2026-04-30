@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java IO 流基础</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📂 Java IO 流基础</h2><p>IO 流分类 (字节/字符/输入/输出)、InputStream/OutputStream、Reader/Writer、File 类、FileInputStream/FileOutputStream、字节流 vs 字符流。</p></div>
+    <div class="card">
+        <h2>IO 流体系</h2>
+        <div class="code">// ========== Java IO 流 ==========
+// 输入/输出: 程序视角
+// 输入流: 读数据 (程序←源)
+// 输出流: 写数据 (程序→目标)
+
+// ========== 分类 ==========
+// 按方向: 输入流 (Input) / 输出流 (Output)
+// 按单位: 字节流 (byte) / 字符流 (char)
+// 按功能: 节点流 (直接操作数据源) / 处理流 (包装节点流)
+
+// ========== 4 大抽象基类 ==========
+//
+// ┌────────────┬──────────────┬──────────────┐
+// │            │ 字节流       │ 字符流       │
+// ├────────────┼──────────────┼──────────────┤
+// │ 输入       │ InputStream  │ Reader       │
+// │ 输出       │ OutputStream │ Writer       │
+// └────────────┴──────────────┴──────────────┘
+//
+// 字节流: 处理二进制文件 (图片/音频/视频/压缩)
+// 字符流: 处理文本文件 (txt/csv/json/xml)
+
+import java.io.*;
+import java.nio.charset.StandardCharsets;
+
+public class IOStreamBasics {
+
+    // ========== InputStream 核心方法 ==========
+    // int read()              读取1字节 (-1 表示结束)
+    // int read(byte[] b)      读取到数组, 返回读取字节数
+    // int read(byte[] b, int off, int len)
+    // void close()            关闭流
+    // long skip(long n)       跳过 n 字节
+
+    // ========== OutputStream 核心方法 ==========
+    // void write(int b)       写入1字节
+    // void write(byte[] b)    写入字节数组
+    // void write(byte[] b, int off, int len)
+    // void flush()            刷新缓冲区
+    // void close()            关闭流
+
+    // ========== File 类 ==========
+    static void fileDemo() {
+        File file = new File("C:/test/example.txt");
+
+        System.out.println(file.getName());       // "example.txt"
+        System.out.println(file.getPath());       // 路径
+        System.out.println(file.getAbsolutePath());
+        System.out.println(file.length());        // 文件大小 (字节)
+        System.out.println(file.exists());        // true/false
+        System.out.println(file.isFile());        // true
+        System.out.println(file.isDirectory());   // false
+        System.out.println(file.canRead());       // true
+        System.out.println(file.lastModified());  // 时间戳
+
+        // 目录操作
+        File dir = new File("C:/test/subdir");
+        dir.mkdir();            // 创建单级
+        dir.mkdirs();           // 创建多级 (包括父目录)
+
+        File[] files = dir.listFiles();  // 列出目录内容
+        String[] names = dir.list();     // 列出文件名
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>字节流</h2>
+        <div class="code">// ========== 字节流示例: 文件复制 ==========
+
+public class ByteStreamDemo {
+
+    // ========== 读文件 (FileInputStream) ==========
+    static void readFile(String path) throws IOException {
+        FileInputStream fis = null;
+        try {
+            fis = new FileInputStream(path);
+            int data;
+            while ((data = fis.read()) != -1) {  // 逐字节读 (慢!)
+                System.out.print((char) data);
+            }
+        } finally {
+            if (fis != null) fis.close();
+        }
+    }
+
+    // ========== 读文件 (缓冲区) ==========
+    static void readFileBuffered(String path) throws IOException {
+        try (FileInputStream fis = new FileInputStream(path)) {
+            byte[] buffer = new byte[1024];
+            int bytesRead;
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                // 处理 buffer[0..bytesRead-1]
+                System.out.write(buffer, 0, bytesRead);
+            }
+        }
+    }
+
+    // ========== 写文件 (FileOutputStream) ==========
+    static void writeFile(String path, String content) throws IOException {
+        try (FileOutputStream fos = new FileOutputStream(path)) {
+            fos.write(content.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    // ========== 追加模式 ==========
+    static void appendFile(String path, String content) throws IOException {
+        try (FileOutputStream fos = new FileOutputStream(path, true)) {
+            // true = 追加 (默认 false 覆盖)
+            fos.write(content.getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
+    // ========== 文件复制 (完整版) ==========
+    static void copyFile(String src, String dest) throws IOException {
+        try (FileInputStream fis = new FileInputStream(src);
+             FileOutputStream fos = new FileOutputStream(dest)) {
+
+            byte[] buffer = new byte[8192];  // 8KB 缓冲区
+            int bytesRead;
+            while ((bytesRead = fis.read(buffer)) != -1) {
+                fos.write(buffer, 0, bytesRead);
+            }
+            fos.flush();  // 刷新缓冲区
+        }
+        // try-with-resources 自动关闭 fis 和 fos
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>字符流</h2>
+        <div class="code">// ========== 字符流: 专门处理文本 ==========
+// FileReader / FileWriter (默认系统编码)
+// InputStreamReader / OutputStreamWriter (指定编码)
+
+import java.io.*;
+
+public class CharStreamDemo {
+
+    // ========== FileReader (读取文本) ==========
+    static void readText(String path) throws IOException {
+        try (FileReader reader = new FileReader(path)) {
+            int data;
+            while ((data = reader.read()) != -1) {
+                System.out.print((char) data);
+            }
+        }
+    }
+
+    // ========== FileWriter (写入文本) ==========
+    static void writeText(String path, String content) throws IOException {
+        try (FileWriter writer = new FileWriter(path)) {
+            writer.write(content);
+            writer.flush();
+        }
+    }
+
+    // ========== 指定编码 (InputStreamReader) ==========
+    static void readUTF8(String path) throws IOException {
+        try (InputStreamReader reader = new InputStreamReader(
+                new FileInputStream(path), StandardCharsets.UTF_8)) {
+            int data;
+            while ((data = reader.read()) != -1) {
+                System.out.print((char) data);
+            }
+        }
+    }
+
+    // ========== 指定编码写入 ==========
+    static void writeUTF8(String path, String content) throws IOException {
+        try (OutputStreamWriter writer = new OutputStreamWriter(
+                new FileOutputStream(path), StandardCharsets.UTF_8)) {
+            writer.write(content);
+        }
+    }
+
+    // ========== 字节流 vs 字符流 ==========
+    // 字节流: 处理所有文件, 按字节
+    // 字符流: 处理文本, 按字符 (处理中文方便)
+
+    // 读中文:
+    // FileInputStream:  "中" 占3字节, 需自行拼装
+    // FileReader:       "中" 读1个char, 自动解码
+
+    // ========== 缓冲流 (性能提升) ==========
+    static void bufferedCopy(String src, String dest) throws IOException {
+        try (BufferedInputStream bis = new BufferedInputStream(
+                new FileInputStream(src));
+             BufferedOutputStream bos = new BufferedOutputStream(
+                new FileOutputStream(dest))) {
+
+            byte[] buffer = new byte[8192];
+            int len;
+            while ((len = bis.read(buffer)) != -1) {
+                bos.write(buffer, 0, len);
+            }
+            bos.flush();
+        }
+        // Buffered 包装: 内部 8KB 缓冲区, 减少系统调用
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>IO 流装饰模式</h2>
+        <div class="code">// ========== IO 流的装饰器模式 ==========
+// 处理流包装节点流, 增强功能
+
+public class DecoratorPattern {
+
+    public static void main(String[] args) throws IOException {
+        // ========== 常用的处理流 ==========
+
+        // 1. Buffered (缓冲)
+        BufferedInputStream bis = new BufferedInputStream(
+            new FileInputStream("file.bin")
+        );
+        // BufferedWriter bw = new BufferedWriter(new FileWriter("file.txt"));
+
+        // 2. Data (基本类型读写)
+        DataOutputStream dos = new DataOutputStream(
+            new FileOutputStream("data.bin")
+        );
+        dos.writeInt(42);
+        dos.writeDouble(3.14);
+        dos.writeUTF("Hello");
+        dos.close();
+
+        DataInputStream dis = new DataInputStream(
+            new FileInputStream("data.bin")
+        );
+        int i = dis.readInt();    // 42
+        double d = dis.readDouble(); // 3.14
+        String s = dis.readUTF(); // "Hello"
+        dis.close();
+
+        // 3. Object (对象序列化)
+        // ObjectOutputStream oos = new ObjectOutputStream(
+        //     new FileOutputStream("obj.dat")
+        // );
+        // oos.writeObject(new Person("Alice", 25));
+        // oos.close();
+
+        // 4. PrintStream / PrintWriter (格式化输出)
+        PrintWriter pw = new PrintWriter(
+            new FileWriter("output.txt")
+        );
+        pw.println("Hello, World!");
+        pw.printf("Value: %.2f%n", 3.14159);
+        pw.close();
+
+        // 5. Piped (管道通信)
+        // PipedInputStream / PipedOutputStream (线程间通信)
+
+        // ========== 流嵌套总结 ==========
+        // new BufferedInputStream(
+        //     new DataInputStream(
+        //         new FileInputStream("file")
+        //     )
+        // );
+
+        // 最内层: 节点流 (连接数据源)
+        // 外层: 处理流 (增加功能)
+    }
+}
+
+// ========== 字节流 vs 字符流选择 ==========
+// 二进制 (图片/音频/视频/zip) → 字节流
+// 文本 (txt/csv/json/xml)     → 字符流
+// 指定编码                     → InputStreamReader/OutputStreamWriter
+// 需要缓冲                     → 加 Buffered
+// 需要随机访问                 → RandomAccessFile</div>
+        <div class="note">💡 IO 要点: 4 大基类 (InputStream/OutputStream/Reader/Writer); FileInputStream/FileOutputStream 字节; FileReader/FileWriter 字符; Buffer 加缓冲提升性能; DataInput/OutputStream 读写基本类型; ObjectInputStream/OutputStream 序列化; try-with-resources 自动关闭; 字节转字符用 InputStreamReader/OutputStreamWriter; 装饰器模式层层包装。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoStream()">流分类</button>
+        <button onclick="demoFile()">文件复制</button>
+        <button onclick="demoChar()">字符流</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoStream() {
+            result.innerHTML = '';
+            log('# IO 流分类');
+            log('');
+            log('字节输入: InputStream');
+            log('  FileInputStream / BufferedInputStream');
+            log('字节输出: OutputStream');
+            log('  FileOutputStream / BufferedOutputStream');
+            log('');
+            log('字符输入: Reader');
+            log('  FileReader / InputStreamReader');
+            log('字符输出: Writer');
+            log('  FileWriter / OutputStreamWriter');
+        }
+
+        function demoFile() {
+            result.innerHTML = '';
+            log('# 文件复制 (经典模式)');
+            log('');
+            log('try (FileInputStream fis = ...;');
+            log('     FileOutputStream fos = ...) {');
+            log('  byte[] buf = new byte[8192];');
+            log('  int len;');
+            log('  while ((len = fis.read(buf)) != -1) {');
+            log('    fos.write(buf, 0, len);');
+            log('  }');
+            log('}');
+            log('');
+            log('// try-with-resources 自动关闭');
+        }
+
+        function demoChar() {
+            result.innerHTML = '';
+            log('# 字符流读写');
+            log('');
+            log('// 写文本');
+            log('try (FileWriter w = new FileWriter("f.txt")) {');
+            log('  w.write("Hello");');
+            log('}');
+            log('');
+            log('// 读文本 (指定编码)');
+            log('try (BufferedReader r = new BufferedReader(');
+            log('    new InputStreamReader(');
+            log('      new FileInputStream("f.txt"), UTF_8))) {');
+            log('  String line = r.readLine();');
+            log('}');
+        }
+    </script>
+</body>
+</html>

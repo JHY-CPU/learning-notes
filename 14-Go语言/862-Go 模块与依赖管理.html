@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 模块与依赖管理</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📦 Go 模块与依赖管理</h2><p>go mod 命令、模块版本管理、replace/retract、vendor、私有仓库、依赖安全与更新、多模块工作区。</p></div>
+    <div class="card">
+        <h2>go mod 基础</h2>
+        <div class="code">// ========== go mod 命令速查 ==========
+// go mod init <module>     // 初始化模块 (生成 go.mod)
+// go mod tidy              // 整理依赖 (添加缺失/移除多余)
+// go mod download          // 下载依赖到缓存
+// go mod verify            // 验证依赖校验和
+// go mod why               // 为什么依赖某个包
+// go mod graph             // 依赖关系图
+// go mod vendor            // 创建 vendor 目录
+// go mod edit              // 编辑 go.mod
+
+// ========== go.mod 文件 ==========
+// module github.com/user/myapp
+//
+// go 1.22
+//
+// require (
+//     github.com/gin-gonic/gin v1.9.1
+//     github.com/go-redis/redis/v8 v8.11.5
+//     gorm.io/gorm v1.25.5
+//     go.uber.org/zap v1.26.0
+// )
+//
+// exclude (
+//     github.com/old/pkg v1.0.0  // 排除有问题的版本
+// )
+//
+// retract (
+//     v1.0.0 // 发布后撤回 (有严重 bug)
+// )
+
+// ========== 版本管理 ==========
+// 语义化版本: vMAJOR.MINOR.PATCH
+// - v1.0.0: 稳定版
+// - v1.0.0-beta.1: 预发布
+// - v0.0.0-20240101010101-abcdef123456: 伪版本 (无 tag)
+
+// 版本选择 (最小版本选择 MVS):
+// 所有依赖所需的最低兼容版本
+
+// ========== go.sum 文件 ==========
+// 包含每个依赖的哈希值, 确保可重复构建
+// go.sum 应提交到版本控制
+// go mod verify 验证完整性
+
+// ========== 常用命令组合 ==========
+// # 清理并更新
+// go mod tidy
+//
+// # 查看依赖
+// go list -m all                    // 所有依赖
+// go list -m -versions github.com/gin-gonic/gin  // 所有版本
+// go list -u -m all                 // 检查可用更新
+//
+// # 更新依赖
+// go get github.com/gin-gonic/gin@v1.9.2     // 特定版本
+// go get -u ./...                             // 更新所有依赖
+// go get -u github.com/gin-gonic/gin          // 更新特定包</div>
+    </div>
+    <div class="card">
+        <h2>高级模块管理</h2>
+        <div class="code">// ========== replace 指令 ==========
+// 用本地路径或 fork 替换依赖
+
+// go.mod:
+// module github.com/user/myapp
+//
+// go 1.22
+//
+// require (
+//     github.com/some/pkg v1.0.0
+// )
+//
+// // 替换为本地开发版本
+// replace github.com/some/pkg => ../some-pkg
+//
+// // 替换为 fork
+// replace github.com/some/pkg => github.com/myfork/pkg v1.0.1
+//
+// // 替换为不同版本
+// replace github.com/some/pkg v1.0.0 => github.com/some/pkg v1.0.1
+
+// ========== retract 指令 ==========
+// 撤回有问题的版本, 告知用户不要使用
+
+// go.mod:
+// retract (
+//     v1.0.0 // 忘记加重要补丁
+//     v1.0.5 // 严重安全漏洞 CVE-2024-xxx
+// )
+
+// 用户运行 go get 时不会安装被撤回的版本
+
+// ========== 多个 replace 的实际用例 ==========
+// 微服务项目: 共享库本地开发
+// myapp/
+// ├── go.mod           // replace => ../mylib
+// ├── main.go
+// └── mylib/
+//     ├── go.mod
+//     └── lib.go
+
+// ========== vendor 目录 ==========
+// go mod vendor  // 复制依赖到 vendor/
+
+// 使用场景:
+// - 离线构建 (CI 没有网络)
+// - 保证依赖不变
+// - 审核依赖源码
+
+// 编译时使用 vendor:
+// go build -mod=vendor ./...
+
+// 注意:
+// - vendor/ 应提交到版本控制 (部分团队策略)
+// - go mod vendor 后运行 go mod tidy 保持同步
+// - 默认 go 1.14+ 自动检测 vendor 目录
+
+// ========== go mod tidy 注意事项 ==========
+// go mod tidy 会:
+// 1. 添加代码中引用的缺失依赖
+// 2. 移除不再使用的依赖
+// 3. 更新 go.sum
+// 4. 确保 go.mod 与源码一致
+
+// 定期运行: go mod tidy && go mod verify</div>
+    </div>
+    <div class="card">
+        <h2>私有仓库与代理</h2>
+        <div class="code">// ========== GOPROXY 环境变量 ==========
+// Go 模块代理, 加速下载
+
+// 默认: https://proxy.golang.org,direct
+// 国内:  https://goproxy.cn,direct
+// 七牛:  https://goproxy.io,direct
+// 禁用:  off
+
+// 设置:
+// go env -w GOPROXY=https://goproxy.cn,direct
+
+// ========== GOPRIVATE 私有仓库 ==========
+// 私有模块不走代理 (因为代理无法访问)
+
+// go env -w GOPRIVATE=github.com/mycompany/*
+// go env -w GOPRIVATE=gitlab.com/private/*
+
+// 多个用逗号分隔:
+// go env -w GOPRIVATE=github.com/mycompany/*,gitlab.internal/*
+
+// 认证: 通过 ~/.netrc 或 git credential
+// machine github.com
+//     login USERNAME
+//     password TOKEN
+
+// 或使用 GONOSUMDB (不校验哈希):
+// go env -w GONOSUMDB=github.com/mycompany/*
+
+// ========== GoProxy 架构 ==========
+// 客户端 → GOPROXY → 源服务器 (GitHub/GitLab)
+//
+// proxy 缓存模块, 加速下载
+// private 模块直接连接源服务器(direct)
+//
+// GOPROXY="https://proxy.golang.org,direct"
+// 先查 proxy, 找不到回退 direct
+
+// ========== GONOSUMCHECK / GONOSUMDB ==========
+// GONOSUMCHECK: 不校验 checksum
+// GONOSUMDB:    不查询 checksum 数据库
+// 私有模块需要这两个
+
+// 推荐配置 (私有模块):
+// go env -w GOPRIVATE=github.com/mycompany/*
+// 自动设置 GONOSUMCHECK 和 GONOSUMDB
+
+// ========== GOFLAGS ==========
+// 全局编译标志
+// go env -w GOFLAGS="-mod=vendor"  // 默认使用 vendor
+
+// ========== 依赖安全 ==========
+// 1. go mod verify           // 验证校验和
+// 2. go vet ./...            // 静态分析
+// 3. govulncheck ./...       // 漏洞扫描
+//    go install golang.org/x/vuln/cmd/govulncheck@latest
+//    govulncheck ./...
+// 4. Dependabot / Renovate   // 自动依赖更新
+// 5. 锁定间接依赖版本</div>
+    </div>
+    <div class="card">
+        <h2>工作区与多模块</h2>
+        <div class="code">// ========== go work (Go 1.18+) ==========
+// 多模块工作区, 替代多个 replace
+
+// 初始化:
+// go work init ./app ./lib
+
+// go.work 文件:
+// go 1.22
+//
+// use (
+//     ./app
+//     ./lib
+// )
+//
+// replace (
+//     example.com/old => ./local-fork
+// )
+
+// 使用:
+// go.work 告诉 go 命令使用本地目录
+// 无需在 go.mod 中写 replace
+
+// 目录结构:
+// project/
+// ├── go.work       // 工作区文件
+// ├── app/
+// │   ├── go.mod    // module myapp
+// │   └── main.go   // import "mylib"
+// ├── lib/
+// │   ├── go.mod    // module mylib
+// │   └── lib.go
+
+// ========== GOPATH 模式 (旧) ==========
+// Go 1.11 之前, 所有代码在 $GOPATH/src 下
+// 无版本管理, 使用 GOPATH + vendor
+
+// 现在: 每个项目独立 go.mod
+// 不再需要设置 GOPATH
+
+// ========== 模块版本策略 ==========
+// v1: github.com/user/repo
+// v2: github.com/user/repo/v2  (import 路径不同)
+// v3: github.com/user/repo/v3
+
+// 主版本 >= 2 时, 路径带 vN
+// import "github.com/user/repo/v2/pkg"
+
+// 兼容性:
+// v1 可以升级 v1.x, v2 是大版本不兼容
+
+// ========== 依赖更新工作流 ==========
+// 1. 查看可用更新
+//    go list -u -m all
+//
+// 2. 更新指定包
+//    go get github.com/gin-gonic/gin@v1.10.0
+//
+// 3. 整理依赖
+//    go mod tidy
+//
+// 4. 验证
+//    go mod verify
+//    go test ./...
+//    go vet ./...
+
+// ========== 常用诊断命令 ==========
+// go env GOMOD          // go.mod 路径
+// go env GOPATH          // GOPATH
+// go env GOMODCACHE      // 模块缓存
+// go env GOPROXY         // 代理
+// go env GOPRIVATE       // 私有模块
+// go env GONOSUMCHECK    // 不校验
+// go env GONOSUMDB       // 不查数据库
+
+// go list -m -json all   // JSON 格式查看所有依赖</div>
+        <div class="note">💡 模块管理要点: go mod init/tidy/download/verify/vendor; go.mod require/replace/retract; MVS 最小版本选择; GOPROXY 加速 (goproxy.cn); GOPRIVATE 私有模块; go work 多模块工作区 (Go 1.18+); go.sum 完整性校验; govulncheck 漏洞扫描; vendor 离线构建; 主版本 >=2 路径带 vN; 更新工作流: get → tidy → verify → test。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoMod()">模块命令</button>
+        <button onclick="demoPrivate()">私有仓库</button>
+        <button onclick="demoWork()">工作区</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoMod() {
+            result.innerHTML = '';
+            log('# go mod 命令');
+            log('');
+            log('初始化: go mod init <module>');
+            log('整理:   go mod tidy');
+            log('下载:   go mod download');
+            log('验证:   go mod verify');
+            log('vendor: go mod vendor');
+            log('');
+            log('查看:');
+            log('  go list -m all');
+            log('  go list -u -m all  // 检查更新');
+            log('');
+            log('更新:');
+            log('  go get pkg@v1.2.3');
+            log('  go get -u ./...');
+        }
+
+        function demoPrivate() {
+            result.innerHTML = '';
+            log('# 私有仓库配置');
+            log('');
+            log('GOPROXY:');
+            log('  默认: https://proxy.golang.org,direct');
+            log('  国内: https://goproxy.cn,direct');
+            log('');
+            log('私有模块:');
+            log('  go env -w GOPRIVATE=github.com/org/*');
+            log('  .netrc 文件配置 token');
+            log('');
+            log('安全:');
+            log('  go mod verify');
+            log('  govulncheck ./...');
+            log('  GOFLAGS=-mod=vendor');
+        }
+
+        function demoWork() {
+            result.innerHTML = '';
+            log('# 工作区模式');
+            log('');
+            log('go.work:');
+            log('  go 1.22');
+            log('  use ( ./app ./lib )');
+            log('');
+            log('初始化:');
+            log('  go work init ./app ./lib');
+            log('');
+            log('优势:');
+            log('  无需 replace 指向本地');
+            log('  团队共用工作区');
+            log('  本地开发多个模块');
+            log('');
+            log('模块版本:');
+            log('  v2+ 路径带 vN');
+            log('  github.com/user/repo/v2');
+        }
+    </script>
+</body>
+</html>

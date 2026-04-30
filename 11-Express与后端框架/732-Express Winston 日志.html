@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express Winston 日志</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📝 Express Winston 日志</h2><p>Winston 日志系统、Logger 配置、Transport (Console/File/HTTP/旋转日志)、自定义格式、日志级别、Morgan 集成、请求上下文日志、生产日志最佳实践。</p></div>
+    <div class="card">
+        <h2>Winston 基础</h2>
+        <div class="code">// ========== Winston 日志 ==========
+// 功能最完善的 Node.js 日志库
+
+// 安装:
+// npm install winston
+
+const winston = require('winston');
+
+// ========== 创建 Logger ==========
+const logger = winston.createLogger({
+    // 日志级别 (数字越高越详细)
+    // error: 0, warn: 1, info: 2, http: 3, verbose: 4, debug: 5, silly: 6
+    level: process.env.LOG_LEVEL || 'info',
+
+    // 格式
+    format: winston.format.combine(
+        winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
+        winston.format.errors({ stack: true }),  // 打印错误堆栈
+        winston.format.json(),                   // JSON 格式 (生产用)
+    ),
+
+    // 输出目的地
+    transports: [
+        // 控制台输出
+        new winston.transports.Console({
+            format: process.env.NODE_ENV === 'production'
+                ? winston.format.json()
+                : winston.format.combine(
+                    winston.format.colorize({ all: true }),
+                    winston.format.printf(({ timestamp, level, message, ...meta }) => {
+                        const metaStr = Object.keys(meta).length
+                            ? `\n  ${JSON.stringify(meta, null, 2)}`
+                            : '';
+                        return `${timestamp} [${level}]: ${message}${metaStr}`;
+                    }),
+                ),
+        }),
+
+        // 文件输出
+        new winston.transports.File({
+            filename: 'logs/error.log',
+            level: 'error',
+            maxsize: 10 * 1024 * 1024,  // 10MB 轮换
+            maxFiles: 10,
+        }),
+        new winston.transports.File({
+            filename: 'logs/combined.log',
+            maxsize: 10 * 1024 * 1024,
+            maxFiles: 5,
+        }),
+    ],
+
+    // 未捕获异常 (自动记录到文件)
+    exceptionHandlers: [
+        new winston.transports.File({ filename: 'logs/exceptions.log' }),
+    ],
+});
+
+// ========== 使用 ==========
+logger.info('Server started', { port: 3000 });
+logger.warn('Rate limit approaching', { ip: req.ip });
+logger.error('Database connection failed', { error: err.message });
+logger.debug('Query executed', { query: 'SELECT ...', duration: '15ms' });
+
+// ========== 自定义格式 ==========
+const myFormat = winston.format.printf(({ timestamp, level, message, ...meta }) => {
+    const req = meta.req ? ` [${meta.req.method} ${meta.req.url}]` : '';
+    const duration = meta.duration ? ` +${meta.duration}ms` : '';
+    return `${timestamp} ${level}:${req} ${message}${duration}`;
+});
+
+// ========== Morgan 集成 ==========
+const morgan = require('morgan');
+
+// 将 morgan 输出重定向到 winston
+const morganStream = {
+    write: (message) => logger.http(message.trim()),
+};
+
+app.use(morgan('combined', { stream: morganStream }));</div>
+    </div>
+    <div class="card">
+        <h2>Transport 与轮转</h2>
+        <div class="code">// ========== 日志轮转 (Rotating File) ==========
+// 按日期轮转, 保留指定天数
+
+const DailyRotateFile = require('winston-daily-rotate-file');
+// npm install winston-daily-rotate-file
+
+const transport = new DailyRotateFile({
+    filename: 'logs/app-%DATE%.log',
+    datePattern: 'YYYY-MM-DD',
+    maxSize: '20m',
+    maxFiles: '14d',       // 保留 14 天
+    zippedArchive: true,   // 旧日志压缩
+});
+
+transport.on('rotate', (oldFile, newFile) => {
+    logger.info('Log rotated', { oldFile, newFile });
+});
+
+logger.add(transport);
+
+// ========== 自定义 Transport ==========
+// 发送日志到外部服务
+
+class SlackTransport extends winston.Transport {
+    constructor(opts) {
+        super(opts);
+        this.webhookUrl = opts.webhookUrl;
+    }
+
+    async log(info, callback) {
+        setImmediate(() => this.emit('logged', info));
+
+        if (info.level === 'error' || info.level === 'warn') {
+            try {
+                await fetch(this.webhookUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        text: `[${info.level.toUpperCase()}] ${info.message}`,
+                        attachments: [{ color: info.level === 'error' ? 'danger' : 'warning', fields: [
+                            { title: 'Service', value: info.service, short: true },
+                            { title: 'Stack', value: info.stack || 'N/A', short: false },
+                        ]}],
+                    }),
+                });
+            } catch (err) {
+                console.error('Slack log failed:', err.message);
+            }
+        }
+
+        callback();
+    }
+}
+
+logger.add(new SlackTransport({
+    webhookUrl: process.env.SLACK_WEBHOOK_URL,
+    level: 'warn',
+}));
+
+// ========== 日志级别与颜色 ==========
+// 自定义级别:
+const customLogger = winston.createLogger({
+    levels: {
+        fatal: 0,
+        error: 1,
+        warn: 2,
+        info: 3,
+        debug: 4,
+        trace: 5,
+    },
+    level: 'info',
+});
+
+// 添加颜色:
+winston.addColors({
+    fatal: 'red',
+    error: 'red',
+    warn: 'yellow',
+    info: 'green',
+    debug: 'blue',
+    trace: 'gray',
+});
+
+// ========== 多个 Logger ==========
+// 不同模块用不同 logger
+
+const dbLogger = winston.createLogger({
+    level: 'info',
+    format: winston.format.json(),
+    defaultMeta: { service: 'database' },
+    transports: [
+        new winston.transports.File({ filename: 'logs/db.log' }),
+    ],
+});
+
+const httpLogger = winston.createLogger({
+    level: 'info',
+    defaultMeta: { service: 'http' },
+    transports: [
+        new winston.transports.File({ filename: 'logs/http.log' }),
+    ],
+});</div>
+    </div>
+    <div class="card">
+        <h2>请求上下文日志</h2>
+        <div class="code">// ========== 请求上下文日志 ==========
+// 每个请求关联 trace ID 和用户信息
+
+const { v4: uuidv4 } = require('uuid');
+
+// ========== Trace ID 中间件 ==========
+app.use((req, res, next) => {
+    req.traceId = req.headers['x-trace-id'] || uuidv4();
+    res.setHeader('X-Trace-Id', req.traceId);
+    next();
+});
+
+// ========== 请求日志中间件 ==========
+app.use((req, res, next) => {
+    const start = Date.now();
+
+    res.on('finish', () => {
+        const duration = Date.now() - start;
+
+        logger.info('HTTP Request', {
+            traceId: req.traceId,
+            method: req.method,
+            url: req.originalUrl,
+            status: res.statusCode,
+            duration: `${duration}ms`,
+            userId: req.user?.sub || 'anonymous',
+            ip: req.ip,
+            userAgent: req.get('user-agent'),
+            contentLength: res.get('content-length'),
+        });
+    });
+
+    next();
+});
+
+// ========== 错误日志 ==========
+// 在错误处理中间件中记录
+app.use((err, req, res, next) => {
+    logger.error('Error handled', {
+        traceId: req.traceId,
+        userId: req.user?.sub,
+        method: req.method,
+        url: req.originalUrl,
+        error: err.message,
+        code: err.code,
+        statusCode: err.statusCode || 500,
+        stack: config.isDev() ? err.stack : undefined,
+        requestBody: config.isDev() ? req.body : undefined,
+    });
+
+    next(err);
+});
+
+// ========== Express 请求日志工具 ==========
+// logger.info('User registered', {
+//     userId: user.id,
+//     email: user.email,
+//     ip: req.ip,
+//     traceId: req.traceId,
+//     duration: `${Date.now() - start}ms`,
+// });
+//
+// logger.warn('Login failed', {
+//     email: req.body.email,
+//     ip: req.ip,
+//     reason: 'Invalid password',
+//     attempt: failedAttempts + 1,
+// });
+
+// ========== 日志查询辅助 ==========
+// JSON 日志可用 jq 查询:
+// cat logs/combined.log | jq 'select(.level == "error")'
+// cat logs/combined.log | jq 'select(.traceId == "abc-123")'
+// cat logs/combined.log | jq 'group_by(.service) | {(. ): length}'</div>
+    </div>
+    <div class="card">
+        <h2>生产日志最佳实践</h2>
+        <div class="code">// ========== 生产日志配置 ==========
+// logger.js:
+
+const winston = require('winston');
+const DailyRotateFile = require('winston-daily-rotate-file');
+const config = require('./config');
+
+// ========== 生产 Logger ==========
+const logger = winston.createLogger({
+    level: config.log.level,
+    format: winston.format.combine(
+        winston.format.timestamp({ format: 'YYYY-MM-DDTHH:mm:ss.SSSZ' }),
+        winston.format.errors({ stack: true }),
+        winston.format.json(),  // 生产 JSON 格式
+    ),
+    defaultMeta: {
+        service: config.serviceName || 'myapp',
+        environment: config.env,
+        nodeVersion: process.version,
+    },
+    transports: [
+        new winston.transports.Console({
+            // 生产也用 JSON, 让日志系统 (ELK/Datadog) 解析
+            format: config.isProd()
+                ? winston.format.json()
+                : winston.format.prettyPrint(),
+        }),
+
+        // 错误日志单独文件
+        new DailyRotateFile({
+            filename: 'logs/error-%DATE%.log',
+            datePattern: 'YYYY-MM-DD',
+            level: 'error',
+            maxFiles: '30d',
+            zippedArchive: true,
+        }),
+
+        // 综合日志
+        new DailyRotateFile({
+            filename: 'logs/combined-%DATE%.log',
+            datePattern: 'YYYY-MM-DD',
+            maxFiles: '14d',
+            zippedArchive: true,
+        }),
+    ],
+});
+
+// ========== 日志最佳实践清单 ==========
+// ✅ 使用结构化 JSON 日志 (ELK/CloudWatch 友好)
+// ✅ 包含 trace ID 追踪请求链路
+// ✅ 错误日志包含堆栈和上下文
+// ✅ 日志轮转避免磁盘占满
+// ✅ 敏感信息脱敏 (密码/token/身份证)
+// ✅ 不同环境不同日志级别
+// ✅ 错误通知告警 (Slack/PagerDuty)
+// ✅ 不记录请求体 (生产)
+// ✅ 日志异步写入不阻塞请求
+
+// ========== 敏感信息脱敏 ==========
+function sanitize(obj) {
+    const sensitive = ['password', 'token', 'secret', 'authorization', 'creditCard'];
+    const sanitized = { ...obj };
+
+    for (const key of sensitive) {
+        if (sanitized[key]) {
+            sanitized[key] = '***REDACTED***';
+        }
+    }
+
+    return sanitized;
+}
+
+// 日志时脱敏:
+logger.info('User data', sanitize(req.body));
+
+// ========== 日志采样 ==========
+// 高流量时只记录部分日志
+function shouldSample(rate = 0.1) {
+    return Math.random() < rate;
+}
+
+app.use((req, res, next) => {
+    if (shouldSample(0.1)) {  // 10% 采样
+        const start = Date.now();
+        res.on('finish', () => {
+            logger.info('Sample request', { duration: Date.now() - start });
+        });
+    }
+    next();
+});</div>
+        <div class="note">💡 Winston 要点: createLogger 配置级别/格式/transport; 格式组合 (timestamp+json+printf); Console + File + DailyRotateFile; 自定义 Transport (Slack/HTTP/DB); Morgan 集成 stream 写日志; Trace ID 追踪; 请求上下文日志; JSON 日志 + jq 查询; 日志轮转 maxFiles/maxSize; 敏感信息脱敏; 采样日志降低开销。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoBasic()">Winston 基础</button>
+        <button onclick="demoTransport()">Transport</button>
+        <button onclick="demoBest()">最佳实践</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoBasic() {
+            result.innerHTML = '';
+            log('# Winston 日志系统');
+            log('');
+            log('级别: error < warn < info < http < debug');
+            log('');
+            log('创建 Logger:');
+            log('winston.createLogger({');
+            log('  level: "info",');
+            log('  format: combine(timestamp(), json()),');
+            log('  transports: [Console, File],');
+            log('});');
+            log('');
+            log('使用:');
+            log('logger.info("msg", { meta });');
+            log('logger.error("err", { error, stack });');
+            log('logger.warn("warn");');
+            log('logger.debug("debug");');
+        }
+
+        function demoTransport() {
+            result.innerHTML = '';
+            log('# Transport 类型');
+            log('');
+            log('Console   - 控制台输出');
+            log('File      - 文件输出 (maxsize/maxFiles)');
+            log('DailyRotateFile - 按日期轮转');
+            log('  filename: logs/app-%DATE%.log');
+            log('  maxFiles: 14d, zippedArchive: true');
+            log('');
+            log('自定义 Transport:');
+            log('  extend winston.Transport');
+            log('  implement log(info, callback)');
+            log('  例: Slack/Webhook/DB');
+        }
+
+        function demoBest() {
+            result.innerHTML = '';
+            log('# 日志最佳实践');
+            log('');
+            log('✅ JSON 格式 (ELK 友好)');
+            log('✅ Trace ID 追踪');
+            log('✅ 日志轮转 (磁盘不爆)');
+            log('✅ 敏感信息脱敏');
+            log('✅ 环境不同级别');
+            log('✅ 错误告警 (Slack)');
+            log('');
+            log('# ELK Stack:');
+            log('Filebeat → Logstash → ES → Kibana');
+            log('');
+            log('# JSON 查询:');
+            log('cat logs/*.log | jq \'.level == "error"\'');
+        }
+    </script>
+</body>
+</html>

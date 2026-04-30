@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Flask路由与视图</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🗺️ Flask 路由与视图</h2><p>Flask 路由高级用法（URL 构建 url_for、HTTP 方法限制、重定向行为）、视图函数、蓝图 Blueprint 模块化、应用工厂模式。</p></div>
+    <div class="card">
+        <h2>URL 构建 url_for</h2>
+        <div class="code">// ========== url_for ==========
+from flask import Flask, url_for, redirect
+app = Flask(__name__)
+
+@app.route("/")
+def index():
+    return "首页"
+
+@app.route("/user/<name>")
+def profile(name):
+    return f"用户: {name}"
+
+@app.route("/login")
+def login():
+    return "登录页面"
+
+# url_for 根据视图函数名生成 URL:
+with app.test_request_context():
+    print(url_for("index"))             # /
+    print(url_for("profile", name="Alice"))  # /user/Alice
+    print(url_for("login"))             # /login
+    print(url_for("profile", name="Bob", page=2))
+    # /user/Bob?page=2  (多余参数变成查询参数)
+
+# 重定向中使用:
+@app.route("/")
+def home():
+    return redirect(url_for("profile", name="Guest"))
+
+# url_for 的好处:
+# 1. URL 变化时不用改模板/代码
+# 2. 自动处理特殊字符转义
+# 3. 蓝图名称自动加前缀</div>
+    </div>
+    <div class="card">
+        <h2>路由高级用法</h2>
+        <div class="code">// ========== 路由选项 ==========
+from flask import Flask, url_for, redirect
+app = Flask(__name__)
+
+# strict_slashes: URL 尾部斜杠行为
+@app.route("/example", strict_slashes=False)
+# /example 和 /example/ 都可访问
+
+@app.route("/strict/", strict_slashes=True)
+# 只有 /strict/ 可访问, /strict 返回 404
+
+# redirect_to: URL 重定向
+@app.route("/old-page", redirect_to="/new-page")
+def old():
+    """此函数不会执行,直接被重定向"""
+    pass
+
+# 同一个函数绑定多个路由:
+@app.route("/")
+@app.route("/home")
+@app.route("/index")
+def home():
+    return "主页"
+
+# 动态路由默认值:
+@app.route("/page/")
+@app.route("/page/<int:num>")
+def page(num=1):
+    return f"第 {num} 页"
+
+# HTTP 方法限制:
+@app.route("/secret", methods=["GET", "POST"])
+def secret():
+    pass
+
+# 每个视图函数只能绑定一个端点名
+# 默认端点名 = 函数名</div>
+    </div>
+    <div class="card">
+        <h2>蓝图 Blueprint</h2>
+        <div class="code">// ========== 蓝图: 模块化路由 ==========
+from flask import Blueprint, Flask
+
+# 创建蓝图 (类似子应用):
+auth_bp = Blueprint("auth", __name__, url_prefix="/auth")
+
+# 蓝图中定义路由:
+@auth_bp.route("/login")
+def login():
+    return "登录页面"
+
+@auth_bp.route("/logout")
+def logout():
+    return "退出登录"
+
+@auth_bp.route("/register", methods=["GET", "POST"])
+def register():
+    return "注册页面"
+
+# 第二个蓝图:
+blog_bp = Blueprint("blog", __name__, url_prefix="/blog")
+
+@blog_bp.route("/")
+def list_posts():
+    return "文章列表"
+
+@blog_bp.route("/<int:post_id>")
+def show_post(post_id):
+    return f"文章 {post_id}"
+
+# 注册蓝图到应用:
+app = Flask(__name__)
+app.register_blueprint(auth_bp)
+app.register_blueprint(blog_bp)
+
+# URL 访问:
+# /auth/login      → auth.login
+# /auth/logout     → auth.logout
+# /auth/register   → auth.register
+# /blog/           → blog.list_posts
+# /blog/42         → blog.show_post
+
+# 蓝图中 url_for:
+# url_for("auth.login")      # /auth/login
+# url_for("blog.show_post", post_id=5)  # /blog/5
+
+# 蓝图模板文件夹:
+# bp = Blueprint("admin", __name__,
+#                template_folder="templates/admin",
+#                static_folder="static/admin")</div>
+    </div>
+    <div class="card">
+        <h2>应用工厂模式</h2>
+        <div class="code">// ========== 应用工厂 ==========
+# 大型项目推荐模式: 用函数创建应用实例
+
+# config.py:
+class Config:
+    SECRET_KEY = "dev-key"
+    SQLALCHEMY_DATABASE_URI = "sqlite:///app.db"
+    DEBUG = True
+
+class ProductionConfig(Config):
+    DEBUG = False
+    SQLALCHEMY_DATABASE_URI = "postgresql://..."
+
+# app/__init__.py:
+from flask import Flask
+
+def create_app(config_name="config.Config"):
+    """应用工厂"""
+    app = Flask(__name__)
+    app.config.from_object(config_name)
+
+    # 注册扩展 (延后初始化)
+    from flask_sqlalchemy import SQLAlchemy
+    db = SQLAlchemy()
+    db.init_app(app)
+
+    # 注册蓝图
+    from .auth import auth_bp
+    from .blog import blog_bp
+    app.register_blueprint(auth_bp)
+    app.register_blueprint(blog_bp)
+
+    # 注册错误处理
+    @app.errorhandler(404)
+    def not_found(e):
+        return {"error": "Not Found"}, 404
+
+    return app
+
+# run.py:
+from app import create_app
+app = create_app()
+
+if __name__ == "__main__":
+    app.run()
+
+# 好处:
+# - 配置灵活 (开发/测试/生产)
+# - 避免全局状态
+# - 方便测试</div>
+    </div>
+    <div class="card">
+        <h2>请求钩子</h2>
+        <div class="code">// ========== 请求钩子 ==========
+from flask import Flask, g, request
+app = Flask(__name__)
+
+# before_request: 每次请求前执行
+@app.before_request
+def before_request():
+    """请求预处理"""
+    g.user = None
+    if "Authorization" in request.headers:
+        # 验证 token, 设置 g.user
+        pass
+    print(f"请求: {request.method} {request.path}")
+
+# after_request: 每次请求后执行 (即使异常)
+@app.after_request
+def after_request(response):
+    """请求后处理"""
+    response.headers["X-Powered-By"] = "Flask"
+    return response
+
+# teardown_request: 请求结束后执行 (即使未处理)
+@app.teardown_request
+def teardown_request(exception=None):
+    """清理资源"""
+    # 关闭数据库连接等
+    pass
+
+# before_first_request: 第一个请求前执行 (3.0 前)
+# Flask 2.3+ 中移除,用 lazy loading 替代
+
+# 蓝图级别钩子 (只对蓝图路由生效):
+@auth_bp.before_request
+def auth_before_request():
+    """只对 /auth/* 生效"""
+    pass
+
+# g 对象: 请求级全局变量 (在 before_request 中设置)
+@app.route("/profile")
+def profile():
+    username = g.user if g.user else "游客"
+    return f"当前用户: {username}"</div>
+        <div class="note">💡 路由与视图要点: (1) url_for('view_func') 生成 URL,避免硬编码; (2) Blueprint 模块化路由,url_prefix 自动添加前缀; (3) 应用工厂 create_app() 灵活配置,避免全局状态; (4) before/after_request 钩子做预处理/后处理; (5) g 对象存储请求级数据。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoUrlFor()">url_for 演示</button>
+        <button onclick="demoBlueprint()">蓝图演示</button>
+        <button onclick="demoHooks()">请求钩子演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoUrlFor() {
+            result.innerHTML = '';
+            log('# url_for 演示');
+            log('');
+            log('url_for("index")          → /');
+            log('url_for("profile", name="Alice") → /user/Alice');
+            log('url_for("login")          → /login');
+            log('');
+            log('url_for("profile", name="Bob", page=2)');
+            log('  → /user/Bob?page=2');
+            log('');
+            log('配合 redirect:');
+            log('  redirect(url_for("index"))');
+        }
+
+        function demoBlueprint() {
+            result.innerHTML = '';
+            log('# 蓝图 Blueprint 演示');
+            log('');
+            log('结构:');
+            log('  auth_bp = Blueprint("auth", __name__,');
+            log('                     url_prefix="/auth")');
+            log('');
+            log('蓝图路由:');
+            log('  @auth_bp.route("/login")   → /auth/login');
+            log('  @auth_bp.route("/logout")  → /auth/logout');
+            log('');
+            log('注册:');
+            log('  app.register_blueprint(auth_bp)');
+            log('  url_for("auth.login")  → /auth/login');
+        }
+
+        function demoHooks() {
+            result.innerHTML = '';
+            log('# 请求钩子演示');
+            log('');
+            log('@app.before_request');
+            log('  请求前执行: 认证/日志/数据库连接');
+            log('');
+            log('@app.after_request');
+            log('  请求后执行: 添加响应头/CORS');
+            log('');
+            log('@app.teardown_request');
+            log('  清理资源: 关闭连接');
+            log('');
+            log('g 对象 — 请求级全局变量:');
+            log('  g.user = current_user');
+        }
+    </script>
+</body>
+</html>

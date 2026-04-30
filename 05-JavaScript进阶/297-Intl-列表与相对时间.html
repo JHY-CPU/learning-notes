@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intl-列表与相对时间</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #listFmt-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Intl 列表与相对时间</h2><p>ListFormat 列表连接、RelativeTimeFormat 相对时间。</p></div>
+    <div class="card">
+        <h2>ListFormat 和 RelativeTimeFormat</h2>
+        <div class="code">// ========== Intl.ListFormat (ES2021) ==========
+// 格式化列表 (如 "A, B 和 C")
+const lf = new Intl.ListFormat(locale, options);
+
+// 选项
+{
+    type: 'conjunction',  // 'conjunction' (A, B 和 C)
+                          // 'disjunction' (A, B 或 C)
+                          // 'unit' (A, B, C)
+    style: 'long',        // 'long' / 'short' / 'narrow'
+}
+
+// 用法
+lf.format(['苹果', '香蕉', '橙子']);
+// '苹果、香蕉和橙子' (zh-CN)
+// '苹果, 香蕉, 橙子' (短格式)
+
+// ========== Intl.RelativeTimeFormat (ES2020) ==========
+// 格式化相对时间 (如 "3天前"、"5分钟后")
+const rtf = new Intl.RelativeTimeFormat(locale, options);
+
+// 选项
+{
+    numeric: 'always',    // 'always' / 'auto' (auto 会使用 "昨天" 而不是 "1天前")
+    style: 'long',        // 'long' / 'short' / 'narrow'
+}
+
+// 用法
+rtf.format(-1, 'day');    // '1天前'
+rtf.format(3, 'month');   // '3个月后'
+rtf.format(-5, 'minute'); // '5分钟前'
+
+// 可用单位
+// 'year' / 'month' / 'week' / 'day' / 'hour' / 'minute' / 'second' / 'quarter'</div>
+    </div>
+    <div class="card">
+        <h2>演示：列表和相对时间</h2>
+        <button onclick="demoList()">ListFormat</button>
+        <button onclick="demoRelative()">RelativeTimeFormat</button>
+        <div id="listFmt-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const listFmtResult = document.getElementById('listFmt-result');
+
+        function log(msg) {
+            listFmtResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoList() {
+            listFmtResult.innerHTML = '';
+            log('📋 ListFormat 列表格式化:');
+            log('');
+
+            const items = ['苹果', '香蕉', '橙子', '葡萄'];
+
+            log('1️⃣ 不同 type 对比:');
+            const types = [
+                { type: 'conjunction', desc: '连接 (和)' },
+                { type: 'disjunction', desc: '选择 (或)' },
+                { type: 'unit', desc: '单位' },
+            ];
+
+            types.forEach(({ type, desc }) => {
+                try {
+                    const lf = new Intl.ListFormat('zh-CN', { type, style: 'long' });
+                    log(`   ${desc} (${type}): ${lf.format(items)}`);
+                } catch (e) {
+                    log(`   ${desc}: ⚠️ 不支持`);
+                }
+            });
+            log('');
+
+            log('2️⃣ 不同 style 对比:');
+            const styles = ['long', 'short', 'narrow'];
+            styles.forEach(style => {
+                try {
+                    const lf = new Intl.ListFormat('zh-CN', { type: 'conjunction', style });
+                    log(`   ${style}: ${lf.format(items)}`);
+                } catch (e) {
+                    log(`   ${style}: ⚠️ 不支持`);
+                }
+            });
+            log('');
+
+            log('3️⃣ 多语言列表:');
+            const locales = [
+                { code: 'zh-CN', name: '中文', items: ['A', 'B', 'C'] },
+                { code: 'en-US', name: '英语', items: ['A', 'B', 'C'] },
+                { code: 'ja-JP', name: '日语', items: ['A', 'B', 'C'] },
+            ];
+            locales.forEach(({ code, name, items }) => {
+                try {
+                    const lf = new Intl.ListFormat(code, { type: 'conjunction' });
+                    log(`   ${name}: ${lf.format(items)}`);
+                } catch (e) {
+                    log(`   ${name}: ⚠️ 不支持`);
+                }
+            });
+        }
+
+        function demoRelative() {
+            listFmtResult.innerHTML = '';
+            log('⏰ RelativeTimeFormat 相对时间:');
+            log('');
+
+            log('1️⃣ 基本用法:');
+            try {
+                const rtf = new Intl.RelativeTimeFormat('zh-CN', { numeric: 'always' });
+                log(`   -1 day: ${rtf.format(-1, 'day')}`);
+                log(`   3 days: ${rtf.format(3, 'day')}`);
+                log(`   -5 minutes: ${rtf.format(-5, 'minute')}`);
+                log(`   2 hours: ${rtf.format(2, 'hour')}`);
+                log(`   -1 month: ${rtf.format(-1, 'month')}`);
+                log(`   1 year: ${rtf.format(1, 'year')}`);
+                log(`   -2 weeks: ${rtf.format(-2, 'week')}`);
+                log(`   -30 seconds: ${rtf.format(-30, 'second')}`);
+            } catch (e) {
+                log('   ⚠️ RelativeTimeFormat 不支持');
+            }
+            log('');
+
+            log('2️⃣ numeric: auto vs always:');
+            try {
+                const rtfAlways = new Intl.RelativeTimeFormat('zh-CN', { numeric: 'always' });
+                const rtfAuto = new Intl.RelativeTimeFormat('zh-CN', { numeric: 'auto' });
+                log(`   always -1天: ${rtfAlways.format(-1, 'day')}`);
+                log(`   auto -1天: ${rtfAuto.format(-1, 'day')}`);
+                log(`   always 0天: ${rtfAlways.format(0, 'day')}`);
+                log(`   auto 0天: ${rtfAuto.format(0, 'day')}`);
+            } catch (e) {
+                log('   ⚠️ 不支持');
+            }
+            log('');
+
+            log('3️⃣ 多语言:');
+            const locales = ['zh-CN', 'en-US', 'ja-JP', 'de-DE'];
+            locales.forEach(code => {
+                try {
+                    const rtf = new Intl.RelativeTimeFormat(code, { numeric: 'auto' });
+                    log(`   ${code}: ${rtf.format(-3, 'day')}`);
+                } catch (e) {
+                    log(`   ${code}: ⚠️`);
+                }
+            });
+        }
+
+        console.log('=== Intl 列表与相对时间 ===');
+
+        document.getElementById('output').textContent =
+            `Intl ListFormat: conjunction/disjunction/unit 列表连接\n` +
+            `Intl RelativeTimeFormat: year/month/day/hour/minute 相对时间\n` +
+            `✅ Intl 列表与相对时间演示完成！`;
+    </script>
+</body>
+</html>

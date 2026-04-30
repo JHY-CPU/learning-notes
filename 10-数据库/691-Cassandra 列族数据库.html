@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cassandra 列族数据库</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🗃️ Cassandra 列族数据库</h2><p>Cassandra 概述、列族数据模型（Row/Column/ColumnFamily/SuperColumn）、CQL 查询语言、分区键与聚簇键、读/写路径、一致性级别、Hinted Handoff、Read Repair、Gossip 协议、去中心化架构。</p></div>
+    <div class="card">
+        <h2>Cassandra 概述</h2>
+        <div class="code">// ========== Apache Cassandra ==========
+// Facebook 开源 -> Apache 顶级项目
+// 列族 (Column-Family) 数据库, 宽列存储
+
+// ========== 核心特点 ==========
+// 1. 去中心化 (无主架构, 所有节点对等)
+// 2. 线性扩展 (加节点 = 加性能)
+// 3. 高可用 (无单点故障)
+// 4. AP 系统 (最终一致性)
+// 5. 写入性能极高 (顺序写 + LSM-Tree)
+
+// ========== 数据模型 ==========
+// ┌────────────────────────────────────┐
+// │ Keyspace (类似数据库)              │
+// │ ├── Table (列族)                   │
+// │ │   ├── Row Key (分区键)           │
+// │ │   ├── Clustering Key (聚簇键)    │
+// │ │   ├── Column Name = Value        │
+// │ │   └── TTL 自动过期               │
+// └────────────────────────────────────┘
+
+// ========== 适用场景 ==========
+// ✅ 写入密集型 (日志/时序/物联网)
+// ✅ 多数据中心部署
+// ✅ 时间序列数据
+// ✅ 大表 (亿级+)
+// ✅ 轻量级事务要求
+
+// ❌ 强一致性事务
+// ❌ 复杂 JOIN/聚合
+// ❌ 灵活查询 (查询必须按主键设计)
+// ❌ 数据量小 (单机即可)</div>
+    </div>
+    <div class="card">
+        <h2>CQL 数据定义</h2>
+        <div class="code">// ========== CQL ==========
+// Cassandra Query Language (类 SQL, 但不是 SQL)
+
+// ========== Keyspace ==========
+CREATE KEYSPACE mydb
+WITH replication = {
+    'class': 'SimpleStrategy',
+    'replication_factor': 3
+};
+
+// 生产用 NetworkTopologyStrategy:
+CREATE KEYSPACE mydb
+WITH replication = {
+    'class': 'NetworkTopologyStrategy',
+    'dc1': 3, 'dc2': 2
+};
+
+// ========== 表 ==========
+// 分区键 + 聚簇键 决定查询模式
+CREATE TABLE users (
+    user_id UUID,
+    name TEXT,
+    email TEXT,
+    age INT,
+    created_at TIMESTAMP,
+    PRIMARY KEY (user_id)           // 只有分区键
+);
+
+// 复合主键:
+CREATE TABLE posts_by_user (
+    user_id UUID,                   // 分区键 (决定数据在哪个节点)
+    created_at TIMESTAMP,           // 第1个聚簇键 (排序)
+    post_id UUID,                   // 第2个聚簇键 (唯一)
+    title TEXT,
+    content TEXT,
+    PRIMARY KEY (user_id, created_at, post_id)
+) WITH CLUSTERING ORDER BY (created_at DESC, post_id ASC);
+
+// ========== 二级索引 ==========
+// 不推荐! 性能差 (分布式查询)
+CREATE INDEX ON users (email);
+
+// 更好的方案: 物化视图
+CREATE MATERIALIZED VIEW users_by_email AS
+    SELECT * FROM users
+    WHERE email IS NOT NULL AND user_id IS NOT NULL
+    PRIMARY KEY (email, user_id);</div>
+    </div>
+    <div class="card">
+        <h2>CRUD 操作</h2>
+        <div class="code">// ========== INSERT ==========
+INSERT INTO users (user_id, name, email, age)
+VALUES (uuid(), 'Alice', 'alice@example.com', 25);
+
+// TTL 自动过期 (秒):
+INSERT INTO sessions (session_id, user_id, data)
+VALUES ('abc123', uuid(), '{...}')
+USING TTL 86400;    // 24 小时后自动删除
+
+// ========== SELECT ==========
+// 必须包含分区键 (否则全表扫描!)
+SELECT * FROM posts_by_user
+WHERE user_id = 123e4567-e89b-12d3-a456-426614174000;
+
+// 按聚簇键排序/过滤:
+SELECT * FROM posts_by_user
+WHERE user_id = 123e4567-e89b-12d3-a456-426614174000
+  AND created_at >= '2024-01-01'
+  AND created_at < '2024-02-01';
+
+// 允许过滤 (不推荐, 性能差):
+SELECT * FROM users WHERE age > 18 ALLOW FILTERING;
+
+// ========== UPDATE ==========
+// UPSERT 语义 (不存在则插入)
+UPDATE users SET email = 'new@example.com'
+WHERE user_id = 123e4567-e89b-12d3-a456-426614174000;
+
+// 计数器:
+UPDATE counter SET count = count + 1
+WHERE id = 'page:home';
+
+// ========== DELETE ==========
+DELETE FROM users
+WHERE user_id = 123e4567-e89b-12d3-a456-426614174000;
+
+// 删除单个列 (非 NULL):
+DELETE email FROM users
+WHERE user_id = 123e4567-e89b-12d3-a456-426614174000;
+
+// ========== 批量操作 (原子但非事务) ==========
+BEGIN BATCH
+  INSERT INTO posts (post_id, user_id, title) VALUES (1, 'u1', 'Post 1');
+  INSERT INTO posts_by_user (user_id, created_at, post_id) VALUES ('u1', '2024-01-01', 1);
+APPLY BATCH;</div>
+    </div>
+    <div class="card">
+        <h2>架构与一致性</h2>
+        <div class="code">// ========== 去中心化架构 ==========
+// ┌────────────────────────────────────────┐
+// │        所有节点对等 (Ring 环)           │
+// ├────────────────────────────────────────┤
+// │  → 每个节点接受读写请求                 │
+// │  → 无单点故障                          │
+// │  → Gossip 协议传播拓扑                 │
+// │  → Partitioner 决定数据分布            │
+// └────────────────────────────────────────┘
+
+// ========== 写入路径 ==========
+// Coordinator 节点:
+// 1. 写入 CommitLog (顺序写, 磁盘)
+// 2. 写入 MemTable (内存, 排序)
+// 3. 达到阈值 -> 刷盘 SSTable (不可变)
+// 4. 定期 Compaction (合并 SSTable, 删除旧数据)
+//
+// 写入无需读: 直接追加, 所以极快 (10K+ ops/s)
+
+// ========== 一致性级别 ==========
+// ┌──────────┬────────────────────────────────┐
+// │ 级别      │ 含义                          │
+// ├──────────┼────────────────────────────────┤
+// │ ONE      │ 1 个节点响应即可              │
+// │ QUORUM   │ (replication_factor / 2) + 1  │
+// │ ALL      │ 所有副本响应                  │
+// │ LOCAL_ONE│ 本地 DC 1 节点                │
+// │ LOCAL_QUORUM│ 本地 DC 法定多数           │
+// │ EACH_QUORUM│ 每 DC 法定多数              │
+// │ ANY      │ 即使只有 hinted handoff 也 ok │
+// └──────────┴────────────────────────────────┘
+
+// 读写一致性组合:
+// 写: CL + 读: CL > replication_factor 则强一致
+// 例: RF=3, Write QUORUM(2) + Read QUORUM(2) = 强一致
+
+// ========== 故障处理 ==========
+// Hinted Handoff:
+//   节点宕机时, Coordinator 保留写操作
+//   节点恢复后回放
+//   默认 3 小时
+
+// Read Repair:
+//   读取时发现副本不一致, 后台修复
+//   全量修复: nodetool repair (定期执行)
+
+// ========== 去中心化: Gossip ==========
+// 每秒 1 次, 每个节点与 1-3 个节点交换状态
+// 传播: 节点存活/负载/Schema 版本
+// 所有节点最终知道所有节点状态</div>
+    </div>
+    <div class="card">
+        <h2>数据分布与 Compaction</h2>
+        <div class="code">// ========== 数据分布 ==========
+// Partitioner (分区器) 决定数据分布:
+// Murmur3Partitioner (默认)
+//   对分区键做 Murmur3 哈希 -> Token
+//   Token 范围决定数据在哪个节点
+
+// 虚拟节点 vnodes (默认 256/节点):
+//   每个节点负责多个 Token 范围
+//   加/删节点影响更均匀
+
+// ========== Compaction 策略 ==========
+// 1. SizeTieredCompactionStrategy (STCS, 默认)
+//    相似大小的 SSTable 合并
+//    适合: 写入量大, 大部分数据最终删除
+
+// 2. LeveledCompactionStrategy (LCS)
+//    分层 SSTable (L0→L1→L2...)
+//    读性能更好, 写放大更多
+//    适合: 读多写少
+
+// 3. TimeWindowCompactionStrategy (TWCS)
+//    按时间窗口压缩
+//    适合: 时序数据 (超过窗口不再压缩)
+
+// Compaction 监控:
+nodetool compactionstats
+nodetool cfstats
+
+// ========== 节点管理命令 ==========
+nodetool status                       // 集群状态
+nodetool info                         // 节点信息
+nodetool ring                         // Token 环
+nodetool repair                       // 修复一致性
+nodetool cleanup                      // 清理旧数据
+nodetool decommission                 // 退役节点
+nodetool rebuild                      // 重建</div>
+        <div class="note">💡 Cassandra 要点: AP 系统, 写入极快; 查询必须按主键设计; 分区键决定数据位置; 聚簇键决定排序; CQL 类 SQL 但有限制; 去中心化无主架构; Gossip 协议; Hinted Handoff + Read Repair 保证最终一致; Compaction 控制读写性能; 适合时序/日志/物联网大数据写入场景。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoModel()">数据模型</button>
+        <button onclick="demoCQL()">CQL 示例</button>
+        <button onclick="demoArch()">架构特性</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoModel() {
+            result.innerHTML = '';
+            log('# Cassandra 数据模型');
+            log('');
+            log('Keyspace → 类似数据库');
+            log('Table (Column Family)');
+            log('  ├── 分区键 (Partition Key)');
+            log('  ├── 聚簇键 (Clustering Key)');
+            log('  └── 普通列');
+            log('');
+            log('查询必须包含分区键!');
+            log('聚簇键决定排序/过滤');
+        }
+
+        function demoCQL() {
+            result.innerHTML = '';
+            log('# CQL 示例');
+            log('');
+            log('CREATE TABLE posts (');
+            log('  user_id UUID,          // 分区键');
+            log('  created_at TIMESTAMP,  // 聚簇键');
+            log('  post_id UUID,          // 聚簇键');
+            log('  title TEXT,');
+            log('  PRIMARY KEY (user_id, created_at, post_id)');
+            log(') WITH CLUSTERING ORDER BY (created_at DESC);');
+            log('');
+            log('SELECT * FROM posts');
+            log('WHERE user_id = ?');
+            log('  AND created_at > ?;');
+        }
+
+        function demoArch() {
+            result.innerHTML = '';
+            log('# Cassandra 架构');
+            log('');
+            log('去中心化: 所有节点对等');
+            log('Gossip: 节点状态传播');
+            log('写入: CommitLog → MemTable → SSTable');
+            log('Compaction: 合并 SSTable');
+            log('Hinted Handoff: 宕机恢复写入');
+            log('Read Repair: 读取时修复不一致');
+            log('');
+            log('一致性: ONE / QUORUM / ALL');
+            log('CAP: AP (最终一致)');
+        }
+    </script>
+</body>
+</html>

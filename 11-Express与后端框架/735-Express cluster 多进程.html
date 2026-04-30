@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express cluster 多进程</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔄 Express cluster 多进程</h2><p>Node.js cluster 模块、多进程架构、Master-Worker 模式、进程通信、优雅重启、负载均衡、进程守护、多进程共享端口、状态共享挑战。</p></div>
+    <div class="card">
+        <h2>Cluster 基础</h2>
+        <div class="code">// ========== Node.js Cluster ==========
+// 利用多核 CPU
+// 主进程 (Master) 负责 fork 工作进程
+// 工作进程 (Worker) 处理请求
+
+// ========== 最简单的 Cluster ==========
+const cluster = require('cluster');
+const http = require('http');
+const os = require('os');
+
+const numCPUs = os.cpus().length;
+
+if (cluster.isMaster) {
+    console.log(`Master ${process.pid} is running`);
+
+    // Fork workers
+    for (let i = 0; i < numCPUs; i++) {
+        cluster.fork();
+    }
+
+    // 监听 worker 退出
+    cluster.on('exit', (worker, code, signal) => {
+        console.log(`Worker ${worker.process.pid} died`);
+        // 自动重启
+        cluster.fork();
+    });
+} else {
+    // Worker 共享同一个端口
+    http.createServer((req, res) => {
+        res.writeHead(200);
+        res.end(`Hello from worker ${process.pid}`);
+    }).listen(3000);
+
+    console.log(`Worker ${process.pid} started`);
+}
+
+// ========== Express + Cluster ==========
+const express = require('express');
+
+if (cluster.isMaster) {
+    const numCPUs = os.cpus().length;
+
+    console.log(`Master ${process.pid} starting ${numCPUs} workers`);
+
+    for (let i = 0; i < numCPUs; i++) {
+        cluster.fork();
+    }
+
+    cluster.on('exit', (worker) => {
+        console.log(`Worker ${worker.process.pid} died. Restarting...`);
+        cluster.fork();
+    });
+
+    // 优雅关闭
+    process.on('SIGTERM', () => {
+        console.log('Master received SIGTERM');
+        for (const id in cluster.workers) {
+            cluster.workers[id].kill();
+        }
+        process.exit(0);
+    });
+} else {
+    const app = express();
+
+    app.get('/', (req, res) => {
+        res.json({
+            pid: process.pid,
+            memory: process.memoryUsage(),
+            uptime: process.uptime(),
+        });
+    });
+
+    app.get('/slow', async (req, res) => {
+        // 模拟耗时操作
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        res.json({ pid: process.pid, message: 'Done' });
+    });
+
+    app.listen(3000);
+}</div>
+    </div>
+    <div class="card">
+        <h2>进程通信</h2>
+        <div class="code">// ========== Master-Worker 通信 ==========
+
+// ========== Master → Worker ==========
+if (cluster.isMaster) {
+    const worker = cluster.fork();
+
+    // 向 worker 发送消息
+    worker.send({ type: 'config', data: { logLevel: 'debug' } });
+
+    // 接收 worker 消息
+    worker.on('message', (msg) => {
+        console.log(`Message from worker:`, msg);
+    });
+
+    // 广播所有 worker
+    for (const id in cluster.workers) {
+        cluster.workers[id].send({ type: 'reload', timestamp: Date.now() });
+    }
+} else {
+    // Worker 接收消息
+    process.on('message', (msg) => {
+        if (msg.type === 'config') {
+            global.logLevel = msg.data.logLevel;
+        }
+        if (msg.type === 'reload') {
+            // 重新加载配置
+        }
+    });
+
+    // Worker 向 master 发送消息
+    process.send({
+        type: 'ready',
+        pid: process.pid,
+        memory: process.memoryUsage(),
+    });
+}
+
+// ========== 共享状态问题 ==========
+// Cluster 多进程不共享内存!
+// 每个 worker 有独立:
+//   - 内存 (变量, 缓存)
+//   - 数据库连接
+//   - Socket.io 连接 (需要 Redis Adapter)
+
+// 需要外部存储共享:
+// Redis: 会话, 缓存, 在线状态
+// 数据库: 持久化数据
+// 消息队列: 任务分发
+
+// ========== 优雅关闭 ==========
+if (cluster.isMaster) {
+    function gracefulShutdown() {
+        console.log('Master shutting down...');
+
+        for (const id in cluster.workers) {
+            const worker = cluster.workers[id];
+            // 通知 worker 关闭
+            worker.send({ type: 'shutdown' });
+
+            // 5 秒未关闭则强制 kill
+            setTimeout(() => {
+                if (!worker.isDead()) {
+                    worker.kill('SIGKILL');
+                }
+            }, 5000);
+        }
+
+        setTimeout(() => process.exit(0), 10000);
+    }
+
+    process.on('SIGTERM', gracefulShutdown);
+    process.on('SIGINT', gracefulShutdown);
+} else {
+    process.on('message', async (msg) => {
+        if (msg.type === 'shutdown') {
+            console.log(`Worker ${process.pid} shutting down...`);
+            await server.close();
+            process.exit(0);
+        }
+    });
+}</div>
+    </div>
+    <div class="card">
+        <h2>进程管理</h2>
+        <div class="code">// ========== 进程管理与监控 ==========
+
+// ========== 优雅重启 (零宕机) ==========
+// 逐 worker 重启, 保持服务可用
+
+if (cluster.isMaster) {
+    function restartWorkers() {
+        const workers = Object.values(cluster.workers);
+        let index = 0;
+
+        function restartNext() {
+            if (index >= workers.length) {
+                console.log('All workers restarted');
+                return;
+            }
+
+            const worker = workers[index];
+            console.log(`Restarting worker ${worker.process.pid}`);
+
+            // 新建 worker
+            const newWorker = cluster.fork();
+
+            // 等新 worker 就绪后关闭旧的
+            newWorker.on('listening', () => {
+                worker.disconnect();
+                worker.kill();
+                console.log(`Worker ${worker.process.pid} replaced`);
+                index++;
+                setTimeout(restartNext, 1000);  // 间隔重启
+            });
+        }
+
+        restartNext();
+    }
+
+    // 接收 SIGHUP 信号重启
+    process.on('SIGHUP', restartWorkers);
+}
+
+// 使用:
+// kill -SIGHUP <master_pid>  # 优雅重启所有 worker
+
+// ========== Worker 健康检查 ==========
+if (cluster.isMaster) {
+    // 定期检查 worker 是否存活
+    setInterval(() => {
+        for (const id in cluster.workers) {
+            const worker = cluster.workers[id];
+            // 发送 ping
+            worker.send({ type: 'ping' });
+        }
+    }, 30000);
+
+    // 超时未响应视为死亡
+    const pendingPings = new Map();
+
+    // 监听 worker 消息
+    cluster.on('message', (worker, msg) => {
+        if (msg.type === 'pong') {
+            pendingPings.delete(worker.id);
+        }
+    });
+} else {
+    process.on('message', (msg) => {
+        if (msg.type === 'ping') {
+            process.send({ type: 'pong', pid: process.pid });
+        }
+    });
+}
+
+// ========== 负载均衡 ==========
+// Cluster 的调度模式:
+// 1. round-robin (Windows/默认) — 轮流分发
+// 2. none (Linux) — OS 内核调度
+
+// 设置调度策略:
+// cluster.schedulingPolicy = cluster.SCHED_RR;  // Round-Robin
+// cluster.schedulingPolicy = cluster.SCHED_NONE;  // OS 调度
+
+// ========== 环境信息 ==========
+// 每个 worker 知道自己的 ID
+if (cluster.isWorker) {
+    console.log(`I am worker #${cluster.worker.id} (PID: ${process.pid})`);
+    // worker.id: 1, 2, 3, ...
+}
+
+// ========== 限制 Worker 数量 ==========
+// 不要超过 CPU 核心数
+// 考虑内存限制
+const WORKER_COUNT = Math.min(numCPUs, process.env.WORKER_MAX || 4);
+
+// I/O 密集型应用: 核心数 + 1
+// CPU 密集型应用: 核心数</div>
+    </div>
+    <div class="card">
+        <h2>生产 Cluster 模板</h2>
+        <div class="code">// ========== 完整 Cluster 模板 ==========
+// cluster.js:
+
+const cluster = require('cluster');
+const os = require('os');
+const config = require('./config');
+
+const WORKER_COUNT = config.workerCount || os.cpus().length;
+
+// ========== Master 进程 ==========
+if (cluster.isMaster) {
+    console.log(`[Master] PID ${process.pid} starting ${WORKER_COUNT} workers`);
+
+    // Fork workers
+    for (let i = 0; i < WORKER_COUNT; i++) {
+        cluster.fork();
+    }
+
+    // Worker 退出自动重启
+    cluster.on('exit', (worker, code, signal) => {
+        console.log(`[Master] Worker ${worker.process.pid} exited (code: ${code})`);
+
+        if (signal !== 'SIGKILL') {
+            console.log('[Master] Forking new worker...');
+            cluster.fork();
+        }
+    });
+
+    // Worker 就绪通知
+    cluster.on('listening', (worker, address) => {
+        console.log(`[Master] Worker ${worker.process.pid} listening on :${address.port}`);
+    });
+
+    // 优雅关闭
+    const shutdown = () => {
+        console.log('[Master] Shutting down...');
+        for (const id in cluster.workers) {
+            cluster.workers[id].kill();
+        }
+        process.exit(0);
+    };
+
+    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', shutdown);
+    process.on('SIGHUP', () => {
+        // 无缝重启
+        console.log('[Master] Reloading workers...');
+        const workers = Object.values(cluster.workers);
+        let i = 0;
+
+        function reloadNext() {
+            if (i >= workers.length) {
+                console.log('[Master] All workers reloaded');
+                return;
+            }
+            const oldWorker = workers[i];
+            const newWorker = cluster.fork();
+
+            newWorker.on('listening', () => {
+                oldWorker.disconnect();
+                oldWorker.kill();
+                i++;
+                setTimeout(reloadNext, 2000);
+            });
+        }
+
+        reloadNext();
+    });
+
+// ========== Worker 进程 ==========
+} else {
+    const app = require('./app');
+    const logger = require('./logger');
+
+    const server = app.listen(config.port, () => {
+        logger.info(`Worker ${process.pid} started on port ${config.port}`);
+        // 通知 master 就绪
+        process.send?.({ type: 'ready', pid: process.pid });
+    });
+
+    // 优雅退出
+    process.on('message', async (msg) => {
+        if (msg.type === 'shutdown') {
+            logger.info(`Worker ${process.pid} shutting down...`);
+            server.close(() => process.exit(0));
+
+            // 强制超时
+            setTimeout(() => process.exit(1), 10000);
+        }
+    });
+
+    // 未捕获异常处理
+    process.on('uncaughtException', (err) => {
+        logger.error({ err }, 'Uncaught exception');
+        server.close(() => process.exit(1));
+    });
+}</div>
+        <div class="note">💡 Cluster 要点: 多核 CPU 利用 (fork 每核一个); Master 管理 Worker 生命周期; Worker 共享端口 (OS 分发); 进程间通信 send/on('message'); 优雅重启 (逐 worker 替换); SIGTERM/SIGINT 关闭; SIGHUP 平滑重启; 不共享内存 (用 Redis/DB 共享); Worker 数量 = CPU 核心数; I/O 密集可 +1; uncaughtException 不崩溃 master。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCluster()">Cluster 基础</button>
+        <button onclick="demoComm()">进程通信</button>
+        <button onclick="demoGraceful()">优雅重启</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCluster() {
+            result.innerHTML = '';
+            log('# Node.js Cluster 架构');
+            log('');
+            log('Master (PID 1000)');
+            log('  ├── Worker 1 (PID 1001)');
+            log('  ├── Worker 2 (PID 1002)');
+            log('  ├── Worker 3 (PID 1003)');
+            log('  └── Worker 4 (PID 1004)');
+            log('');
+            log('Master: fork, monitor, restart');
+            log('Worker: handle requests');
+            log('所有 Worker: 共享端口 3000');
+            log('');
+            log('cluster.fork() = 进程数');
+            log('进程数 = CPU 核心数');
+        }
+
+        function demoComm() {
+            result.innerHTML = '';
+            log('# 进程间通信');
+            log('');
+            log('Master → Worker:');
+            log('  worker.send({ type, data })');
+            log('');
+            log('Worker → Master:');
+            log('  process.send({ type, pid })');
+            log('');
+            log('Worker 接收:');
+            log('  process.on("message", (msg) => {})');
+            log('');
+            log('不共享内存!');
+            log('共享状态 → Redis/数据库');
+        }
+
+        function demoGraceful() {
+            result.innerHTML = '';
+            log('# 优雅重启 (零宕机)');
+            log('');
+            log('1. 收到 SIGHUP');
+            log('2. Fork 新 Worker');
+            log('3. 新 Worker listening → 就绪');
+            log('4. 旧 Worker disconnect + kill');
+            log('5. 等待 1s → 重启下一个');
+            log('');
+            log('结果: 始终保持 N-1 个 Worker 在线');
+            log('');
+            log('命令:');
+            log('kill -SIGHUP <master_pid>');
+        }
+    </script>
+</body>
+</html>

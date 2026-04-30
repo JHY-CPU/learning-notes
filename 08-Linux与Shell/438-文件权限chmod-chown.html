@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件权限chmod-chown</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔐 文件权限 chmod/chown</h2><p>Linux 权限模型、chmod 数字/符号模式、chown/chgrp、umask、特殊权限位。</p></div>
+    <div class="card">
+        <h2>Linux 权限模型</h2>
+        <p>Linux 的权限模型基于"用户-组-其他"三类主体，每类主体有"读-写-执行"三种权限。</p>
+        <div class="code">// ========== 权限三元素 ==========
+// 每个文件有三组权限 (每组 r/w/x):
+//
+//   - rwx rwx rwx
+//   ┬ ┬─┬ ┬─┬ ┬─┬
+//   │ │  │ │  │ └── 其他用户 (others)
+//   │ │  │ └──── 组用户 (group)
+//   │ └─────── 文件所有者 (user/owner)
+//   └──────── 文件类型
+
+// ========== 数字权限表示 ==========
+// r = 4, w = 2, x = 1
+// 组合 = 数字相加
+//
+//   rw- = 4+2+0 = 6
+//   r-x = 4+0+1 = 5
+//   r-- = 4+0+0 = 4
+//   --- = 0
+//   rwx = 4+2+1 = 7
+//
+// 常见权限:
+//   755 = rwxr-xr-x   (文件: 所有者可读写执行,其他只读执行)
+//   644 = rw-r--r--   (文件: 所有者可读写,其他只读)
+//   600 = rw-------   (私密文件)
+//   777 = rwxrwxrwx   (完全开放,不安全)
+//   700 = rwx------   (私有目录)
+
+// ========== 目录权限的特殊性 ==========
+// 目录的"读" = 列出内容 (ls)
+// 目录的"写" = 创建/删除文件
+// 目录的"执行" = 进入目录 (cd)
+//
+// 重要: 要访问目录中的文件,需要目录的"执行"权限
+// 即使有读权限,没有执行权限也无法进入目录!</div>
+    </div>
+    <div class="card">
+        <h2>chmod — 修改权限</h2>
+        <div class="code">// ========== 数字模式 ==========
+// $ chmod 755 script.sh         # rwxr-xr-x
+// $ chmod 644 file.txt          # rw-r--r--
+// $ chmod 600 private.key       # rw------- (私钥)
+// $ chmod 700 ~/.ssh            # rwx------ (SSH 目录)
+// $ chmod 755 /var/www          # Web 目录
+// $ chmod -R 755 directory/     # 递归修改目录下所有文件
+
+// ========== 符号模式 ==========
+// u = user (所有者), g = group (组)
+// o = others (其他), a = all (全部)
+// + 添加权限, - 移除权限, = 设置精确权限
+//
+// $ chmod u+x script.sh         # 给所有者加执行权限
+// $ chmod g-w file.txt          # 移除组的写权限
+// $ chmod o-r file.txt          # 移除其他人的读权限
+// $ chmod a+x script.sh         # 给所有人加执行权限
+// $ chmod u=rwx,g=rx,o=rx file # 精确设置: 755
+// $ chmod go-w file.txt         # 组和其他人移除写权限
+
+// ========== 递归修改 ==========
+// $ chmod -R 755 directory/     # 所有文件设为 755
+// $ find . -type f -exec chmod 644 {} \;  # 只改文件为 644
+// $ find . -type d -exec chmod 755 {} \;  # 只改目录为 755
+//
+// 推荐: 目录 755, 文件 644 是安全通用配置</div>
+    </div>
+    <div class="card">
+        <h2>chown — 修改所有者</h2>
+        <div class="code">// ========== chown (Change Owner) ==========
+// $ chown alice file.txt               # 修改所有者为 alice
+// $ chown alice:bobs file.txt           # 修改所有者和组
+// $ chown :bobs file.txt                # 只修改组
+// $ chown -R alice directory/           # 递归修改目录
+// $ chown --reference=ref.txt target.txt # 复制所有权
+
+// ========== chgrp (Change Group) ==========
+// $ chgrp developers file.txt           # 修改组
+// $ chgrp -R developers directory/      # 递归修改组
+
+// ========== 常见场景 ==========
+// Web 服务器权限:
+//   $ chown -R www-data:www-data /var/www
+//   $ chmod -R 755 /var/www
+//   $ chmod -R 775 /var/www/uploads    # 上传目录需写权限
+//
+// SSH 密钥:
+//   $ chmod 700 ~/.ssh
+//   $ chmod 600 ~/.ssh/id_rsa          # 私钥
+//   $ chmod 644 ~/.ssh/id_rsa.pub      # 公钥
+
+// ========== umask — 默认权限掩码 ==========
+// 决定新创建文件的默认权限
+//
+// $ umask                   # 查看当前 umask
+// 0022
+//
+// 计算方式:
+//   文件: 666 - umask = 默认权限
+//   目录: 777 - umask = 默认权限
+//
+// umask=022:
+//   文件: 666-022 = 644 (rw-r--r--)
+//   目录: 777-022 = 755 (rwxr-xr-x)
+//
+// umask=002 (开发者常用):
+//   文件: 664, 目录: 775 (组可写)</div>
+        <div class="note">🔑 SSH 私钥必须设为 600 或更严格,否则 SSH 会拒绝使用它。这是新手常见的坑: ssh 说"Permissions 0644 for id_rsa are too open"。</div>
+    </div>
+    <div class="card">
+        <h2>特殊权限位</h2>
+        <div class="code">// ========== SUID / SGID / Sticky Bit ==========
+//
+// SUID (Set User ID) — 4xxx:
+//   以文件所有者的身份运行程序
+//   $ chmod u+s program
+//   $ chmod 4755 program
+//   示例: /usr/bin/passwd (普通用户可改密码)
+//   安全风险: 不要轻易设置!
+//
+// SGID (Set Group ID) — 2xxx:
+//   继承目录的组,新文件自动属于父目录的组
+//   $ chmod g+s directory
+//   $ chmod 2755 directory
+//   协作开发目录常用
+//
+// Sticky Bit — 1xxx:
+//   只有文件所有者能删除自己的文件
+//   $ chmod +t /tmp
+//   $ chmod 1777 /tmp
+//   示例: /tmp (任何人都可写,但不能删别人的文件)
+
+// ========== 查看特殊权限 ==========
+// $ ls -la /usr/bin/passwd
+// -rwsr-xr-x  1 root root  59976 Nov 24  2022 /usr/bin/passwd
+//   ↑ SUID
+//
+// $ ls -la / | grep tmp
+// drwxrwxrwt  13 root root  4096 Jan 15 10:00 tmp
+//            ↑ Sticky bit
+
+// ========== ACL (访问控制列表) ==========
+// 更细粒度的权限控制,超越 u/g/o 三元组
+//
+// $ setfacl -m u:alice:rwx file.txt  # 给 alice 单独权限
+// $ setfacl -m g:dev:rw file.txt      # 给 dev 组权限
+// $ getfacl file.txt                  # 查看 ACL
+// $ setfacl -b file.txt               # 移除所有 ACL</div>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('🔐 文件权限 chmod/chown');
+        log('');
+        log('权限三元组: user / group / others — rwx');
+        log('数字: r=4 w=2 x=1 → 755(rwxr-xr-x) 644(rw-r--r--)');
+        log('chmod 改权限, chown 改所有者, chgrp 改组');
+        log('特殊: SUID(4) / SGID(2) / Sticky Bit(1)');
+        log('目录权限: r=列出, w=创建/删除, x=进入');
+    </script>
+</body>
+</html>

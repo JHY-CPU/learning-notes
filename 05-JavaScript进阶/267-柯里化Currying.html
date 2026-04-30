@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>柯里化Currying</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>柯里化 Currying</h2><p>将接收多个参数的函数转换为每次只接收一个参数的嵌套函数序列。f(a,b,c) → f(a)(b)(c)。核心思想：参数复用和延迟计算。</p></div>
+    <div class="card"><h2>通用 curry 实现</h2><p>支持任意元数函数的自动柯里化，直到收集够所有参数才执行原函数。</p><div class="code">function curry(fn) { return function curried(...args) { if (args.length >= fn.length) return fn(...args); return (...more) => curried(...args, ...more); }; }</div></div>
+    <div class="card"><h2>占位符支持</h2><p>使用 _ 作为占位符，允许跳过某些参数，稍后再填充。</p><div class="code">const curried = curry(fn, _); curried(1, _, 3)(2); // 占位符被 2 替换</div></div>
+    <div class="card"><h2>实际应用场景</h2><p>日志级别函数（log('INFO')('消息')）、URL 构建器（buildUrl(base)(path)）、事件处理器配置等。</p></div>
+    <div class="card"><h2>交互演示</h2><p>
+        <button onclick="demoBasicCurry()">基础柯里化</button>
+        <button onclick="demoPlaceholder()">占位符支持</button>
+        <button onclick="demoLogger()">日志级别应用</button>
+        <button onclick="demoUrlBuilder()">URL 构建器</button>
+    </p></div>
+    <pre id="output"></pre>
+    <script>
+        const output = document.getElementById('output');
+
+        function log(msg) {
+            output.textContent += msg + '\n';
+            console.log(msg);
+        }
+
+        function clearLog() {
+            output.textContent = '';
+        }
+
+        // ========== 通用 curry 实现（自动推导） ==========
+        function curry(fn) {
+            return function curried(...args) {
+                if (args.length >= fn.length) {
+                    return fn.apply(this, args);
+                }
+                return function(...more) {
+                    return curried.apply(this, args.concat(more));
+                };
+            };
+        }
+
+        // ========== 带占位符的 curry 实现 ==========
+        const _ = Symbol('placeholder'); // 占位符
+
+        function curryWithPlaceholder(fn) {
+            return function curried(...args) {
+                // 检查是否收集够了参数（排除占位符）
+                const filled = args.filter(a => a !== _).length;
+                const total = fn.length;
+
+                if (filled >= total && !args.includes(_)) {
+                    return fn.apply(this, args);
+                }
+
+                return function(...more) {
+                    // 合并参数：将占位符替换为新传入的参数
+                    const merged = args.map(a => a === _ && more.length ? more.shift() : a);
+                    return curried.apply(this, [...merged, ...more]);
+                };
+            };
+        }
+
+        // ========== 1. 基础柯里化演示 ==========
+        function demoBasicCurry() {
+            clearLog();
+            log('=== 基础柯里化 ===\n');
+
+            // 普通函数
+            const add = (a, b, c) => a + b + c;
+            log(`普通调用: add(1, 2, 3) = ${add(1, 2, 3)}`);
+
+            // 柯里化
+            const curriedAdd = curry(add);
+            log(`curriedAdd(1)(2)(3) = ${curriedAdd(1)(2)(3)}`);
+            log(`curriedAdd(1, 2)(3) = ${curriedAdd(1, 2)(3)}`);
+            log(`curriedAdd(1)(2, 3) = ${curriedAdd(1)(2, 3)}`);
+
+            // 参数复用
+            const add10 = curriedAdd(10);
+            log(`\n复用第一个参数: add10 = curriedAdd(10)`);
+            log(`add10(20)(30) = ${add10(20)(30)}`);
+            log(`add10(5)(5) = ${add10(5)(5)}`);
+
+            // 字符串拼接
+            const greet = (greeting, name) => `${greeting}, ${name}!`;
+            const curriedGreet = curry(greet);
+            const sayHello = curriedGreet('Hello');
+            const sayHi = curriedGreet('Hi');
+            log(`\n字符串拼接柯里化:`);
+            log(`sayHello('张三') = ${sayHello('张三')}`);
+            log(`sayHi('李四') = ${sayHi('李四')}`);
+        }
+
+        // ========== 2. 占位符支持 ==========
+        function demoPlaceholder() {
+            clearLog();
+            log('=== 占位符支持 ===\n');
+
+            const fn = (a, b, c, d) => `(${a}, ${b}, ${c}, ${d})`;
+            const curried = curryWithPlaceholder(fn);
+
+            log('使用 _ 占位符跳过参数:');
+            log(`curried(1, _, 3, _)(2)(4) = ${curried(1, _, 3, _)(2)(4)}`);
+            log(`curried(_, _, _, 'fixed')(1)(2)(3) = ${curried(_, _, _, 'fixed')(1)(2)(3)}`);
+            log(`curried(1)(_)(3)(2)(4) = ${curried(1)(_)(3)(2)(4)}`);
+
+            log('\n占位符 vs 普通柯里化：占位符允许任意位置参数跳过，普通柯里化只能从左到右依次传入');
+        }
+
+        // ========== 3. 日志级别应用 ==========
+        function demoLogger() {
+            clearLog();
+            log('=== 日志级别应用 ===\n');
+
+            const logMessage = (level, tag, message) => {
+                const timestamp = new Date().toLocaleTimeString();
+                return `[${timestamp}] [${level}] [${tag}] ${message}`;
+            };
+
+            const curriedLog = curryWithPlaceholder(logMessage);
+
+            // 预设日志级别 - 创建不同级别的日志函数
+            const info = curriedLog('INFO');
+            const warn = curriedLog('WARN');
+            const error = curriedLog('ERROR');
+
+            // 预设标签
+            const infoAPI = info('API');
+            const warnDB = warn('DB');
+
+            log(infoAPI('用户登录成功'));
+            log(infoAPI('获取数据完成'));
+            log(warnDB('查询速度较慢'));
+            log(error('ERROR', '系统', '连接超时'));
+
+            log('\n优势：通过部分应用创建专用的日志函数，减少重复传参');
+        }
+
+        // ========== 4. URL 构建器 ==========
+        function demoUrlBuilder() {
+            clearLog();
+            log('=== URL 构建器应用 ===\n');
+
+            const buildUrl = (baseUrl, path, params) => {
+                const query = params ? '?' + new URLSearchParams(params).toString() : '';
+                return `${baseUrl}${path}${query}`;
+            };
+
+            const curriedBuildUrl = curry(buildUrl);
+
+            // 预设 API 基础 URL
+            const apiUrl = curriedBuildUrl('https://api.example.com');
+
+            // 预设路径
+            const apiUsers = apiUrl('/users');
+            const apiPosts = apiUrl('/posts');
+
+            log(apiUsers({ page: 1, limit: 10 }));
+            log(apiUsers({ id: 123 }));
+            log(apiPosts({ category: 'tech' }));
+            log(apiPosts({ id: 456, include: 'author' }));
+
+            log('\n优势：将 URL 构建分解为 baseUrl → path → params 三个层次，每层可复用');
+        }
+
+        log('=== 柯里化 Currying 演示 ===\n柯里化将多参数函数转换为单参数函数链，实现参数复用和延迟计算。\n\n点击上方按钮查看不同应用。');
+    </script>
+</body>
+</html>

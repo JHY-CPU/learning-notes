@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实战-无限滚动</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; max-width: 500px; margin: 0 auto; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        /* 文章卡片 */
+        .post-item { padding: 14px; background: #f8f9fa; border-radius: 8px; margin-bottom: 10px; border-left: 3px solid #3498db; transition: transform 0.15s; }
+        .post-item:hover { transform: translateX(4px); }
+        .post-item .title { font-size: 15px; color: #2c3e50; font-weight: bold; margin-bottom: 4px; }
+        .post-item .meta { font-size: 12px; color: #95a5a6; display: flex; gap: 12px; }
+        .post-item .meta span { display: flex; align-items: center; gap: 4px; }
+        .post-item .excerpt { font-size: 13px; color: #666; margin-top: 6px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        /* 加载状态 */
+        .load-more { text-align: center; padding: 16px; color: #95a5a6; font-size: 13px; }
+        .load-more .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid #e0e0e0; border-top-color: #3498db; border-radius: 50%; animation: spin 0.6s linear infinite; margin-right: 8px; vertical-align: middle; }
+        .load-more .error { color: #e74c3c; }
+        .load-more .error button { margin-left: 8px; padding: 4px 12px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-size: 12px; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        /* 顶部信息 */
+        .info-bar { display: flex; justify-content: space-between; font-size: 12px; color: #95a5a6; margin-bottom: 10px; }
+        .controls { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+        .controls button { padding: 6px 14px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-size: 12px; }
+        .controls button:hover { opacity: 0.9; }
+        .controls button.secondary { background: #95a5a6; }
+        .controls button.danger { background: #e74c3c; }
+        /* 哨兵元素 (对用户不可见) */
+        #sentinel { height: 1px; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>♾️ 无限滚动</h2>
+        <p style="color:#7f8c8d;font-size:13px;">滚动分页加载、IntersectionObserver 触发、加载状态、防重复。</p>
+        <div class="controls">
+            <button onclick="resetFeed()">↺ 重置</button>
+            <button onclick="toggleAutoLoad()" id="autoLoadToggle" class="secondary">⏸ 暂停自动加载</button>
+            <button onclick="simulateError()" class="danger">⚠️ 模拟错误</button>
+        </div>
+        <div class="info-bar">
+            <span id="postCount">已加载: 0 篇</span>
+            <span id="pageInfo">第 0/∞ 页</span>
+        </div>
+        <div id="feed"></div>
+        <div class="load-more" id="loadMore">
+            <span id="loadStatus">⬇️ 向下滚动加载更多</span>
+        </div>
+        <div id="sentinel"></div>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('♾️ 无限滚动演示:');
+        log('');
+
+        // ========== 模拟数据 ==========
+        const topics = [
+            'JavaScript 异步编程深入解析',
+            'CSS Grid 布局完全指南',
+            'React 18 新特性概览',
+            'TypeScript 类型体操进阶',
+            '前端性能优化实战',
+            'Node.js 事件循环详解',
+            'Webpack 5 模块联邦',
+            '浏览器渲染原理',
+            'Rust 在前端工具链中的应用',
+            '微前端架构设计与实践',
+            'WebAssembly 入门教程',
+            'Vue 3 Composition API 最佳实践',
+            'HTTP/3 与 QUIC 协议',
+            'Chrome DevTools 调试技巧',
+            '设计模式在前端的应用',
+            '函数式编程与柯里化',
+            'Web 安全之 XSS 与 CSRF',
+            'GraphQL 与 REST API 对比',
+            'Deno vs Node.js 下一代运行时',
+            '前端工程化与 Monorepo',
+        ];
+        const authors = ['张三', '李四', '王五', '赵六', '陈七', '刘八', '孙九', '周十'];
+        const categories = ['JavaScript', 'CSS', 'React', '工程化', 'Node.js', '安全', '架构'];
+
+        let posts = [];
+        let page = 0;
+        const PAGE_SIZE = 5;
+        let isLoading = false;
+        let hasMore = true;
+        let autoLoad = true;
+        let simulateErrorMode = false;
+        let observer = null;
+        let totalLoaded = 0;
+
+        // ========== 模拟 API 请求 ==========
+        function fetchPage(pageNum, size) {
+            return new Promise((resolve, reject) => {
+                setTimeout(() => {
+                    if (simulateErrorMode && Math.random() < 0.5) {
+                        reject(new Error('网络错误: 请求超时'));
+                        return;
+                    }
+                    const start = pageNum * size;
+                    const items = [];
+                    for (let i = 0; i < size; i++) {
+                        const idx = (start + i) % topics.length;
+                        const daysAgo = Math.floor(Math.random() * 30) + 1;
+                        const author = authors[Math.floor(Math.random() * authors.length)];
+                        const cat = categories[Math.floor(Math.random() * categories.length)];
+                        const views = Math.floor(Math.random() * 10000) + 100;
+                        items.push({
+                            id: `${pageNum}-${i}`,
+                            title: topics[idx],
+                            author,
+                            category: cat,
+                            date: `${daysAgo} 天前`,
+                            views,
+                            excerpt: `这是关于"${topics[idx]}"的一篇详细教程，涵盖了从入门到实战的核心知识点，适合 ${Math.random() > 0.5 ? '初学者' : '进阶开发者'} 阅读。`,
+                        });
+                    }
+                    resolve(items);
+                }, 600 + Math.random() * 400); // 模拟网络延迟
+            });
+        }
+
+        // ========== 渲染文章 ==========
+        function renderPosts(items) {
+            const feed = document.getElementById('feed');
+            items.forEach(post => {
+                const el = document.createElement('div');
+                el.className = 'post-item';
+                el.style.animation = 'fadeIn 0.3s ease';
+                el.innerHTML = `
+                    <div class="title">${post.title}</div>
+                    <div class="meta">
+                        <span>✍️ ${post.author}</span>
+                        <span>📂 ${post.category}</span>
+                        <span>📅 ${post.date}</span>
+                        <span>👁️ ${post.views.toLocaleString()}</span>
+                    </div>
+                    <div class="excerpt">${post.excerpt}</div>
+                `;
+                feed.appendChild(el);
+            });
+            totalLoaded += items.length;
+            document.getElementById('postCount').textContent = `已加载: ${totalLoaded} 篇`;
+            document.getElementById('pageInfo').textContent = `第 ${page} / ∞ 页`;
+        }
+
+        // ========== 加载更多 ==========
+        async function loadMore() {
+            if (isLoading || !hasMore) return;
+            if (!autoLoad) return;
+
+            isLoading = true;
+            document.getElementById('loadStatus').innerHTML = '<span class="spinner"></span>加载中...';
+
+            try {
+                const items = await fetchPage(page, PAGE_SIZE);
+                posts.push(...items);
+                renderPosts(items);
+                page++;
+                log(`📄 加载第 ${page} 页 (${items.length} 篇)`);
+                document.getElementById('loadStatus').textContent = '⬇️ 向下滚动加载更多';
+            } catch (err) {
+                log(`❌ 加载失败: ${err.message}`);
+                document.getElementById('loadStatus').innerHTML = `
+                    <span class="error">❌ ${err.message}</span>
+                    <button onclick="retryLoad()">重试</button>
+                `;
+            } finally {
+                isLoading = false;
+            }
+        }
+
+        async function retryLoad() {
+            document.getElementById('loadStatus').textContent = '🔄 重试中...';
+            await loadMore();
+        }
+
+        // ========== IntersectionObserver ==========
+        function initObserver() {
+            const sentinel = document.getElementById('sentinel');
+            observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting && autoLoad) {
+                        loadMore();
+                    }
+                });
+            }, { rootMargin: '100px' });
+            observer.observe(sentinel);
+        }
+
+        // ========== 控制 ==========
+        function toggleAutoLoad() {
+            autoLoad = !autoLoad;
+            document.getElementById('autoLoadToggle').textContent = autoLoad ? '⏸ 暂停自动加载' : '▶️ 恢复自动加载';
+            log(`🔄 自动加载: ${autoLoad ? '开启' : '暂停'}`);
+            if (autoLoad) loadMore();
+        }
+
+        function resetFeed() {
+            document.getElementById('feed').innerHTML = '';
+            posts = [];
+            page = 0;
+            totalLoaded = 0;
+            hasMore = true;
+            simulateErrorMode = false;
+            document.getElementById('postCount').textContent = '已加载: 0 篇';
+            document.getElementById('pageInfo').textContent = '第 0 / ∞ 页';
+            document.getElementById('loadStatus').textContent = '⬇️ 向下滚动加载更多';
+            log('↺ 已重置');
+            if (autoLoad) loadMore();
+        }
+
+        function simulateError() {
+            simulateErrorMode = !simulateErrorMode;
+            log(`⚠️ 错误模拟: ${simulateErrorMode ? '开启 (50% 概率失败)' : '关闭'}`);
+        }
+
+        // ========== 动画 ==========
+        const style = document.createElement('style');
+        style.textContent = `@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }`;
+        document.head.appendChild(style);
+
+        // ========== 初始化 ==========
+        initObserver();
+        // 首次加载
+        setTimeout(() => loadMore(), 300);
+        log('✅ 无限滚动就绪 (IntersectionObserver 触发)');
+    </script>
+</body>
+</html>

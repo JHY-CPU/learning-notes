@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 游标与动态SQL</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>➰ SQL 游标与动态 SQL</h2><p>游标概念与使用 (DECLARE/OPEN/FETCH/CLOSE)、游标循环、游标变量、动态 SQL (PREPARE/EXECUTE)、SQL 注入防范、应用场景与替代方案。</p></div>
+    <div class="card">
+        <h2>游标基础</h2>
+        <div class="code">// ========== 游标概念 ==========
+-- 游标: 逐行处理查询结果
+-- 类似程序中的迭代器
+
+-- 何时使用游标:
+-- 1. 需要对每一行执行复杂业务逻辑
+-- 2. 逐行计算无法用纯 SQL 表达
+-- 3. 调用外部系统 (每行触发 API)
+
+-- 尽量避免游标!
+-- 基于集合的 SQL 通常比游标快 10-100 倍
+-- 95% 的游标可以用更好的 SQL 替代
+
+-- ========== 游标生命周期 ==========
+-- 1. DECLARE cursor_name CURSOR FOR SELECT ...
+-- 2. OPEN cursor_name
+-- 3. FETCH cursor_name INTO variables
+-- 4. CLOSE cursor_name
+
+-- ========== MySQL 游标 ==========
+DELIMITER $$
+
+CREATE PROCEDURE process_orders()
+BEGIN
+    DECLARE done INT DEFAULT FALSE;
+    DECLARE v_order_id INT;
+    DECLARE v_user_id INT;
+    DECLARE v_amount DECIMAL(12,2);
+
+    -- 1. 声明游标
+    DECLARE cur CURSOR FOR
+        SELECT id, user_id, amount FROM orders WHERE status = 'pending';
+
+    -- 2. 声明 NOT FOUND 处理器
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+
+    -- 3. 打开游标
+    OPEN cur;
+
+    -- 4. 逐行处理
+    read_loop: LOOP
+        FETCH cur INTO v_order_id, v_user_id, v_amount;
+
+        IF done THEN
+            LEAVE read_loop;
+        END IF;
+
+        -- 业务逻辑: 给用户发通知
+        INSERT INTO notifications (user_id, message, related_id)
+        VALUES (v_user_id, CONCAT('订单 ', v_order_id, ' 需要处理'), v_order_id);
+    END LOOP;
+
+    -- 5. 关闭游标
+    CLOSE cur;
+END$$
+
+DELIMITER ;</div>
+    </div>
+    <div class="card">
+        <h2>游标进阶</h2>
+        <div class="code">// ========== 带参数的游标 ==========
+
+DELIMITER $$
+
+CREATE PROCEDURE process_department_orders(IN dept_id INT)
+BEGIN
+    DECLARE done INT DEFAULT FALSE;
+    DECLARE v_order_id INT;
+    DECLARE v_amount DECIMAL(12,2);
+
+    DECLARE cur CURSOR FOR
+        SELECT o.id, o.amount
+        FROM orders o
+        JOIN products p ON o.id = p.id  -- 示例关联
+        WHERE p.category_id = dept_id;
+
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+
+    OPEN cur;
+    -- ... 处理逻辑
+    CLOSE cur;
+END$$
+
+DELIMITER ;
+
+-- ========== 可更新游标 ==========
+-- MySQL: FOR UPDATE 可以锁定游标行
+
+DECLARE cur CURSOR FOR
+    SELECT id, quantity FROM inventory WHERE quantity < 10
+    FOR UPDATE;
+
+-- 在循环中:
+-- UPDATE inventory SET quantity = quantity + 100
+-- WHERE CURRENT OF cur;
+-- (MySQL 不支持 WHERE CURRENT OF,改用 id)
+
+-- ========== PostgreSQL 游标 ==========
+-- PostgreSQL 游标更灵活:
+
+-- DECLARE cur CURSOR FOR
+--     SELECT id, name FROM users FOR UPDATE;
+
+-- FETCH NEXT FROM cur;
+-- FETCH PRIOR FROM cur;
+-- FETCH FIRST FROM cur;
+-- FETCH LAST FROM cur;
+-- FETCH ABSOLUTE n FROM cur;
+-- FETCH RELATIVE n FROM cur;
+
+-- MOVE 游标位置 (不获取数据):
+-- MOVE FORWARD 5 FROM cur;</div>
+    </div>
+    <div class="card">
+        <h2>动态 SQL</h2>
+        <div class="code">// ========== 动态 SQL 概念 ==========
+-- 动态 SQL: 在运行时构建并执行 SQL
+-- 用途: 动态表名、动态条件、DDL 操作
+
+-- 风险: SQL 注入!
+-- 永远不要拼接用户输入!
+
+-- ========== MySQL 动态 SQL ==========
+
+-- 1. 基本 PREPARE/EXECUTE
+SET @sql = CONCAT('SELECT * FROM ', 'users', ' WHERE id = ?');
+PREPARE stmt FROM @sql;
+SET @id = 1;
+EXECUTE stmt USING @id;
+DEALLOCATE PREPARE stmt;
+
+-- 2. 存储过程中动态 SQL
+DELIMITER $$
+
+CREATE PROCEDURE search_products(
+    IN p_category VARCHAR(50),
+    IN p_min_price DECIMAL(10,2),
+    IN p_max_price DECIMAL(10,2)
+)
+BEGIN
+    SET @sql = 'SELECT * FROM products WHERE 1=1';
+
+    IF p_category IS NOT NULL THEN
+        SET @sql = CONCAT(@sql, ' AND category = ''', p_category, '''');
+    END IF;
+
+    IF p_min_price IS NOT NULL THEN
+        SET @sql = CONCAT(@sql, ' AND price >= ', p_min_price);
+    END IF;
+
+    IF p_max_price IS NOT NULL THEN
+        SET @sql = CONCAT(@sql, ' AND price <= ', p_max_price);
+    END IF;
+
+    PREPARE stmt FROM @sql;
+    EXECUTE stmt;
+    DEALLOCATE PREPARE stmt;
+END$$
+
+DELIMITER ;
+
+-- ⚠️ 注意: 上面字符串拼接存在 SQL 注入风险!
+-- 安全做法: 使用参数化查询
+
+-- ========== 安全动态 SQL ==========
+
+-- 使用参数化查询 (避免注入):
+SET @sql = 'SELECT * FROM products WHERE category = ? AND price BETWEEN ? AND ?';
+PREPARE stmt FROM @sql;
+SET @cat = 'Electronics';
+SET @min = 100;
+SET @max = 500;
+EXECUTE stmt USING @cat, @min, @max;
+DEALLOCATE PREPARE stmt;
+
+-- ========== PostgreSQL 动态 SQL ==========
+-- EXECUTE ... USING (安全方式)
+
+-- CREATE FUNCTION search_products(cat TEXT, min_price NUMERIC)
+-- RETURNS SETOF products AS $$
+-- BEGIN
+--     RETURN QUERY EXECUTE
+--         'SELECT * FROM products WHERE category = $1 AND price >= $2'
+--         USING cat, min_price;
+-- END;
+-- $$ LANGUAGE plpgsql;</div>
+    </div>
+    <div class="card">
+        <h2>SQL 注入防范</h2>
+        <div class="code">// ========== SQL 注入 ==========
+-- SQL 注入: 通过输入插入恶意 SQL
+
+-- ❌ 不安全 (字符串拼接):
+SET @input = "1' OR '1'='1";
+SET @sql = CONCAT('SELECT * FROM users WHERE id = ', @input);
+-- 实际执行: SELECT * FROM users WHERE id = 1' OR '1'='1
+-- 返回所有用户!
+
+-- ❌ 更危险:
+SET @input = "1; DROP TABLE users; --";
+SET @sql = CONCAT('SELECT * FROM users WHERE id = ', @input);
+-- 可能删除整张表!
+
+-- ✅ 安全: 参数化查询
+SET @sql = 'SELECT * FROM users WHERE id = ?';
+PREPARE stmt FROM @sql;
+SET @id = 1;
+EXECUTE stmt USING @id;
+
+-- ✅ 安全: 使用 QUOTE 函数 (MySQL)
+SET @safe_input = QUOTE("1' OR '1'='1");
+SET @sql = CONCAT('SELECT * FROM users WHERE id = ', @safe_input);
+-- QUOTE() 会转义特殊字符
+
+-- ========== 游标 vs 基于集合 ==========
+
+-- ❌ 游标 (慢):
+-- DECLARE cur CURSOR FOR SELECT id FROM orders;
+-- LOOP FETCH ... UPDATE orders SET ... WHERE id = v_id;
+
+-- ✅ 基于集合 (快 100 倍):
+-- UPDATE orders SET ... WHERE ...;
+
+-- 经验法则:
+-- 需要逐行处理? → 想想能不能用 JOIN/WINDOW 替代
+-- 实在不行? → 在应用层用 Python/Java 处理
+-- 再不行? → 才用游标</div>
+        <div class="note">💡 游标与动态 SQL: 游标逐行处理,通常比集合操作慢; 能不用就不用; 动态 SQL 用 PREPARE/EXECUTE; 永远用参数化查询防 SQL 注入; QUOTE() 函数转义字符串; 应用层处理逐行逻辑通常比游标好。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCursor()">游标演示</button>
+        <button onclick="demoDynamic()">动态 SQL 演示</button>
+        <button onclick="demoInject()">SQL 注入演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCursor() {
+            result.innerHTML = '';
+            log('# 游标');
+            log('');
+            log('DECLARE cur CURSOR FOR');
+            log('    SELECT id, name FROM users;');
+            log('DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;');
+            log('OPEN cur;');
+            log('FETCH cur INTO v_id, v_name;');
+            log('CLOSE cur;');
+            log('');
+            log('注意: 游标比集合操作慢很多!');
+        }
+
+        function demoDynamic() {
+            result.innerHTML = '';
+            log('# 动态 SQL');
+            log('');
+            log('SET @sql = "SELECT * FROM products WHERE price > ?";');
+            log('PREPARE stmt FROM @sql;');
+            log('SET @price = 100;');
+            log('EXECUTE stmt USING @price;');
+            log('DEALLOCATE PREPARE stmt;');
+            log('');
+            log('用途: 动态条件, 动态表名');
+            log('注意: 使用参数化查询防注入');
+        }
+
+        function demoInject() {
+            result.innerHTML = '';
+            log('# SQL 注入防范');
+            log('');
+            log('❌ 不安全:');
+            log("  CONCAT('SELECT * FROM users WHERE id = ', input)");
+            log('');
+            log('✅ 安全:');
+            log("  PREPARE stmt FROM 'SELECT * FROM users WHERE id = ?';");
+            log('  EXECUTE stmt USING @id;');
+            log('');
+            log('✅ QUOTE() 转义:');
+            log("  CONCAT('...WHERE id = ', QUOTE(input))");
+        }
+    </script>
+</body>
+</html>

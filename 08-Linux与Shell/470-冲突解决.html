@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>冲突解决</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚡ 冲突解决</h2><p>冲突产生原因、冲突标记、手动解决、合并工具、冲突预防策略。</p></div>
+    <div class="card">
+        <h2>冲突的产生</h2>
+        <div class="code">// ========== 什么时候产生冲突 ==========
+// 1. 两个分支修改了同一文件的同一区域
+// 2. 一个分支删除了文件,另一个分支修改了它
+// 3. 一个分支修改了文件,另一个分支重命名了它
+
+// 冲突不是错误——Git 不知道哪个版本正确
+// 需要你人工决定
+
+// ========== 冲突标记 ==========
+// Git 在冲突文件中插入标记:
+
+<<<<<<< HEAD                    # 当前分支的版本
+当前分支的内容
+=======                         # 分割线
+合并进来的内容
+>>>>>>> feature                 # 被合并分支的版本
+
+// ========== 冲突状态 ==========
+// 冲突中的文件状态:
+//   Unmerged paths:
+//     both modified:   src/app.js
+
+git status                      # 查看哪些文件有冲突
+git diff                        # 查看冲突的具体内容</div>
+    </div>
+    <div class="card">
+        <h2>解决冲突的步骤</h2>
+        <div class="code">// ========== 标准解决流程 ==========
+// 1. 查看冲突文件
+git status
+# both modified:   src/app.js
+
+// 2. 编辑冲突文件,手动解决
+//    可以选择:
+//    - 保留当前分支 (删掉 ==== 和 >>>>)
+//    - 保留合并分支 (删掉 <<<< 和 ====)
+//    - 合并两者内容
+
+// 3. 标记为已解决
+git add src/app.js
+
+// 4. 完成合并
+git commit
+
+// ========== 解决策略 ==========
+// 策略 1: 保留一方
+// 全部保留当前分支:
+// 删除 <<<<<<< HEAD, =======, >>>>>>> feature
+
+// 策略 2: 合并
+// 把两段逻辑合并,保留有用的部分
+
+// 策略 3: 使用工具
+git mergetool                    # 启动配置的合并工具
+
+// ========== 中止合并 ==========
+// 如果冲突太复杂,可以回退到合并前
+git merge --abort                # 回到合并前的状态
+
+// ========== 使用他人版本 ==========
+// 直接使用某方的版本 (不手动编辑)
+git checkout --ours file.txt     # 使用当前分支版本
+git checkout --theirs file.txt   # 使用合并分支版本
+git add file.txt                 # 标记已解决</div>
+    </div>
+    <div class="card">
+        <h2>合并工具 (mergetool)</h2>
+        <div class="code">// ========== 配置合并工具 ==========
+// vimdiff
+git config --global merge.tool vimdiff
+git config --global merge.conflictstyle diff3  # 显示共同祖先
+
+// 其他工具:
+git config --global merge.tool meld       # Meld (图形化)
+git config --global merge.tool kdiff3     # KDiff3
+git config --global merge.tool p4merge    # Perforce
+git config --global merge.tool beyondcompare  # Beyond Compare
+
+// ========== 使用 mergetool ==========
+git mergetool                      # 启动配置的工具
+
+// mergetool 打开后通常有 3 个面板:
+// LOCAL    - 当前分支的版本
+// BASE     - 共同祖先 (两个分支分叉前的版本)
+// REMOTE   - 被合并分支的版本
+// 中间面板 - 合并结果 (编辑这个)
+
+// 保存后关闭,mergetool 会问是否已解决
+// 然后自动 git add
+
+// ========== GUI 工具 ==========
+// IDE 内置:
+//   VSCode: 内置冲突解决编辑器 (3 路对比)
+//   IntelliJ: 内置冲突解决器
+//   GitKraken / Sourcetree: 图形化解决
+
+// VSCode 命令行:
+code --wait -d file.txt conflicted.txt  # 作为 diff 工具</div>
+    </div>
+    <div class="card">
+        <h2>冲突预防</h2>
+        <div class="code">// ========== 减少冲突的策略 ==========
+// 1. 经常合并主分支到功能分支
+git checkout feature
+git merge main                     # 经常 merge,避免积压
+
+// 2. 小批量提交,每次改动小
+// 3. 避免同时修改同一文件
+// 4. 使用 .gitattributes 设置 diff 驱动
+
+// ========== 保持分支同步 ==========
+// 推荐: 经常 rebase 或 merge 主分支
+
+// 方式 1: merge (保留分支分叉历史)
+git checkout feature
+git merge main     # 合并 main 到 feature
+
+// 方式 2: rebase (线性历史)
+git checkout feature
+git rebase main    # 将 feature 的提交"变基"到 main 顶部
+
+// ========== git rerere ==========
+// Reuse Recorded Resolution
+// 自动记录冲突解决方式,下次相同冲突自动应用
+git config --global rerere.enabled true
+
+// 启用后,Git 会自动记住并重放冲突解决
+
+// ========== .gitattributes — diff 驱动 ==========
+// 某些文件需要特殊的 diff 方式
+// .gitattributes:
+
+# 二进制文件用 diff 比较
+*.pdf diff=pdf
+
+# 避免自动换行转换
+*.sh text eol=lf
+*.bat text eol=crlf
+
+# 标记冲突更清晰
+*.java text diff=java
+*.js text diff=javascript
+*.py text diff=python
+
+// ========== 冲突类型实战 ==========
+// Example: 两个分支都修改了 config.yml
+// 分支 A: 改 port: 3000 → 4000
+// 分支 B: 改 host: localhost → 0.0.0.0
+// → 如果不同行,自动合并成功,无冲突!
+
+// 冲突只发生在:
+// 1. 同一文件同一区域
+// 2. 并且 Git 无法自动决定保留哪个版本</div>
+        <div class="note">💡 冲突不是坏事——它说明 Git 保护了你的代码不被错误覆盖。解决冲突的要点: 先 git status 看哪些文件冲突,打开冲突文件查找 <<<<<,理解双方意图后合并,git add 标记解决,git commit 完成合并。关键是不要慌——abort 按钮随时可用。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoConflict()">冲突演示</button>
+        <button onclick="demoResolve()">解决演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoConflict() {
+            result.innerHTML = '';
+            log('# Git 冲突演示');
+            log('');
+            log('文件 index.js 在两个分支都被修改:');
+            log('');
+            log('分支 main:');
+            log('  const greeting = "Hello World";');
+            log('');
+            log('分支 feature:');
+            log('  const greeting = "Hello GitHub";');
+            log('');
+            log('合并后冲突标记:');
+            log('  <<<<<<< HEAD');
+            log('  const greeting = "Hello World";');
+            log('  =======');
+            log('  const greeting = "Hello GitHub";');
+            log('  >>>>>>> feature');
+            log('');
+            log('$ git status');
+            log('  On branch main');
+            log('  You have unmerged paths:');
+            log('    both modified:   index.js');
+        }
+
+        function demoResolve() {
+            result.innerHTML = '';
+            log('# 冲突解决演示');
+            log('');
+            log('$ git status');
+            log('  both modified: src/config.js');
+            log('');
+            log('# 查看冲突:');
+            log('$ cat src/config.js');
+            log('  <<<<<<< HEAD');
+            log('  port: 3000');
+            log('  =======');
+            log('  port: 8080');
+            log('  >>>>>>> feature');
+            log('');
+            log('# 解决:');
+            log('  编辑为 port: 8080 (保留 feature 的版本)');
+            log('');
+            log('$ git add src/config.js');
+            log('$ git commit -m "fix: merge conflict in config"');
+            log('');
+            log('# 或使用工具:');
+            log('$ git mergetool');
+            log('  (打开配置的合并工具,可视化解决)');
+        }
+    </script>
+</body>
+</html>

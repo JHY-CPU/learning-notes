@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Flask模板与Jinja2</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🎨 Flask 模板与 Jinja2</h2><p>Jinja2 模板引擎语法（变量/过滤器/控制结构）、模板继承、静态文件处理、WTForms 表单定义与验证、flash 消息。</p></div>
+    <div class="card">
+        <h2>Jinja2 模板语法</h2>
+        <div class="code">// ========== Jinja2 基础语法 ==========
+// 分隔符:
+// {{ ... }} — 表达式 (变量输出)
+// {% ... %} — 控制语句 (if/for/block)
+// {# ... #} — 注释
+
+// ========== 传参到模板 ==========
+from flask import Flask, render_template
+app = Flask(__name__)
+
+@app.route("/")
+def index():
+    return render_template("index.html",
+        title="首页",
+        username="Alice",
+        items=["苹果", "香蕉", "橘子"]
+    )</div>
+        <div class="code">// ========== templates/index.html ==========
+// &lt;!DOCTYPE html&gt;
+// &lt;html&gt;
+// &lt;head&gt;
+//     &lt;title&gt;{{ title }}&lt;/title&gt;
+// &lt;/head&gt;
+// &lt;body&gt;
+//     &lt;h1&gt;欢迎, {{ username }}&lt;/h1&gt;
+//
+//     {# 条件判断 #}
+//     {% if items %}
+//         &lt;ul&gt;
+//         {% for item in items %}
+//             &lt;li&gt;{{ item }}&lt;/li&gt;
+//         {% endfor %}
+//         &lt;/ul&gt;
+//     {% else %}
+//         &lt;p&gt;列表为空&lt;/p&gt;
+//     {% endif %}
+// &lt;/body&gt;
+// &lt;/html&gt;</div>
+    </div>
+    <div class="card">
+        <h2>Jinja2 过滤器</h2>
+        <div class="code">// ========== 内置过滤器 ==========
+// 语法: {{ variable | filter }}
+// 链式: {{ variable | filter1 | filter2 }}
+
+// 字符串过滤器:
+// {{ "hello" | upper }}          → HELLO
+// {{ "HELLO" | lower }}          → hello
+// {{ "hello world" | title }}    → Hello World
+// {{ " hello " | trim }}         → hello
+// {{ "hello" | reverse }}        → olleh
+
+// 列表过滤器:
+// {{ [1, 2, 3] | first }}        → 1
+// {{ [1, 2, 3] | last }}         → 3
+// {{ [3, 1, 2] | sort }}         → [1, 2, 3]
+// {{ [1, 2, 3] | length }}       → 3
+// {{ [1, 2, 3] | join(", ") }}   → "1, 2, 3"
+// {{ [1, 1, 2] | unique }}       → [1, 2]
+
+// 数字过滤器:
+// {{ 3.14159 | round(2) }}        → 3.14
+// {{ 42 | abs }}                  → 42
+
+// 默认值:
+// {{ name | default("游客") }}
+
+// HTML 转义 (安全):
+// {{ "<script>" | escape }}      → &amp;lt;script&amp;gt;
+// {{ "<b>bold</b>" | safe }}     → <b>bold</b> (不转义)
+
+// 自定义过滤器:
+@app.template_filter("reverse")
+def reverse_filter(s):
+    return s[::-1]
+
+// 模板中使用: {{ "hello" | reverse }} → olleh</div>
+    </div>
+    <div class="card">
+        <h2>模板继承</h2>
+        <div class="code">// ========== 模板继承 ==========
+// base.html — 父模板:
+// &lt;!DOCTYPE html&gt;
+// &lt;html&gt;
+// &lt;head&gt;
+//     {% block head %}
+//     &lt;meta charset="UTF-8"&gt;
+//     &lt;title&gt;{% block title %}默认标题{% endblock %}&lt;/title&gt;
+//     &lt;link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}"&gt;
+//     {% endblock %}
+// &lt;/head&gt;
+// &lt;body&gt;
+//     &lt;nav&gt;
+//         &lt;a href="/"&gt;首页&lt;/a&gt;
+//         &lt;a href="/about"&gt;关于&lt;/a&gt;
+//     &lt;/nav&gt;
+//
+//     &lt;main&gt;
+//     {% block content %}{% endblock %}
+//     &lt;/main&gt;
+//
+//     {% block footer %}
+//     &lt;footer&gt;© 2024&lt;/footer&gt;
+//     {% endblock %}
+// &lt;/body&gt;
+// &lt;/html&gt;
+
+// page.html — 子模板:
+// {% extends "base.html" %}
+//
+// {% block title %}关于我们{% endblock %}
+//
+// {% block content %}
+// &lt;h1&gt;关于页面&lt;/h1&gt;
+// &lt;p&gt;这里是内容&lt;/p&gt;
+// {% endblock %}
+//
+// {% block footer %}
+//     {{ super() }}  {# 保留父模板内容 #}
+//     &lt;p&gt;额外页脚信息&lt;/p&gt;
+// {% endblock %}</div>
+    </div>
+    <div class="card">
+        <h2>静态文件</h2>
+        <div class="code">// ========== 静态文件 ==========
+// 默认文件夹: static/
+// project/
+// ├── app.py
+// ├── templates/
+// └── static/
+//     ├── css/style.css
+//     ├── js/app.js
+//     └── images/logo.png
+
+// 在模板中引用:
+// &lt;link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}"&gt;
+// &lt;script src="{{ url_for('static', filename='js/app.js') }}"&gt;&lt;/script&gt;
+// &lt;img src="{{ url_for('static', filename='images/logo.png') }}" alt="Logo"&gt;
+
+// 静态文件版本控制:
+// {{ url_for('static', filename='css/style.css', v=1.0) }}
+// → /static/css/style.css?v=1.0
+
+// ========== 包含其他模板 ==========
+// {% include "header.html" %}
+// {% include "footer.html" ignore missing %}
+
+// ========== 宏 (类似函数) ==========
+// {% macro input(name, label, type="text") %}
+//     &lt;label for="{{ name }}"&gt;{{ label }}&lt;/label&gt;
+//     &lt;input type="{{ type }}" name="{{ name }}" id="{{ name }}"&gt;
+// {% endmacro %}
+
+// 使用:
+// {{ input("username", "用户名") }}
+// {{ input("password", "密码", type="password") }}
+
+// 导入宏:
+// {% from "forms.html" import input %}</div>
+    </div>
+    <div class="card">
+        <h2>WTForms 表单</h2>
+        <div class="code">// ========== Flask-WTF 表单 ==========
+// 安装: pip install flask-wtf
+
+from flask_wtf import FlaskForm
+from wtforms import StringField, PasswordField, IntegerField, SelectField
+from wtforms.validators import DataRequired, Email, Length, NumberRange
+
+class RegisterForm(FlaskForm):
+    username = StringField("用户名",
+        validators=[DataRequired(), Length(min=3, max=20)])
+    email = StringField("邮箱",
+        validators=[DataRequired(), Email()])
+    age = IntegerField("年龄",
+        validators=[NumberRange(min=0, max=150)])
+    password = PasswordField("密码",
+        validators=[Length(min=6)])
+    role = SelectField("角色",
+        choices=[("user", "用户"), ("admin", "管理员")])
+
+// ========== 在视图使用 ==========
+from flask import render_template, redirect, url_for, flash
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    form = RegisterForm()
+    if form.validate_on_submit():
+        # 验证通过,获取数据
+        username = form.username.data
+        email = form.email.data
+        # 保存到数据库...
+        flash("注册成功!", "success")
+        return redirect(url_for("index"))
+    return render_template("register.html", form=form)
+
+// ========== 模板中渲染 ==========
+// &lt;form method="POST"&gt;
+//     {{ form.hidden_tag() }}
+//
+//     &lt;p&gt;
+//     {{ form.username.label }}&lt;br&gt;
+//     {{ form.username(size=20) }}&lt;br&gt;
+//     {% for error in form.username.errors %}
+//         &lt;span style="color:red"&gt;{{ error }}&lt;/span&gt;
+//     {% endfor %}
+//     &lt;/p&gt;
+//
+//     {{ form.submit() }}
+// &lt;/form&gt;
+
+// ========== flash 消息 ==========
+from flask import flash
+
+flash("操作成功!", "success")      # 类别: success/info/warning/error
+flash("请检查输入", "warning")
+
+// 模板中显示:
+// {% with messages = get_flashed_messages(with_categories=true) %}
+//   {% if messages %}
+//     {% for category, message in messages %}
+//       &lt;div class="alert alert-{{ category }}"&gt;
+//         {{ message }}
+//       &lt;/div&gt;
+//     {% endfor %}
+//   {% endif %}
+// {% endwith %}</div>
+        <div class="note">💡 模板与表单要点: (1) {{ var }} 输出,{% %} 控制; (2) 过滤器用 | 链式调用: {{ name | upper | trim }}; (3) {% extends "base" %} + {% block %} 模板继承; (4) WTForms 定义表单,validate_on_submit() 验证; (5) flash + get_flashed_messages 消息闪现。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoTemplate()">模板演示</button>
+        <button onclick="demoForm()">表单演示</button>
+        <button onclick="demoFlash()">flash 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoTemplate() {
+            result.innerHTML = '';
+            log('# Jinja2 演示');
+            log('');
+            log('变量: {{ username }}');
+            log('过滤器: {{ "hello" | upper }} → HELLO');
+            log('条件: {% if user %} ... {% endif %}');
+            log('循环: {% for item in items %} ... {% endfor %}');
+            log('');
+            log('继承:');
+            log('  {% extends "base.html" %}');
+            log('  {% block content %} ... {% endblock %}');
+            log('  {{ super() }} 保留父模板内容');
+        }
+
+        function demoForm() {
+            result.innerHTML = '';
+            log('# WTForms 演示');
+            log('');
+            log('class RegisterForm(FlaskForm):');
+            log('    username = StringField("用户名",');
+            log('        validators=[DataRequired()])');
+            log('    email = StringField("邮箱",');
+            log('        validators=[Email()])');
+            log('');
+            log('验证:');
+            log('  form.validate_on_submit()');
+            log('  form.username.data');
+            log('  form.username.errors');
+            log('');
+            log('常用验证器:');
+            log('  DataRequired / Email / Length / NumberRange');
+        }
+
+        function demoFlash() {
+            result.innerHTML = '';
+            log('# flash 消息演示');
+            log('');
+            log('flash("成功!", "success")');
+            log('flash("警告!", "warning")');
+            log('flash("错误!", "error")');
+            log('');
+            log('模板中获取:');
+            log('  {% with messages =');
+            log('    get_flashed_messages(with_categories=true) %}');
+            log('    ...');
+            log('  {% endwith %}');
+        }
+    </script>
+</body>
+</html>

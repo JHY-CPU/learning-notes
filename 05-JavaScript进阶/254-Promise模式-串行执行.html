@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Promise模式-串行执行</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #serial-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Promise 模式 — 串行执行</h2><p>Promise 串行 reduce、forEach 串行、串行与并行混合。</p></div>
+    <div class="card">
+        <h2>串行执行实现</h2>
+        <div class="code">// ========== reduce 串行 ==========
+const tasks = [task1, task2, task3];
+const result = await tasks.reduce((prev, task) => {
+    return prev.then(task);
+}, Promise.resolve());
+
+// 简写
+const result = await tasks.reduce(
+    (prev, task) => prev.then(task),
+    Promise.resolve()
+);
+
+// ========== async/await 串行 ==========
+async function runSerial(tasks) {
+    const results = [];
+    for (const task of tasks) {
+        results.push(await task());
+    }
+    return results;
+}
+
+// ========== for...of 串行 ==========
+async function serialForOf(tasks) {
+    const results = [];
+    for (const task of tasks) {
+        const result = await task;
+        results.push(result);
+    }
+    return results;
+}
+
+// ========== 串行与并行混合 ==========
+// 分阶段执行: 阶段1串行, 阶段2并行
+const step1 = await taskA();              // 串行
+const step2 = await taskB(step1);         // 串行
+const [a, b, c] = await Promise.all([    // 并行
+    taskC(step2),
+    taskD(step2),
+    taskE(step2),
+]);</div>
+    </div>
+    <div class="card">
+        <h2>演示：串行执行</h2>
+        <button onclick="demoSerial()">串行执行 reduce</button>
+        <button onclick="demoMixed()">串行+并行混合</button>
+        <div id="serial-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const serialResult = document.getElementById('serial-result');
+
+        function log(msg) {
+            serialResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function createAsyncTask(name, value, delay = 400) {
+            return async () => {
+                log(`   🔄 ${name} 开始...`);
+                await new Promise(r => setTimeout(r, delay));
+                log(`   ✅ ${name} → ${value}`);
+                return value;
+            };
+        }
+
+        async function demoSerial() {
+            serialResult.innerHTML = '';
+            log('🔗 串行执行 (reduce 模式):');
+            log('');
+
+            const tasks = [
+                createAsyncTask('任务 A', 10),
+                createAsyncTask('任务 B', 20),
+                createAsyncTask('任务 C', 30),
+            ];
+
+            const start = performance.now();
+
+            // reduce 串行，传递累积值
+            const finalResult = await tasks.reduce((prev, task) => {
+                return prev.then(acc => {
+                    return task().then(result => acc + result);
+                });
+            }, Promise.resolve(0));
+
+            const elapsed = ((performance.now() - start) / 1000).toFixed(1);
+            log(`\n📊 最终累积结果: ${finalResult}`);
+            log(`⏱️ 总耗时: ${elapsed}s (3个任务串行)`);
+            log('');
+            log('📌 串行特点:');
+            log('   • 按顺序执行，前一个完成后执行下一个');
+            log('   • 总耗时 = 各任务耗时之和');
+            log('   • 适合有依赖关系的任务');
+        }
+
+        async function demoMixed() {
+            serialResult.innerHTML = '';
+            log('🔀 串行+并行混合模式:');
+            log('');
+
+            // 模拟: 先获取用户信息（串行），再并行加载相关内容
+            async function fetchUser() {
+                log('   📡 获取用户信息...');
+                await new Promise(r => setTimeout(r, 300));
+                log('   ✅ 用户信息获取完成');
+                return { id: 1, name: 'Alice' };
+            }
+
+            async function fetchPosts(userId) {
+                log(`   📡 获取用户 ${userId} 的帖子...`);
+                await new Promise(r => setTimeout(r, 500));
+                log('   ✅ 帖子获取完成');
+                return ['帖子1', '帖子2'];
+            }
+
+            async function fetchFriends(userId) {
+                log(`   📡 获取用户 ${userId} 的好友...`);
+                await new Promise(r => setTimeout(r, 400));
+                log('   ✅ 好友获取完成');
+                return ['Bob', 'Charlie'];
+            }
+
+            async function fetchSettings(userId) {
+                log(`   📡 获取用户 ${userId} 的设置...`);
+                await new Promise(r => setTimeout(r, 350));
+                log('   ✅ 设置获取完成');
+                return { theme: 'dark' };
+            }
+
+            const start = performance.now();
+
+            // 阶段1: 串行 — 先获取用户
+            const user = await fetchUser();
+
+            // 阶段2: 并行 — 同时获取不依赖的数据
+            const [posts, friends, settings] = await Promise.all([
+                fetchPosts(user.id),
+                fetchFriends(user.id),
+                fetchSettings(user.id),
+            ]);
+
+            const elapsed = ((performance.now() - start) / 1000).toFixed(1);
+
+            log(`\n📊 用户: ${user.name}`);
+            log(`📊 帖子: ${posts.join(', ')}`);
+            log(`📊 好友: ${friends.join(', ')}`);
+            log(`📊 设置: ${JSON.stringify(settings)}`);
+            log(`⏱️ 总耗时: ${elapsed}s`);
+            log('');
+            log('📌 混合模式优势:');
+            log('   • 串行保证依赖顺序');
+            log('   • 并行最大化吞吐');
+            log('   • 整体最优性能');
+        }
+
+        console.log('=== Promise 模式: 串行执行 ===');
+
+        document.getElementById('output').textContent =
+            `Promise 串行执行: reduce 串行 / for...of / 串行并行混合\n` +
+            `依赖任务串行 / 独立任务并行 / 性能最优\n` +
+            `✅ Promise 串行执行演示完成！`;
+    </script>
+</body>
+</html>

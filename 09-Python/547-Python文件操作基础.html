@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python文件操作基础</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📁 Python 文件操作基础</h2><p>open() 函数与文件模式、read/readline/readlines、write/writelines、文件指针 tell/seek、文本 vs 二进制模式、编码处理 encoding。</p></div>
+    <div class="card">
+        <h2>open() 与文件模式</h2>
+        <div class="code">// ========== open() 基本语法 ==========
+// open(filename, mode, encoding)
+
+// 常用模式:
+// "r"   — 只读 (默认)
+// "w"   — 写入 (覆盖)
+// "a"   — 追加
+// "x"   — 创建新文件 (文件已存在则报错)
+// "b"   — 二进制模式 (rb, wb, ab)
+// "+"   — 读写 (r+, w+, a+, x+)
+
+// 基本读取:
+f = open("example.txt", "r", encoding="utf-8")
+content = f.read()             # 读取全部内容
+f.close()                      # 必须关闭!
+
+// 最佳实践: 用 with 自动关闭 (详见 548)
+with open("example.txt", "r", encoding="utf-8") as f:
+    content = f.read()          # with 块结束自动关闭
+
+// ========== 写入模式 ==========
+# "w" 模式: 覆盖写入
+with open("output.txt", "w", encoding="utf-8") as f:
+    f.write("Hello, World!\n")
+    f.write("第二行\n")
+
+# "a" 模式: 追加写入
+with open("output.txt", "a", encoding="utf-8") as f:
+    f.write("追加的内容\n")
+
+# "x" 模式: 排他创建
+try:
+    with open("new.txt", "x", encoding="utf-8") as f:
+        f.write("新文件")
+except FileExistsError:
+    print("文件已存在!")
+
+// ========== 文件打开模式组合 ==========
+// r   — 只读 (默认),文件必须存在
+// r+  — 读写,文件必须存在,指针在开头
+// w   — 只写,覆盖,文件不存在则创建
+// w+  — 读写,覆盖,文件不存在则创建
+// a   — 追加,文件不存在则创建
+// a+  — 读写追加,文件不存在则创建
+// x   — 创建新文件,文件存在报错
+// x+  — 创建新文件读写,文件存在报错
+
+// rb  — 二进制只读
+// wb  — 二进制写入
+// ab  — 二进制追加</div>
+    </div>
+    <div class="card">
+        <h2>读取文件方法</h2>
+        <div class="code">// ========== 读取方法对比 ==========
+// 假设文件内容:
+// line 1
+// line 2
+// line 3
+
+// 1. read() — 读取全部
+with open("file.txt", encoding="utf-8") as f:
+    content = f.read()          # "line 1\nline 2\nline 3\n"
+    print(repr(content))
+
+// 2. read(n) — 读取 n 个字符
+with open("file.txt", encoding="utf-8") as f:
+    chunk = f.read(5)           # "line "
+    print(repr(chunk))
+
+// 3. readline() — 读取一行
+with open("file.txt", encoding="utf-8") as f:
+    line1 = f.readline()        # "line 1\n" (包含换行符)
+    line2 = f.readline()        # "line 2\n"
+    print(repr(line1))
+
+// 4. readlines() — 读取所有行到列表
+with open("file.txt", encoding="utf-8") as f:
+    lines = f.readlines()       # ["line 1\n", "line 2\n", "line 3\n"]
+    print(lines)
+
+// 5. 迭代方式 — 最推荐!(省内存)
+with open("file.txt", encoding="utf-8") as f:
+    for line in f:              # 逐行读取,不会全部加载到内存
+        print(line.strip())     # 去掉换行符
+
+// ========== 大文件处理 ==========
+// 大文件不能用 read() 或 readlines()!
+// 会占用大量内存
+
+// ✅ 正确: 逐行迭代
+def process_large_file(filename):
+    with open(filename, encoding="utf-8") as f:
+        for lineno, line in enumerate(f, 1):
+            # 每次只处理一行
+            process_line(lineno, line.strip())
+
+// ✅ 分块读取 (二进制文件)
+def read_in_chunks(filename, chunk_size=1024):
+    with open(filename, "rb") as f:
+        while True:
+            chunk = f.read(chunk_size)
+            if not chunk:       # 读完
+                break
+            process_chunk(chunk)</div>
+    </div>
+    <div class="card">
+        <h2>文件指针: tell() 和 seek()</h2>
+        <div class="code">// ========== 文件指针 ==========
+// 文件就像磁带: 有一个位置指针
+// tell() — 当前指针位置
+// seek() — 移动指针
+
+// ========== tell() ==========
+with open("file.txt", "w", encoding="utf-8") as f:
+    print(f.tell())             # 0 (开头)
+
+    f.write("Hello")
+    print(f.tell())             # 5
+
+    f.write(" World")
+    print(f.tell())             # 11
+
+// ========== seek() ==========
+// seek(offset, whence)
+// whence: 0=文件开头, 1=当前位置, 2=文件末尾
+
+with open("file.txt", "w+", encoding="utf-8") as f:
+    f.write("0123456789")
+
+    f.seek(0)                   # 回到开头
+    print(f.read(3))            # "012"
+
+    f.seek(5)                   # 从开头偏移 5
+    print(f.read(3))            # "567"
+
+    f.seek(0, 2)                # 移到末尾
+    print(f.tell())             # 10
+
+    f.seek(-3, 2)               # 从末尾往前 3
+    print(f.read())             # "789"
+
+// ========== 实际应用 ==========
+// 读取文件最后 N 行:
+def tail(filename, n=10):
+    """类似 Unix tail 命令"""
+    with open(filename, "rb") as f:
+        # 移到末尾
+        f.seek(0, 2)
+        pos = f.tell()
+        lines = []
+
+        # 从后往前读
+        while len(lines) < n and pos > 0:
+            # 一次往前读 1024 字节
+            chunk_size = min(1024, pos)
+            pos -= chunk_size
+            f.seek(pos)
+            chunk = f.read(chunk_size)
+
+            # 处理这个块
+            lines_in_chunk = chunk.count(b"\n")
+            # ... (简化版)
+
+        return lines[-n:]
+
+// 注意: 文本模式下 seek() 有限制
+// 二进制模式更灵活</div>
+    </div>
+    <div class="card">
+        <h2>文本 vs 二进制模式</h2>
+        <div class="code">// ========== 文本模式 ==========
+// "r", "w", "a" 等默认为文本模式
+// - 自动处理编码 (encoding)
+// - 自动转换换行符 (\n 与 \r\n)
+
+with open("text.txt", "w", encoding="utf-8") as f:
+    f.write("Hello\nWorld\n")   # 自动处理换行
+
+with open("text.txt", "r", encoding="utf-8") as f:
+    data = f.read()             # 返回 str
+
+// ========== 二进制模式 ==========
+// "rb", "wb", "ab" 等
+// - 不处理编码,返回 bytes
+// - 不转换换行符
+
+with open("binary.bin", "wb") as f:
+    f.write(b"Hello\nWorld\n")  # 写入 bytes
+
+with open("binary.bin", "rb") as f:
+    data = f.read()             # 返回 bytes
+    print(data)                 # b"Hello\nWorld\n"
+
+// ========== 何时用二进制 ==========
+// 1. 图片/音频/视频文件
+with open("image.png", "rb") as f:
+    img_data = f.read()
+
+// 2. pickle 序列化
+import pickle
+data = {"key": "value"}
+with open("data.pkl", "wb") as f:
+    pickle.dump(data, f)
+
+with open("data.pkl", "rb") as f:
+    loaded = pickle.load(f)
+
+// 3. 文件复制 (避免编码问题)
+def copy_file(src, dst):
+    with open(src, "rb") as fin:
+        with open(dst, "wb") as fout:
+            while True:
+                chunk = fin.read(8192)  # 8KB 块
+                if not chunk:
+                    break
+                fout.write(chunk)
+
+// ========== 编码问题 ==========
+// 未知编码时用 errors 参数处理
+# 忽略错误:
+with open("file.txt", "r", encoding="utf-8", errors="ignore") as f:
+    pass
+
+# 替换错误字符:
+with open("file.txt", "r", encoding="utf-8", errors="replace") as f:
+    pass
+
+# 二进制模式避开编码问题:
+with open("file.txt", "rb") as f:
+    raw = f.read()
+    text = raw.decode("utf-8", errors="replace")</div>
+        <div class="note">💡 文件操作要点: (1) 始终用 with open() 自动关闭文件; (2) 大文件用 for line in f 逐行迭代; (3) tell()/seek() 控制文件指针,二进制模式更灵活; (4) 文本模式自动处理编码和换行,二进制模式返回 bytes; (5) 写文件用 "w" 覆盖,"a" 追加,"x" 排他创建。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoFile()">文件操作演示</button>
+        <button onclick="demoSeek()">seek/tell 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoFile() {
+            result.innerHTML = '';
+            log('# 文件操作演示 (模拟)');
+            log('');
+            log('读取文件:');
+            log('  with open("f.txt", "r") as f:');
+            log('      content = f.read()     # 全部');
+            log('      for line in f:         # 逐行(推荐)');
+            log('          print(line.strip())');
+            log('');
+            log('写入文件:');
+            log('  with open("f.txt", "w") as f:');
+            log('      f.write("Hello\\n")');
+            log('      f.writelines(lines)    # 写多行');
+            log('');
+            log('模式:');
+            log('  r=只读 w=覆盖 a=追加');
+            log('  b=二进制 +=读写 x=排他');
+            log('');
+            log('大文件用逐行迭代,别用 read()!');
+        }
+
+        function demoSeek() {
+            result.innerHTML = '';
+            log('# 文件指针演示');
+            log('');
+            log('with open("f.txt", "w+") as f:');
+            log('    f.write("0123456789")');
+            log('    f.tell() → 10');
+            log('    f.seek(0) → 回到开头');
+            log('    f.read(3) → "012"');
+            log('    f.seek(5) → 偏移到 5');
+            log('    f.read(2) → "56"');
+            log('    f.seek(0, 2) → 末尾');
+            log('    f.seek(-3, 2) → 末尾前3');
+            log('    f.read() → "789"');
+            log('');
+            log('seek(offset, whence):');
+            log('  whence=0: 开头 (默认)');
+            log('  whence=1: 当前位置');
+            log('  whence=2: 末尾');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSP安全策略</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        .csp-demo { background: #f8f9fa; border: 1px solid #ddd; border-radius: 4px; padding: 12px; margin: 10px 0; font-family: monospace; font-size: 12px; line-height: 1.5; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>CSP 安全策略</h2><p>Content-Security-Policy 指令、script-src/style-src/img-src、report-only。</p></div>
+    <div class="card">
+        <h2>CSP API</h2>
+        <div class="code">// ========== HTTP 头 ==========
+Content-Security-Policy: default-src 'self';
+    script-src 'self' https://cdn.example.com;
+    style-src 'self' 'unsafe-inline';
+    img-src 'self' data: https:;
+    connect-src 'self' https://api.example.com;
+    font-src 'self' https://fonts.gstatic.com;
+    frame-src 'none';
+    object-src 'none';
+
+// ========== meta 标签 ==========
+<meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'">
+
+// ========== 报告模式 ==========
+Content-Security-Policy-Report-Only: default-src 'self';
+    report-uri /csp-report;</div>
+    </div>
+    <div class="card">
+        <h2>演示：CSP</h2>
+        <button onclick="demoDirectives()">CSP 指令</button>
+        <button onclick="demoSources()">源列表</button>
+        <button onclick="demoNonce()">Nonce 与 Hash</button>
+        <button onclick="demoReport()">报告模式</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoDirectives() {
+            result.innerHTML = '';
+            log('📋 CSP 指令:');
+            log('');
+
+            log('1️⃣ 资源控制指令:');
+            log('   default-src     — 默认源 (所有资源的 fallback)');
+            log('   script-src      — 脚本源');
+            log('   style-src       — 样式源');
+            log('   img-src         — 图片源');
+            log('   font-src        — 字体源');
+            log('   connect-src     — 连接源 (fetch/XHR/WebSocket)');
+            log('   media-src       — 媒体源 (audio/video)');
+            log('   object-src      — 插件源 (Flash/Java)');
+            log('   frame-src       — 框架源 (iframe)');
+            log('   worker-src      — Web Worker 源');
+            log('   manifest-src    — Manifest 源');
+            log('');
+
+            log('2️⃣ 文档控制指令:');
+            log('   base-uri        — <base> 限制');
+            log('   form-action     — 表单提交目标');
+            log('   frame-ancestors — 嵌入限制 (X-Frame-Options)');
+            log('   navigate-to     — 导航限制');
+            log('');
+
+            log('3️⃣ 其他指令:');
+            log('   report-uri      — 违规报告地址');
+            log('   report-to       — Reporting API (新版)');
+            log('   upgrade-insecure-requests — 升级 HTTP→HTTPS');
+            log('   block-all-mixed-content   — 阻止混合内容');
+            log('');
+
+            log('4️⃣ 完整示例:');
+            log('   Content-Security-Policy:');
+            log('     default-src \'self\';');
+            log('     script-src \'self\' \'unsafe-inline\'');
+            log('                https://analytics.google.com;');
+            log('     style-src \'self\' \'unsafe-inline\';');
+            log('     img-src \'self\' data: https:;');
+            log('     font-src https://fonts.gstatic.com;');
+            log('     connect-src \'self\' https://api.myapp.com;');
+            log('     frame-ancestors \'none\';');
+            log('     form-action \'self\';');
+            log('     base-uri \'self\';');
+        }
+
+        function demoSources() {
+            result.innerHTML = '';
+            log('🎯 CSP 源列表:');
+            log('');
+
+            log('1️⃣ 关键字源:');
+            log('   \'self\'          — 同源 (协议+域名+端口)');
+            log('   \'none\'          — 禁止任何源');
+            log('   \'strict-dynamic\' — 信任动态加载的脚本');
+            log('');
+
+            log('2️⃣ unsafe 关键字:');
+            log('   \'unsafe-inline\'  — 允许内联代码 (不推荐)');
+            log('   \'unsafe-eval\'    — 允许 eval() (不推荐)');
+            log('   \'unsafe-hashes\'  — 允许特定内联事件处理');
+            log('   \'wasm-unsafe-eval\' — 允许 WASM 编译');
+            log('');
+
+            log('3️⃣ URL 模式:');
+            log('   https://example.com     — 精确域名');
+            log('   https://*.example.com  — 子域名通配');
+            log('   https://               — 所有 HTTPS');
+            log('   data:                  — data: URL');
+            log('   blob:                  — blob: URL');
+            log('');
+
+            log('4️⃣ Nonce (一次性令牌):');
+            log('   Content-Security-Policy: script-src \'nonce-abc123\'');
+            log('   <script nonce="abc123">alert("ok")</script>');
+            log('');
+
+            log('5️⃣ Hash (脚本摘要):');
+            log('   // 计算脚本的 SHA-256/384/512');
+            log('   Content-Security-Policy:');
+            log('     script-src \'sha256-abc123def...\'');
+            log('');
+
+            log('6️⃣ 严格 CSP 推荐:');
+            log('   script-src \'nonce-{random}\' \'strict-dynamic\';');
+            log('   object-src \'none\';');
+            log('   base-uri \'self\';');
+            log('   优点: 无需 \'unsafe-inline\', 安全性高');
+        }
+
+        function demoNonce() {
+            result.innerHTML = '';
+            log('🔐 Nonce 与 Hash:');
+            log('');
+
+            log('1️⃣ Nonce (number used once):');
+            log('   服务器每次生成随机值');
+            log('   只有带正确 nonce 的脚本可执行');
+            log('');
+
+            log('2️⃣ Nonce 实现:');
+            log('   // 服务端生成随机 nonce');
+            log('   const nonce = crypto.randomBytes(16).toString("hex");');
+            log('');
+            log('   // CSP 头');
+            log('   Content-Security-Policy:');
+            log('     script-src \'nonce-\' + nonce + \' \'strict-dynamic\';');
+            log('');
+            log('   // HTML');
+            log('   <script nonce="' + nonce + '">');
+            log('     console.log("这个脚本被信任");');
+            log('   </script>');
+            log('');
+
+            log('3️⃣ Nonce 安全要求:');
+            log('   • 每次请求生成新的 nonce');
+            log('   • 不可预测 (密码学安全随机)');
+            log('   • 足够长度 (至少 128 位)');
+            log('   • 不在页面其他地方泄露');
+            log('');
+
+            log('4️⃣ Hash 方式:');
+            log('   // 先计算脚本的 hash, 加入 CSP');
+            log('   // script content: alert("hello");');
+            log('   // SHA-256: a3b5c7d9e1f2...');
+            log('   Content-Security-Policy:');
+            log('     script-src \'sha256-a3b5c7d9e1f2...\'');
+            log('');
+
+            log('5️⃣ Hash 适用场景:');
+            log('   • 内联脚本不变化 (固定代码)');
+            log('   • 第三方小部件 (固定代码段)');
+            log('   • 不适用动态生成的脚本');
+            log('');
+
+            log('6️⃣ strict-dynamic:');
+            log('   信任由已信任脚本动态加载的脚本');
+            log('   会自动忽略 URL 白名单');
+            log('   需配合 nonce 或 hash 使用');
+        }
+
+        function demoReport() {
+            result.innerHTML = '';
+            log('📊 CSP 报告模式:');
+            log('');
+
+            log('1️⃣ Report-Only 模式:');
+            log('   Content-Security-Policy-Report-Only:');
+            log('     default-src \'self\';');
+            log('     report-uri /csp-violation-report');
+            log('');
+            log('   仅报告违规，不阻止执行');
+            log('   用于测试和迁移');
+            log('');
+
+            log('2️⃣ 违规报告格式:');
+            log('   {');
+            log('     "csp-report": {');
+            log('       "document-uri": "https://example.com/page",');
+            log('       "referrer": "https://evil.com/",');
+            log('       "blocked-uri": "https://evil.com/script.js",');
+            log('       "violated-directive": "script-src \'self\'",');
+            log('       "original-policy": "script-src \'self\';...",');
+            log('       "source-file": "https://example.com/page",');
+            log('       "line-number": 42,');
+            log('       "column-number": 10,');
+            log('       "disposition": "report"');
+            log('     }');
+            log('   }');
+            log('');
+
+            log('3️⃣ report-to (Reporting API):');
+            log('   Content-Security-Policy: ...;');
+            log('     report-to csp-endpoint;');
+            log('');
+            log('   Report-To: {');
+            log('     "group": "csp-endpoint",');
+            log('     "max_age": 10886400,');
+            log('     "endpoints": [{');
+            log('       "url": "https://report.example.com/csp"');
+            log('     }]');
+            log('   }');
+            log('');
+
+            log('4️⃣ 部署建议:');
+            log('   ① Report-Only 模式收集违规');
+            log('   ② 修复所有违规后再开启强制模式');
+            log('   ③ 逐步收紧策略');
+            log('   ④ 设置监控和告警');
+            log('');
+
+            log('5️⃣ 常见问题:');
+            log('   • 内联脚本被阻止 → 使用 nonce');
+            log('   • eval() 被阻止 → \'unsafe-eval\' 或重构');
+            log('   • 第三方 CDN → 加入白名单');
+            log('   • 报告数据量大 → 采样上报 (1-10%)');
+        }
+
+        console.log('=== CSP 安全策略 ===');
+        document.getElementById('output').textContent =
+            `CSP 安全策略: 指令 / 源列表 / Nonce / Hash / strict-dynamic / Report-Only\n` +
+            `✅ CSP 安全策略演示完成！`;
+    </script>
+</body>
+</html>

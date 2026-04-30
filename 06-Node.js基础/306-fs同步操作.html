@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>fs同步操作</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #fsSync-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>fs 同步操作</h2><p>readFileSync / writeFileSync / existsSync / mkdirSync / unlinkSync / rmdirSync。</p></div>
+    <div class="card">
+        <h2>fs 同步 API</h2>
+        <div class="code">// ========== fs 同步方法 (Sync) ==========
+// ⚠️ 同步方法会阻塞主线程
+// 适合: 启动时初始化、脚本、CLI 工具
+// 不适合: 高并发服务器
+
+const fs = require('fs');
+
+// ========== 文件读取 ==========
+// 读文件 (返回 Buffer 或字符串)
+const data = fs.readFileSync('/path/file.txt', 'utf-8');
+const buffer = fs.readFileSync('/path/file.txt'); // Buffer
+
+// ========== 文件写入 ==========
+// 写文件 (覆盖)
+fs.writeFileSync('/path/file.txt', 'content', 'utf-8');
+
+// 追加
+fs.appendFileSync('/path/file.txt', '追加内容');
+
+// ========== 目录操作 ==========
+const exists = fs.existsSync('/path');        // 是否存在
+fs.mkdirSync('/path/dir', { recursive: true }); // 创建目录
+fs.rmdirSync('/path/dir');                    // 删除空目录
+fs.rmSync('/path/dir', { recursive: true });  // 递归删除 (Node 14+)
+
+// ========== 文件信息 ==========
+const stats = fs.statSync('/path/file.txt');
+stats.isFile()           // 是否文件
+stats.isDirectory()      // 是否目录
+stats.size              // 文件大小
+stats.mtime             // 修改时间
+
+// ========== 删除/重命名 ==========
+fs.unlinkSync('/path/file.txt');  // 删除文件
+fs.renameSync('/old', '/new');    // 重命名/移动
+
+// ========== 读取目录 ==========
+const files = fs.readdirSync('/path'); // 文件列表</div>
+        <div class="note">⚠️ 同步操作会阻塞事件循环，不适合生产服务器。<br>
+        💡 使用 fs.promises 异步版本获得更好性能。<br>
+        💡 对于 CLI 工具和初始化脚本，同步方法更方便。</div>
+    </div>
+    <div class="card">
+        <h2>演示：模拟文件系统</h2>
+        <button onclick="demoFileSystem()">模拟 fs 操作</button>
+        <div id="fsSync-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const fsSyncResult = document.getElementById('fsSync-result');
+
+        function log(msg) {
+            fsSyncResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // 模拟文件系统
+        class MockFileSystem {
+            constructor() {
+                this.files = new Map();
+                this.dirs = new Set(['/']);
+            }
+
+            writeFileSync(path, content) {
+                this.files.set(path, content);
+                this._ensureDir(path);
+                log(`   📝 写入文件: ${path} (${content.length} 字节)`);
+            }
+
+            readFileSync(path) {
+                if (!this.files.has(path)) throw new Error(`ENOENT: ${path}`);
+                log(`   📖 读取文件: ${path}`);
+                return this.files.get(path);
+            }
+
+            existsSync(path) {
+                return this.files.has(path) || this.dirs.has(path);
+            }
+
+            mkdirSync(path) {
+                this.dirs.add(path);
+                log(`   📁 创建目录: ${path}`);
+            }
+
+            unlinkSync(path) {
+                if (!this.files.has(path)) throw new Error(`ENOENT: ${path}`);
+                this.files.delete(path);
+                log(`   🗑️ 删除文件: ${path}`);
+            }
+
+            readdirSync(path) {
+                const items = [];
+                for (const key of this.files.keys()) {
+                    if (key.startsWith(path) && key !== path) {
+                        items.push(key.replace(path, ''));
+                    }
+                }
+                return items;
+            }
+
+            statSync(path) {
+                const isFile = this.files.has(path);
+                const isDir = this.dirs.has(path);
+                return {
+                    isFile: () => isFile,
+                    isDirectory: () => isDir,
+                    size: isFile ? this.files.get(path).length : 0,
+                    mtime: new Date(),
+                };
+            }
+
+            _ensureDir(path) {
+                const parts = path.split('/').slice(0, -1);
+                let current = '';
+                for (const p of parts) {
+                    current += p + '/';
+                    this.dirs.add(current.replace(/\/+$/, '/') || '/');
+                }
+            }
+        }
+
+        function demoFileSystem() {
+            fsSyncResult.innerHTML = '';
+            log('📂 模拟文件系统操作:');
+            log('');
+
+            const fs = new MockFileSystem();
+
+            try {
+                // 创建目录
+                log('1️⃣ mkdirSync:');
+                fs.mkdirSync('/data');
+                fs.mkdirSync('/data/logs');
+
+                // 写文件
+                log('\n2️⃣ writeFileSync:');
+                fs.writeFileSync('/data/logs/app.log', '2024-01-15 INFO Server started');
+                fs.writeFileSync('/data/config.json', '{"port": 3000, "env": "dev"}');
+                fs.writeFileSync('/data/README.md', '# Data Directory');
+
+                // 检查存在
+                log('\n3️⃣ existsSync:');
+                log(`   /data/config.json: ${fs.existsSync('/data/config.json')}`);
+                log(`   /data/missing.txt: ${fs.existsSync('/data/missing.txt')}`);
+
+                // 读文件
+                log('\n4️⃣ readFileSync:');
+                const config = fs.readFileSync('/data/config.json');
+                log(`   内容: ${config}`);
+
+                // 文件信息
+                log('\n5️⃣ statSync:');
+                const stat = fs.statSync('/data/config.json');
+                log(`   是文件: ${stat.isFile()}`);
+                log(`   大小: ${stat.size} 字节`);
+                log(`   修改时间: ${stat.mtime.toLocaleString()}`);
+
+                // 读目录
+                log('\n6️⃣ readdirSync:');
+                const items = fs.readdirSync('/data/');
+                log(`   /data/ 内容: [${items.join(', ')}]`);
+
+                // 删文件
+                log('\n7️⃣ unlinkSync:');
+                fs.unlinkSync('/data/README.md');
+                log(`   删除后 exists: ${fs.existsSync('/data/README.md')}`);
+
+            } catch (err) {
+                log(`❌ 错误: ${err.message}`);
+            }
+
+            log('');
+            log('📌 fs 同步 API 适用场景:');
+            log('   • 启动配置加载');
+            log('   • CLI 工具');
+            log('   • 脚本任务');
+            log('   • 构建工具');
+        }
+
+        console.log('=== fs 同步操作 ===');
+
+        document.getElementById('output').textContent =
+            `fs 同步操作: readFileSync / writeFileSync / existsSync / mkdirSync\n` +
+            `unlinkSync / rmdirSync / readdirSync / statSync / renameSync\n` +
+            `✅ fs 同步操作演示完成！`;
+    </script>
+</body>
+</html>

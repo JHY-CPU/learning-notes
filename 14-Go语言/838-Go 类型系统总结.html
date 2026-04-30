@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 类型系统总结</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🏛️ Go 类型系统总结</h2><p>类型分类、类型转换规则、赋值兼容性、类型安全哲学、常见类型设计模式、与其他语言的对比。</p></div>
+    <div class="card">
+        <h2>Go 类型分类</h2>
+        <div class="code">// ========== Go 类型分类 ==========
+// 所有类型分为 4 大类:
+
+// 1. 基本类型 (Basic Types)
+// bool, string, int/uint 系列, float32/64, complex64/128, byte, rune
+
+// 2. 复合类型 (Composite Types)
+// array, struct, pointer, function, interface, slice, map, channel
+
+// 3. 类型定义 (Defined Types)
+type MyInt int           // 新类型 (基于基本类型)
+type MySlice []int       // 新类型 (基于复合类型)
+
+// 4. 类型别名 (Type Alias)
+type Rune = int32        // Go 内置: rune 是 int32 的别名
+type Byte = uint8        // byte 是 uint8 的别名
+type Any = interface{}   // Go 1.18+
+
+// ========== 具名类型 vs 非具名类型 ==========
+// 具名类型: 有类型名称 (int, string, MyInt, *User)
+// 非具名类型: 类型字面量 ([]int, map[string]int, struct{...})
+
+// 非具名类型可赋值规则:
+// 底层类型相同且类型标签相同即可赋值
+func assignable() {
+    var a []int           // 非具名
+    var b []int           // 非具名 (相同字面量)
+    b = a                 // OK (字面量相同)
+
+    type MySlice []int
+    var c MySlice         // 具名
+    // c = a                // 编译错误! MySlice ≠ []int
+    c = MySlice(a)        // 需显式转换
+    _ = c
+}
+
+// ========== 底层类型规则 ==========
+// 底层类型决定类型转换的合法性
+
+type Celsius float64     // 底层类型: float64
+type Fahrenheit float64  // 底层类型: float64
+
+func conversion() {
+    var c Celsius = 100.0
+    var f Fahrenheit = 212.0
+
+    // 相同底层类型可显式转换
+    c = Celsius(f)
+    f = Fahrenheit(c)
+
+    // 但不能直接赋值
+    // c = f  // 编译错误
+
+    // int 和 float 之间
+    var i int = 42
+    var fl float64 = float64(i) // 需显式转换
+    _ = fl
+}
+
+// ========== 类型解引用路径 ==========
+// Go 类型关系:
+// 值类型 ↔ 指针类型: T 和 *T
+// 具体类型 ↔ 接口类型: T 和 interface{...}
+
+type Stringer interface {
+    String() string
+}
+
+var _ Stringer = (*MyString)(nil)  // 编译检查</div>
+    </div>
+    <div class="card">
+        <h2>类型转换与断言</h2>
+        <div class="code">// ========== 类型转换规则总览 ==========
+
+// 1. 数值类型之间: 显式转换
+var i int = 42
+var f float64 = float64(i)
+var u uint = uint(i)
+
+// 2. string ↔ []byte/rune: 显式
+s := string([]byte{'h', 'e', 'l', 'l', 'o'})  // "hello"
+b := []byte("hello")                            // [104 101 ...]
+
+// 3. 相同底层类型: 显式
+type ID int64
+var id ID = ID(42)
+
+// 4. 接口 ↔ 具体类型: 类型断言
+var x interface{} = "hello"
+s := x.(string)
+
+// 5. 指针类型: unsafe 包
+// *T 不能直接转换为 *U, 除非通过 unsafe.Pointer
+
+// 6. 类型定义之间: 仅底层类型相同且为基本类型
+type A int
+type B int
+var a A = 1
+var b B = B(a)  // 显式转换
+
+// ========== 隐式转换 (Go 中很少) ==========
+func implicitConversions() {
+    // 1. 常量到变量
+    var i int = 42     // 常量 42 隐式转 int
+    // var i int = 42.5 // 编译错误! 常量精度丢失
+
+    // 2. 接口赋值
+    var s fmt.Stringer = MyString{}
+
+    // 3. 类型别名
+    type MyInt = int
+    var x MyInt = 42   // MyInt 就是 int
+    var y int = x      // OK, 别名
+
+    // 4. 非类型常量的默认类型
+    const n = 42       // 无类型常量
+    var iv int = n     // 隐式转为 int
+    var fv float64 = n // 也隐式转为 float64!
+}
+
+// ========== 类型的可赋值性 ==========
+// 以下情况可赋值 (无需转换):
+// 1. 类型完全相同
+// 2. 类型字面量相同
+// 3. 目标类型是接口, 源类型实现了它
+// 4. 类型别名
+
+func assignRules() {
+    var s fmt.Stringer
+
+    // 实现接口的具体类型可赋值
+    s = &MyString{}  // *MyString 实现了 Stringer
+
+    // 接口之间可赋值 (如果方法集超集)
+    type ReadWriter interface {
+        Read([]byte) (int, error)
+        Write([]byte) (int, error)
+    }
+    // ReadWriter 可赋值给 Reader, Writer 等子集
+
+    _ = s
+}
+
+// ========== 类型 equality ==========
+// 结构体可比较条件: 所有字段可比较
+type Point struct { X, Y int }   // 可比较
+type Bad struct { Data []int }   // 不可比较 (切片)
+
+func equality() {
+    p1 := Point{1, 2}
+    p2 := Point{1, 2}
+    fmt.Println(p1 == p2)  // true (逐字段比较)
+
+    // Bad 类型:
+    // var b1, b2 Bad
+    // fmt.Println(b1 == b2)  // 编译错误!
+}</div>
+    </div>
+    <div class="card">
+        <h2>类型设计哲学</h2>
+        <div class="code">// ========== Go 类型设计核心理念 ==========
+
+// 1. 显式 > 隐式
+//   - 没有隐式数值转换 (防止精度丢失)
+//   - 没有隐式类型继承 (防止复杂层次)
+//   - 没有隐式构造函数 (零值可用)
+
+// 2. 组合 > 继承
+//   - 嵌入结构体 (不是继承)
+//   - 接口隐式满足 (不是实现)
+//   - 小接口 + 组合 (大接口)
+
+// 3. 值语义 > 引用语义
+//   - 大多数类型是值类型
+//   - 切片/map/chan 是引用类型
+//   - 指针明确用 * 标记
+
+// 4. 零值安全
+//   - 每个变量自动初始化
+//   - 没有未初始化变量
+//   - 零值按类型定义 (int=0, *T=nil)
+
+// ========== 常见类型设计模式 ==========
+
+// 1. 小接口 + 组合
+type Reader interface { Read(p []byte) (n int, err error) }
+type Writer interface { Write(p []byte) (n int, err error) }
+type Closer interface { Close() error }
+
+type ReadWriter interface { Reader; Writer }
+type ReadCloser interface { Reader; Closer }
+
+// 2. 新类型避免"原始类型困扰"
+type UserID int64         // 明确语义
+type Email string         // 明确验证
+
+// 3. 函数类型作为接口替代
+type Handler func(req *Request) *Response
+type Middleware func(Handler) Handler
+
+// 4. 类型集合 (Go 1.18+ 类型集)
+type Number interface {
+    ~int | ~float64
+}
+
+// ========== 类型安全与性能 ==========
+// 静态类型 → 编译期检查, 运行时高效
+// 接口 → 动态分派 (小开销)
+// 泛型 → 编译期展开 (无运行时开销)
+
+// 类型检查时间:
+// 编译期: 类型转换, 接口实现, 泛型约束
+// 运行时: 类型断言, 动态分派
+
+// ========== Go vs 其他语言 ==========
+// Go:   结构体+接口+组合, 隐式接口实现, 显式转换
+// Java: 类+继承+接口, 显式 implements, 隐式自动装箱
+// Rust: struct+trait, 显式 impl, 零成本抽象
+// Python: 鸭子类型, 运行时检查
+
+// Go 的哲学: 简单明确, 避免意外
+// - 没有方法重载
+// - 没有操作符重载
+// - 没有类型继承
+// - 虚函数由接口替代
+// - 泛型 1.18+ 引入 (谨慎设计)</div>
+        <div class="note">💡 类型系统总结: 4 大类 (基本/复合/定义/别名); 具名 vs 非具名类型; 底层类型决定转换合法性; 隐式转换极少 (常量→变量, 接口赋值, 别名); 结构体可比较条件: 所有字段可比较; 设计哲学: 显式>隐式, 组合>继承, 值语义, 零值安全; 新类型 (type UserID int64) 增强语义安全; 小接口组合成大接口; Go 类型系统追求简单明确。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoTypes()">类型分类</button>
+        <button onclick="demoConvert()">转换规则</button>
+        <button onclick="demoDesign()">设计哲学</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoTypes() {
+            result.innerHTML = '';
+            log('# Go 类型分类');
+            log('');
+            log('基本: bool, string, int, float64, byte, rune');
+            log('复合: array, slice, map, struct, chan, ptr');
+            log('定义: type MyInt int');
+            log('别名: type Rune = int32');
+            log('');
+            log('具名: int, string, MyType');
+            log('非具名: []int, map[string]int');
+            log('');
+            log('底层类型决定转换:');
+            log('  type Celsius float64');
+            log('  type Fahrenheit float64');
+            log('  Celsius(Fahrenheit(100)) // OK');
+        }
+
+        function demoConvert() {
+            result.innerHTML = '';
+            log('# 类型转换规则');
+            log('');
+            log('显式转换:');
+            log('  数值: float64(int(42))');
+            log('  string/[]byte: string([]byte{...})');
+            log('  相同底层: MyInt(int(42))');
+            log('  类型断言: x.(string)');
+            log('');
+            log('隐式转换 (极少):');
+            log('  常量 → 变量: var i int = 42');
+            log('  接口赋值');
+            log('  类型别名');
+            log('');
+            log('不能: 不同类型直接赋值');
+            log('  type A int; type B int');
+            log('  var a A; var b B');
+            log('  // b = a  // 编译错误!');
+        }
+
+        function demoDesign() {
+            result.innerHTML = '';
+            log('# Go 类型设计哲学');
+            log('');
+            log('显式 > 隐式:');
+            log('  无隐式数值转换');
+            log('  无隐式继承');
+            log('');
+            log('组合 > 继承:');
+            log('  嵌入提升方法');
+            log('  小接口组合');
+            log('');
+            log('值语义 + 零值:');
+            log('  声明即初始化');
+            log('  零值按类型定义');
+            log('');
+            log('模式:');
+            log('  小接口: Reader, Writer');
+            log('  新类型: type UserID int64');
+            log('  函数类型: type Handler func');
+        }
+    </script>
+</body>
+</html>

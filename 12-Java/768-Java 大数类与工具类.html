@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java 大数类与工具类</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🧮 Java 大数类与工具类</h2><p>BigInteger (任意大整数)、BigDecimal (精确小数/金钱计算)、Math/Random/ThreadLocalRandom、UUID、Objects、日期时间工具 (java.time)。</p></div>
+    <div class="card">
+        <h2>BigInteger</h2>
+        <div class="code">// ========== BigInteger ==========
+// 任意大整数 (不可变, 类似 String)
+// 用于超出 long 范围的整数运算
+
+import java.math.BigInteger;
+import java.util.Random;
+
+public class BigIntegerDemo {
+    public static void main(String[] args) {
+        // ========== 创建 ==========
+        // 从 long
+        BigInteger a = BigInteger.valueOf(123456789L);
+
+        // 从 String
+        BigInteger b = new BigInteger("987654321098765432109876543210");
+
+        // 从进制
+        BigInteger hex = new BigInteger("FF", 16);  // 255
+
+        // 随机大数 (40 位)
+        BigInteger randomBig = new BigInteger(40, new Random());
+
+        // ========== 运算 (不可变, 返回新对象) ==========
+        BigInteger x = new BigInteger("10000000000000000000");
+        BigInteger y = new BigInteger("20000000000000000000");
+
+        BigInteger sum = x.add(y);              // +
+        BigInteger diff = y.subtract(x);        // -
+        BigInteger prod = x.multiply(y);        // ×
+        BigInteger quot = y.divide(x);          // ÷
+        BigInteger rem = y.remainder(x);        // %
+
+        System.out.println(sum);   // 30000000000000000000
+        System.out.println(prod);  // 200000000000000000000000000000000000000
+
+        // ========== 比较 ==========
+        // compareTo: -1 (小于), 0 (等于), 1 (大于)
+        System.out.println(x.compareTo(y));   // -1
+        System.out.println(x.equals(y));      // false
+
+        // ========== 常用方法 ==========
+        BigInteger n = new BigInteger("12345");
+        System.out.println(n.pow(2));             // 152399025 (平方)
+        System.out.println(n.abs());              // 绝对值
+        System.out.println(n.negate());           // 取反
+        System.out.println(n.mod(new BigInteger("100"))); // 模 100
+
+        // 最大公约数
+        BigInteger gcd = new BigInteger("12").gcd(new BigInteger("18"));
+        System.out.println(gcd);  // 6
+
+        // 是否为素数
+        BigInteger prime = new BigInteger("9999991");
+        System.out.println(prime.isProbablePrime(10));  // true
+
+        // 下一个素数
+        BigInteger nextPrime = prime.nextProbablePrime();
+        System.out.println(nextPrime);
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>BigDecimal</h2>
+        <div class="code">// ========== BigDecimal ==========
+// 精确十进制浮点数, 用于金钱/科学计算
+// 解决 double 精度问题
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+
+public class BigDecimalDemo {
+    public static void main(String[] args) {
+        // ========== double 精度问题 ==========
+        double d1 = 0.1;
+        double d2 = 0.2;
+        System.out.println(d1 + d2);  // 0.30000000000000004! ❌
+
+        // ========== BigDecimal 精确保 ==========
+        BigDecimal bd1 = new BigDecimal("0.1");  // 用 String!
+        BigDecimal bd2 = new BigDecimal("0.2");
+        System.out.println(bd1.add(bd2));  // 0.3 ✅
+
+        // ❌ 不要用 double 构造:
+        // new BigDecimal(0.1)  →  0.1000000000000000055511...
+
+        // ========== 创建 ==========
+        BigDecimal fromStr = new BigDecimal("3.14159");
+        BigDecimal fromLong = BigDecimal.valueOf(12345);
+        BigDecimal fromDouble = BigDecimal.valueOf(0.1);  // 推荐!
+
+        // ========== 运算 ==========
+        BigDecimal a = new BigDecimal("10.50");
+        BigDecimal b = new BigDecimal("3.20");
+
+        System.out.println(a.add(b));            // 13.70
+        System.out.println(a.subtract(b));       // 7.30
+        System.out.println(a.multiply(b));       // 33.600
+
+        // 除法需要指定精度和舍入模式!
+        // System.out.println(a.divide(b));  // ❌ ArithmeticException!
+
+        BigDecimal divided = a.divide(b, 4, RoundingMode.HALF_UP);
+        System.out.println(divided);  // 3.2813
+
+        // ========== 舍入模式 ==========
+        // HALF_UP:     四舍五入 (常用)
+        // HALF_DOWN:   五舍六入
+        // HALF_EVEN:   银行家舍入 (向最近的偶数)
+        // CEILING:     向上取整
+        // FLOOR:       向下取整
+        // UP:          远离零
+        // DOWN:        向零舍入
+
+        // ========== 设置精度 ==========
+        BigDecimal val = new BigDecimal("123.456789");
+        System.out.println(val.setScale(2, RoundingMode.HALF_UP));    // 123.46
+        System.out.println(val.setScale(0, RoundingMode.HALF_UP));    // 123
+
+        // ========== 比较 (用 compareTo, 不用 equals!) ==========
+        BigDecimal x = new BigDecimal("2.0");
+        BigDecimal y = new BigDecimal("2.00");
+        System.out.println(x.equals(y));     // false! (scale 不同)
+        System.out.println(x.compareTo(y));  // 0 (数学相等) ✅
+
+        // ========== 金钱计算 ==========
+        BigDecimal price = new BigDecimal("19.99");
+        BigDecimal taxRate = new BigDecimal("0.08");
+        BigDecimal tax = price.multiply(taxRate)
+            .setScale(2, RoundingMode.HALF_UP);
+        BigDecimal total = price.add(tax);
+
+        System.out.println("Price: $" + price);     // $19.99
+        System.out.println("Tax: $" + tax);          // $1.60
+        System.out.println("Total: $" + total);      // $21.59
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>Random 与 UUID</h2>
+        <div class="code">// ========== 随机数与 UUID ==========
+import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
+
+public class RandomDemo {
+    public static void main(String[] args) {
+        // ========== Math.random() ==========
+        // [0.0, 1.0) 的 double
+        double r = Math.random();
+        int dice = (int)(Math.random() * 6) + 1;  // 1~6
+
+        // ========== Random 类 ==========
+        Random rand = new Random();
+        // Random rand = new Random(42);  // 固定种子 (可重复)
+
+        int n = rand.nextInt(100);        // [0, 100)
+        int m = rand.nextInt(10, 20);     // [10, 20) (Java 17+)
+        double d = rand.nextDouble();     // [0.0, 1.0)
+        float f = rand.nextFloat();       // [0.0, 1.0)
+        long l = rand.nextLong();         // 任意 long
+        boolean b = rand.nextBoolean();   // true/false
+        byte[] bytes = new byte[16];
+        rand.nextBytes(bytes);            // 填充随机字节
+
+        // 高斯分布 (平均值 0.0, 标准差 1.0)
+        double gaussian = rand.nextGaussian();
+
+        // ========== ThreadLocalRandom (Java 7+) ==========
+        // 每个线程独立, 性能更好
+        // 用于并发环境, 无需传 Random 实例
+
+        ThreadLocalRandom tlr = ThreadLocalRandom.current();
+        int t = tlr.nextInt(1, 101);       // [1, 101)
+        double td = tlr.nextDouble(100);   // [0, 100)
+
+        // ========== UUID (通用唯一标识符) ==========
+        UUID uuid = UUID.randomUUID();
+        System.out.println(uuid);                // "550e8400-e29b-41d4-a716-446655440000"
+        System.out.println(uuid.toString().length());  // 36
+
+        UUID fromStr = UUID.fromString("550e8400-e29b-41d4-a716-446655440000");
+
+        // 获取各部分
+        System.out.println(uuid.getMostSignificantBits());   // 高 64 位
+        System.out.println(uuid.getLeastSignificantBits());  // 低 64 位
+    }
+}
+
+// ========== Collections / Objects 工具类 ==========
+class UtilClasses {
+    public static void main(String[] args) {
+        // ========== Objects (Java 7+) ==========
+        String s = null;
+
+        // null 安全
+        System.out.println(Objects.toString(s, "default"));  // "default"
+        System.out.println(Objects.hash("a", "b", "c"));     // 组合哈希
+
+        // 检查工具
+        // Objects.requireNonNull(s, "s must not be null");   // NullPointerException!
+        // Objects.requireNonNullElse(s, "default");          // "default"
+
+        // 比较
+        System.out.println(Objects.equals(null, null));   // true
+        System.out.println(Objects.equals("a", "a"));     // true
+
+        // ========== Date/Time API (Java 8+) ==========
+        // java.time 包: LocalDate, LocalTime, LocalDateTime
+
+        java.time.LocalDate today = java.time.LocalDate.now();
+        java.time.LocalTime now = java.time.LocalTime.now();
+        java.time.LocalDateTime dt = java.time.LocalDateTime.now();
+
+        System.out.println(today);         // 2026-04-29
+        System.out.println(now);           // 14:30:00.123
+        System.out.println(dt);            // 2026-04-29T14:30:00.123
+
+        // 格式化
+        String formatted = dt.format(
+            java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+        );
+        System.out.println(formatted);     // "2026-04-29 14:30"
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>常用工具类总结</h2>
+        <div class="code">// ========== 常用工具类一览 ==========
+
+import java.math.*;
+import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
+
+public class UtilSummary {
+    public static void main(String[] args) {
+        // ========== 数学 ==========
+        Math.abs(-5);           // 5
+        Math.max(3, 7);         // 7
+        Math.ceil(3.2);         // 4.0
+        Math.floor(3.8);        // 3.0
+        Math.round(3.5);        // 4
+        Math.pow(2, 10);        // 1024.0
+        Math.sqrt(144);         // 12.0
+        Math.random();          // [0, 1.0)
+
+        // ========== 大数 ==========
+        BigInteger bi = new BigInteger("9999999999999999");
+        BigDecimal bd = new BigDecimal("19.99");
+
+        // ========== 随机 ==========
+        new Random().nextInt(100);
+        ThreadLocalRandom.current().nextInt(1, 10);
+
+        // ========== UUID ==========
+        UUID.randomUUID().toString();
+
+        // ========== 数组工具 ==========
+        int[] arr = {3, 1, 4, 1, 5};
+        Arrays.sort(arr);
+        Arrays.toString(arr);
+        Arrays.binarySearch(arr, 4);
+        int[] copy = Arrays.copyOf(arr, arr.length);
+
+        // ========== 集合工具 ==========
+        List<String> list = Collections.unmodifiableList(
+            Arrays.asList("a", "b")
+        );
+        // Collections.synchronizedList(list);  // 线程安全包装
+        // Collections.max(list), min(list), reverse(list), shuffle(list)
+
+        // ========== 日期时间 (java.time) ==========
+        java.time.LocalDate date = java.time.LocalDate.of(2026, 12, 25);
+        java.time.LocalTime time = java.time.LocalTime.of(14, 30);
+        java.time.LocalDateTime dateTime = java.time.LocalDateTime.of(date, time);
+        java.time.Instant instant = java.time.Instant.now();  // 时间戳
+        java.time.Duration duration = java.time.Duration.ofHours(2);  // 时长
+        java.time.Period period = java.time.Period.ofDays(7);  // 周期
+    }
+}
+
+// ========== 选择指南 ==========
+// 整数 < 2^63-1      → long (最快)
+// 整数 > 2^63-1      → BigInteger
+// 小数精确计算        → BigDecimal
+// 一般浮点            → double/float
+// 金钱                → BigDecimal (String 构造)
+// 随机数              → ThreadLocalRandom (并发)
+// 唯一标识            → UUID
+// 日期时间            → java.time 包 (LocalDate/LocalDateTime)
+// null 安全           → Objects 工具类</div>
+        <div class="note">💡 工具类要点: BigInteger 任意大整数; BigDecimal 精确小数 (用 String 构造!); 除法必须指定精度和舍入模式; compareTo 比较 BigDecimal; ThreadLocalRandom 并发随机; UUID 唯一标识; Objects null-安全工具; java.time 现代日期时间 API (LocalDate/LocalDateTime/Instant); Math 类基本数学运算。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoBigInt()">BigInteger</button>
+        <button onclick="demoDecimal()">BigDecimal</button>
+        <button onclick="demoUtil()">工具类</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoBigInt() {
+            result.innerHTML = '';
+            log('# BigInteger');
+            log('');
+            log('BigInteger a = new BigInteger("999999...");');
+            log('a.add(b)   a.subtract(b)');
+            log('a.multiply(b)  a.divide(b)');
+            log('a.pow(n)   a.gcd(b)');
+            log('a.isProbablePrime(10)  // 素数测试');
+            log('');
+            log('不可变: 每次返回新对象');
+        }
+
+        function demoDecimal() {
+            result.innerHTML = '';
+            log('# BigDecimal');
+            log('');
+            log('构造: new BigDecimal("0.1")  ✅');
+            log('      BigDecimal.valueOf(0.1) ✅');
+            log('      new BigDecimal(0.1)     ❌');
+            log('');
+            log('除法: a.divide(b, scale, mode)');
+            log('舍入: HALF_UP 四舍五入');
+            log('比较: compareTo() ✅');
+            log('      equals()  ❌ (scale 敏感)');
+        }
+
+        function demoUtil() {
+            result.innerHTML = '';
+            log('# 工具类一览');
+            log('');
+            log('Random: nextInt(n)');
+            log('ThreadLocalRandom: 并发环境');
+            log('UUID: randomUUID()');
+            log('Objects: toString/hash/equals');
+            log('LocalDate: now()/of()/format()');
+            log('Instant: now() // 时间戳');
+            log('');
+            log('金钱 → BigDecimal');
+            log('大数 → BigInteger');
+            log('日期 → java.time');
+        }
+    </script>
+</body>
+</html>

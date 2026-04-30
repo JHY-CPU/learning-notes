@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python闭包与nonlocal</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔒 Python 闭包与 nonlocal</h2><p>闭包概念与原理、__closure__ 属性、nonlocal 关键字、闭包的实际应用（计数器/缓存/延迟计算）、闭包 vs 全局变量。</p></div>
+    <div class="card">
+        <h2>闭包基础</h2>
+        <div class="code">// ========== 什么是闭包 ==========
+// 闭包: 内部函数引用了外部函数的变量
+// 即使外部函数已经返回,内部函数仍能访问那些变量
+
+def outer(x):
+    def inner(y):
+        return x + y      # inner 引用了 outer 的 x
+    return inner          # 返回 inner 函数本身
+
+add5 = outer(5)           # add5 是 inner(y) 绑定 x=5 的版本
+print(add5(3))            # 8
+print(add5(10))           # 15
+
+// ========== 闭包的三个条件 ==========
+// 1. 有嵌套函数 (内部函数定义在外部函数内)
+// 2. 内部函数引用了外部函数的变量
+// 3. 外部函数返回内部函数
+
+// ========== __closure__ 属性 ==========
+// 每个闭包函数都有一个 __closure__ 属性
+// 存储被捕获的外部变量
+
+def outer(x):
+    def inner(y):
+        return x + y
+    return inner
+
+f = outer(42)
+print(f.__closure__)       # (&lt;cell at 0x...: int object at 0x...&gt;,)
+print(f.__closure__[0].cell_contents)  # 42
+
+// cell_contents 可以读取闭包捕获的值
+// 对于调试和理解闭包很有用</div>
+    </div>
+    <div class="card">
+        <h2>nonlocal 关键字</h2>
+        <div class="code">// ========== nonlocal 的作用 ==========
+// 在嵌套函数中修改外层函数的变量
+// 没有 nonlocal 时,赋值会创建新的局部变量
+
+// ❌ 没有 nonlocal:
+def outer():
+    count = 0
+    def inner():
+        # 这里 count += 1 会报错!
+        # 因为赋值操作让 Python 认为 count 是局部变量
+        count += 1        # UnboundLocalError!
+        return count
+    return inner
+
+// ✅ 使用 nonlocal:
+def outer():
+    count = 0
+    def inner():
+        nonlocal count    # 声明 count 来自外层作用域
+        count += 1
+        return count
+    return inner
+
+counter = outer()
+print(counter())           # 1
+print(counter())           # 2
+print(counter())           # 3
+
+// ========== nonlocal 与 global 的区别 ==========
+x = "global"
+
+def outer():
+    x = "enclosing"
+
+    def inner():
+        # global x    # 修改模块级别的 x
+        # nonlocal x  # 修改 outer 中的 x
+        x = "local"  # 创建新的局部变量
+        print(x)
+
+    inner()
+    print(x)
+
+// nonlocal 往上查找一层就停止
+// 不会一直找到全局作用域
+
+// ========== 多层嵌套 ==========
+def level1():
+    x = 1
+    def level2():
+        x = 2          # level1 的 x 被遮蔽
+        def level3():
+            nonlocal x  # 修改 level2 的 x!
+            x += 1
+            return x
+        return level3
+    return level2
+
+fn = level1()
+print(fn()())             # 3</div>
+    </div>
+    <div class="card">
+        <h2>闭包的实际应用</h2>
+        <div class="code">// ========== 应用 1: 计数器工厂 ==========
+def make_counter(start=0, step=1):
+    """创建计数器"""
+    count = start
+    def counter():
+        nonlocal count
+        current = count
+        count += step
+        return current
+    return counter
+
+counter_a = make_counter(0, 2)   # 0, 2, 4, 6...
+counter_b = make_counter(10)     # 10, 11, 12...
+
+print(counter_a())  # 0
+print(counter_a())  # 2
+print(counter_b())  # 10
+print(counter_a())  # 4
+print(counter_b())  # 11
+
+// ========== 应用 2: 缓存/记忆化 ==========
+def make_cache():
+    """创建一个带缓存的函数"""
+    cache = {}
+
+    def cached_func(key, value=None):
+        nonlocal cache
+        if value is not None:
+            cache[key] = value    # 存入缓存
+            return value
+        return cache.get(key, None)  # 读取缓存
+
+    def clear():
+        nonlocal cache
+        cache = {}
+
+    # 返回多个函数
+    cached_func.clear = clear
+    return cached_func
+
+cache = make_cache()
+cache("user:1", {"name": "Alice"})
+print(cache("user:1"))    # {"name": "Alice"}
+cache.clear()
+print(cache("user:1"))    # None
+
+// ========== 应用 3: 延迟计算 (Lazy) ==========
+def lazy_evaluate(func):
+    """延迟计算: 只在第一次调用时求值"""
+    computed = False
+    result = None
+
+    def wrapper():
+        nonlocal computed, result
+        if not computed:
+            result = func()    # 只执行一次
+            computed = True
+        return result
+
+    return wrapper
+
+@lazy_evaluate          # 等价于 expensive = lazy_evaluate(expensive)
+def expensive():
+    print("执行耗时计算...")
+    return 42 * 42
+
+print("定义完成,尚未计算")
+print(expensive())      # 执行计算 + 打印 1764
+print(expensive())      # 直接返回缓存值,不打印</div>
+    </div>
+    <div class="card">
+        <h2>闭包常见陷阱</h2>
+        <div class="code">// ========== 陷阱 1: 延迟绑定 (经典) ==========
+// 循环中创建闭包,所有函数共享同一个变量 i
+
+funcs = []
+for i in range(3):
+    funcs.append(lambda: i)    # 所有 lambda 引用同一个 i
+
+for f in funcs:
+    print(f())                 # 2, 2, 2 (循环结束 i=2)
+
+// ✅ 修复 1: 默认参数 (在定义时绑定)
+funcs = []
+for i in range(3):
+    funcs.append(lambda i=i: i)  # 默认参数在定义时求值
+
+for f in funcs:
+    print(f())                 # 0, 1, 2
+
+// ✅ 修复 2: 闭包工厂
+def make_func(i):
+    return lambda: i
+
+funcs = [make_func(i) for i in range(3)]
+for f in funcs:
+    print(f())                 # 0, 1, 2
+
+// ========== 陷阱 2: 可变对象不需要 nonlocal ==========
+// nonlocal 只用于 赋值/绑定 操作
+// 修改可变对象的内容不需要 nonlocal
+
+def make_adder():
+    items = []                 # 可变对象
+
+    def add(value):
+        items.append(value)    # ✅ 修改内容,不需要 nonlocal
+        return items
+
+    return add
+
+adder = make_adder()
+print(adder(1))                # [1]
+print(adder(2))                # [1, 2]
+
+// 因为 items.append() 没有改变 items 的"身份"
+// items = ... 才需要 nonlocal
+
+// ========== 陷阱 3: 闭包内存泄漏 ==========
+// 闭包会持有外部变量的引用,阻止垃圾回收
+
+def create_tracker():
+    large_data = [1] * 1000000  # 大对象
+    def tracker():
+        return len(large_data)
+    return tracker
+
+# tracker 持有 large_data 的引用
+# large_data 不会被 GC 回收!
+# 解决方案: 用完 del, 或用 weakref
+
+// 闭包原则:
+// - 闭包保留的是变量对象本身,不是值
+// - 闭包可能意外延长对象生命周期
+// - 临时闭包用完即弃</div>
+        <div class="note">💡 闭包要点: (1) 闭包=函数+捕获的外部变量; (2) 修改外部变量需要 nonlocal; (3) 可变对象的内容修改不需要 nonlocal; (4) 循环闭包延迟绑定用默认参数修复; (5) 闭包适合计数器/缓存/延迟计算/装饰器。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoClosure()">闭包基础演示</button>
+        <button onclick="demoNonlocal()">nonlocal 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoClosure() {
+            result.innerHTML = '';
+            log('# 闭包演示');
+            log('');
+            log('def outer(x):');
+            log('    def inner(y):');
+            log('        return x + y');
+            log('    return inner');
+            log('');
+            log('add5 = outer(5)');
+            log('add5(3) →', 5 + 3);
+            log('add5(10) →', 5 + 10);
+            log('');
+            log('闭包三要素:');
+            log('1. 嵌套函数');
+            log('2. 引用外部变量');
+            log('3. 返回内部函数');
+            log('');
+            log('应用: 延迟计算、计数器、缓存');
+        }
+
+        function demoNonlocal() {
+            result.innerHTML = '';
+            log('# nonlocal 演示');
+            log('');
+            log('def make_counter(start):');
+            log('    count = start');
+            log('    def counter():');
+            log('        nonlocal count');
+            log('        count += 1');
+            log('        return count');
+            log('    return counter');
+            log('');
+            // JS 模拟
+            let count1 = 10;
+            function counter1() { return ++count1; }
+            let count2 = 0;
+            function counter2() { return ++count2; }
+            log('c1 = make_counter(10)');
+            log('c2 = make_counter(0)');
+            log('c1() →', counter1());
+            log('c1() →', counter1());
+            log('c2() →', counter2());
+            log('c1() →', counter1());
+            log('');
+            log('nonlocal: 修改外层函数变量');
+            log('global: 修改模块全局变量');
+        }
+    </script>
+</body>
+</html>

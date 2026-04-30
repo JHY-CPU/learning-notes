@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>选择器-querySelector</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e67e22; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        .demo-box { display: inline-block; margin: 5px; padding: 15px 20px; background: #3498db; color: white; border-radius: 4px; }
+        .demo-box.special { background: #e74c3c; }
+        [data-type="highlight"] { background: #2ecc71 !important; }
+        .nested { border: 1px solid #ddd; padding: 10px; margin: 5px 0; border-radius: 4px; }
+        .nested .inner { background: #f8f9fa; padding: 8px; margin: 3px 0; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>选择器 — querySelector / querySelectorAll</h2><p>使用 CSS 选择器语法查找元素，更灵活强大。</p></div>
+    <div class="card">
+        <h2>querySelector</h2>
+        <div class="code">// 返回匹配 CSS 选择器的第一个元素
+// 没找到返回 null
+
+const firstItem = document.querySelector('.item');
+const mainTitle = document.querySelector('#title');
+const firstDiv = document.querySelector('div');
+const special = document.querySelector('[data-type="highlight"]');
+
+// 复杂 CSS 选择器
+const child = document.querySelector('ul > li:first-child');
+const nth = document.querySelector('div:nth-of-type(2)');
+const attr = document.querySelector('input[type="text"]');
+const combo = document.querySelector('div.card > h2 + p');
+
+// 在指定元素范围内查找
+const container = document.querySelector('.container');
+const innerItem = container.querySelector('.item');
+
+// ⚠️ 只返回第一个匹配
+// 如果要全部匹配，用 querySelectorAll</div>
+    </div>
+    <div class="card">
+        <h2>querySelectorAll</h2>
+        <div class="code">// 返回所有匹配 CSS 选择器的元素
+// 返回 NodeList（静态集合）
+
+const allItems = document.querySelectorAll('.item');
+const allButtons = document.querySelectorAll('button');
+const allInputs = document.querySelectorAll('input, textarea, select');
+const allSpecial = document.querySelectorAll('[data-type]');
+
+// NodeList 有 forEach！
+allItems.forEach(item => {
+    console.log(item.textContent);
+});
+
+// 也可以转数组
+const arr = [...allItems];
+const arr2 = Array.from(allItems);
+
+// 获取元素内的特定子元素
+const container2 = document.getElementById('container');
+const children = container2.querySelectorAll(':scope > .direct-child');
+// :scope 表示当前元素（container2），不加的话规则是从全局匹配</div>
+    </div>
+    <div class="card">
+        <h2>CSS 选择器示例</h2>
+        <div class="code">// 基本选择器
+querySelector('*')               // 所有元素
+querySelector('div')             // 标签选择器
+querySelector('.class')          // 类选择器
+querySelector('#id')             // ID 选择器
+querySelector('[data-key]')      // 属性存在
+querySelector('[type="text"]')   // 属性等于
+
+// 组合选择器
+querySelector('div.item')        // div 且 class=item
+querySelector('ul > li')         // 直接子元素
+querySelector('div p')           // 后代元素
+querySelector('h1 + p')          // 紧邻兄弟
+querySelector('h1 ~ p')          // 所有后续兄弟
+
+// 伪类
+querySelector(':first-child')
+querySelector(':last-child')
+querySelector(':nth-child(2)')
+querySelector(':nth-of-type(odd)')
+querySelector(':not(.hidden)')
+querySelector(':empty')
+querySelector(':checked')
+querySelector(':disabled')
+
+// 伪元素（querySelector 可以，但不会返回元素）
+// querySelector('::before')  // 返回 null</div>
+    </div>
+    <div class="card">
+        <h2>querySelector vs getElement 对比</h2>
+        <div class="code">// querySelector / querySelectorAll
+// ✅ 使用 CSS 选择器，灵活强大
+// ✅ NodeList 有 forEach
+// ✅ #id, .class 不需要记不同方法
+// ❌ NodeList 是静态的（不会自动更新）
+// ❌ 性能略慢（解析 CSS 选择器）
+
+// getElementById / getElementsByClassName / getElementsByTagName
+// ✅ 性能更快
+// ✅ HTMLCollection 是动态的（自动更新）
+// ❌ 方法名多，需要记
+// ❌ HTMLCollection 没有 forEach
+// ❌ 功能有限（不能复杂选择）
+
+// 现代开发推荐：
+// - querySelector(id) 替代 getElementById
+// - querySelectorAll 用于复杂选择
+// - getElementsByTagName 用于需要动态集合的场景
+// - 性能差异通常可忽略，优先用 querySelector</div>
+    </div>
+    <div class="nested">
+        <div class="inner" data-type="highlight">内部元素 1 (data-type=highlight)</div>
+        <div class="inner">内部元素 2</div>
+        <div class="inner special-inner">内部元素 3</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== querySelector ===');
+        const firstInner = document.querySelector('.inner');
+        console.log('第一个 .inner:', firstInner?.textContent);
+
+        const highlighted = document.querySelector('[data-type="highlight"]');
+        console.log('data-type:', highlighted?.textContent);
+
+        const nestedDiv = document.querySelector('.nested');
+        const firstChild = nestedDiv?.querySelector('.inner');
+        console.log('nested 内第一个 .inner:', firstChild?.textContent);
+
+        console.log('=== querySelectorAll ===');
+        const allInner = document.querySelectorAll('.inner');
+        console.log('.inner 数量:', allInner.length);
+        console.log('遍历:');
+        allInner.forEach((el, i) => {
+            console.log(`  [${i}]`, el.textContent);
+        });
+
+        console.log('=== 复杂选择器 ===');
+        // 有 data-type 属性的 .inner
+        const withAttr = document.querySelectorAll('.inner[data-type]');
+        console.log('带 data-type 的 .inner:', withAttr.length);
+
+        // 排除特定元素
+        const notSpecial = document.querySelectorAll('.inner:not(.special-inner)');
+        console.log('非 special 的 .inner:', notSpecial.length);
+
+        console.log('=== NodeList 静态性 ===');
+        const staticList = document.querySelectorAll('.inner');
+        console.log('初始数量:', staticList.length);
+        const newInner = document.createElement('div');
+        newInner.className = 'inner';
+        newInner.textContent = '动态添加';
+        document.querySelector('.nested')?.appendChild(newInner);
+        console.log('添加后 NodeList 不变:', staticList.length);  // 还是 3
+
+        console.log('=== 转数组 ===');
+        const arr = [...allInner];
+        console.log('转数组后可用 map:', arr.map(el => el.tagName));
+
+        document.getElementById('output').textContent =
+            `第一个 .inner: ${firstInner?.textContent}\n` +
+            `.inner 总数: ${allInner.length}\n` +
+            `带 data-type: ${withAttr.length}\n` +
+            `✅ 选择器-querySelector 演示完成！`;
+    </script>
+</body>
+</html>

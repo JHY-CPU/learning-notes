@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 字符串函数</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📝 SQL 字符串函数</h2><p>CONCAT/SUBSTRING/REPLACE/LENGTH/UPPER/LOWER/TRIM, 正则替换, 字符串分割, MySQL 与 PostgreSQL 函数对照, 实战数据清洗案例。</p></div>
+    <div class="card">
+        <h2>字符串基础函数</h2>
+        <div class="code">// ========== 字符串基础函数 ==========
+
+-- 1. 连接字符串
+-- MySQL:
+SELECT CONCAT(first_name, ' ', last_name) AS full_name FROM users;
+-- 结果: 'Alice Smith'
+
+SELECT CONCAT_WS(', ', 'apple', 'banana', 'cherry');
+-- 结果: 'apple, banana, cherry' (CONCAT With Separator)
+
+-- PostgreSQL:
+-- SELECT first_name || ' ' || last_name AS full_name FROM users;
+-- SELECT CONCAT_WS(', ', 'apple', 'banana', 'cherry');
+
+-- 2. 字符串长度
+SELECT LENGTH('Hello 世界');     -- MySQL: 9 (字节,中文3字节)
+SELECT CHAR_LENGTH('Hello 世界'); -- MySQL: 7 (字符数)
+-- PostgreSQL: LENGTH('Hello 世界') → 7 (字符数)
+
+-- 3. 大小写转换
+SELECT UPPER('hello');   -- 'HELLO'
+SELECT LOWER('WORLD');   -- 'world'
+
+-- 4. 截取字符串
+-- MySQL:
+SELECT SUBSTRING('Hello World', 1, 5);   -- 'Hello' (位置从1开始)
+SELECT SUBSTRING('Hello World', 7);       -- 'World' (到末尾)
+SELECT SUBSTR('Hello World', 1, 5);       -- SUBSTRING 别名
+
+-- PostgreSQL: 同上
+
+-- 5. 去除空格
+SELECT TRIM('  hello  ');     -- 'hello' (首尾)
+SELECT LTRIM('  hello');       -- 'hello' (左侧)
+SELECT RTRIM('hello  ');       -- 'hello' (右侧)
+
+-- 6. 查找位置
+SELECT POSITION('World' IN 'Hello World');  -- 7
+SELECT LOCATE('World', 'Hello World');       -- 7 (MySQL)
+-- SELECT STRPOS('Hello World', 'World');    -- 7 (PostgreSQL)</div>
+    </div>
+    <div class="card">
+        <h2>字符串替换与填充</h2>
+        <div class="code">// ========== 替换 ==========
+
+-- 1. 替换子串
+SELECT REPLACE('Hello World', 'World', 'SQL');  -- 'Hello SQL'
+
+-- 2. 正则替换
+-- MySQL 8.0+:
+SELECT REGEXP_REPLACE('Hello 123 World', '[0-9]', '');
+-- 结果: 'Hello  World' (去掉了数字)
+
+SELECT REGEXP_REPLACE('my_email@gmail.com', '@.*', '@hidden');
+-- 结果: 'my_email@hidden'
+
+-- PostgreSQL:
+-- SELECT REGEXP_REPLACE('Hello 123 World', '\d', '', 'g');
+
+-- 3. 子串提取 (正则)
+-- MySQL:
+SELECT REGEXP_SUBSTR('Contact: alice@test.com', '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}');
+-- 结果: 'alice@test.com'
+
+-- PostgreSQL:
+-- SELECT SUBSTRING('Contact: alice@test.com' FROM '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}');
+
+-- ========== 填充 ==========
+
+-- 1. 左侧填充
+SELECT LPAD('42', 5, '0');     -- '00042' (左填充0到5位)
+SELECT RPAD('hello', 8, '-');   -- 'hello---' (右填充)
+
+-- 2. 重复字符串
+SELECT REPEAT('abc', 3);        -- 'abcabcabc' (MySQL)
+-- SELECT REPEAT('abc', 3);     -- PostgreSQL 也有
+
+-- 3. 反转
+SELECT REVERSE('hello');         -- 'olleh'
+
+-- ========== 格式化 ==========
+
+-- 1. 格式化数字
+SELECT FORMAT(12345.6789, 2);    -- '12,345.68' (MySQL)
+-- SELECT TO_CHAR(12345.6789, 'FM999G999D99'); -- PostgreSQL
+
+-- 2. 生成随机字符串
+-- MySQL:
+SELECT LEFT(UUID(), 8);          -- 'a1b2c3d4' (取UUID前8位)
+SELECT SUBSTRING(MD5(RAND()), 1, 8);  -- 随机8位</div>
+    </div>
+    <div class="card">
+        <h2>字符串分割与分析</h2>
+        <div class="code">// ========== 字符串分割 ==========
+
+-- 1. 按分隔符拆分
+-- MySQL: SUBSTRING_INDEX
+SELECT SUBSTRING_INDEX('apple,banana,cherry', ',', 1);  -- 'apple'
+SELECT SUBSTRING_INDEX('apple,banana,cherry', ',', 2);  -- 'apple,banana'
+SELECT SUBSTRING_INDEX('apple,banana,cherry', ',', -1); -- 'cherry' (从右数)
+
+-- PostgreSQL: SPLIT_PART
+-- SELECT SPLIT_PART('apple,banana,cherry', ',', 1);  -- 'apple'
+-- SELECT SPLIT_PART('apple,banana,cherry', ',', 2);  -- 'banana'
+
+-- 2. 字符串转数组
+-- MySQL:
+SELECT JSON_ARRAY('apple', 'banana');  -- ['apple', 'banana']
+
+-- PostgreSQL:
+-- SELECT STRING_TO_ARRAY('apple,banana,cherry', ',');  -- {apple,banana,cherry}
+-- SELECT ARRAY_TO_STRING(ARRAY['a','b','c'], ',');       -- 'a,b,c'
+
+-- ========== 字符串比较 ==========
+
+-- 1. 比较两个字符串
+SELECT STRCMP('abc', 'abc');   -- 0 (MySQL)
+SELECT STRCMP('abc', 'abd');   -- -1
+SELECT STRCMP('abd', 'abc');   -- 1
+
+-- PostgreSQL: 直接用比较运算符 = <> < > <= >=
+
+-- 2. 字符串相似度
+-- MySQL 没有内置,可用应用层实现
+-- PostgreSQL:
+-- SELECT SIMILARITY('hello', 'hallo');  -- 需要 pg_trgm 扩展
+
+-- 3. 模式匹配
+-- LIKE:
+SELECT * FROM users WHERE email LIKE '%@gmail.com';
+SELECT * FROM users WHERE name LIKE 'A_';  -- 2个字符,以A开头
+
+-- 正则 (MySQL):
+SELECT * FROM users WHERE email REGEXP '^[a-z]+@[a-z]+\.[a-z]{2,}$';
+
+-- 正则 (PostgreSQL):
+-- SELECT * FROM users WHERE email ~ '^[a-z]+@[a-z]+\.[a-z]{2,}$';</div>
+    </div>
+    <div class="card">
+        <h2>数据清洗实战</h2>
+        <div class="code">// ========== 字符串清洗示例 ==========
+
+-- 准备: 脏数据
+CREATE TABLE raw_users (
+    id INT PRIMARY KEY,
+    name VARCHAR(100),          -- 首尾空格,大小写混乱
+    email VARCHAR(100),         -- 大小写混乱
+    phone VARCHAR(50)           -- 格式混乱
+);
+
+INSERT INTO raw_users VALUES
+(1, '  Alice Smith  ', 'ALICE@TEST.COM', '138-0013-8000'),
+(2, '  BOB   JONES ', 'Bob@Test.com', '139.0013.8001'),
+(3, 'CHARLIE   BROWN', 'charlie@test.com', '140-00138002');
+
+-- 1. 清洗姓名
+SELECT
+    id,
+    TRIM(name) AS name_trimmed,
+    REGEXP_REPLACE(TRIM(name), '\\s+', ' ') AS name_clean,
+    INITCAP(TRIM(name)) AS name_proper  -- 首字母大写
+FROM raw_users;
+
+-- 注意: MySQL 没有 INITCAP,自定义:
+-- CONCAT(UPPER(LEFT(col,1)), LOWER(SUBSTRING(col,2)))
+
+-- 2. 清洗邮箱 (统一小写,去空格)
+SELECT
+    id,
+    LOWER(TRIM(email)) AS email_clean
+FROM raw_users;
+
+-- 3. 清洗电话号码
+SELECT
+    id,
+    phone,
+    REGEXP_REPLACE(phone, '[^0-9]', '') AS digits_only,
+    CONCAT(
+        SUBSTRING(REGEXP_REPLACE(phone, '[^0-9]', ''), 1, 3), '-',
+        SUBSTRING(REGEXP_REPLACE(phone, '[^0-9]', ''), 4, 4), '-',
+        SUBSTRING(REGEXP_REPLACE(phone, '[^0-9]', ''), 8, 4)
+    ) AS phone_formatted
+FROM raw_users;
+
+-- 4. 提取域名
+SELECT
+    email,
+    SUBSTRING(email, LOCATE('@', email) + 1) AS domain
+FROM users;
+
+-- 5. 脱敏 (数据安全)
+SELECT
+    CONCAT(LEFT(email, 1), '***', SUBSTRING(email, LOCATE('@', email))) AS email_masked,
+    CONCAT(LEFT(phone, 3), '****', RIGHT(phone, 4)) AS phone_masked
+FROM users;
+
+-- 结果: a***@test.com, 138****8000</div>
+    </div>
+    <div class="card">
+        <h2>MySQL vs PostgreSQL 对照</h2>
+        <div class="code">// ========== 函数对照表 ==========
+-- 功能          MySQL              PostgreSQL
+-- -----------  -----------------  ---------------------
+-- 连接          CONCAT(a,b)        a || b 或 CONCAT()
+-- 带分隔符连接  CONCAT_WS(',',a,b) CONCAT_WS(',',a,b)
+-- 长度(字节)    LENGTH(s)          OCTET_LENGTH(s)
+-- 长度(字符)    CHAR_LENGTH(s)     LENGTH(s) 或 CHAR_LENGTH()
+-- 截取          SUBSTRING(s,1,5)   SUBSTRING(s,1,5)
+-- 查找          LOCATE(x,s)        STRPOS(s,x) 或 POSITION(x IN s)
+-- 替换          REPLACE(s,a,b)     REPLACE(s,a,b)
+-- 正则替换      REGEXP_REPLACE     REGEXP_REPLACE(s,p,r,'g')
+-- 拆分          SUBSTRING_INDEX    SPLIT_PART(s,d,n)
+-- 填充          LPAD/RPAD          LPAD/RPAD
+-- 反转          REVERSE            REVERSE
+-- 格式化数字    FORMAT(n,d)        TO_CHAR(n,'fmt')
+-- 首字母大写    (无)               INITCAP(s)
+-- 重复          REPEAT             REPEAT
+-- 空格生成      SPACE(n)           REPEAT(' ',n)
+-- 字符串比较    STRCMP(a,b)        直接用 = < >
+
+-- ========== 实际建议 ==========
+-- 1. 字符串操作尽量在应用层做 (Python/Java)
+--    数据库擅长的不是字符串处理
+-- 2. 复杂清洗用 ETL 工具 (如 pandas)
+-- 3. SQL 字符串函数适合简单转换
+-- 4. 大数据量下正则表达式可能很慢
+-- 5. 尽量使用数据库内置函数而非自定义</div>
+        <div class="note">💡 字符串函数: CONCAT 连接; SUBSTRING 截取; REPLACE 替换; TRIM 去空格; LOWER/UPPER 大小写; REGEXP_REPLACE 正则替换; 数据清洗常用 TRIM+REGEXP; 复杂处理建议在应用层进行。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoBasic()">基础函数</button>
+        <button onclick="demoClean()">数据清洗</button>
+        <button onclick="demoMask()">数据脱敏</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoBasic() {
+            result.innerHTML = '';
+            log('# 字符串基础函数');
+            log('');
+            log("CONCAT('Hello', ' ', 'World')  → Hello World");
+            log("UPPER('hello')   → HELLO");
+            log("LOWER('WORLD')   → world");
+            log("TRIM('  hi  ')   → hi");
+            log("SUBSTRING('abcde', 2, 3) → bcd");
+            log("REPLACE('abc', 'b', 'x')  → axc");
+            log("LENGTH('Hello')  → 5");
+        }
+
+        function demoClean() {
+            result.innerHTML = '';
+            log('# 数据清洗');
+            log('');
+            log("-- 清洗姓名:");
+            log("TRIM(name)  -- 去首尾空格");
+            log("REGEXP_REPLACE(name, '\\s+', ' ') -- 合并空格");
+            log('');
+            log("-- 清洗邮箱:");
+            log("LOWER(TRIM(email)) -- 小写+去空格");
+            log('');
+            log("-- 清洗电话:");
+            log("REGEXP_REPLACE(phone, '[^0-9]', '') -- 只留数字");
+        }
+
+        function demoMask() {
+            result.innerHTML = '';
+            log('# 数据脱敏');
+            log('');
+            log("-- 邮箱脱敏:");
+            log("CONCAT(LEFT(email, 1), '***',");
+            log("       SUBSTRING(email, LOCATE('@', email)))");
+            log("  a***@test.com");
+            log('');
+            log("-- 手机脱敏:");
+            log("CONCAT(LEFT(phone, 3), '****', RIGHT(phone, 4))");
+            log("  138****8000");
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>09-字符串匹配总结 (Matching Summary)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<h1>09 - 字符串匹配总结 (Matching Summary)</h1>
+
+<div class="card">
+  <h2>算法总览</h2>
+  <table border="1" cellpadding="10" cellspacing="0" style="width:100%;border-collapse:collapse;text-align:center;">
+    <tr style="background:#2c3e50;color:white;">
+      <th>算法</th><th>预处理</th><th>匹配时间</th><th>扫描方向</th><th>核心技巧</th><th>适用场景</th>
+    </tr>
+    <tr style="background:#e8f8f5;">
+      <td><strong>朴素匹配</strong></td>
+      <td>无</td>
+      <td>O(n·m)</td>
+      <td>左→右</td>
+      <td>暴力枚举</td>
+      <td>教学演示，短文本</td>
+    </tr>
+    <tr style="background:#fef9e7;">
+      <td><strong>Rabin-Karp</strong></td>
+      <td>O(m)</td>
+      <td>O(n+m) 平均</td>
+      <td>左→右</td>
+      <td>滚动哈希</td>
+      <td>多模式匹配，去重检测</td>
+    </tr>
+    <tr style="background:#e8f8f5;">
+      <td><strong>KMP</strong></td>
+      <td>O(m)</td>
+      <td>O(n+m)</td>
+      <td>左→右</td>
+      <td>前缀函数</td>
+      <td>需要线性保证的场景</td>
+    </tr>
+    <tr style="background:#fef9e7;">
+      <td><strong>Boyer-Moore</strong></td>
+      <td>O(m+Σ)</td>
+      <td>O(n/m) 平均</td>
+      <td>右→左</td>
+      <td>坏字符+好后缀</td>
+      <td>文本编辑器，搜索引擎</td>
+    </tr>
+    <tr style="background:#e8f8f5;">
+      <td><strong>Sunday</strong></td>
+      <td>O(m)</td>
+      <td>O(n/m) 平均</td>
+      <td>右→左</td>
+      <td>下一个字符跳跃</td>
+      <td>实现简单，快速匹配</td>
+    </tr>
+    <tr style="background:#fef9e7;">
+      <td><strong>AC 自动机</strong></td>
+      <td>O(∑m)</td>
+      <td>O(n)</td>
+      <td>左→右</td>
+      <td>Trie + 失败指针</td>
+      <td>多模式匹配</td>
+    </tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>选择指南</h2>
+  <div class="note">
+    <strong>如何选择合适的算法？</strong>
+  </div>
+  <ul>
+    <li><strong>只需实现简单功能：</strong> 使用语言内置的 <code>indexOf</code> 或 <code>includes</code>（底层通常是优化的 BM 或双指针算法）</li>
+    <li><strong>需要稳定的线性性能：</strong> KMP 算法（常用于 DNA 序列分析等关键场景）</li>
+    <li><strong>追求最佳平均性能：</strong> Boyer-Moore 或 Sunday（自然语言文本搜索）</li>
+    <li><strong>同时搜索多个模式：</strong> AC 自动机（多模式匹配的最佳选择）</li>
+    <li><strong>需要检测重复/近似匹配：</strong> Rabin-Karp（滚动哈希思想可扩展）</li>
+    <li><strong>模式串非常短（m ≤ 5）：</strong> 朴素匹配可能最快（无预处理开销）</li>
+    <li><strong>字符集很小（如 DNA 只有 4 种碱基）：</strong> BM 和 Sunday 的跳跃效果有限，KMP 更稳定</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>性能对比图</h2>
+  <p>以下表格展示了在不同文本和模式下各算法的大致比较次数（数值为对比，非精确测试）：</p>
+  <table border="1" cellpadding="8" cellspacing="0" style="width:100%;border-collapse:collapse;text-align:center;">
+    <tr style="background:#3498db;color:white;"><th>测试场景</th><th>朴素</th><th>KMP</th><th>BM</th><th>Sunday</th></tr>
+    <tr><td>英文文章 (n=1000, m=10)</td><td>~10000</td><td>~1010</td><td>~120</td><td>~150</td></tr>
+    <tr><td>DNA序列 (n=1000, m=10)</td><td>~10000</td><td>~1010</td><td>~600</td><td>~700</td></tr>
+    <tr><td>重复字符 (n=1000, m=10)</td><td>~9910</td><td>~1010</td><td>~10000</td><td>~9910</td></tr>
+    <tr><td>随机字符串 (n=1000, m=10)</td><td>~3000</td><td>~1010</td><td>~200</td><td>~250</td></tr>
+  </table>
+  <div class="note" style="margin-top:10px;">
+    <strong>注意：</strong> BM 和 Sunday 在重复字符模式（如 T="AAAA...", P="AAAAB"）下会退化为 O(n·m)，而 KMP 始终保持 O(n+m)。
+  </div>
+</div>
+
+<div class="card">
+  <h2>交互：多算法对比工具</h2>
+  <p>输入文本和模式串，对比四种算法的性能：</p>
+  <input type="text" id="textInput" value="ABABDABACDABABCABAB" style="width:100%;padding:8px;margin:5px 0;">
+  <input type="text" id="patternInput" value="ABABCABAB" style="width:100%;padding:8px;margin:5px 0;">
+  <br>
+  <button onclick="compareAll()">对比所有算法</button>
+  <div id="result"></div>
+</div>
+
+<script>
+function computePi(P) {
+  const m = P.length;
+  const pi = new Array(m).fill(0);
+  let k = 0;
+  for (let i = 1; i < m; i++) {
+    while (k > 0 && P[i] !== P[k]) k = pi[k - 1];
+    if (P[i] === P[k]) k++;
+    pi[i] = k;
+  }
+  return pi;
+}
+
+function countNaive(T, P) {
+  let comps = 0;
+  const n = T.length, m = P.length;
+  const pos = [];
+  for (let i = 0; i <= n - m; i++) {
+    let j = 0;
+    while (j < m) {
+      comps++;
+      if (T[i + j] !== P[j]) break;
+      j++;
+    }
+    if (j === m) pos.push(i);
+  }
+  return { pos, comps };
+}
+
+function countKMP(T, P) {
+  let comps = 0;
+  const pi = computePi(P);
+  const n = T.length, m = P.length;
+  const pos = [];
+  let j = 0;
+  for (let i = 0; i < n; i++) {
+    while (j > 0 && T[i] !== P[j]) {
+      comps++;
+      j = pi[j - 1];
+    }
+    comps++;
+    if (T[i] === P[j]) j++;
+    if (j === m) {
+      pos.push(i - m + 1);
+      j = pi[j - 1];
+    }
+  }
+  return { pos, comps };
+}
+
+function countBM(T, P) {
+  let comps = 0;
+  const n = T.length, m = P.length;
+  if (m === 0 || m > n) return { pos: [], comps: 0 };
+  const pos = [];
+  const bc = {};
+  for (let i = 0; i < m; i++) bc[P[i]] = i;
+  let i = 0;
+  while (i <= n - m) {
+    let j = m - 1;
+    while (j >= 0) {
+      comps++;
+      if (P[j] !== T[i + j]) break;
+      j--;
+    }
+    if (j < 0) {
+      pos.push(i);
+      i += (i + m < n) ? m - (bc[T[i + m]] !== undefined ? bc[T[i + m]] : -1) : 1;
+    } else {
+      const b = bc[T[i + j]] !== undefined ? bc[T[i + j]] : -1;
+      i += Math.max(1, j - b);
+    }
+  }
+  return { pos, comps };
+}
+
+function countSunday(T, P) {
+  let comps = 0;
+  const n = T.length, m = P.length;
+  if (m === 0 || m > n) return { pos: [], comps: 0 };
+  const pos = [];
+  const shift = {};
+  for (let i = 0; i < m; i++) shift[P[i]] = m - i;
+  let i = 0;
+  while (i <= n - m) {
+    let j = 0;
+    while (j < m) {
+      comps++;
+      if (P[m - 1 - j] !== T[i + m - 1 - j]) break;
+      j++;
+    }
+    if (j === m) pos.push(i);
+    if (i + m < n) {
+      const nextChar = T[i + m];
+      i += shift[nextChar] !== undefined ? shift[nextChar] : (m + 1);
+    } else break;
+  }
+  return { pos, comps };
+}
+
+function compareAll() {
+  const T = document.getElementById('textInput').value;
+  const P = document.getElementById('patternInput').value;
+  if (!T || !P) { document.getElementById('result').innerHTML = '请输入文本和模式串'; return; }
+
+  const naive = countNaive(T, P);
+  const kmp = countKMP(T, P);
+  const bm = countBM(T, P);
+  const sun = countSunday(T, P);
+
+  let html = '<h3>算法对比结果</h3>';
+  html += `<p>文本长度 n=${T.length}，模式长度 m=${P.length}</p>`;
+
+  html += '<table border="1" cellpadding="10" cellspacing="0" style="width:100%;border-collapse:collapse;text-align:center;">';
+  html += '<tr style="background:#2c3e50;color:white;"><th>算法</th><th>匹配位置</th><th>比较次数</th><th>效率</th></tr>';
+  const minComp = Math.min(naive.comps, kmp.comps, bm.comps, sun.comps);
+  const algos = [
+    { name: '朴素匹配', data: naive },
+    { name: 'KMP', data: kmp },
+    { name: 'Boyer-Moore', data: bm },
+    { name: 'Sunday', data: sun }
+  ];
+
+  for (const algo of algos) {
+    const pct = Math.round((algo.data.comps / naive.comps) * 100);
+    const isFast = algo.data.comps === minComp;
+    html += `<tr style="${isFast ? 'background:#d5f5e3;' : ''}">`;
+    html += `<td><strong>${algo.name}</strong></td>`;
+    html += `<td>${algo.data.pos.length === 0 ? '无' : '[' + algo.data.pos.join(',') + ']'}</td>`;
+    html += `<td>${algo.data.comps}</td>`;
+    html += `<td>${pct}% ${isFast ? '⭐最快' : ''}</td>`;
+    html += '</tr>';
+  }
+  html += '</table>';
+
+  document.getElementById('result').innerHTML = html;
+}
+</script>
+</body></html>

@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手写Promise链式</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #chain-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>手写 Promise 链式</h2><p>Promise 链式调用实现、值穿透、错误传播、静态方法。</p></div>
+    <div class="card">
+        <h2>链式 Promise 实现</h2>
+        <div class="code">// ========== 链式调用的核心 ==========
+// then() 返回一个新的 Promise
+// 回调返回值如果是 Promise, 则等待它完成
+// 回调返回值如果是普通值, 则作为下一个 then 的参数
+
+class ChainPromise {
+    constructor(executor) { /* ... */ }
+
+    then(onFulfilled, onRejected) {
+        const nextPromise = new ChainPromise((resolve, reject) => {
+            // 处理 fulfilled 状态
+            const handleFulfilled = (value) => {
+                queueMicrotask(() => {
+                    try {
+                        const result = onFulfilled(value);
+                        resolve(result);
+                    } catch (err) {
+                        reject(err);
+                    }
+                });
+            };
+
+            // 处理 rejected 状态
+            const handleRejected = (reason) => {
+                queueMicrotask(() => {
+                    try {
+                        const result = onRejected(reason);
+                        resolve(result); // 错误恢复
+                    } catch (err) {
+                        reject(err);
+                    }
+                });
+            };
+
+            // 根据当前状态执行
+            if (this.state === FULFILLED) handleFulfilled(this.value);
+            else if (this.state === REJECTED) handleRejected(this.reason);
+            else {
+                this.onFulfilledCallbacks.push(handleFulfilled);
+                this.onRejectedCallbacks.push(handleRejected);
+            }
+        });
+
+        return nextPromise;
+    }
+}
+
+// ========== 静态方法 ==========
+ChainPromise.resolve = (value) => new ChainPromise(resolve => resolve(value));
+ChainPromise.reject = (reason) => new ChainPromise((_, reject) => reject(reason));</div>
+        <div class="note">💡 关键: then() 返回新 Promise, 形成链式调用。<br>
+        💡 返回值处理: 普通值直接 resolve, Promise 则等待。<br>
+        💡 错误传播: 链中任何位置 reject, 跳到下一个 catch。</div>
+    </div>
+    <div class="card">
+        <h2>演示：手写链式 Promise</h2>
+        <button onclick="demoChain()">链式调用</button>
+        <button onclick="demoErrorProp()">错误传播</button>
+        <div id="chain-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const chainResult = document.getElementById('chain-result');
+
+        function log(msg) {
+            chainResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // 简易链式 Promise
+        class ChainPromise {
+            constructor(executor) {
+                this.state = 'pending';
+                this.value = undefined;
+                this.reason = undefined;
+                this.onFulfilledCallbacks = [];
+                this.onRejectedCallbacks = [];
+
+                const resolve = (value) => {
+                    if (this.state !== 'pending') return;
+                    this.state = 'fulfilled';
+                    this.value = value;
+                    this.onFulfilledCallbacks.forEach(fn => fn());
+                };
+
+                const reject = (reason) => {
+                    if (this.state !== 'pending') return;
+                    this.state = 'rejected';
+                    this.reason = reason;
+                    this.onRejectedCallbacks.forEach(fn => fn());
+                };
+
+                try { executor(resolve, reject); }
+                catch (e) { reject(e); }
+            }
+
+            then(onFulfilled, onRejected) {
+                onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : v => v;
+                onRejected = typeof onRejected === 'function' ? onRejected : e => { throw e; };
+
+                return new ChainPromise((resolve, reject) => {
+                    const handleFulfilled = () => {
+                        queueMicrotask(() => {
+                            try {
+                                resolve(onFulfilled(this.value));
+                            } catch (e) { reject(e); }
+                        });
+                    };
+
+                    const handleRejected = () => {
+                        queueMicrotask(() => {
+                            try {
+                                resolve(onRejected(this.reason));
+                            } catch (e) { reject(e); }
+                        });
+                    };
+
+                    if (this.state === 'fulfilled') handleFulfilled();
+                    else if (this.state === 'rejected') handleRejected();
+                    else {
+                        this.onFulfilledCallbacks.push(handleFulfilled);
+                        this.onRejectedCallbacks.push(handleRejected);
+                    }
+                });
+            }
+
+            catch(onRejected) {
+                return this.then(null, onRejected);
+            }
+
+            static resolve(v) { return new ChainPromise(r => r(v)); }
+            static reject(r) { return new ChainPromise((_, rej) => rej(r)); }
+        }
+
+        function demoChain() {
+            chainResult.innerHTML = '';
+            log('⛓️ 链式调用演示:');
+            log('');
+
+            new ChainPromise(resolve => resolve(1))
+                .then(v => {
+                    log(`   then 1: ${v}`);
+                    return v + 1;
+                })
+                .then(v => {
+                    log(`   then 2: ${v}`);
+                    return v + 1;
+                })
+                .then(v => {
+                    log(`   then 3: ${v}`);
+                    return v + 1;
+                })
+                .then(v => {
+                    log(`   then 4: ${v} (最终结果)`);
+                });
+
+            log('');
+            log('📌 链式特点:');
+            log('   • 每个 then 返回新 Promise');
+            log('   • 返回值传递给下一个 then');
+            log('   • 支持无限链式');
+        }
+
+        function demoErrorProp() {
+            chainResult.innerHTML = '';
+            log('⚠️ 错误传播演示:');
+            log('');
+
+            new ChainPromise((_, reject) => reject('初始错误'))
+                .then(v => {
+                    log(`   then 1: ${v} (不会执行)`);
+                    return v;
+                })
+                .then(v => {
+                    log(`   then 2: ${v} (不会执行)`);
+                    return v;
+                })
+                .catch(e => {
+                    log(`   catch: ${e} (错误被捕获)`);
+                    return '已恢复';
+                })
+                .then(v => {
+                    log(`   then 恢复后: ${v}`);
+                });
+
+            log('');
+            log('📌 错误传播规则:');
+            log('   • 错误沿链条传递');
+            log('   • 跳过中间所有 then');
+            log('   • 直到遇到 catch');
+            log('   • catch 可返回正常值恢复');
+        }
+
+        console.log('=== 手写 Promise 链式 ===');
+
+        document.getElementById('output').textContent =
+            `手写 Promise 链式: then 返回新 Promise / 值穿透 / 错误传播\n` +
+            `静态方法: Promise.resolve / Promise.reject\n` +
+            `✅ 手写 Promise 链式演示完成！`;
+    </script>
+</body>
+</html>

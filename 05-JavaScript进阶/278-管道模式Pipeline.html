@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管道模式Pipeline</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; max-height: 200px; overflow-y: auto; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        .pipeline-vis { display: flex; align-items: center; justify-content: center; gap: 5px; flex-wrap: wrap; padding: 15px; background: #f8f9fa; border-radius: 8px; margin: 10px 0; }
+        .pipeline-vis .step { background: #3498db; color: white; padding: 6px 12px; border-radius: 4px; font-size: 13px; }
+        .pipeline-vis .arrow { color: #e74c3c; font-weight: bold; }
+        .pipeline-vis .input, .pipeline-vis .output { background: #2c3e50; color: white; padding: 6px 12px; border-radius: 4px; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>管道模式 Pipeline</h2><p>将一系列处理步骤（函数）串联起来，每个步骤的输出是下一步的输入。类似工厂流水线，数据依次经过各个工作站处理。</p></div>
+    <div class="card"><h2>Class Pipeline 实现</h2><p>通过 pipe(fn) 注册处理步骤，execute(input) 启动处理链。支持异步中间件模式（Koa 风格）。</p></div>
+    <div class="card"><h2>数据转换管道</h2><p>典型应用：数据清洗（sanitize）→ 验证（validate）→ 格式化（format）。分离每个处理步骤，便于测试和复用。</p></div>
+    <div class="pipeline-vis"><span class="input">输入</span><span class="arrow">→</span><span class="step">清洗</span><span class="arrow">→</span><span class="step">验证</span><span class="arrow">→</span><span class="step">格式化</span><span class="arrow">→</span><span class="step">输出</span><span class="arrow">→</span><span class="output">结果</span></div>
+    <div class="card"><h2>交互演示</h2><p>
+        <button onclick="demoBasicPipeline()">基础管道</button>
+        <button onclick="demoDataPipeline()">数据转换管道</button>
+        <button onclick="demoAsyncPipeline()">异步管道</button>
+        <button onclick="demoMiddleware()">中间件管道</button>
+        <button onclick="demoErrorHandling()">错误处理</button>
+    </p></div>
+    <pre id="output"></pre>
+    <script>
+        const output = document.getElementById('output');
+
+        function log(msg) {
+            const line = document.createElement('div');
+            line.style.cssText = 'padding:2px 0;font-size:13px;border-bottom:1px solid #333;';
+            line.textContent = msg;
+            output.appendChild(line);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function clearLog() {
+            output.innerHTML = '';
+        }
+
+        // ========== Pipeline 实现 ==========
+        class Pipeline {
+            constructor() {
+                this._steps = [];
+                this._errorHandler = null;
+            }
+
+            // 注册处理步骤
+            pipe(fn) {
+                this._steps.push(fn);
+                return this; // 链式调用
+            }
+
+            // 注册错误处理器
+            onError(handler) {
+                this._errorHandler = handler;
+                return this;
+            }
+
+            // 同步执行
+            execute(input) {
+                log(`[管道] 开始处理输入: ${JSON.stringify(input)}`);
+                let result = input;
+                for (let i = 0; i < this._steps.length; i++) {
+                    try {
+                        result = this._steps[i](result);
+                        log(`  [步骤 ${i + 1}] → ${JSON.stringify(result)}`);
+                    } catch (err) {
+                        log(`  [步骤 ${i + 1}] 错误: ${err.message}`);
+                        if (this._errorHandler) {
+                            return this._errorHandler(err, result);
+                        }
+                        throw err;
+                    }
+                }
+                log(`[管道] 处理完成: ${JSON.stringify(result)}`);
+                return result;
+            }
+
+            // 异步执行（支持 async 步骤）
+            async executeAsync(input) {
+                log(`[异步管道] 开始处理: ${JSON.stringify(input)}`);
+                let result = input;
+                for (let i = 0; i < this._steps.length; i++) {
+                    try {
+                        result = await Promise.resolve(this._steps[i](result));
+                        log(`  [步骤 ${i + 1}] → ${JSON.stringify(result)}`);
+                    } catch (err) {
+                        log(`  [步骤 ${i + 1}] 错误: ${err.message}`);
+                        if (this._errorHandler) {
+                            return this._errorHandler(err, result);
+                        }
+                        throw err;
+                    }
+                }
+                log(`[异步管道] 完成: ${JSON.stringify(result)}`);
+                return result;
+            }
+        }
+
+        // ========== Koa 风格中间件管道 ==========
+        class MiddlewarePipeline {
+            constructor() {
+                this._middlewares = [];
+            }
+
+            use(fn) {
+                this._middlewares.push(fn);
+                return this;
+            }
+
+            async execute(ctx) {
+                let index = -1;
+
+                const dispatch = async (i) => {
+                    if (i <= index) {
+                        throw new Error('next() 多次调用');
+                    }
+                    index = i;
+                    const fn = this._middlewares[i];
+                    if (!fn) return;
+
+                    try {
+                        await fn(ctx, () => dispatch(i + 1));
+                    } catch (err) {
+                        log(`  中间件错误: ${err.message}`);
+                        ctx.error = err;
+                    }
+                };
+
+                await dispatch(0);
+                return ctx;
+            }
+        }
+
+        // ========== 1. 基础管道 ==========
+        function demoBasicPipeline() {
+            clearLog();
+            log('=== 基础 Pipeline ===\n');
+
+            const pipeline = new Pipeline()
+                .pipe(x => x * 2)
+                .pipe(x => x + 10)
+                .pipe(x => `结果: ${x}`);
+
+            log('Pipeline: x → x*2 → x+10 → "结果: ${x}"');
+            const result = pipeline.execute(5);
+            log(`\n最终结果: ${result}`);
+        }
+
+        // ========== 2. 数据转换管道 ==========
+        function demoDataPipeline() {
+            clearLog();
+            log('=== 数据转换管道: 清洗 → 验证 → 格式化 ===\n');
+
+            const dataPipeline = new Pipeline()
+                // 步骤1: 清洗
+                .pipe(data => {
+                    log(`  [清洗] 移除空格和特殊字符`);
+                    return {
+                        ...data,
+                        name: data.name.trim(),
+                        email: data.email.trim().toLowerCase(),
+                        age: parseInt(data.age, 10)
+                    };
+                })
+                // 步骤2: 验证
+                .pipe(data => {
+                    log(`  [验证] 检查必填字段`);
+                    if (!data.name) throw new Error('姓名为必填项');
+                    if (!data.email.includes('@')) throw new Error('邮箱格式不正确');
+                    if (isNaN(data.age) || data.age < 0 || data.age > 150) throw new Error('年龄无效');
+                    log(`  [验证] 通过`);
+                    return data;
+                })
+                // 步骤3: 格式化
+                .pipe(data => ({
+                    displayName: `用户: ${data.name}`,
+                    contact: data.email,
+                    ageGroup: data.age < 18 ? '未成年' : data.age < 60 ? '成年' : '老年',
+                    createdAt: new Date().toISOString()
+                }))
+                .onError((err, data) => {
+                    log(`  [错误处理] ${err.message}`);
+                    return { error: err.message, originalData: data };
+                });
+
+            log('处理有效数据:');
+            const result1 = dataPipeline.execute({ name: ' 张三 ', email: ' ZHANG@EXAMPLE.COM ', age: '25' });
+
+            log('\n处理无效数据:');
+            const result2 = dataPipeline.execute({ name: '', email: 'invalid', age: '200' });
+
+            log(`\n结果1: ${JSON.stringify(result1)}`);
+            log(`结果2: ${JSON.stringify(result2)}`);
+        }
+
+        // ========== 3. 异步管道 ==========
+        function demoAsyncPipeline() {
+            clearLog();
+            log('=== 异步管道 (async/await) ===\n');
+
+            const delay = ms => new Promise(r => setTimeout(r, ms));
+
+            const pipeline = new Pipeline()
+                .pipe(async data => {
+                    log('  查询用户信息...');
+                    await delay(300);
+                    return { ...data, user: { id: 1, name: '张三' } };
+                })
+                .pipe(async data => {
+                    log('  查询订单信息...');
+                    await delay(200);
+                    return { ...data, orders: [{ id: 101, amount: 299 }] };
+                })
+                .pipe(async data => {
+                    log('  计算统计...');
+                    const total = data.orders.reduce((s, o) => s + o.amount, 0);
+                    return { ...data, summary: { totalOrders: data.orders.length, totalAmount: total } };
+                });
+
+            log('启动异步管道:');
+            pipeline.executeAsync({ userId: 1 })
+                .then(result => {
+                    log(`\n最终结果: ${JSON.stringify(result, null, 2)}`);
+                });
+        }
+
+        // ========== 4. Koa 风格中间件管道 ==========
+        function demoMiddleware() {
+            clearLog();
+            log('=== Koa 风格中间件管道 ===\n');
+
+            const pipeline = new MiddlewarePipeline();
+
+            // 日志中间件
+            pipeline.use(async (ctx, next) => {
+                log(`[日志] 请求: ${ctx.method} ${ctx.path}`);
+                await next();
+                log(`[日志] 响应状态: ${ctx.status}`);
+            });
+
+            // 计时中间件
+            pipeline.use(async (ctx, next) => {
+                const start = Date.now();
+                await next();
+                const ms = Date.now() - start;
+                log(`[计时] ${ctx.path} 处理耗时 ${ms}ms`);
+            });
+
+            // 认证中间件
+            pipeline.use(async (ctx, next) => {
+                if (!ctx.headers?.authorization) {
+                    ctx.status = 401;
+                    ctx.body = { error: '未授权' };
+                    log(`[认证] 缺少令牌，返回 401`);
+                    return; // 不调用 next，终止链
+                }
+                log(`[认证] 令牌验证通过`);
+                await next();
+            });
+
+            // 业务处理中间件
+            pipeline.use(async (ctx, next) => {
+                ctx.status = 200;
+                ctx.body = { message: 'Hello ' + (ctx.user || 'Guest') };
+                log(`[业务] 处理完成`);
+                await next();
+            });
+
+            log('测试1: 无认证令牌:');
+            pipeline.execute({ method: 'GET', path: '/api/data', headers: {} })
+                .then(ctx => log(`  body: ${JSON.stringify(ctx.body)}`));
+
+            log('\n测试2: 有认证令牌:');
+            pipeline.execute({ method: 'GET', path: '/api/data', headers: { authorization: 'Bearer xxx' } })
+                .then(ctx => log(`  body: ${JSON.stringify(ctx.body)}`));
+        }
+
+        // ========== 5. 错误处理 ==========
+        function demoErrorHandling() {
+            clearLog();
+            log('=== 管道错误处理 ===\n');
+
+            const pipeline = new Pipeline()
+                .pipe(x => {
+                    if (x < 0) throw new Error('输入不能为负数');
+                    return x * 2;
+                })
+                .pipe(x => {
+                    if (x > 100) throw new Error('数值过大');
+                    return x + 10;
+                })
+                .pipe(x => `成功: ${x}`)
+                .onError((err, value) => {
+                    return { error: err.message, lastValue: value };
+                });
+
+            log('正常输入:');
+            let result = pipeline.execute(5);
+            log(`  ${JSON.stringify(result)}`);
+
+            log('\n负数输入:');
+            result = pipeline.execute(-1);
+            log(`  ${JSON.stringify(result)}`);
+
+            log('\n过大输入:');
+            result = pipeline.execute(100); // 100*2=200 > 100
+            log(`  ${JSON.stringify(result)}`);
+
+            log('\n管道模式优势: 每个步骤职责单一，组合灵活，错误处理集中');
+        }
+
+        log('=== 管道模式 Pipeline 演示 ===\n管道模式将处理逻辑分解为独立步骤，数据依次流经各步骤处理。\n\n点击上方按钮查看不同示例。');
+    </script>
+</body>
+</html>

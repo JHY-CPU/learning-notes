@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Promise模式-并发限制</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #limit-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Promise 模式 — 并发限制</h2><p>pLimit 实现、并发队列、令牌桶、最大并发数控制。</p></div>
+    <div class="card">
+        <h2>并发限制实现</h2>
+        <div class="code">// ========== 基础并发限制 ==========
+async function asyncPool(limit, items, fn) {
+    const results = [];
+    const executing = new Set();
+
+    for (const item of items) {
+        const p = Promise.resolve().then(() => fn(item));
+        results.push(p);
+        executing.add(p);
+
+        const clean = () => executing.delete(p);
+        p.then(clean, clean);
+
+        if (executing.size >= limit) {
+            await Promise.race(executing);
+        }
+    }
+
+    return Promise.all(results);
+}
+
+// ========== pLimit 风格 ==========
+function pLimit(concurrency) {
+    const queue = [];
+    let active = 0;
+
+    async function next() {
+        active++;
+        const { fn, resolve, reject } = queue.shift();
+        try {
+            resolve(await fn());
+        } catch (err) {
+            reject(err);
+        } finally {
+            active--;
+            if (queue.length > 0) next();
+        }
+    }
+
+    return function (fn) {
+        return new Promise((resolve, reject) => {
+            queue.push({ fn, resolve, reject });
+            if (active < concurrency) next();
+        });
+    };
+}
+
+// 使用
+const limit = pLimit(3);
+const tasks = urls.map(url => limit(() => fetch(url)));
+const results = await Promise.all(tasks);</div>
+    </div>
+    <div class="card">
+        <h2>演示：并发限制</h2>
+        <button onclick="demoConcurrency()">并发限制演示</button>
+        <button onclick="demoCompare()">对比无限制</button>
+        <div id="limit-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const limitResult = document.getElementById('limit-result');
+
+        function log(msg) {
+            limitResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // 模拟异步任务
+        function createTask(id, duration = 500 + Math.random() * 500) {
+            return async () => {
+                log(`   🚀 任务 ${id} 开始 (需要 ${Math.round(duration)}ms)`);
+                await new Promise(r => setTimeout(r, duration));
+                log(`   ✅ 任务 ${id} 完成`);
+                return `结果 ${id}`;
+            };
+        }
+
+        // 并发限制函数
+        async function runWithLimit(limit, tasks) {
+            const results = [];
+            const running = new Set();
+            let idx = 0;
+
+            async function enqueue() {
+                while (idx < tasks.length) {
+                    if (running.size >= limit) {
+                        await Promise.race(running);
+                    }
+                    const taskIdx = idx++;
+                    const p = tasks[taskIdx]().then(r => {
+                        results[taskIdx] = r;
+                        return r;
+                    });
+                    running.add(p);
+                    p.finally(() => running.delete(p));
+                }
+                await Promise.allSettled(running);
+                return results;
+            }
+
+            return enqueue();
+        }
+
+        async function demoConcurrency() {
+            limitResult.innerHTML = '';
+            log('🔗 并发限制演示 (最大并发 = 3):');
+            log('');
+
+            const tasks = Array.from({ length: 10 }, (_, i) => createTask(i + 1));
+
+            const start = performance.now();
+            await runWithLimit(3, tasks);
+            const elapsed = ((performance.now() - start) / 1000).toFixed(1);
+
+            log(`\n📊 10 个任务, 并发 3, 总耗时 ${elapsed}s`);
+            log('📌 并发限制优势:');
+            log('   • 控制资源使用');
+            log('   • 避免服务器过载');
+            log('   • 稳定的吞吐量');
+        }
+
+        async function demoCompare() {
+            limitResult.innerHTML = '';
+            log('⚖️ 对比: 有限制 vs 无限制:');
+            log('');
+
+            const tasks1 = Array.from({ length: 8 }, (_, i) => createTask(i + 1, 300 + Math.random() * 200));
+            const tasks2 = Array.from({ length: 8 }, (_, i) => createTask(i + 9, 300 + Math.random() * 200));
+
+            log('--- 并发 3 (有限制) ---');
+            const start1 = performance.now();
+            await runWithLimit(3, tasks1);
+            const time1 = ((performance.now() - start1) / 1000).toFixed(1);
+            log(`⏱️ 总耗时: ${time1}s`);
+            log('');
+
+            log('--- 无限制 (全部同时) ---');
+            const start2 = performance.now();
+            await Promise.all(tasks2.map(t => t()));
+            const time2 = ((performance.now() - start2) / 1000).toFixed(1);
+            log(`⏱️ 总耗时: ${time2}s`);
+
+            log('');
+            log('📌 无限制的问题:');
+            log('   • 同时发出大量请求');
+            log('   • 可能耗尽连接池');
+            log('   • 客户端/服务器压力大');
+        }
+
+        console.log('=== Promise 模式: 并发限制 ===');
+
+        document.getElementById('output').textContent =
+            `Promise 并发限制: pLimit / 并发队列 / 令牌桶\n` +
+            `控制最大并发数 / 资源管理 / 稳定吞吐量\n` +
+            `✅ Promise 并发限制演示完成！`;
+    </script>
+</body>
+</html>

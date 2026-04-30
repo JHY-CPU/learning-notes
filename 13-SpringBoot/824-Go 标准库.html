@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 标准库</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📚 Go 标准库</h2><p>os 文件操作、io.Reader/Writer 接口、JSON 序列化、时间处理 time、正则 regexp、字符串 strings/strconv、sort 排序、log 日志。</p></div>
+    <div class="card">
+        <h2>文件操作 os/io</h2>
+        <div class="code">// ========== 文件操作 ==========
+
+package main
+
+import (
+    "bufio"
+    "fmt"
+    "io"
+    "os"
+)
+
+// ========== 读取文件 ==========
+func readFile(filename string) (string, error) {
+    // 方式 1: 一次性读取
+    data, err := os.ReadFile(filename)
+    if err != nil {
+        return "", err
+    }
+    return string(data), nil
+}
+
+// 方式 2: 流式读取 (大文件)
+func readFileStream(filename string) error {
+    f, err := os.Open(filename)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+
+    scanner := bufio.NewScanner(f)
+    for scanner.Scan() {
+        line := scanner.Text()
+        fmt.Println(line)
+    }
+    return scanner.Err()
+}
+
+// 方式 3: 带缓冲读取
+func readBuffered(filename string) error {
+    f, err := os.Open(filename)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+
+    reader := bufio.NewReader(f)
+    for {
+        line, err := reader.ReadString('\n')
+        fmt.Print(line)
+        if err == io.EOF {
+            break
+        }
+        if err != nil {
+            return err
+        }
+    }
+    return nil
+}
+
+// ========== 写入文件 ==========
+func writeFile(filename, content string) error {
+    // 方式 1: 一次性写入
+    return os.WriteFile(filename, []byte(content), 0644)
+}
+
+// 方式 2: 追加写入
+func appendToFile(filename, content string) error {
+    f, err := os.OpenFile(filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+
+    _, err = f.WriteString(content + "\n")
+    return err
+}
+
+// 方式 3: 缓冲写入
+func writeBuffered(filename string, lines []string) error {
+    f, err := os.Create(filename)
+    if err != nil {
+        return err
+    }
+    defer f.Close()
+
+    writer := bufio.NewWriter(f)
+    for _, line := range lines {
+        _, err := writer.WriteString(line + "\n")
+        if err != nil {
+            return err
+        }
+    }
+    return writer.Flush()  // 刷新缓冲区到磁盘
+}
+
+// ========== 文件信息 ==========
+func fileInfo(filename string) {
+    info, err := os.Stat(filename)
+    if err != nil {
+        fmt.Println("文件不存在")
+        return
+    }
+    fmt.Println("名称:", info.Name())
+    fmt.Println("大小:", info.Size())
+    fmt.Println("权限:", info.Mode())
+    fmt.Println("修改时间:", info.ModTime())
+    fmt.Println("是目录:", info.IsDir())
+}
+
+// ========== 目录操作 ==========
+func dirOps() {
+    os.Mkdir("mydir", 0755)                 // 创建单层目录
+    os.MkdirAll("a/b/c", 0755)              // 创建多层目录
+    os.Remove("mydir")                      // 删除文件或空目录
+    os.RemoveAll("a")                       // 递归删除
+
+    entries, _ := os.ReadDir(".")
+    for _, e := range entries {
+        fmt.Println(e.Name(), e.IsDir())
+    }
+}
+
+// ========== io.Reader / io.Writer ==========
+// 核心接口:
+// type Reader interface { Read(p []byte) (n int, err error) }
+// type Writer interface { Write(p []byte) (n int, err error) }
+
+// io.Copy: Reader → Writer
+func copyFile(src, dst string) error {
+    source, err := os.Open(src)
+    if err != nil {
+        return err
+    }
+    defer source.Close()
+
+    dest, err := os.Create(dst)
+    if err != nil {
+        return err
+    }
+    defer dest.Close()
+
+    _, err = io.Copy(dest, source)
+    return err
+}
+
+// 限制读取: io.LimitReader
+// func (w http.ResponseWriter, r *http.Request) {
+//     limitedReader := io.LimitReader(r.Body, 10<<20)  // 10MB 限制
+//     body, _ := io.ReadAll(limitedReader)
+// }</div>
+    </div>
+    <div class="card">
+        <h2>JSON 序列化</h2>
+        <div class="code">// ========== JSON ==========
+
+import "encoding/json"
+
+type User struct {
+    ID        int64     `json:"id"`
+    Username  string    `json:"username"`
+    Email     string    `json:"email,omitempty"`  // 空则忽略
+    Password  string    `json:"-"`                // 忽略
+    CreatedAt time.Time `json:"created_at"`
+    Roles     []string  `json:"roles"`
+}
+
+// ========== 序列化 ==========
+func marshalDemo() {
+    user := User{
+        ID:        1,
+        Username:  "alice",
+        Email:     "alice@example.com",
+        Password:  "secret123",
+        CreatedAt: time.Now(),
+        Roles:     []string{"user", "admin"},
+    }
+
+    // 格式化输出
+    data, _ := json.MarshalIndent(user, "", "  ")
+    fmt.Println(string(data))
+    // {
+    //   "id": 1,
+    //   "username": "alice",
+    //   "email": "alice@example.com",
+    //   "created_at": "2024-01-15T10:30:00+08:00",
+    //   "roles": ["user", "admin"]
+    // }
+    // 注意: password 被忽略
+
+    // 紧凑输出
+    data2, _ := json.Marshal(user)
+    fmt.Println(string(data2))
+}
+
+// ========== 反序列化 ==========
+func unmarshalDemo() {
+    jsonStr := `{
+        "id": 1,
+        "username": "alice",
+        "email": "alice@example.com"
+    }`
+
+    var user User
+    err := json.Unmarshal([]byte(jsonStr), &user)
+    if err != nil {
+        fmt.Println("解析失败:", err)
+        return
+    }
+    fmt.Println(user.Username)  // alice
+
+    // 解析到 map
+    var result map[string]interface{}
+    json.Unmarshal([]byte(jsonStr), &result)
+    fmt.Println(result["username"])  // alice (类型为 interface{})
+
+    // 类型断言提取
+    username := result["username"].(string)
+}
+
+// ========== streaming JSON ==========
+// 大 JSON 流式处理
+
+func streamJSON(reader io.Reader) {
+    dec := json.NewDecoder(reader)
+    for {
+        var user User
+        if err := dec.Decode(&user); err == io.EOF {
+            break
+        } else if err != nil {
+            log.Fatal(err)
+        }
+        fmt.Println(user.Username)
+    }
+}
+
+// ========== 自定义 JSON ==========
+type Duration time.Duration
+
+func (d Duration) MarshalJSON() ([]byte, error) {
+    return json.Marshal(time.Duration(d).String())
+}
+
+func (d *Duration) UnmarshalJSON(b []byte) error {
+    var s string
+    if err := json.Unmarshal(b, &s); err != nil {
+        return err
+    }
+    dur, err := time.ParseDuration(s)
+    if err != nil {
+        return err
+    }
+    *d = Duration(dur)
+    return nil
+}</div>
+    </div>
+    <div class="card">
+        <h2>时间与字符串</h2>
+        <div class="code">// ========== time 包 ==========
+
+import "time"
+
+func timeDemo() {
+    now := time.Now()
+    fmt.Println(now)                    // 2024-01-15 10:30:00 +0800 CST
+
+    // 创建时间
+    specific := time.Date(2024, 1, 15, 10, 30, 0, 0, time.UTC)
+
+    // 格式化 (Go 的参考时间是 Mon Jan 2 15:04:05 MST 2006 = 1 2 3 4 5 6 7)
+    fmt.Println(now.Format("2006-01-02 15:04:05"))    // 2024-01-15 10:30:00
+    fmt.Println(now.Format("2006/01/02"))             // 2024/01/15
+    fmt.Println(now.Format(time.RFC3339))             // 2024-01-15T10:30:00+08:00
+
+    // 解析
+    t, _ := time.Parse("2006-01-02", "2024-01-15")
+    t2, _ := time.Parse(time.RFC3339, "2024-01-15T10:30:00Z")
+
+    // 时间计算
+    later := now.Add(2 * time.Hour)
+    diff := later.Sub(now)              // 2h0m0s
+
+    // 时间比较
+    fmt.Println(now.Before(later))      // true
+    fmt.Println(now.After(later))       // false
+
+    // 定时器
+    timer := time.NewTimer(2 * time.Second)
+    <-timer.C                           // 2 秒后触发
+
+    ticker := time.NewTicker(time.Second)
+    for range ticker.C {               // 每秒触发
+        fmt.Println("tick")
+    }
+
+    // 休眠
+    time.Sleep(100 * time.Millisecond)
+
+    // 时区
+    loc, _ := time.LoadLocation("Asia/Shanghai")
+    shanghaiTime := now.In(loc)
+}
+
+// ========== strings 包 ==========
+import "strings"
+
+func stringDemo() {
+    s := "Hello, World!"
+
+    strings.Contains(s, "World")       // true
+    strings.HasPrefix(s, "Hello")      // true
+    strings.HasSuffix(s, "!")          // true
+    strings.Index(s, "World")          // 7
+    strings.Count(s, "l")              // 3
+
+    strings.ToUpper(s)                 // "HELLO, WORLD!"
+    strings.ToLower(s)                 // "hello, world!"
+    strings.TrimSpace("  hello  ")     // "hello"
+    strings.Replace(s, "World", "Go", 1) // "Hello, Go!"
+    strings.Split("a,b,c", ",")        // ["a", "b", "c"]
+    strings.Join([]string{"a", "b"}, ",") // "a,b"
+
+    // Builder (高效字符串拼接)
+    var sb strings.Builder
+    sb.WriteString("Hello")
+    sb.WriteString(", ")
+    sb.WriteString("World!")
+    fmt.Println(sb.String())           // Hello, World!
+}
+
+// ========== strconv ==========
+import "strconv"
+
+func strconvDemo() {
+    // string ↔ int
+    n, _ := strconv.Atoi("42")         // string → int
+    s := strconv.Itoa(42)              // int → string
+
+    // Parse
+    f, _ := strconv.ParseFloat("3.14", 64)
+    b, _ := strconv.ParseBool("true")
+    i64, _ := strconv.ParseInt("255", 16, 64)  // 16进制
+
+    // Format
+    str := strconv.FormatInt(255, 16)  // "ff"
+}</div>
+    </div>
+    <div class="card">
+        <h2>排序与日志</h2>
+        <div class="code">// ========== sort 包 ==========
+
+import "sort"
+
+func sortDemo() {
+    // 基本类型排序
+    nums := []int{3, 1, 4, 1, 5}
+    sort.Ints(nums)                // [1, 1, 3, 4, 5]
+    sort.Sort(sort.Reverse(sort.IntSlice(nums))) // 降序
+
+    strs := []string{"c", "a", "b"}
+    sort.Strings(strs)             // [a, b, c]
+
+    // 自定义排序 (使用 less 函数)
+    users := []User{
+        {Username: "Alice", ID: 3},
+        {Username: "Bob", ID: 1},
+        {Username: "Charlie", ID: 2},
+    }
+
+    sort.Slice(users, func(i, j int) bool {
+        return users[i].ID < users[j].ID
+    })
+    // 按 ID 升序: [Bob, Charlie, Alice]
+
+    // 二分查找 (已排序的切片)
+    arr := []int{1, 3, 5, 7, 9}
+    idx := sort.Search(len(arr), func(i int) bool {
+        return arr[i] >= 5
+    })
+    fmt.Println(idx)  // 2 (arr[2] = 5)
+}
+
+// ========== log 包 ==========
+import "log"
+
+func logDemo() {
+    // 基本日志 (输出到 stderr)
+    log.Println("信息日志")
+    log.Printf("用户 %s 登录", "alice")
+    log.Fatalln("致命错误")       // 输出后 os.Exit(1)
+    // log.Panicln("panic")     // 输出后 panic
+
+    // 自定义 logger
+    logger := log.New(os.Stdout, "APP: ", log.Ldate|log.Ltime|log.Lshortfile)
+    logger.Println("自定义日志")
+
+    // 配置
+    log.SetFlags(log.Ldate | log.Ltime | log.Lmicroseconds | log.Lshortfile)
+    log.SetPrefix("DEBUG: ")
+    log.SetOutput(os.Stdout)
+
+    // 生产环境建议使用结构化日志库: zap / logrus / zerolog
+}
+
+// ========== regexp 正则 ==========
+import "regexp"
+
+func regexpDemo() {
+    // 编译 (一次编译, 多次使用)
+    re := regexp.MustCompile(`^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$`)
+
+    // 匹配
+    fmt.Println(re.MatchString("test@example.com"))  // true
+    fmt.Println(re.MatchString("invalid"))           // false
+
+    // 提取
+    logRe := regexp.MustCompile(`(\d{4}-\d{2}-\d{2}) (\w+)`)
+    matches := logRe.FindStringSubmatch("2024-01-15 ERROR: xxx")
+    fmt.Println(matches[0])  // "2024-01-15 ERROR"
+    fmt.Println(matches[1])  // "2024-01-15"
+    fmt.Println(matches[2])  // "ERROR"
+
+    // 替换
+    result := regexp.MustCompile(`\d+`).ReplaceAllString("id: 123, count: 456", "***")
+    fmt.Println(result)      // "id: ***, count: ***"
+}</div>
+        <div class="note">💡 标准库要点: os.ReadFile/WriteFile 快捷读写; bufio.Scanner 大文件逐行; io.Copy 流式复制; json.Marshal/Unmarshal 序列化; time.Format 2006-01-02; strings.Builder 高效拼接; sort.Slice 自定义排序; log 包基础日志; regexp.MustCompile 编译正则; strconv.Atoi/Itoa 数字转换。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoFile()">文件操作</button>
+        <button onclick="demoJSON()">JSON</button>
+        <button onclick="demoTime()">时间</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoFile() {
+            result.innerHTML = '';
+            log('# Go 文件操作');
+            log('');
+            log('读取:');
+            log('  os.ReadFile("file")      — 全读');
+            log('  bufio.NewScanner(f)      — 逐行');
+            log('  os.Open("file")          — 打开');
+            log('');
+            log('写入:');
+            log('  os.WriteFile("f", data)  — 全写');
+            log('  bufio.NewWriter(f)       — 缓冲写');
+            log('  io.Copy(dst, src)        — 流复制');
+            log('');
+            log('检查: os.Stat("file")');
+        }
+
+        function demoJSON() {
+            result.innerHTML = '';
+            log('# JSON');
+            log('');
+            log('类型:');
+            log('  json.Marshal(v)       → []byte');
+            log('  json.Unmarshal(b, &v) → 解析');
+            log('  json.MarshalIndent    → 格式化');
+            log('');
+            log('流式:');
+            log('  json.NewDecoder(r).Decode(&v)');
+            log('  json.NewEncoder(w).Encode(v)');
+            log('');
+            log('标签: `json:"name,omitempty"`');
+            log('`json:"-"` 忽略字段');
+        }
+
+        function demoTime() {
+            result.innerHTML = '';
+            log('# time 包');
+            log('');
+            log('参考时间: Mon Jan 2 15:04:05 MST 2006');
+            log('格式: 1 2 3 4 5 6 7');
+            log('');
+            log('示例:');
+            log('  2006-01-02 15:04:05');
+            log('  2006/01/02');
+            log('  time.RFC3339');
+            log('');
+            log('操作:');
+            log('  Add, Sub, Before, After');
+            log('  time.Timer / time.Ticker');
+            log('  time.Sleep');
+            log('  time.LoadLocation');
+        }
+    </script>
+</body>
+</html>

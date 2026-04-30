@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据缓存策略</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #cache-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>数据缓存策略</h2><p>内存缓存 / localStorage 缓存 / Cache-API / LRU / SWR 模式。</p></div>
+    <div class="card">
+        <h2>内存缓存 (Map)</h2>
+        <div class="code">// 最简单的内存缓存
+const cache = new Map();
+
+function getCached(key, fn) {
+    if (cache.has(key)) {
+        return Promise.resolve(cache.get(key));
+    }
+    return fn().then(val => {
+        cache.set(key, val);
+        return val;
+    });
+}
+
+// 带 TTL 的缓存
+class TTLCache {
+    constructor(ttlMs = 60000) {
+        this.cache = new Map();
+        this.ttl = ttlMs;
+    }
+    get(key) {
+        const item = this.cache.get(key);
+        if (!item) return undefined;
+        if (Date.now() - item.time > this.ttl) {
+            this.cache.delete(key);
+            return undefined;
+        }
+        return item.value;
+    }
+    set(key, value) {
+        this.cache.set(key, { value, time: Date.now() });
+    }
+    delete(key) { this.cache.delete(key); }
+    clear() { this.cache.clear(); }
+}</div>
+    </div>
+    <div class="card">
+        <h2>SWR 模式</h2>
+        <div class="code">// Stale-While-Revalidate: 先返回缓存，再后台更新
+async function swrFetch(key, fetchFn) {
+    const cached = localStorage.getItem(key);
+    if (cached) {
+        // 异步更新缓存（不阻塞 UI）
+        fetchFn().then(data => {
+            localStorage.setItem(key, JSON.stringify(data));
+        }).catch(() => {});
+        return JSON.parse(cached); // 立即返回旧的
+    }
+    const data = await fetchFn();
+    localStorage.setItem(key, JSON.stringify(data));
+    return data;
+}
+
+// 使用
+const data = await swrFetch('posts', () =>
+    fetch('/api/posts').then(r => r.json())
+);</div>
+        <div class="note">💡 SWR 模式在用户体验上非常好：秒开旧数据 → 后台更新。<br>
+        💡 内存缓存最快但页面刷新丢失，localStorage 持久但读取慢。<br>
+        💡 Cache-API 专为 HTTP 请求设计，配合 Service Worker 使用。</div>
+    </div>
+    <div class="card">
+        <h2>演示：缓存效果</h2>
+        <button onclick="demoTTL()">TTL 缓存演示</button>
+        <button onclick="demoSWR()">SWR 模式演示</button>
+        <div id="cache-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const cacheResult = document.getElementById('cache-result');
+
+        function log(msg) {
+            cacheResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // TTL 缓存
+        class TTLCache {
+            constructor(ttl = 3000) {
+                this.store = new Map();
+                this.ttl = ttl;
+            }
+            get(key) {
+                const item = this.store.get(key);
+                if (!item) return null;
+                if (Date.now() - item.time > this.ttl) {
+                    this.store.delete(key);
+                    return null;
+                }
+                return item.value;
+            }
+            set(key, value) {
+                this.store.set(key, { value, time: Date.now() });
+            }
+        }
+
+        function demoTTL() {
+            cacheResult.innerHTML = '';
+            const ttlCache = new TTLCache(2000);
+
+            ttlCache.set('key1', '缓存数据 A');
+            log(`立即读取: ${ttlCache.get('key1')}`);
+            log(`等待 3 秒后...`);
+
+            setTimeout(() => {
+                const val = ttlCache.get('key1');
+                log(`3 秒后读取: ${val === null ? '❌ 已过期' : val}`);
+            }, 3000);
+        }
+
+        function demoSWR() {
+            cacheResult.innerHTML = '';
+            let fetchCount = 0;
+
+            // 模拟 fetch
+            async function fetchData() {
+                fetchCount++;
+                await new Promise(r => setTimeout(r, 500));
+                return { data: `结果 #${fetchCount}`, time: Date.now() };
+            }
+
+            // SWR
+            async function swrFetch(key, fn) {
+                const cached = sessionStorage.getItem(key);
+                if (cached) {
+                    log('📦 命中缓存，立即返回旧数据');
+                    log('🔄 后台异步更新数据...');
+                    fn().then(data => {
+                        sessionStorage.setItem(key, JSON.stringify(data));
+                        log(`✅ 缓存已更新: ${JSON.stringify(data)}`);
+                    });
+                    return JSON.parse(cached);
+                }
+                log('🆕 首次请求...');
+                const data = await fn();
+                sessionStorage.setItem(key, JSON.stringify(data));
+                return data;
+            }
+
+            (async () => {
+                const r1 = await swrFetch('swr-demo', fetchData);
+                log(`第1次: ${JSON.stringify(r1)}`);
+
+                const r2 = await swrFetch('swr-demo', fetchData);
+                log(`第2次 (SWR): ${JSON.stringify(r2)}`);
+
+                setTimeout(async () => {
+                    const r3 = await swrFetch('swr-demo', fetchData);
+                    log(`第3次 (SWR): ${JSON.stringify(r3)}`);
+                }, 1000);
+            })();
+        }
+
+        console.log('=== 数据缓存策略 ===');
+
+        document.getElementById('output').textContent =
+            `缓存策略: 内存TTL / localStorage / SWR / Cache-API / LRU\n` +
+            `SWR: Stale-While-Revalidate（先旧后新）\n` +
+            `✅ 缓存策略演示完成！`;
+    </script>
+</body>
+</html>

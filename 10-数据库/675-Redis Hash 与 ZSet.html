@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redis Hash 与 ZSet</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔢 Redis Hash 与 ZSet</h2><p>Hash 操作 (HSET/HGET/HGETALL/HINCRBY)、对象存储 (用户/商品)、ZSet 操作 (ZADD/ZRANGE/ZREVRANGE/ZRANK)、排行榜实现、分数与范围查询。</p></div>
+    <div class="card">
+        <h2>Hash 类型</h2>
+        <div class="code">// ========== Hash (哈希) ==========
+// 键值对集合, 适合存储对象
+// 类似 Java HashMap 或 Python dict
+
+// ========== 基本操作 ==========
+
+// 设置字段
+HSET user:1000 name "Alice"           // 1
+HSET user:1000 age 28                 // 1 (另一字段)
+HSET user:1000 email "alice@test.com" // 1
+
+// 同时设置多个字段
+HSET user:1001 name "Bob" age 25 email "bob@test.com"
+
+// 获取字段
+HGET user:1000 name                   // "Alice"
+HGET user:1000 age                    // "28"
+
+// 获取多个字段
+HMGET user:1000 name email            // ["Alice", "alice@test.com"]
+
+// 获取所有字段和值
+HGETALL user:1000
+// 1) "name"   2) "Alice"  3) "age"  4) "28"  5) "email" 6) "alice@test.com"
+
+// 获取所有字段名 / 所有值
+HKEYS user:1000                       // ["name", "age", "email"]
+HVALS user:1000                       // ["Alice", "28", "alice@test.com"]
+
+// 删除字段
+HDEL user:1000 age                    // 1 (删除成功)
+HDEL user:1000 age                    // 0 (不存在)
+
+// ========== 计数器 ==========
+
+HINCRBY user:1000 login_count 1       // 登录次数 +1
+HINCRBY user:1000 score 10            // 积分 +10
+HINCRBY user:1000 score -5            // 积分 -5
+HINCRBYFLOAT product:1 price 9.99     // 浮点数增加
+
+// ========== 存在检查 ==========
+
+HEXISTS user:1000 email              // 是否存在: 1
+HLEN user:1000                       // 字段数量: 3
+
+// ========== 原子操作 ==========
+
+HSETNX user:1000 phone "138xxxx"     // 不存在才设置 (防止覆盖)
+HSTRLEN user:1000 name               // 值长度</div>
+    </div>
+    <div class="card">
+        <h2>Hash 对象存储模式</h2>
+        <div class="code">// ========== Hash 存储对象 ==========
+
+// ========== 方法 1: Hash (推荐) ==========
+HSET user:1000 name "Alice" age 28 email "alice@test.com"
+// 优点: 节省内存, 可单独读写字段
+// 适合: 对象/结构化数据
+
+// ========== 方法 2: String JSON (简单) ==========
+SET user:1000 '{"name":"Alice","age":28,"email":"alice@test.com"}'
+// 优点: 简单
+// 缺点: 更新字段需要整个重写
+
+// ========== 方法 3: 多个 String ==========
+SET user:1000:name "Alice"
+SET user:1000:age 28
+SET user:1000:email "alice@test.com"
+// 缺点: 键太多, 管理复杂
+
+// ========== 选择建议 ==========
+// 经常读写单字段 → Hash
+// 整体读写, 很少部分更新 → String JSON
+// 简单 KV → String
+
+// ========== 实战: 用户会话 ==========
+// 存储会话数据
+HSET session:abc123
+    user_id 1000
+    login_at "2024-10-01T10:00:00"
+    ip "192.168.1.1"
+    role "admin"
+
+// 读取特定字段
+HGET session:abc123 user_id       // "1000"
+
+// 设置过期 (会话过期)
+EXPIRE session:abc123 86400       // 24 小时
+
+// ========== Hash 内存优化 ==========
+// 小 Hash 使用 ziplist 编码 (节省内存)
+// 当字段 > 512 或值 > 64 byte 时转为 hashtable
+// 适合存储大量小对象 (如用户资料)
+
+// 查看编码:
+OBJECT ENCODING user:1000         // "ziplist" 或 "hashtable"</div>
+    </div>
+    <div class="card">
+        <h2>ZSet (有序集合)</h2>
+        <div class="code">// ========== ZSet (Sorted Set) ==========
+// 带分数的有序唯一元素集合
+// 每个元素关联一个分数, 按分数排序
+// 核心应用: 排行榜
+
+// ========== 基本操作 ==========
+
+// 添加元素 (带分数)
+ZADD leaderboard 100 "Alice"          // 1
+ZADD leaderboard 200 "Bob"            // 1
+ZADD leaderboard 150 "Carol"          // 1
+ZADD leaderboard 200 "Bob"            // 0 (已存在, 更新分数)
+
+// 删除元素
+ZREM leaderboard "Carol"              // 1
+
+// ========== 查询 ==========
+
+// 按排名范围查 (低→高)
+ZRANGE leaderboard 0 -1               // 所有, 分数升序
+ZRANGE leaderboard 0 -1 WITHSCORES    // 带分数
+
+// 按排名范围查 (高→低)
+ZREVRANGE leaderboard 0 -1 WITHSCORES // 降序
+
+// 按分数范围查
+ZRANGEBYSCORE leaderboard 100 200      // 分数 100-200 的
+ZRANGEBYSCORE leaderboard 100 +inf     // 分数 >= 100
+
+// 获取排名
+ZRANK leaderboard "Alice"             // 排名 (0-based, 升序)
+ZREVRANK leaderboard "Alice"          // 排名 (降序)
+
+// ========== 获取分数/计数 ==========
+
+ZSCORE leaderboard "Alice"            // 100
+ZCARD leaderboard                     // 元素数量: 3
+ZCOUNT leaderboard 100 200            // 分数范围内个数: 3
+
+// ========== 增减分数 ==========
+
+ZINCRBY leaderboard 50 "Alice"        // Alice +50 → 150
+ZINCRBY leaderboard -30 "Bob"         // Bob -30 → 170
+
+// ========== 删除 ==========
+
+ZPOPMAX leaderboard 1                 // 弹出最高分的 1 个
+ZPOPMIN leaderboard 1                 // 弹出最低分的 1 个
+ZREMRANGEBYRANK leaderboard 0 99      // 删除排名前 100 (低分)
+ZREMRANGEBYSCORE leaderboard 0 50     // 删除分数 0-50 的</div>
+    </div>
+    <div class="card">
+        <h2>ZSet 排行榜实战</h2>
+        <div class="code">// ========== ZSet 实战应用 ==========
+
+// ========== 1. 游戏排行榜 ==========
+// 每日更新
+ZADD leaderboard:daily:20241001
+    1500 "player:100"
+    1200 "player:200"
+    1800 "player:300"
+    900  "player:400"
+
+// Top 10:
+ZREVRANGE leaderboard:daily:20241001 0 9 WITHSCORES
+
+// 玩家排名:
+ZREVRANK leaderboard:daily:20241001 "player:100"
+ZSCORE leaderboard:daily:20241001 "player:100"
+
+// 玩家周围 (5 名上下):
+// 先查排名, 再用 ZRANGE 获取周围
+
+// ========== 2. 热门文章 ==========
+ZINCRBY hot:articles 1 "article:42"    // 浏览 +1
+ZINCRBY hot:articles 5 "article:42"    // 点赞 +5
+
+// 今日热门:
+ZREVRANGE hot:articles 0 9 WITHSCORES
+
+// ========== 3. 自动补全 (时间线) ==========
+// 用时间戳做分数
+ZADD timeline:user:100
+    1696118400 "post:1"
+    1696204800 "post:2"
+    1696291200 "post:3"
+
+// 最新动态:
+ZREVRANGE timeline:user:100 0 9
+
+// ========== 4. 延时队列 ==========
+// 用执行时间戳做分数
+ZADD delayed:queue
+    1696118400 "task:1"
+    1696204800 "task:2"
+
+// 轮询到期任务:
+ZRANGEBYSCORE delayed:queue 0 1696118420  // 当前时间
+ZREMRANGEBYSCORE delayed:queue 0 1696118420  // 处理完删除
+
+// ========== 5. 商品销量排行 ==========
+ZINCRBY product:sales:monthly:202410 1 "product:42"
+ZREVRANGE product:sales:monthly:202410 0 9 WITHSCORES</div>
+        <div class="note">💡 Hash 要点: 存储对象推荐 Hash (不是 String JSON); HINCRBY 原子计数器; HSETNX 防覆盖; 小 Hash 用 ziplist 省内存。ZSet 要点: 排行榜核心工具; ZINCRBY 动态更新; ZREVRANGE Top-N; ZRANK/ZREVRANK 查排名; 适合排行榜/延时队列/热门列表。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoHash()">Hash 操作</button>
+        <button onclick="demoZSet()">ZSet 操作</button>
+        <button onclick="demoLeader()">排行榜</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoHash() {
+            result.innerHTML = '';
+            log('# Hash 操作');
+            log('');
+            log('HSET user:1000 name "Alice"');
+            log('HGET user:1000 name → "Alice"');
+            log('HGETALL user:1000 → 全部字段');
+            log('HINCRBY user:1000 score 10');
+            log('HEXISTS user:1000 email → 0/1');
+        }
+
+        function demoZSet() {
+            result.innerHTML = '';
+            log('# ZSet 操作');
+            log('');
+            log('ZADD leaderboard 100 "Alice"');
+            log('ZADD leaderboard 200 "Bob"');
+            log('ZRANGE leaderboard 0 -1 → 升序');
+            log('ZREVRANGE 0 -1 WITHSCORES → 降序带分');
+            log('ZRANK key member → 排名');
+        }
+
+        function demoLeader() {
+            result.innerHTML = '';
+            log('# 排行榜实战');
+            log('');
+            log('Top 10:');
+            log('  ZREVRANGE leaderboard 0 9');
+            log('');
+            log('玩家排名:');
+            log('  ZREVRANK leaderboard player:100');
+            log('');
+            log('分数增减:');
+            log('  ZINCRBY leaderboard 50 player:100');
+        }
+    </script>
+</body>
+</html>

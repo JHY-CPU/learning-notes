@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redis 高可用哨兵与集群</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔒 Redis 高可用哨兵与集群</h2><p>主从复制原理、Sentinel 哨兵模式、Redis Cluster 集群架构、分片与哈希槽、集群 vs 哨兵对比、客户端连接方案。</p></div>
+    <div class="card">
+        <h2>主从复制</h2>
+        <div class="code">// ========== Redis 主从复制 ==========
+
+// ========== 配置 ==========
+// 从节点配置文件:
+replicaof 127.0.0.1 6379   # 指定主节点
+replica-read-only yes       # 从节点只读 (默认)
+
+// 命令行:
+SLAVEOF 127.0.0.1 6379     // 临时启用
+SLAVEOF NO ONE              // 取消复制
+
+// ========== 复制原理 ==========
+// 1. 从节点发送 SYNC/PSYNC 命令
+// 2. 主节点执行 BGSAVE (生成 RDB)
+// 3. 主节点发送 RDB 到从节点
+// 4. 从节点加载 RDB
+// 5. 主节点发送后续增量命令 (repl backlog)
+
+// 全量复制: 初次/断连重连
+// 部分复制: 断连时间短, 从 backlog 中恢复
+
+// ========== 复制偏移量 ==========
+INFO replication
+// role:slave
+// master_host:127.0.0.1
+// master_port:6379
+// master_link_status:up
+// master_last_io_seconds_ago:0
+// slave_repl_offset:123456
+
+// ========== 主从架构优点 ==========
+// ✅ 读写分离 (主写从读)
+// ✅ 数据冗余
+// ✅ 从节点做备份
+// ✅ 水平扩展读能力
+
+// ========== 主从架构局限 ==========
+// ❌ 主节点故障需手动切换
+// ❌ 主节点写仍是单点
+// ❌ 复制延迟 (异步复制)</div>
+    </div>
+    <div class="card">
+        <h2>Sentinel 哨兵</h2>
+        <div class="code">// ========== Sentinel ==========
+// Redis 高可用方案: 自动故障转移
+
+// ========== 架构 ==========
+// ┌─────────────────────────────┐
+// │       Sentinel 集群          │
+// │  (3 个哨兵, 奇数确保投票)    │
+// │  sentinel-1 sentinel-2 sentinel-3 │
+// └──────┬──────────────────────┘
+//        │ 监控
+// ┌──────┴──────────────────────┐
+// │  Redis 主从                  │
+// │  Master (主)                │
+// │  ├── Slave-1 (从)           │
+// │  └── Slave-2 (从)           │
+// └─────────────────────────────┘
+
+// ========== Sentinel 配置 ==========
+# sentinel.conf
+port 26379
+sentinel monitor mymaster 127.0.0.1 6379 2
+sentinel down-after-milliseconds mymaster 5000
+sentinel failover-timeout mymaster 60000
+
+// 说明:
+// monitor mymaster: 监控名称为 mymaster 的主节点
+// 2: 需要 2 个哨兵同意才能判定主节点下线
+// down-after-milliseconds: 主观下线判定时间
+// failover-timeout: 故障转移超时
+
+// ========== 启动哨兵 ==========
+redis-sentinel /path/to/sentinel.conf
+
+// ========== Sentinel 命令 ==========
+SENTINEL masters                    // 查看所有主节点
+SENTINEL slaves mymaster            // 查看从节点
+SENTINEL sentinels mymaster         // 查看其他哨兵
+SENTINEL get-master-addr-by-name mymaster  // 获取主节点地址
+SENTINEL failover mymaster          // 手动故障转移
+
+// ========== 故障转移流程 ==========
+// 1. 哨兵检测到主节点主观下线 (sdown)
+// 2. 哨兵询问其他哨兵确认 (需要 quorum 数)
+// 3. 确认客观下线 (odown)
+// 4. 哨兵推选 Leader (Raft 选举)
+// 5. Leader 选择一个从节点成为新主
+//    选举规则: 优先级高 > 复制偏移量大 > runid 小
+// 6. 其他从节点指向新主
+// 7. 原主恢复后成为从节点</div>
+    </div>
+    <div class="card">
+        <h2>Redis Cluster</h2>
+        <div class="code">// ========== Redis Cluster ==========
+// 分布式方案: 自动分片 + 高可用
+
+// ========== 架构 ==========
+// ┌─────────────────────────────────┐
+// │  Redis Cluster                  │
+// │  ┌──────┐ ┌──────┐ ┌──────┐   │
+// │  │Node A│ │Node B│ │Node C│   │
+// │  │0-5460│ │5461-│ │10923-│   │
+// │  │      │ │10922│ │16383│   │
+// │  │Master│ │Master│ │Master│   │
+// │  ├──────┤ ├──────┤ ├──────┤   │
+// │  │Slave │ │Slave │ │Slave │   │
+// │  └──────┘ └──────┘ └──────┘   │
+// └─────────────────────────────────┘
+
+// ========== 哈希槽 ==========
+// 16384 个哈希槽 (0-16383)
+// 每个 key 通过 CRC16(key) % 16384 分配到槽
+// 槽均匀分布到所有主节点
+
+// 计算槽:
+HASH SLOT key    // 查看 key 的槽号
+
+// ========== 配置 ==========
+// redis.conf
+port 7000
+cluster-enabled yes
+cluster-config-file nodes.conf
+cluster-node-timeout 5000
+
+// ========== 创建集群 ==========
+// 启动 6 个节点 (3 主 + 3 从):
+
+redis-cli --cluster create \
+    127.0.0.1:7000 127.0.0.1:7001 127.0.0.1:7002 \
+    127.0.0.1:7003 127.0.0.1:7004 127.0.0.1:7005 \
+    --cluster-replicas 1
+// --cluster-replicas 1: 每个主节点配 1 个从节点
+
+// ========== 集群操作 ==========
+// 连接集群 (-c 启用集群模式):
+redis-cli -c -p 7000
+
+// 查看集群状态:
+CLUSTER INFO
+CLUSTER NODES
+CLUSTER SLOTS
+
+// 重新分片:
+redis-cli --cluster reshard 127.0.0.1:7000
+
+// 添加节点:
+redis-cli --cluster add-node 127.0.0.1:7006 127.0.0.1:7000
+
+// ========== 集群限制 ==========
+// 1. 不支持多 key 操作 (除非相同槽)
+// 2. 不支持 Lua 脚本中的多 key (除非相同槽)
+// 3. 不支持事务跨槽
+// 4. 只能使用 db 0
+// 5. Pipeline 中的 key 需在相同槽
+// 解决: 使用 hash tags: {user:1000}.name</div>
+    </div>
+    <div class="card">
+        <h2>解决方案对比与选型</h2>
+        <div class="code">// ========== 对比 ==========
+// ┌──────────────┬───────────┬─────────────┬─────────────┐
+// │ 特性          │ 主从       │ Sentinel    │ Cluster     │
+// ├──────────────┼───────────┼─────────────┼─────────────┤
+// │ 自动故障转移  │ ❌        │ ✅          │ ✅          │
+// │ 水平扩展写    │ ❌        │ ❌          │ ✅          │
+// │ 水平扩展读    │ ✅ 加从   │ ✅ 加从     │ ✅ 加节点   │
+// │ 分片          │ ❌        │ ❌          │ ✅          │
+// │ 最大节点数    │ 1主+N从  │ 1主+N从    │ ~1000       │
+// │ 运维复杂度    │ 低        │ 中          │ 高          │
+// │ 客户端支持    │ 简单      │ 简单        │ 集群模式    │
+// ├──────────────┼───────────┼─────────────┼─────────────┤
+// │ 适用场景      │ 开发测试  │ 生产高可用  │ 超大数据量  │
+// └──────────────┴───────────┴─────────────┴─────────────┘
+
+// ========== 选型建议 ==========
+// 单机 (开发/小项目): 单个 Redis
+// 高可用 (生产): Sentinel (3 个哨兵 + 1 主 2 从)
+// 大数据 (几百 GB): Cluster (自动分片)
+// 数据 < 单机内存: Sentinel 更简单
+// 数据 > 单机内存: Cluster 必须
+
+// ========== 云托管方案 ==========
+// AWS ElastiCache: 托管 Redis, 自动故障转移
+// Redis Cloud: Redis 官方云
+// 阿里云 Redis: 托管 + 集群
+// 用云托管可省去运维复杂度</div>
+        <div class="note">💡 高可用要点: 主从复制做读写分离; Sentinel 做自动故障转移; Cluster 做水平分片; Sentinel 是 HA 方案, Cluster 是分布式方案; 数据 < 单机内存用 Sentinel; 数据 > 单机内存用 Cluster; 云托管简化运维。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoRepl()">主从复制</button>
+        <button onclick="demoSentinel()">哨兵模式</button>
+        <button onclick="demoCluster()">集群模式</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoRepl() {
+            result.innerHTML = '';
+            log('# 主从复制');
+            log('');
+            log('replicaof 127.0.0.1 6379');
+            log('从节点只读, 主节点写');
+            log('全量复制: RDB 同步');
+            log('增量复制: backlog 恢复');
+            log('主故障需手动切换');
+        }
+
+        function demoSentinel() {
+            result.innerHTML = '';
+            log('# Sentinel 哨兵');
+            log('');
+            log('3 个哨兵 (奇数)');
+            log('自动故障转移');
+            log('监控 → 投票 → 选举新主');
+            log('原主恢复后变为从');
+            log('quorum: 2 个哨兵确认');
+        }
+
+        function demoCluster() {
+            result.innerHTML = '';
+            log('# Redis Cluster');
+            log('');
+            log('16384 哈希槽自动分配');
+            log('CRC16(key) % 16384');
+            log('3 主 3 从 (生产)');
+            log('自动故障转移 + 分片');
+            log('用 hash tags 处理多 key');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shadow DOM</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Shadow DOM</h2><p>attachShadow、mode(open/closed)、样式隔离、:host/slotted。</p></div>
+    <div class="card">
+        <h2>Shadow DOM API</h2>
+        <div class="code">// ========== 创建 Shadow DOM ==========
+const host = document.getElementById('host');
+const shadow = host.attachShadow({ mode: 'open' });
+// mode: 'open' - 外部可访问 shadowRoot
+// mode: 'closed' - 外部不可访问
+
+// ========== 添加内容 ==========
+shadow.innerHTML = `
+    <style>
+        :host { display: block; }
+        :host(.active) { border: 2px solid blue; }
+        :host([hidden]) { display: none; }
+        ::slotted(p) { color: gray; }
+        ::slotted(.highlight) { color: red; }
+    </style>
+    <slot></slot>
+    <slot name="footer"></slot>
+`;
+
+// ========== 事件重定向 ==========
+// Shadow DOM 内部事件会冒泡到外部
+// event.composedPath() 显示完整路径
+
+// ========== 插槽 Slot ==========
+// <slot name="header">默认内容</slot>
+// <span slot="header">自定义标题</span></div>
+    </div>
+    <div class="card">
+        <h2>演示：Shadow DOM</h2>
+        <button onclick="demoAttach()">创建 Shadow DOM</button>
+        <button onclick="demoStyle()">样式隔离</button>
+        <button onclick="demoSlot()">Slot 插槽</button>
+        <button onclick="demoEvent()">事件与 composed</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoAttach() {
+            result.innerHTML = '';
+            log('🌓 创建 Shadow DOM:');
+            log('');
+
+            log('1️⃣ attachShadow:');
+            log('   const shadow = host.attachShadow({ mode: "open" });');
+            log('');
+
+            log('2️⃣ mode 区别:');
+            log('');
+
+            class MockShadowRoot {
+                constructor(host, mode) {
+                    this.host = host;
+                    this.mode = mode;
+                    this.innerHTML = '';
+                    this._styles = new Set();
+                }
+                querySelector(sel) { return null; }
+                getElementById(id) { return null; }
+            }
+
+            const openShadow = new MockShadowRoot('el', 'open');
+            const closedShadow = new MockShadowRoot('el', 'closed');
+
+            log('   open shadow:');
+            log(`      mode: ${openShadow.mode}`);
+            log(`      host.shadowRoot → 可访问`);
+            log(`      el.shadowRoot → ShadowRoot 对象`);
+            log('');
+
+            log('   closed shadow:');
+            log(`      mode: ${closedShadow.mode}`);
+            log(`      host.shadowRoot → null`);
+            log(`      el.shadowRoot → undefined`);
+            log('');
+
+            log('3️⃣ Shadow DOM 结构:');
+            log('   #shadow-root (open)');
+            log('     ├── <style> /* 隔离样式 */ </style>');
+            log('     ├── <div class="container">');
+            log('     │   ├── <slot name="header">');
+            log('     │   ├── <slot> (默认插槽)');
+            log('     │   └── <slot name="footer">');
+            log('     └── </div>');
+
+            log('');
+            log('📌 Shadow DOM 边界:');
+            log('   • 样式完全隔离');
+            log('   • DOM 查询隔离 (querySelector 不越界)');
+            log('   • 事件会重定向 (composed)');
+        }
+
+        function demoStyle() {
+            result.innerHTML = '';
+            log('🎨 样式隔离:');
+            log('');
+
+            log('1️⃣ 外部样式不影响 Shadow DOM:');
+            log('   body .card { color: red; } /* 不影响 Shadow DOM */');
+            log('');
+
+            log('2️⃣ Shadow DOM 内部样式不影响外部:');
+            log('   :host div { margin: 10px; } /* 仅在 Shadow DOM 内生效 */');
+            log('');
+
+            log('3️⃣ :host 伪类:');
+            const hostRules = [
+                ':host { display: block; }',
+                ':host([theme="dark"]) { background: #333; color: white; }',
+                ':host(.large) { font-size: 1.5em; }',
+                ':host(:hover) { opacity: 0.8; }',
+                ':host-context(.dark-mode) { background: #222; }',
+            ];
+            hostRules.forEach(r => log(`   ${r}`));
+            log('');
+
+            log('4️⃣ ::slotted 选择器:');
+            log('   ::slotted(p) { color: #666; }');
+            log('   ::slotted([slot="title"]) { font-size: 20px; }');
+            log('   ::slotted(*) { margin: 4px 0; }');
+            log('');
+
+            log('5️⃣ CSS 自定义属性穿透:');
+            log('   /* 外部定义 */');
+            log('   :root { --primary-color: blue; }');
+            log('   /* Shadow DOM 内使用 */');
+            log('   :host { color: var(--primary-color, red); }');
+            log('');
+
+            log('📌 CSS 自定义属性 (CSS Variables):');
+            log('   • 可以穿透 Shadow DOM 边界');
+            log('   • 是 Shadow DOM 主题化的主要方式');
+            log('   • 比 CSS 类名更安全');
+        }
+
+        function demoSlot() {
+            result.innerHTML = '';
+            log('🔲 Slot 插槽:');
+            log('');
+
+            log('1️⃣ 插槽定义:');
+            log('   <slot name="header">默认标题</slot>');
+            log('   <slot>默认内容 (未命名插槽)</slot>');
+            log('   <slot name="footer">默认页脚</slot>');
+            log('');
+
+            log('2️⃣ 插槽使用:');
+            log('   <my-card>');
+            log('     <h1 slot="header">自定义标题</h1>');
+            log('     <p>这是一段正文内容</p>');
+            log('     <p slot="footer">版权信息</p>');
+            log('   </my-card>');
+            log('');
+
+            log('3️⃣ 具名插槽 vs 默认插槽:');
+            log('   具名插槽: name="header" → slot="header"');
+            log('   默认插槽: 没有 name → 没有 slot 属性的内容');
+            log('');
+
+            log('4️⃣ slotchange 事件:');
+            log('   slot.addEventListener("slotchange", (e) => {');
+            log('     console.log("插槽内容变化");');
+            log('   });');
+            log('');
+
+            log('5️⃣ 多插槽渲染模拟:');
+            function renderSlots(slots) {
+                log('   渲染 Shadow DOM:');
+                log('   <div class="card">');
+                for (const [name, content] of Object.entries(slots)) {
+                    const slotName = name === 'default' ? '(默认)' : `"${name}"`;
+                    log(`     <slot name=${slotName}>${content}</slot>`);
+                }
+                log('   </div>');
+            }
+
+            renderSlots({
+                header: '用户卡片',
+                default: '这里是用户信息...',
+                footer: '© 2025'
+            });
+        }
+
+        function demoEvent() {
+            result.innerHTML = '';
+            log('⚡ 事件与 composed:');
+            log('');
+
+            log('1️⃣ 事件重定向 (Event Retargeting):');
+            log('   在 Shadow DOM 内部触发的事件');
+            log('   冒泡到外部时, target 会被重定向到 host 元素');
+            log('');
+
+            log('2️⃣ composed 属性:');
+            log('   大多数事件默认 composed: true');
+            log('   可以穿过 Shadow DOM 边界');
+            log('   mouse/click/keyboard 事件 → composed: true');
+            log('   mouseenter/mouseleave → composed: false');
+            log('');
+
+            log('3️⃣ event.composedPath():');
+            log('   返回事件传播路径的完整数组:');
+            log('   [内部元素, shadow-root, host, ...]');
+            log('');
+
+            // 模拟事件传播
+            log('4️⃣ 事件传播模拟:');
+            const path = [
+                '<button> (Shadow DOM 内部)',
+                '#shadow-root (open)',
+                '<my-element> (host)',
+                '<body>',
+                '<html>',
+                'Document',
+            ];
+            log('   点击 Shadow DOM 内按钮:');
+            log('   event.composedPath():');
+            path.forEach((p, i) => log(`     [${i}] ${p}`));
+
+            log('');
+            log('5️⃣ 自定义事件与 composed:');
+            log('   // 不能穿过 Shadow DOM');
+            log('   new CustomEvent("my-event", { composed: false });');
+            log('   // 可以穿过 Shadow DOM');
+            log('   new CustomEvent("my-event", { bubbles: true, composed: true });');
+            log('');
+
+            log('📌 事件穿透总结:');
+            log('   • 物理事件 (click, keydown): 默认 composed: true');
+            log('   • 自定义事件: 需要手动设置 composed: true');
+            log('   • focusin/focusout: composed: true');
+            log('   • mouseenter/mouseleave: composed: false');
+        }
+
+        console.log('=== Shadow DOM ===');
+        document.getElementById('output').textContent =
+            `Shadow DOM: attachShadow / mode / :host / ::slotted / Slot / 事件\n` +
+            `✅ Shadow DOM 演示完成！`;
+    </script>
+</body>
+</html>

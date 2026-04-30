@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Git工作流</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📋 Git 工作流</h2><p>Gitflow、GitHub Flow、GitLab Flow、选择指南、团队协作最佳实践。</p></div>
+    <div class="card">
+        <h2>Gitflow 工作流</h2>
+        <div class="code">// ========== Gitflow 概述 ==========
+// 由 Vincent Driessen 在 2010 年提出
+// 严格的分支模型,适合有版本发布周期的项目
+
+// ========== 分支类型 ==========
+// main (master):      生产就绪代码
+// develop (dev):      开发主线 (集成分支)
+// feature/*:          功能开发 (基于 develop)
+// release/*:          发布准备 (基于 develop)
+// hotfix/*:           紧急修复 (基于 main)
+
+// ========== Gitflow 流程 ==========
+// 1. 日常开发: feature → develop
+git checkout -b feature/login develop
+# 开发...
+git checkout develop
+git merge --no-ff feature/login
+
+// 2. 准备发布: develop → release
+git checkout -b release/v1.2.0 develop
+# 测试、修 bug、更新版本号...
+git checkout main
+git merge --no-ff release/v1.2.0
+git tag -a v1.2.0 -m "Release v1.2.0"
+git checkout develop
+git merge --no-ff release/v1.2.0
+
+// 3. 紧急修复: main → hotfix → main + develop
+git checkout -b hotfix/critical main
+# 修复...
+git checkout main
+git merge --no-ff hotfix/critical
+git tag -a v1.2.1 -m "Hotfix v1.2.1"
+git checkout develop
+git merge --no-ff hotfix/critical
+
+// ========== Gitflow 优缺点 ==========
+// 优点:
+// - 结构清晰,适合版本发布周期
+// - 生产环境稳定
+// - hotfix 不影响开发进度
+//
+// 缺点:
+// - 分支多,操作复杂
+// - 不适合持续部署
+// - 学习成本高</div>
+    </div>
+    <div class="card">
+        <h2>GitHub Flow</h2>
+        <div class="code">// ========== GitHub Flow ==========
+// GitHub 推荐的简化工作流
+// 只有一个长期分支: main
+// 所有开发在 feature 分支
+
+// ========== 原则 ==========
+// 1. main 分支始终可部署
+// 2. 新功能/修复从 main 创建分支
+// 3. 经常 push 到远程
+// 4. 创建 PR 进行 Code Review
+// 5. 合并后立即部署
+
+// ========== 完整流程 ==========
+// 1. 创建分支
+git checkout -b feature/user-login main
+
+// 2. 定期推送到远程
+git push -u origin feature/user-login
+
+// 3. 创建 PR (GitHub 上或 gh CLI)
+gh pr create --title "feat: user login" --body "..."
+
+// 4. Code Review + CI 通过
+
+// 5. 合并到 main
+gh pr merge --squash
+
+// 6. 部署 (自动或手动)
+
+// ========== 优缺点 ==========
+// 优点:
+// - 简单,容易理解
+// - 适合 CI/CD
+// - PR 驱动开发
+// - 适合持续部署的项目
+//
+// 缺点:
+// - 没有 develop 分支,不适合复杂发布周期
+// - 功能分支需要频繁同步 main
+// - 不适合多版本支持
+
+// ========== 最佳实践 ==========
+// 1. 小型 PR (1-2 天的工作量)
+// 2. PR 标题清晰
+// 3. 功能分支从 main 定期 rebase
+// 4. CI 必须通过才能合并
+// 5. 合并后删除分支</div>
+    </div>
+    <div class="card">
+        <h2>GitLab Flow</h2>
+        <div class="code">// ========== GitLab Flow ==========
+// GitLab 推荐的流程,结合了 Gitflow 和 GitHub Flow
+// 增加了环境分支和环境/版本管理
+
+// ========== 核心概念 ==========
+// 1. main: 开发主线 (功能分支合并到 main)
+// 2. pre-production: 预发布环境
+// 3. production: 生产环境
+
+// ========== 环境分支 ==========
+// 将代码从 main 逐步提升到不同环境
+git checkout -b pre-production main
+git checkout -b production pre-production
+
+// 代码提升流程:
+// main → pre-production → production
+
+// 每次合并后部署到对应环境:
+// - main 合并 → 部署到 staging
+// - pre-production 合并 → 部署到预发布
+// - production 合并 → 部署到生产
+
+// ========== 版本分支 ==========
+// 适用于: 需要维护多个版本的 SaaS 或库
+
+// 当 main 开发到 v2.0 时,仍需维护 v1.x
+git checkout -b v1-stable main
+# 只 cherry-pick 必要的修复
+git cherry-pick bugfix-commit
+
+// ========== 三种工作流对比 ==========
+//          Gitflow         GitHub Flow     GitLab Flow
+// 复杂度   高               低              中
+// 发布    版本周期          持续部署        环境分支
+// 长期分支 main+develop+…   main            main+环境分支
+// 适合     库/大规模项目     Web 应用       企业级应用
+// CI/CD   可选              必须            必须
+
+// ========== 选择指南 ==========
+// 小团队 / 创业项目     → GitHub Flow
+// 大型项目 / 版本发布   → Gitflow
+// 企业级 / 多环境      → GitLab Flow
+// 开源项目             → GitHub Flow
+// 移动 App             → Gitflow (版本周期)
+// SaaS 应用            → GitHub Flow 或 GitLab Flow</div>
+    </div>
+    <div class="card">
+        <h2>团队协作最佳实践</h2>
+        <div class="code">// ========== 分支命名 ==========
+// feature/<issue-id>-<desc>
+// fix/<issue-id>-<desc>
+// hotfix/<desc>
+// chore/<desc>
+
+// 示例:
+// feature/123-user-login
+// fix/456-null-pointer
+// hotfix/critical-security
+// chore/update-deps
+
+// ========== Commit 规范 ==========
+// Conventional Commits:
+//   feat: add user login
+//   fix: handle null pointer in parser
+//   docs: update API documentation
+//   refactor: extract validation logic
+//   test: add login E2E tests
+//   chore: bump dependencies
+
+// ========== PR 规范 ==========
+// 1. 标题: <type>(<scope>): <description>
+// 2. 关联 Issue: Closes #123
+// 3. 测试说明
+// 4. Reviewer 分配
+
+// ========== 禁止操作 ==========
+// ❌ push --force 到公共分支
+// ❌ rebase 已推送的公共分支
+// ❌ 直接提交到 main (强制 PR)
+// ❌ 超大 PR (>500 行改动)
+// ❌ 提交密码/密钥
+
+// ========== Git Hooks ==========
+// 自动化检查 (在 .git/hooks/ 目录)
+// pre-commit:   提交前运行测试/lint
+// commit-msg:   检查提交信息格式
+// pre-push:     推送前运行测试
+// post-merge:   合并后自动安装依赖
+
+// 推荐: 用 husky + lint-staged (Node.js)
+// 或 pre-commit (Python)
+
+// ========== 推荐日常流程 ==========
+git checkout -b feature/xxx main
+# 开发,多次 commit
+git fetch origin
+git rebase origin/main       # 保持同步
+git push -u origin feature/xxx
+# 创建 PR
+# Code Review → 通过 → 合并
+git checkout main
+git pull
+git branch -d feature/xxx     # 删除本地分支</div>
+        <div class="note">💡 选择工作流的核心依据: 发布节奏。每天发布选 GitHub Flow,按版本周期发布选 Gitflow,多环境多版本选 GitLab Flow。无论选哪种,核心原则不变:main 始终可部署、PR 必须 Review、Commit 规范一致。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoGitflow()">Gitflow 演示</button>
+        <button onclick="demoGhFlow()">GitHub Flow 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoGitflow() {
+            result.innerHTML = '';
+            log('# Gitflow 工作流演示');
+            log('');
+            log('分支结构:');
+            log('  main ────●─────────●─────────');
+            log('            \\       / \\       /');
+            log('  develop    ●─────●───●─────●───');
+            log('              \\   /       \\   /');
+            log('  feature      ●─●         ●─●');
+            log('                         /');
+            log('  hotfix                ●');
+            log('');
+            log('流程:');
+            log('  1. git checkout -b feature/login develop');
+            log('  2. 开发 → 提交 → push');
+            log('  3. git checkout develop → git merge --no-ff feature/login');
+            log('  4. git checkout -b release/v1.0 develop');
+            log('  5. 测试/修 bug → merge 到 main + develop');
+        }
+
+        function demoGhFlow() {
+            result.innerHTML = '';
+            log('# GitHub Flow 演示');
+            log('');
+            log('分支结构:');
+            log('  main ────●────●────●────●────');
+            log('            \\        /    /');
+            log('  feature    ●──●──●    /');
+            log('                      /');
+            log('  fix               ●─●');
+            log('');
+            log('流程:');
+            log('  1. git checkout -b feature/xxx main');
+            log('  2. 开发,多次 commit');
+            log('  3. 定期 git push');
+            log('  4. 创建 PR → Code Review');
+            log('  5. CI 通过 → 合并到 main');
+            log('  6. 自动部署 → 删除分支');
+        }
+    </script>
+</body>
+</html>

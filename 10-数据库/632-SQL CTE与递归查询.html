@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL CTE与递归查询</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔄 SQL CTE 与递归查询</h2><p>WITH 公用表表达式、CTE vs 子查询、递归 CTE (WITH RECURSIVE)、层级数据查询 (组织树/分类树/路径枚举)、实际应用场景。</p></div>
+    <div class="card">
+        <h2>CTE 基础</h2>
+        <div class="code">// ========== CTE 概念 ==========
+-- CTE: Common Table Expression (公用表表达式)
+-- 用 WITH 定义临时结果集,可在主查询中多次引用
+-- 只在当前查询执行期间存在
+
+-- 语法:
+-- WITH cte_name AS (
+--     SELECT ...
+-- )
+-- SELECT * FROM cte_name;
+
+-- ========== 基本 CTE ==========
+-- 1. 简单 CTE
+WITH dept_avg AS (
+    SELECT department, AVG(salary) AS avg_salary
+    FROM employees
+    GROUP BY department
+)
+SELECT e.name, e.department, e.salary,
+       ROUND(d.avg_salary, 0) AS dept_avg
+FROM employees e
+JOIN dept_avg d ON e.department = d.department
+WHERE e.salary > d.avg_salary;
+
+-- 2. 多 CTE (逗号分隔)
+WITH
+dept_stats AS (
+    SELECT department,
+           COUNT(*) AS emp_count,
+           AVG(salary) AS avg_salary
+    FROM employees
+    GROUP BY department
+),
+company_avg AS (
+    SELECT AVG(salary) AS overall_avg FROM employees
+)
+SELECT d.*, c.overall_avg
+FROM dept_stats d
+CROSS JOIN company_avg c
+WHERE d.avg_salary > c.overall_avg;
+
+-- ========== CTE vs 子查询 ==========
+-- 场景: 每个部门薪资最高的员工
+
+-- 子查询方式:
+SELECT e.name, e.department, e.salary
+FROM employees e
+JOIN (
+    SELECT department, MAX(salary) AS max_salary
+    FROM employees
+    GROUP BY department
+) d ON e.department = d.department AND e.salary = d.max_salary;
+
+-- CTE 方式 (更清晰):
+WITH dept_max AS (
+    SELECT department, MAX(salary) AS max_salary
+    FROM employees
+    GROUP BY department
+)
+SELECT e.name, e.department, e.salary
+FROM employees e
+JOIN dept_max d ON e.department = d.department
+                AND e.salary = d.max_salary;
+
+-- CTE 优势: 可多次引用,可递归,可复用,可读性好</div>
+    </div>
+    <div class="card">
+        <h2>CTE 的优势</h2>
+        <div class="code">// ========== CTE 优势 ==========
+
+-- 1. 多次引用同一结果
+WITH expensive_products AS (
+    SELECT * FROM products WHERE price > 100
+)
+SELECT 'expensive' AS category, COUNT(*) AS cnt,
+       AVG(price) AS avg_price FROM expensive_products
+UNION ALL
+SELECT 'cheap', COUNT(*), AVG(price)
+FROM products WHERE price <= 100;
+
+-- 2. 分层/步骤处理
+-- 三步: 找出高价值用户 → 分析其购买品类 → 统计
+WITH
+high_value_users AS (
+    SELECT user_id, SUM(amount) AS total
+    FROM orders
+    GROUP BY user_id
+    HAVING total > 1000
+),
+their_categories AS (
+    SELECT DISTINCT hv.user_id, c.name AS category
+    FROM high_value_users hv
+    JOIN orders o ON hv.user_id = o.user_id
+    JOIN order_items oi ON o.id = oi.order_id
+    JOIN products p ON oi.product_id = p.id
+    JOIN categories c ON p.category_id = c.id
+)
+SELECT category, COUNT(DISTINCT user_id) AS user_count
+FROM their_categories
+GROUP BY category
+ORDER BY user_count DESC;
+
+-- 3. 可修改性 (CTE 定义在上方,主查询在下方)
+-- 子查询嵌套越深越难读,CTE 线性展开
+
+-- ========== CTE 注意事项 ==========
+-- 1. MySQL 8.0+, PostgreSQL, SQL Server, SQLite 支持
+-- 2. MySQL 5.x 不支持!
+-- 3. CTE 不是物化的 (MySQL 可能物化)
+-- 4. 多次引用可能多次执行 (可能不如临时表)</div>
+    </div>
+    <div class="card">
+        <h2>递归 CTE</h2>
+        <div class="code">// ========== 递归 CTE 基础 ==========
+-- 递归 CTE: 可以引用自身的 CTE
+-- 用于: 树形结构 / 层级数据 / 图遍历
+
+-- 语法:
+-- WITH RECURSIVE cte_name AS (
+--     SELECT ...     ← 初始查询 (锚点/基准)
+--     UNION ALL
+--     SELECT ...     ← 递归查询 (引用 cte_name)
+-- )
+-- SELECT * FROM cte_name;
+
+-- 终止条件: 递归查询返回空结果时停止
+
+-- ========== 简单递归: 数字序列 ==========
+-- 生成 1 到 10 的数字
+WITH RECURSIVE numbers AS (
+    -- 锚点: 初始值
+    SELECT 1 AS n
+    UNION ALL
+    -- 递归: 每次加 1
+    SELECT n + 1 FROM numbers WHERE n < 10
+)
+SELECT * FROM numbers;
+
+-- 结果: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+
+-- ========== 日期序列 ==========
+WITH RECURSIVE dates AS (
+    SELECT DATE('2024-01-01') AS dt
+    UNION ALL
+    SELECT dt + INTERVAL 1 DAY FROM dates
+    WHERE dt < '2024-01-10'
+)
+SELECT * FROM dates;
+
+-- 用途: 生成连续日期,补全缺失日期</div>
+    </div>
+    <div class="card">
+        <h2>树形结构: 组织层级</h2>
+        <div class="code">// ========== 组织树查询 ==========
+-- 数据: employees(id, name, manager_id)
+-- id | name  | manager_id
+-- 1  | Alice | NULL       (CEO)
+-- 2  | Bob   | 1
+-- 3  | Carol | 1
+-- 4  | Dave  | 2
+-- 5  | Eve   | 2
+-- 6  | Frank | 3
+
+-- 查询 Alice 的所有下属 (递归向下)
+WITH RECURSIVE subordinates AS (
+    -- 锚点: Alice
+    SELECT id, name, manager_id, 0 AS level
+    FROM employees
+    WHERE id = 1
+
+    UNION ALL
+
+    -- 递归: 找到每个员工的下属
+    SELECT e.id, e.name, e.manager_id, s.level + 1
+    FROM employees e
+    JOIN subordinates s ON e.manager_id = s.id
+)
+SELECT * FROM subordinates ORDER BY level, name;
+
+-- 结果:
+-- id | name  | manager_id | level
+-- 1  | Alice | NULL       | 0
+-- 2  | Bob   | 1          | 1
+-- 3  | Carol | 1          | 1
+-- 4  | Dave  | 2          | 2
+-- 5  | Eve   | 2          | 2
+-- 6  | Frank | 3          | 2
+
+-- 查询 Dave 的所有上级 (递归向上)
+WITH RECURSIVE managers AS (
+    -- 锚点: Dave
+    SELECT id, name, manager_id, 0 AS level
+    FROM employees
+    WHERE id = 4
+
+    UNION ALL
+
+    SELECT e.id, e.name, e.manager_id, m.level + 1
+    FROM employees e
+    JOIN managers m ON e.id = m.manager_id
+)
+SELECT * FROM managers ORDER BY level DESC;
+
+-- 结果:
+-- id | name  | manager_id | level
+-- 1  | Alice | NULL       | 1
+-- 2  | Bob   | 1          | 0
+-- 4  | Dave  | 2          | 0 (锚点,level=0)</div>
+    </div>
+    <div class="card">
+        <h2>树形结构: 分类树</h2>
+        <div class="code">// ========== 分类层级 ==========
+-- categories: id, name, parent_id
+-- id | name         | parent_id
+-- 1  | 电子产品     | NULL
+-- 2  | 手机         | 1
+-- 3  | 电脑         | 1
+-- 4  | 智能手机     | 2
+-- 5  | 功能手机     | 2
+-- 6  | 笔记本       | 3
+-- 7  | 台式机       | 3
+
+-- 1. 完整路径 (面包屑导航)
+WITH RECURSIVE category_path AS (
+    -- 锚点: 顶级分类
+    SELECT id, name, parent_id, name AS path, 0 AS level
+    FROM categories
+    WHERE parent_id IS NULL
+
+    UNION ALL
+
+    -- 递归: 子分类
+    SELECT c.id, c.name, c.parent_id,
+           CONCAT(cp.path, ' > ', c.name) AS path,
+           cp.level + 1
+    FROM categories c
+    JOIN category_path cp ON c.parent_id = cp.id
+)
+SELECT * FROM category_path ORDER BY path;
+
+-- 结果:
+-- id | name     | path
+-- 1  | 电子产品  | 电子产品
+-- 2  | 手机      | 电子产品 > 手机
+-- 4  | 智能手机  | 电子产品 > 手机 > 智能手机
+-- 5  | 功能手机  | 电子产品 > 手机 > 功能手机
+-- 3  | 电脑      | 电子产品 > 电脑
+-- 6  | 笔记本    | 电子产品 > 电脑 > 笔记本
+-- 7  | 台式机    | 电子产品 > 电脑 > 台式机
+
+-- 2. 每个分类下的商品数量 (含子分类)
+WITH RECURSIVE category_tree AS (
+    SELECT id, id AS root_id
+    FROM categories
+
+    UNION ALL
+
+    SELECT c.id, ct.root_id
+    FROM categories c
+    JOIN category_tree ct ON c.parent_id = ct.id
+)
+SELECT ct.root_id AS category_id, c.name,
+       COUNT(p.id) AS product_count
+FROM category_tree ct
+JOIN categories c ON ct.root_id = c.id
+LEFT JOIN products p ON p.category_id = ct.id
+GROUP BY ct.root_id, c.name
+ORDER BY category_id;</div>
+    </div>
+    <div class="card">
+        <h2>实际应用场景</h2>
+        <div class="code">// ========== 场景 1: 补全日期序列 ==========
+-- 每日销售报表,缺日期补 0
+WITH RECURSIVE dates AS (
+    SELECT MIN(DATE(created_at)) AS dt FROM orders
+    UNION ALL
+    SELECT dt + INTERVAL 1 DAY FROM dates
+    WHERE dt < (SELECT MAX(DATE(created_at)) FROM orders)
+)
+SELECT d.dt, COALESCE(SUM(o.amount), 0) AS daily_revenue
+FROM dates d
+LEFT JOIN orders o ON DATE(o.created_at) = d.dt
+GROUP BY d.dt
+ORDER BY d.dt;
+
+-- ========== 场景 2: 图遍历 (推荐关系) ==========
+-- referrals: referrer_id, referred_id
+-- 查找推荐链 (A 推荐了 B, B 推荐了 C...)
+WITH RECURSIVE referral_chain AS (
+    SELECT referrer_id, referred_id, 1 AS depth
+    FROM referrals
+    WHERE referrer_id = 1
+
+    UNION ALL
+
+    SELECT r.referrer_id, r.referred_id, rc.depth + 1
+    FROM referrals r
+    JOIN referral_chain rc ON r.referrer_id = rc.referred_id
+    WHERE rc.depth < 5  -- 限制深度,防止死循环
+)
+SELECT * FROM referral_chain;
+
+-- ========== 递归 CTE 注意事项 ==========
+-- 1. 必须有终止条件 (否则死循环!)
+-- 2. 递归部分不能包含: GROUP BY, DISTINCT, 聚合函数
+-- 3. 限制递归深度避免性能问题:
+--    MySQL: SET cte_max_recursion_depth = 100;
+--    PostgreSQL: 自动检测循环 (检测重复行)
+-- 4. 递归部分只能引用 CTE 一次
+-- 5. UNION ALL 比 UNION 快</div>
+        <div class="note">💡 CTE 要点: WITH 定义临时结果集; 可多次引用提升可读性; RECURSIVE 实现递归查询 (树/图); 锚点+递归+终止条件; 用于组织树、分类路径、日期序列、图遍历。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCTE()">CTE 演示</button>
+        <button onclick="demoRecursive()">递归 CTE 演示</button>
+        <button onclick="demoTree()">树形查询演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCTE() {
+            result.innerHTML = '';
+            log('# CTE 公用表表达式');
+            log('');
+            log('WITH dept_max AS (');
+            log('    SELECT department, MAX(salary) AS max_salary');
+            log('    FROM employees GROUP BY department');
+            log(')');
+            log('SELECT e.name, e.salary');
+            log('FROM employees e');
+            log('JOIN dept_max d ON e.department = d.department');
+            log('  AND e.salary = d.max_salary;');
+            log('');
+            log('优点: 可读性好,可多次引用,支持递归');
+        }
+
+        function demoRecursive() {
+            result.innerHTML = '';
+            log('# 递归 CTE');
+            log('');
+            log('WITH RECURSIVE numbers AS (');
+            log('    SELECT 1 AS n');
+            log('    UNION ALL');
+            log('    SELECT n + 1 FROM numbers WHERE n < 10');
+            log(')');
+            log('SELECT * FROM numbers;');
+            log('');
+            log('结构: 锚点 + UNION ALL + 递归');
+            log('终止: 递归返回空结果');
+            log('注意: 必须有终止条件!');
+        }
+
+        function demoTree() {
+            result.innerHTML = '';
+            log('# 树形查询');
+            log('');
+            log('WITH RECURSIVE org_tree AS (');
+            log('    SELECT id, name, 0 AS level');
+            log('    FROM employees WHERE manager_id IS NULL');
+            log('    UNION ALL');
+            log('    SELECT e.id, e.name, t.level + 1');
+            log('    FROM employees e');
+            log('    JOIN org_tree t ON e.manager_id = t.id');
+            log(')');
+            log('SELECT * FROM org_tree;');
+            log('');
+            log('应用: 组织架构,分类树,评论回复');
+        }
+    </script>
+</body>
+</html>

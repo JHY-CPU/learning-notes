@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>地理位置Geolocation</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #geo-result { background: #f8f9fa; padding: 15px; border-radius: 4px; font-size: 13px; min-height: 60px; }
+        #geo-result .row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #eee; }
+        #geo-result .key { color: #7f8c8d; }
+        #geo-result .val { font-weight: bold; color: #2c3e50; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Geolocation API</h2><p>获取用户的地理位置（经度/纬度/海拔/速度等）。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 检查可用性
+if ('geolocation' in navigator) {
+    // 支持
+} else {
+    // 不支持
+}
+
+// 获取当前位置
+navigator.geolocation.getCurrentPosition(success, error, options);
+
+// 成功回调
+function success(pos) {
+    pos.coords.latitude;       // 纬度
+    pos.coords.longitude;      // 经度
+    pos.coords.accuracy;       // 精度（米）
+    pos.coords.altitude;       // 海拔（米）
+    pos.coords.altitudeAccuracy; // 海拔精度
+    pos.coords.heading;        // 朝向（度，0=北）
+    pos.coords.speed;          // 速度（m/s）
+    pos.timestamp;             // 时间戳
+}
+
+// 错误回调
+function error(err) {
+    err.code;      // 1=PERMISSION_DENIED, 2=POSITION_UNAVAILABLE, 3=TIMEOUT
+    err.message;   // 错误描述
+}
+
+// 选项
+const options = {
+    enableHighAccuracy: true, // 高精度（GPS，耗电）
+    timeout: 10000,           // 超时（ms）
+    maximumAge: 60000,        // 缓存时间（ms）
+};
+
+// 持续监听位置变化
+const watchId = navigator.geolocation.watchPosition(success, error, options);
+navigator.geolocation.clearWatch(watchId);</div>
+        <div class="note">⚠️ 需要用户授权才能使用（浏览器会弹出权限请求）。<br>
+        ⚠️ 仅在 HTTPS 下可用（本地 localhost 也可以）。<br>
+        ⚠️ enableHighAccuracy:true 会增加耗电，请按需使用。</div>
+    </div>
+    <div class="card">
+        <h2>演示：获取位置</h2>
+        <button onclick="getLocation()">获取我的位置</button>
+        <button onclick="startWatching()" id="watch-btn">持续监听</button>
+        <div id="geo-result">
+            <div class="row"><span class="key">状态</span><span class="val" id="geo-status">点击按钮获取</span></div>
+            <div class="row"><span class="key">纬度</span><span class="val" id="geo-lat">-</span></div>
+            <div class="row"><span class="key">经度</span><span class="val" id="geo-lng">-</span></div>
+            <div class="row"><span class="key">精度</span><span class="val" id="geo-acc">-</span></div>
+            <div class="row"><span class="key">海拔</span><span class="val" id="geo-alt">-</span></div>
+        </div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const geoStatus = document.getElementById('geo-status');
+        const geoLat = document.getElementById('geo-lat');
+        const geoLng = document.getElementById('geo-lng');
+        const geoAcc = document.getElementById('geo-acc');
+        const geoAlt = document.getElementById('geo-alt');
+
+        function updateUI(pos) {
+            geoStatus.textContent = '✅ 已获取';
+            geoLat.textContent = pos.coords.latitude.toFixed(6);
+            geoLng.textContent = pos.coords.longitude.toFixed(6);
+            geoAcc.textContent = pos.coords.accuracy + 'm';
+            geoAlt.textContent = pos.coords.altitude != null ? pos.coords.altitude.toFixed(1) + 'm' : 'N/A';
+            console.log('位置:', pos.coords.latitude, pos.coords.longitude);
+        }
+
+        function handleError(err) {
+            const msgs = {
+                1: '用户拒绝了位置权限',
+                2: '无法获取位置（GPS 不可用）',
+                3: '获取位置请求超时',
+            };
+            geoStatus.textContent = '❌ ' + (msgs[err.code] || err.message);
+            console.error('Geolocation error:', err);
+        }
+
+        function getLocation() {
+            if (!('geolocation' in navigator)) {
+                geoStatus.textContent = '❌ 浏览器不支持 Geolocation';
+                return;
+            }
+            geoStatus.textContent = '⏳ 获取中...';
+            navigator.geolocation.getCurrentPosition(updateUI, handleError, {
+                enableHighAccuracy: false,
+                timeout: 10000,
+                maximumAge: 60000,
+            });
+        }
+
+        let watchId = null;
+        function startWatching() {
+            const btn = document.getElementById('watch-btn');
+            if (watchId) {
+                navigator.geolocation.clearWatch(watchId);
+                watchId = null;
+                btn.textContent = '持续监听';
+                btn.style.background = '#3498db';
+                return;
+            }
+            if (!('geolocation' in navigator)) return;
+            watchId = navigator.geolocation.watchPosition((pos) => {
+                updateUI(pos);
+                geoStatus.textContent = '🔄 监听中...';
+            }, handleError, { enableHighAccuracy: true, timeout: 15000 });
+            btn.textContent = '停止监听';
+            btn.style.background = '#e74c3c';
+        }
+
+        console.log('=== Geolocation API ===');
+        console.log('支持 Geolocation:', 'geolocation' in navigator);
+
+        document.getElementById('output').textContent =
+            `Geolocation: 获取地理位置\n` +
+            `getCurrentPosition / watchPosition / clearWatch\n` +
+            `coords: latitude/longitude/accuracy/altitude/speed/heading\n` +
+            `✅ Geolocation 演示完成！`;
+    </script>
+</body>
+</html>

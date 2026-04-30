@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>项目实战 Celery + RabbitMQ 任务队列</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📦 项目实战 7: Celery + RabbitMQ 任务队列</h2><p>Celery 配置与任务定义、定期任务 (celery beat)、结果后端 (Redis)、Flask 任务提交 API、Flower 监控面板。</p></div>
+    <div class="card">
+        <h2>项目结构</h2>
+        <div class="code"># celery-app/
+# ├── app/
+# │   ├── __init__.py
+# │   ├── celery_app.py      # Celery 实例
+# │   ├── config.py          # 配置
+# │   ├── tasks/
+# │   │   ├── __init__.py
+# │   │   ├── email.py       # 邮件任务
+# │   │   ├── video.py       # 视频处理
+# │   │   └── report.py      # 报表生成
+# │   └── web/
+# │       ├── __init__.py
+# │       └── app.py         # Flask API
+# ├── docker-compose.yml
+# └── requirements.txt
+
+# ========== Celery 配置 ==========
+# app/config.py
+class CeleryConfig:
+    broker_url = "amqp://guest:guest@rabbitmq:5672//"
+    result_backend = "redis://redis:6379/0"
+    task_serializer = "json"
+    result_serializer = "json"
+    accept_content = ["json"]
+    timezone = "Asia/Shanghai"
+    enable_utc = True
+
+    # 任务设置
+    task_acks_late = True           # 任务完成后才 ACK
+    task_reject_on_worker_lost = True  # worker 崩溃重新入队
+    task_default_retry_delay = 60   # 重试延迟
+    task_max_retries = 3            # 最大重试次数
+    task_track_started = True       # 追踪任务状态
+    task_soft_time_limit = 300      # 软超时 5分钟
+    task_time_limit = 600           # 硬超时 10分钟
+
+    # 队列设置
+    task_default_queue = "default"
+    task_queues = {
+        "default": {"exchange": "default", "routing_key": "default"},
+        "email":   {"exchange": "email",   "routing_key": "email"},
+        "video":   {"exchange": "video",   "routing_key": "video"},
+        "high":    {"exchange": "high",    "routing_key": "high"},
+    }
+
+    # Beat 调度
+    beat_schedule = {
+        "cleanup-temp": {
+            "task": "app.tasks.report.cleanup_temp_files",
+            "schedule": crontab(hour=3, minute=0),  # 每天凌晨3点
+        },
+        "send-daily-report": {
+            "task": "app.tasks.report.send_daily",
+            "schedule": crontab(hour=9, minute=0),   # 每天9点
+        },
+    }
+
+# ========== Celery 实例 ==========
+# app/celery_app.py
+from celery import Celery
+from .config import CeleryConfig
+
+celery_app = Celery("worker")
+celery_app.config_from_object(CeleryConfig)
+
+# 自动发现任务
+celery_app.autodiscover_tasks(["app.tasks"])</div>
+    </div>
+    <div class="card">
+        <h2>任务定义</h2>
+        <div class="code"># ========== 邮件任务 ==========
+# app/tasks/email.py
+from app.celery_app import celery_app
+import smtplib
+from time import sleep
+
+@celery_app.task(
+    bind=True,
+    max_retries=3,
+    default_retry_delay=60,
+    queue="email",
+    route_name="email.send_welcome",
+)
+def send_welcome_email(self, user_email: str, username: str):
+    """发送欢迎邮件"""
+    try:
+        # 模拟发送
+        sleep(2)
+        logger.info(f"欢迎邮件已发送至 {user_email}")
+        return {"status": "sent", "email": user_email}
+    except smtplib.SMTPException as exc:
+        raise self.retry(exc=exc)
+
+# ========== 视频处理任务 ==========
+# app/tasks/video.py
+@celery_app.task(bind=True, queue="video", track_started=True)
+def process_video(self, video_id: str, input_path: str):
+    """视频转码 + 缩略图生成"""
+    self.update_state(
+        state="PROGRESS",
+        meta={"step": "validating", "percent": 10}
+    )
+
+    # 步骤 1: 验证
+    validate(video_id)
+    self.update_state(state="PROGRESS", meta={"step": "transcoding", "percent": 30})
+
+    # 步骤 2: 转码
+    transcode(input_path, "h264", "output.mp4")
+    self.update_state(state="PROGRESS", meta={"step": "thumbnail", "percent": 70})
+
+    # 步骤 3: 生成缩略图
+    generate_thumbnail("output.mp4")
+    self.update_state(state="PROGRESS", meta={"step": "done", "percent": 100})
+
+    return {"video_id": video_id, "status": "completed", "output": "output.mp4"}
+
+# ========== 任务链 (Workflow) ==========
+@celery_app.task(queue="default")
+def validate(data):
+    if not data.get("email"):
+        raise ValueError("email required")
+    return data
+
+@celery_app.task(queue="default")
+def process(data):
+    logger.info(f"Processing: {data}")
+    return {"result": "success", "data": data}
+
+@celery_app.task(queue="default")
+def notify(result):
+    logger.info(f"Notification: {result}")
+
+# 任务链: validate → process → notify
+# workflow = chain(
+#     validate.s(data),
+#     process.s(),
+#     notify.s()
+# )
+# workflow()
+
+# 或者使用 Canvas:
+# from celery import group, chord
+#
+# # 并行任务
+# parallel = group([task_a.s(), task_b.s(), task_c.s()])
+#
+# # 并行完成后汇总
+# workflow = chord(parallel)(summarize.s())</div>
+    </div>
+    <div class="card">
+        <h2>Flask API 与 Flower 监控</h2>
+        <div class="code"># ========== Flask API ==========
+# app/web/app.py
+from flask import Flask, request, jsonify
+from app.celery_app import celery_app
+from app.tasks.email import send_welcome_email
+from app.tasks.video import process_video
+
+app = Flask(__name__)
+
+# 提交异步任务
+@app.post("/api/tasks/email")
+def send_email():
+    data = request.get_json()
+    task = send_welcome_email.delay(
+        data["email"], data["username"]
+    )
+    return jsonify({"task_id": task.id, "status": "queued"}), 202
+
+# 提交视频处理
+@app.post("/api/tasks/video")
+def process_video_task():
+    data = request.get_json()
+    task = process_video.delay(
+        data["video_id"], data["input_path"]
+    )
+    return jsonify({"task_id": task.id, "status": "queued"}), 202
+
+# 查询任务状态
+@app.get("/api/tasks/<task_id>")
+def get_task_status(task_id):
+    task = celery_app.AsyncResult(task_id)
+
+    result = {
+        "task_id": task_id,
+        "status": task.status,
+        "state": task.state,
+    }
+
+    if task.state == "SUCCESS":
+        result["result"] = task.result
+    elif task.state == "FAILURE":
+        result["error"] = str(task.info)
+    elif task.state == "PROGRESS":
+        result["meta"] = task.info
+
+    return jsonify(result)
+
+# ========== 启动 Worker ==========
+# 终端命令:
+# # 启动 Celery Worker
+# celery -A app.celery_app worker \
+#   --loglevel=info \
+#   --concurrency=4 \
+#   --queues=default,email,video,high
+#
+# # 启动 Beat (定时任务)
+# celery -A app.celery_app beat --loglevel=info
+#
+# # 启动 Flower (监控面板)
+# celery -A app.celery_app flower \
+#   --port=5555 \
+#   --basic-auth=admin:secret
+
+# ========== Docker Compose ==========
+# docker-compose.yml:
+# version: '3.8'
+# services:
+#   rabbitmq:
+#     image: rabbitmq:3-management-alpine
+#     ports:
+#       - "5672:5672"   # AMQP
+#       - "15672:15672" # 管理界面
+#
+#   redis:
+#     image: redis:7-alpine
+#
+#   worker:
+#     build: .
+#     command: celery -A app.celery_app worker --loglevel=info
+#     depends_on: [rabbitmq, redis]
+#     volumes:
+#       - ./app:/app
+#
+#   beat:
+#     build: .
+#     command: celery -A app.celery_app beat --loglevel=info
+#     depends_on: [rabbitmq, redis]
+#
+#   flower:
+#     build: .
+#     command: celery -A app.celery_app flower --port=5555
+#     ports: ["5555:5555"]
+#     depends_on: [rabbitmq, redis]
+#
+#   web:
+#     build: .
+#     command: gunicorn -w 4 app.web.app:app -b 0.0.0.0:5000
+#     ports: ["5000:5000"]
+#     depends_on: [rabbitmq, redis]</div>
+        <div class="note">💡 Celery + RabbitMQ 任务队列要点: Celery Worker 异步消费任务; RabbitMQ 作为 Broker 消息中间件; Redis 作为结果后端; 任务路由到不同队列 (email/video/high); 任务链 Chain 和 Canvas (group/chord) 编排; Flower 监控; Beat 定时任务 cron; 重试机制 + 超时; 任务状态追踪 AsyncResult。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCelery()">Celery 基础</button>
+        <button onclick="demoTasks()">任务类型</button>
+        <button onclick="demoMonitor()">监控</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCelery() {
+            result.innerHTML = '';
+            log('# Celery 任务队列');
+            log('');
+            log('组件:');
+            log('  Broker: RabbitMQ 消息中间件');
+            log('  Worker: 执行任务');
+            log('  Beat: 定时任务调度');
+            log('  Result Backend: Redis');
+            log('');
+            log('流程:');
+            log('  API 提交 → RabbitMQ → Worker 消费');
+            log('  → 结果存 Redis → 查询状态');
+        }
+
+        function demoTasks() {
+            result.innerHTML = '';
+            log('# 任务类型');
+            log('');
+            log('异步任务:');
+            log('  send_welcome_email.delay(args)');
+            log('  立即返回 task_id');
+            log('');
+            log('定时任务:');
+            log('  Beat 调度 + crontab');
+            log('  每天凌晨清理 temp 文件');
+            log('');
+            log('任务链:');
+            log('  chain(validate, process, notify)');
+            log('  group: 并行任务');
+            log('  chord: 并行+汇总');
+        }
+
+        function demoMonitor() {
+            result.innerHTML = '';
+            log('# Flower 监控面板');
+            log('');
+            log('功能:');
+            log('  查看 Worker 状态');
+            log('  任务列表 + 状态');
+            log('  队列长度监控');
+            log('  任务重试/撤销');
+            log('');
+            log('URL:');
+            log('  http://localhost:5555');
+            log('  admin / secret');
+            log('');
+            log('RabbitMQ 管理:');
+            log('  http://localhost:15672');
+            log('  guest / guest');
+        }
+    </script>
+</body>
+</html>

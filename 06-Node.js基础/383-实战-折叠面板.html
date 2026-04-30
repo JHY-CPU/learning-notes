@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实战-折叠面板</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; max-width: 500px; margin: 0 auto; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .accordion { margin: 10px 0; }
+        .accordion-item { border: 1px solid #ddd; border-radius: 6px; margin-bottom: 8px; overflow: hidden; }
+        .accordion-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; background: #f8f9fa; cursor: pointer; font-size: 14px; color: #2c3e50; transition: background 0.2s; }
+        .accordion-header:hover { background: #eef0f2; }
+        .accordion-header .arrow { transition: transform 0.3s; font-size: 12px; }
+        .accordion-header .arrow.open { transform: rotate(180deg); }
+        .accordion-body { max-height: 0; overflow: hidden; transition: max-height 0.3s ease, padding 0.3s ease; padding: 0 16px; background: white; }
+        .accordion-body.open { max-height: 200px; padding: 12px 16px; }
+        .accordion-body p { margin: 0; font-size: 13px; color: #666; line-height: 1.6; }
+        .controls { display: flex; gap: 8px; margin: 10px 0; }
+        .controls button { padding: 6px 14px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-size: 12px; }
+        .controls button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>📂 折叠面板</h2>
+        <p style="color:#7f8c8d;font-size:13px;">Accordion 手风琴、多开限制、展开/折叠动画。</p>
+        <div class="controls">
+            <button onclick="expandAll()">展开全部</button>
+            <button onclick="collapseAll()">折叠全部</button>
+            <button onclick="toggleMode()">切换模式: 单开</button>
+        </div>
+        <div class="accordion" id="accordion">
+            <div class="accordion-item">
+                <div class="accordion-header" onclick="toggleItem(this)">
+                    <span>🎨 HTML 是什么?</span>
+                    <span class="arrow">▼</span>
+                </div>
+                <div class="accordion-body">
+                    <p>HTML (HyperText Markup Language) 是构建网页的标准标记语言。它使用标签来描述网页的结构和内容。</p>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <div class="accordion-header" onclick="toggleItem(this)">
+                    <span>🎨 CSS 的作用?</span>
+                    <span class="arrow">▼</span>
+                </div>
+                <div class="accordion-body">
+                    <p>CSS (Cascading Style Sheets) 用于控制网页的视觉呈现，包括布局、颜色、字体、动画等样式。</p>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <div class="accordion-header" onclick="toggleItem(this)">
+                    <span>🎨 JavaScript 特点?</span>
+                    <span class="arrow">▼</span>
+                </div>
+                <div class="accordion-body">
+                    <p>JavaScript 是一种动态编程语言，支持面向对象、函数式和事件驱动编程，是 Web 开发的核心语言。</p>
+                </div>
+            </div>
+            <div class="accordion-item">
+                <div class="accordion-header" onclick="toggleItem(this)">
+                    <span>🎨 什么是 DOM?</span>
+                    <span class="arrow">▼</span>
+                </div>
+                <div class="accordion-body">
+                    <p>DOM (Document Object Model) 是 HTML 文档的编程接口，将文档表示为树结构，允许 JS 动态操作页面。</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('📂 折叠面板演示:');
+        log('');
+
+        let singleMode = true;
+
+        function toggleItem(header) {
+            const body = header.nextElementSibling;
+            const arrow = header.querySelector('.arrow');
+            const isOpen = body.classList.contains('open');
+
+            if (singleMode && !isOpen) {
+                // Close all others
+                document.querySelectorAll('.accordion-body').forEach(b => {
+                    b.classList.remove('open');
+                    b.previousElementSibling.querySelector('.arrow').classList.remove('open');
+                });
+            }
+
+            body.classList.toggle('open');
+            arrow.classList.toggle('open');
+            log(isOpen ? `🔽 折叠: "${header.textContent.trim()}"` : `🔼 展开: "${header.textContent.trim()}"`);
+        }
+
+        function expandAll() {
+            document.querySelectorAll('.accordion-body').forEach(b => {
+                b.classList.add('open');
+                b.previousElementSibling.querySelector('.arrow').classList.add('open');
+            });
+            log('📖 展开全部');
+        }
+
+        function collapseAll() {
+            document.querySelectorAll('.accordion-body').forEach(b => {
+                b.classList.remove('open');
+                b.previousElementSibling.querySelector('.arrow').classList.remove('open');
+            });
+            log('📕 折叠全部');
+        }
+
+        function toggleMode() {
+            singleMode = !singleMode;
+            log(`🔄 切换为: ${singleMode ? '单开模式 (手风琴)' : '多开模式'}`);
+        }
+
+        log('✅ 折叠面板就绪');
+    </script>
+</body>
+</html>

@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UDP与TCP对比</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚖️ UDP 与 TCP 对比</h2><p>TCP vs UDP 全面对比、选型指南、应用场景、TCP 拥塞控制与流量控制。</p></div>
+    <div class="card">
+        <h2>TCP vs UDP 全面对比</h2>
+        <div class="code">// ========== TCP vs UDP ==========
+//
+// 特性             TCP              UDP
+// ─────────────────────────────────────────────
+// 连接类型        面向连接          无连接
+// 可靠性          可靠传输          尽力交付
+// 数据顺序        保证按序          不保证顺序
+// 重传机制        自动重传丢包      无重传
+// 流量控制        滑动窗口          无
+// 拥塞控制        慢启动+拥塞避免   无
+// 数据边界        字节流            消息边界
+// 头部大小        20-60 bytes       8 bytes
+// 传输效率        较低              较高
+// 延迟            较高              较低
+// 双工性          全双工            全双工
+// 广播/组播       不支持            支持
+//
+// ========== 数据包头部对比 ==========
+// TCP 头部 (~20 bytes):
+//   源端口(2) + 目的端口(2) + 序列号(4)
+//   + 确认号(4) + 数据偏移(1) + 标志位(1)
+//   + 窗口大小(2) + 校验和(2) + 紧急指针(2)
+//
+// UDP 头部 (8 bytes):
+//   源端口(2) + 目的端口(2) + 长度(2) + 校验和(2)</div>
+    </div>
+    <div class="card">
+        <h2>TCP 拥塞控制</h2>
+        <p>TCP 通过拥塞控制算法防止网络过载，主要包括四个阶段：</p>
+        <div class="code">// ========== TCP 拥塞控制算法 ==========
+//
+// 1. 慢启动 (Slow Start)
+//    cwnd 从 1 开始,每收到一个 ACK 翻倍
+//    指数增长直到慢启动阈值 (ssthresh)
+//
+// 2. 拥塞避免 (Congestion Avoidance)
+//    超过 ssthresh 后, cwnd 线性增长
+//    每 RTT 增加 1 (加法增加)
+//
+// 3. 快速重传 (Fast Retransmit)
+//    收到 3 个重复 ACK → 立即重传
+//    不等超时
+//
+// 4. 快速恢复 (Fast Recovery)
+//    重传后 cwnd 减半
+//    然后进入拥塞避免
+
+// ========== 拥塞控制示意 ==========
+// cwnd
+//  ↑
+//  │              ┌───── 拥塞避免 (线性增长)
+//  │             ╱
+//  │       ┌────  ← 慢启动阈值 (ssthresh)
+//  │      ╱
+//  │  ┌───   ← 慢启动 (指数增长)
+//  │ ╱
+//  └──────────────────────────→ 时间
+//        ^ 丢包事件: cwnd 减半</div>
+        <div class="note">📊 拥塞控制是 TCP 区别于 UDP 的核心特性——TCP 不仅关心"自己的发送速度",还关心"网络是否拥堵"。这保证了互联网不会因为某个连接发送太快而崩溃。</div>
+    </div>
+    <div class="card">
+        <h2>TCP 流量控制</h2>
+        <p>流量控制防止发送方速度超过接收方处理能力，通过滑动窗口机制实现。</p>
+        <div class="code">// ========== 滑动窗口 ==========
+// 接收方在 TCP 头部中通告窗口大小 (win)
+// 发送方根据窗口大小调整发送量
+//
+// 示例:
+//   接收方 win=10000 → 最多发 10000 bytes
+//   接收方 win=0     → 停止发送 (窗口关闭)
+//
+// ========== 窗口缩放因子 ==========
+// TCP 头部窗口字段只有 16 位 (最大 65535)
+// 高带宽场景需要更大窗口
+// Window Scale 选项 (RFC 1323):
+//   缩放因子 = 2^N (N=0-14)
+//   实际窗口 = 头部窗口 × 2^N
+//
+// 例: 窗口=65535, 缩放=7
+//   实际窗口 = 65535 × 128 ≈ 8MB
+
+// ========== 选择重传 (SACK) ==========
+// 默认 TCP 只确认连续收到的数据
+// 如果丢包,即使后面的包已收到也要重传全部
+// SACK 选项: 告知发送方哪些区间已收到
+// 发送方只需重传确实丢失的部分</div>
+    </div>
+    <div class="card">
+        <h2>选型指南</h2>
+        <p>根据应用需求选择 TCP 或 UDP。</p>
+        <div class="code">// ========== 选 TCP 的场景 ==========
+// 必须选 TCP:
+//   - Web 浏览: HTTP/HTTPS
+//   - 文件传输: FTP/SFTP
+//   - 电子邮件: SMTP/IMAP
+//   - 远程登录: SSH/Telnet
+//   - 数据库: MySQL/PostgreSQL
+//
+// 原因: 数据完整性 > 实时性
+// 丢失一个 HTTP 请求可能破坏整个页面
+//
+// ========== 选 UDP 的场景 ==========
+// 必须选 UDP:
+//   - 实时视频/音频: WebRTC/RTP
+//   - 在线游戏: FPS/MOBA 游戏
+//   - DNS 查询
+//   - DHCP
+//   - NTP 时间同步
+//
+// 原因: 实时性 > 数据完整性
+// 丢一帧画面胜过延迟等待重传
+//
+// ========== TCP 还是 UDP? ==========
+// 需要可靠?  → TCP
+// 需要低延迟? → UDP
+// 数据小且频繁? → UDP (DNS 只需几十字节)
+// 大文件传输? → TCP
+// 不确定? → TCP (默认安全选择),除非明确需要 UDP</div>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('⚖️ UDP 与 TCP 对比');
+        log('');
+        log('TCP: 可靠/按序/流量控制/拥塞控制 — 适合 Web/文件/邮件');
+        log('UDP: 不可靠/低延迟/无控制 — 适合视频/游戏/DNS');
+        log('TCP 拥塞控制: 慢启动 → 拥塞避免 → 快速重传 → 快速恢复');
+        log('流量控制: 滑动窗口机制,接收方通告窗口大小');
+        log('核心选择标准: 数据完整性重要 → TCP; 实时性重要 → UDP');
+    </script>
+</body>
+</html>

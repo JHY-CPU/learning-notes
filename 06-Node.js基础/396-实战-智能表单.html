@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实战-智能表单</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; max-width: 500px; margin: 0 auto; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        /* 表单样式 */
+        .form-group { margin-bottom: 16px; position: relative; }
+        .form-group label { display: block; font-size: 13px; color: #2c3e50; margin-bottom: 4px; font-weight: bold; }
+        .form-group label .required { color: #e74c3c; margin-left: 2px; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 10px 12px; border: 2px solid #e0e0e0; border-radius: 6px; font-size: 14px; transition: border-color 0.2s; box-sizing: border-box; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #3498db; box-shadow: 0 0 0 3px rgba(52,152,219,0.1); }
+        .form-group input.error, .form-group select.error, .form-group textarea.error { border-color: #e74c3c; }
+        .form-group input.success, .form-group select.success, .form-group textarea.success { border-color: #2ecc71; }
+        .form-group input:disabled { background: #f5f5f5; cursor: not-allowed; }
+        /* 错误消息 */
+        .error-msg { font-size: 12px; color: #e74c3c; margin-top: 4px; min-height: 18px; display: flex; align-items: center; gap: 4px; }
+        .error-msg::before { content: '⚠️'; font-size: 11px; }
+        .error-msg:empty { display: none; }
+        /* 帮助文本 */
+        .help-text { font-size: 11px; color: #95a5a6; margin-top: 2px; }
+        /* 密码强度 */
+        .password-strength { margin-top: 6px; }
+        .password-strength .bar { height: 4px; border-radius: 2px; background: #e0e0e0; overflow: hidden; }
+        .password-strength .bar .fill { height: 100%; border-radius: 2px; transition: width 0.3s, background 0.3s; }
+        .password-strength .label { font-size: 11px; margin-top: 2px; }
+        .password-strength .label.weak { color: #e74c3c; }
+        .password-strength .label.medium { color: #f39c12; }
+        .password-strength .label.strong { color: #2ecc71; }
+        /* 提交按钮 */
+        .form-actions { display: flex; gap: 8px; margin-top: 20px; }
+        .form-actions button { flex: 1; padding: 10px; border: none; border-radius: 6px; font-size: 14px; cursor: pointer; font-weight: bold; }
+        .form-actions button.primary { background: #3498db; color: white; }
+        .form-actions button.primary:hover { background: #2980b9; }
+        .form-actions button.primary:disabled { background: #93c5e8; cursor: not-allowed; }
+        .form-actions button.secondary { background: #95a5a6; color: white; }
+        .form-actions button.secondary:hover { background: #7f8c8d; }
+        /* 成功信息 */
+        .success-message { display: none; text-align: center; padding: 20px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; margin-top: 16px; }
+        .success-message.show { display: block; }
+        .success-message .icon { font-size: 36px; margin-bottom: 8px; }
+        .success-message .text { font-size: 16px; color: #166534; font-weight: bold; }
+        .success-message .sub { font-size: 13px; color: #4ade80; margin-top: 4px; }
+        .char-count { float: right; font-size: 11px; color: #95a5a6; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>📝 智能表单</h2>
+        <p style="color:#7f8c8d;font-size:13px;">表单验证 UI、实时错误提示、密码强度指示、提交前检查。</p>
+
+        <form id="smartForm" onsubmit="return handleSubmit(event)" novalidate>
+            <!-- 用户名 -->
+            <div class="form-group">
+                <label>用户名 <span class="required">*</span></label>
+                <input type="text" id="username" placeholder="3-16 位字母/数字/下划线" oninput="validateField('username')" onblur="validateField('username')">
+                <div class="error-msg" id="usernameError"></div>
+                <div class="help-text">至少 3 个字符，仅支持字母、数字、下划线</div>
+            </div>
+
+            <!-- 邮箱 -->
+            <div class="form-group">
+                <label>邮箱 <span class="required">*</span></label>
+                <input type="email" id="email" placeholder="example@mail.com" oninput="validateField('email')" onblur="validateField('email')">
+                <div class="error-msg" id="emailError"></div>
+                <div class="help-text">请输入有效的邮箱地址</div>
+            </div>
+
+            <!-- 密码 -->
+            <div class="form-group">
+                <label>密码 <span class="required">*</span></label>
+                <input type="password" id="password" placeholder="至少 8 位" oninput="validateField('password')">
+                <div class="error-msg" id="passwordError"></div>
+                <div class="password-strength" id="passwordStrength">
+                    <div class="bar"><div class="fill" id="strengthFill" style="width:0%"></div></div>
+                    <div class="label" id="strengthLabel">输入密码</div>
+                </div>
+            </div>
+
+            <!-- 确认密码 -->
+            <div class="form-group">
+                <label>确认密码 <span class="required">*</span></label>
+                <input type="password" id="confirmPwd" placeholder="再次输入密码" oninput="validateField('confirmPwd')">
+                <div class="error-msg" id="confirmPwdError"></div>
+            </div>
+
+            <!-- 年龄 -->
+            <div class="form-group">
+                <label>年龄</label>
+                <input type="number" id="age" placeholder="18-120" min="18" max="120" oninput="validateField('age')">
+                <div class="error-msg" id="ageError"></div>
+            </div>
+
+            <!-- 手机号 -->
+            <div class="form-group">
+                <label>手机号</label>
+                <input type="tel" id="phone" placeholder="11 位手机号" oninput="validateField('phone')">
+                <div class="error-msg" id="phoneError"></div>
+            </div>
+
+            <!-- 个人简介 -->
+            <div class="form-group">
+                <label>个人简介</label>
+                <textarea id="bio" placeholder="最多 200 字" maxlength="200" oninput="validateField('bio')" style="min-height:60px;"></textarea>
+                <span class="char-count" id="charCount">0/200</span>
+                <div class="error-msg" id="bioError"></div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="primary" id="submitBtn">提交</button>
+                <button type="reset" class="secondary" onclick="resetForm()">重置</button>
+            </div>
+        </form>
+
+        <div class="success-message" id="successMessage">
+            <div class="icon">✅</div>
+            <div class="text">提交成功!</div>
+            <div class="sub" id="successDetail"></div>
+        </div>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('📝 智能表单演示:');
+        log('');
+
+        // ========== 验证规则 ==========
+        const validators = {
+            username(val) {
+                if (!val.trim()) return '用户名不能为空';
+                if (val.length < 3) return '至少 3 个字符';
+                if (val.length > 16) return '不超过 16 个字符';
+                if (!/^[a-zA-Z0-9_]+$/.test(val)) return '仅支持字母、数字、下划线';
+                return '';
+            },
+            email(val) {
+                if (!val.trim()) return '邮箱不能为空';
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val)) return '邮箱格式不正确';
+                return '';
+            },
+            password(val) {
+                if (!val) return '密码不能为空';
+                if (val.length < 8) return '至少 8 位';
+                return '';
+            },
+            confirmPwd(val) {
+                const pwd = document.getElementById('password').value;
+                if (!val) return '请确认密码';
+                if (val !== pwd) return '两次密码不一致';
+                return '';
+            },
+            age(val) {
+                if (!val.trim()) return '';
+                const num = parseInt(val);
+                if (isNaN(num)) return '请输入数字';
+                if (num < 18 || num > 120) return '年龄范围 18-120';
+                return '';
+            },
+            phone(val) {
+                if (!val.trim()) return '';
+                if (!/^1\d{10}$/.test(val)) return '请输入 11 位手机号';
+                return '';
+            },
+            bio(val) {
+                if (val.length > 200) return '不超过 200 字';
+                return '';
+            },
+        };
+
+        // ========== 验证单个字段 ==========
+        function validateField(field) {
+            const input = document.getElementById(field);
+            const errorEl = document.getElementById(`${field}Error`);
+            const val = input.value;
+
+            const error = validators[field] ? validators[field](val) : '';
+            errorEl.textContent = error;
+
+            // 样式
+            input.classList.remove('error', 'success');
+            if (error) {
+                input.classList.add('error');
+            } else if (val.trim()) {
+                input.classList.add('success');
+            }
+
+            // 特殊处理
+            if (field === 'password') updatePasswordStrength(val);
+            if (field === 'bio') updateCharCount(val);
+            if (field === 'confirmPwd' || field === 'password') {
+                // 实时同步验证确认密码
+                const confirmEl = document.getElementById('confirmPwd');
+                if (confirmEl.value) validateField('confirmPwd');
+            }
+
+            updateSubmitBtn();
+            return !error;
+        }
+
+        // ========== 密码强度 ==========
+        function updatePasswordStrength(pwd) {
+            const fill = document.getElementById('strengthFill');
+            const label = document.getElementById('strengthLabel');
+
+            if (!pwd) {
+                fill.style.width = '0%';
+                fill.style.background = '#e0e0e0';
+                label.textContent = '输入密码';
+                label.className = 'label';
+                return;
+            }
+
+            let score = 0;
+            if (pwd.length >= 8) score++;
+            if (pwd.length >= 12) score++;
+            if (/[a-z]/.test(pwd) && /[A-Z]/.test(pwd)) score++;
+            if (/\d/.test(pwd)) score++;
+            if (/[^a-zA-Z0-9]/.test(pwd)) score++;
+
+            if (score <= 1) {
+                fill.style.width = '25%';
+                fill.style.background = '#e74c3c';
+                label.textContent = '弱 - 请增加复杂度';
+                label.className = 'label weak';
+            } else if (score <= 3) {
+                fill.style.width = '60%';
+                fill.style.background = '#f39c12';
+                label.textContent = '中 - 可以更强';
+                label.className = 'label medium';
+            } else {
+                fill.style.width = '100%';
+                fill.style.background = '#2ecc71';
+                label.textContent = '强 - 密码安全度很高';
+                label.className = 'label strong';
+            }
+        }
+
+        // ========== 字数统计 ==========
+        function updateCharCount(val) {
+            document.getElementById('charCount').textContent = `${val.length}/200`;
+        }
+
+        // ========== 提交按钮状态 ==========
+        function updateSubmitBtn() {
+            const btn = document.getElementById('submitBtn');
+            const fields = ['username', 'email', 'password', 'confirmPwd', 'age', 'phone', 'bio'];
+            const allValid = fields.every(f => {
+                const input = document.getElementById(f);
+                const errorEl = document.getElementById(`${f}Error`);
+                if (f === 'age' || f === 'phone' || f === 'bio') {
+                    return !errorEl.textContent;
+                }
+                return input.value.trim() && !errorEl.textContent;
+            });
+            btn.disabled = !allValid;
+        }
+
+        // ========== 提交 ==========
+        function handleSubmit(e) {
+            e.preventDefault();
+
+            // 验证所有字段
+            const fields = ['username', 'email', 'password', 'confirmPwd', 'age', 'phone', 'bio'];
+            let allValid = true;
+            fields.forEach(f => {
+                if (!validateField(f)) allValid = false;
+            });
+
+            if (!allValid) {
+                log('❌ 表单验证失败');
+                return false;
+            }
+
+            // 收集数据
+            const data = {
+                username: document.getElementById('username').value,
+                email: document.getElementById('email').value,
+                age: document.getElementById('age').value || '未填写',
+                phone: document.getElementById('phone').value || '未填写',
+                bio: document.getElementById('bio').value || '未填写',
+            };
+
+            // 显示成功
+            document.getElementById('successDetail').textContent =
+                `欢迎, ${data.username}! 注册邮箱: ${data.email}`;
+            document.getElementById('successMessage').classList.add('show');
+            document.getElementById('smartForm').style.display = 'none';
+
+            log(`✅ 表单提交成功: ${JSON.stringify(data)}`);
+            return false;
+        }
+
+        // ========== 重置 ==========
+        function resetForm() {
+            document.getElementById('smartForm').reset();
+            document.getElementById('successMessage').classList.remove('show');
+            document.getElementById('smartForm').style.display = 'block';
+
+            const fields = ['username', 'email', 'password', 'confirmPwd', 'age', 'phone', 'bio'];
+            fields.forEach(f => {
+                const input = document.getElementById(f);
+                const errorEl = document.getElementById(`${f}Error`);
+                input.classList.remove('error', 'success');
+                errorEl.textContent = '';
+            });
+
+            document.getElementById('strengthFill').style.width = '0%';
+            document.getElementById('strengthLabel').textContent = '输入密码';
+            document.getElementById('charCount').textContent = '0/200';
+            document.getElementById('submitBtn').disabled = true;
+            log('🔄 表单已重置');
+        }
+
+        // ========== 初始化 ==========
+        document.getElementById('submitBtn').disabled = true;
+        log('✅ 智能表单就绪 (实时验证)');
+    </script>
+</body>
+</html>

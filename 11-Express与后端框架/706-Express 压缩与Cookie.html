@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express 压缩与 Cookie</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🗜️ Express 压缩与 Cookie</h2><p>compression 中间件 (gzip/brotli/动态压缩)、响应压缩最佳实践、cookie-parser (签名Cookie/JSON Cookie)、Cookie 选项 (httpOnly/secure/sameSite)、Session Cookie vs 持久 Cookie。</p></div>
+    <div class="card">
+        <h2>compression 压缩</h2>
+        <div class="code">// ========== compression ==========
+// 使用 gzip/deflate 压缩响应体 (减少传输大小)
+
+npm install compression
+
+// ========== 基本使用 ==========
+const compression = require('compression');
+app.use(compression());
+
+// ========== 配置选项 ==========
+app.use(compression({
+    // 压缩阈值 (默认 1kb)
+    threshold: 1024,                  // 小于 1kb 不压缩
+
+    // 过滤函数 (哪些响应要压缩)
+    filter: (req, res) => {
+        // 不压缩图片 (已压缩格式)
+        if (req.path.match(/\.(jpg|png|gif|webp|mp4)$/)) {
+            return false;
+        }
+        // 使用默认过滤 (text/html, application/json 等)
+        return compression.filter(req, res);
+    },
+
+    // 压缩级别 (1-9, 默认 6)
+    level: 6,                         // 平衡速度与压缩比
+
+    // 内存占用 (级别越高占用越大)
+    memLevel: 8,                      // 内存级别 1-9
+
+    // 配合 Brotli (Node 11.7+)
+    brotli: {
+        enabled: true,
+        quality: 4,                   // 0-11, 默认 4
+    }
+}));
+
+// ========== 按路由压缩 ==========
+// 只为 API 响应启用压缩:
+app.use('/api', compression());
+
+// 只为大响应启用:
+app.get('/api/report', compression({ threshold: 512 }), (req, res) => {
+    // 大报告
+});
+
+// ========== 压缩效果 ==========
+// JSON 响应:   10KB → 2KB  (80% 减少)
+// HTML 页面:   50KB → 10KB (80% 减少)
+// CSS/JS:      100KB → 20KB (80% 减少)
+// 图片:        已压缩, 不启用
+
+// ========== 注意事项 ==========
+// 1. 压缩消耗 CPU → 高并发需权衡
+// 2. Nginx 层已经压缩的话, Express 不需要再压缩
+// 3. 小响应 (< 1KB) 不值得压缩
+// 4. 图片/视频不要重复压缩
+// 5. 流式响应可能不支持压缩</div>
+    </div>
+    <div class="card">
+        <h2>cookie-parser</h2>
+        <div class="code">// ========== cookie-parser ==========
+// 解析 Cookie 头, 填充 req.cookies
+
+npm install cookie-parser
+
+// ========== 基本使用 ==========
+const cookieParser = require('cookie-parser');
+app.use(cookieParser());
+
+// req.cookies → { key: value }
+
+// ========== 签名 Cookie ==========
+// 防止 Cookie 被篡改
+app.use(cookieParser('my-secret-key'));
+
+// 设置签名 Cookie:
+res.cookie('session', 'abc123', {
+    signed: true,        // 签名
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000,  // 1 天
+});
+
+// 读取签名 Cookie:
+req.signedCookies.session   // → 'abc123'
+// 如果被篡改 → false
+
+// ========== JSON Cookie ==========
+res.cookie('cart', JSON.stringify({ items: [1, 2, 3] }));
+
+// 或直接传对象 (cookie-parser 自动处理):
+res.cookie('preferences', { theme: 'dark', lang: 'zh-CN' });
+
+// ========== Cookie 选项 ==========
+res.cookie('token', 'jwt-xxx', {
+    // 安全选项
+    httpOnly: true,            // 禁止 JS 访问 (防 XSS)
+    secure: true,              // 仅 HTTPS 传输
+    sameSite: 'strict',        // 'strict' | 'lax' | 'none'
+
+    // 生命周期
+    maxAge: 7 * 24 * 60 * 60 * 1000,  // 7 天后过期 (毫秒)
+    expires: new Date('2025-12-31'),  // 绝对过期时间
+    // maxAge 和 expires 选一个
+
+    // 路径/域名
+    path: '/',                 // 作用路径
+    domain: '.example.com',    // 作用域名
+});
+
+// ========== 删除 Cookie ==========
+res.clearCookie('token');
+res.clearCookie('session', { path: '/admin' });</div>
+    </div>
+    <div class="card">
+        <h2>Session vs Cookie</h2>
+        <div class="code">// ========== Cookie 类型 ==========
+// ┌──────────────┬───────────────────┬──────────────────┐
+// │ 特性          │ Session Cookie    │ 持久 Cookie      │
+// ├──────────────┼───────────────────┼──────────────────┤
+// │ 存储位置      │ 内存 (不持久)    │ 硬盘             │
+// │ 生命周期      │ 浏览器关闭即删   │ 直到 maxAge      │
+// │ 设置方法      │ res.cookie(无maxAge) │ res.cookie(有maxAge) │
+// └──────────────┴───────────────────┴──────────────────┘
+
+// Session Cookie (关闭浏览器就删):
+res.cookie('sessionId', 'abc', { httpOnly: true });
+
+// 持久 Cookie (7 天后过期):
+res.cookie('rememberMe', 'token', {
+    httpOnly: true,
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+});
+
+// ========== SameSite 详解 ==========
+// 'strict':   仅同站请求带 Cookie (最安全)
+//   <a href="..."> 也不带 Cookie
+//
+// 'lax':      同站 + 顶级导航带 Cookie (默认)
+//   <a href="..."> 会带, <img>/<iframe> 不带
+//
+// 'none':     所有请求都带 (必须 secure: true)
+//   用于跨站请求 (第三方嵌入)
+
+// ========== 最佳实践 ==========
+// Cookie vs localStorage vs sessionStorage:
+// ┌──────────┬──────────────────────────────┐
+// │ Cookie   │ HTTP 自动发送, 可 httpOnly    │
+// │ localStorage │ JS 访问, 不自动发送       │
+// │ sessionStorage│ 标签页隔离              │
+// └──────────┴──────────────────────────────┘
+
+// Cookie 安全原则:
+// 1. 敏感数据用 signed cookie
+// 2. httpOnly 防 XSS 读取
+// 3. secure (HTTPS only)
+// 4. sameSite: 'strict' 或 'lax'
+// 5. 不要存敏感数据 (用 session ID 存服务端)
+// 6. Cookie 大小限制 4KB</div>
+        <div class="note">💡 compression 要点: gzip 减少 80% 传输大小; 小响应不压缩; 图片/视频跳过; Nginx 反向代理时在 Nginx 层压缩更高效。Cookie 要点: cookie-parser 解析 Cookie; signed cookie 防篡改; httpOnly+secure+sameSite 三件套保护; Session Cookie 关闭即删; SameSite strict 最安全但影响用户体验; Cookie 4KB 限制不能存大量数据。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCompress()">压缩配置</button>
+        <button onclick="demoCookie()">Cookie 设置</button>
+        <button onclick="demoSecure()">安全选项</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCompress() {
+            result.innerHTML = '';
+            log('# compression 压缩');
+            log('');
+            log('app.use(compression({');
+            log('  threshold: 1024,');
+            log('  level: 6,');
+            log('  filter: (req, res) => {');
+            log('    if (req.path.match(/\\.(jpg|png)$/))');
+            log('      return false;');
+            log('    return compression.filter(req, res);');
+            log('  }');
+            log('}));');
+            log('');
+            log('效果: 10KB → 2KB (80%)');
+        }
+
+        function demoCookie() {
+            result.innerHTML = '';
+            log('# Cookie 设置');
+            log('');
+            log('// 解析:');
+            log('app.use(cookieParser("secret"));');
+            log('');
+            log('// 设置:');
+            log('res.cookie("key", "val", {');
+            log('  httpOnly: true,');
+            log('  secure: true,');
+            log('  signed: true,');
+            log('  maxAge: 86400000');
+            log('});');
+            log('');
+            log('// 读取:');
+            log('req.cookies        // 未签名');
+            log('req.signedCookies  // 签名');
+        }
+
+        function demoSecure() {
+            result.innerHTML = '';
+            log('# Cookie 安全选项');
+            log('');
+            log('httpOnly → 禁止 JS 访问');
+            log('secure   → 仅 HTTPS');
+            log('sameSite → strict/lax/none');
+            log('signed   → 防篡改');
+            log('maxAge   → 有效期限制');
+            log('');
+            log('推荐:');
+            log('{ httpOnly: true,');
+            log('  secure: true,');
+            log('  sameSite: "lax",');
+            log('  signed: true }');
+        }
+    </script>
+</body>
+</html>

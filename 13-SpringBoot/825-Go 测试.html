@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 测试</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🧪 Go 测试</h2><p>testing 包、单元测试命名规则、表格驱动测试、子测试、基准测试 Benchmark、覆盖率、httptest HTTP 测试、testify 断言库。</p></div>
+    <div class="card">
+        <h2>单元测试</h2>
+        <div class="code">// ========== Go 测试 ==========
+// 文件: *_test.go
+// 函数: func TestXxx(t *testing.T)
+// 命令: go test ./... -v
+
+package main
+
+import (
+    "testing"
+    "fmt"
+)
+
+// ========== 被测试函数 ==========
+func Add(a, b int) int {
+    return a + b
+}
+
+func Divide(a, b int) (int, error) {
+    if b == 0 {
+        return 0, fmt.Errorf("division by zero")
+    }
+    return a / b, nil
+}
+
+func IsEven(n int) bool {
+    return n%2 == 0
+}
+
+// ========== 单元测试 ==========
+// 文件: math_test.go
+// 运行: go test -v
+
+func TestAdd(t *testing.T) {
+    result := Add(2, 3)
+    expected := 5
+
+    if result != expected {
+        t.Errorf("Add(2, 3) = %d; want %d", result, expected)
+    }
+}
+
+// ========== 表格驱动测试 ==========
+// Go 推荐模式
+
+func TestDivide(t *testing.T) {
+    tests := []struct {
+        name     string
+        a, b     int
+        expected int
+        wantErr  bool
+    }{
+        {"正常除法", 10, 2, 5, false},
+        {"被除数为零", 0, 5, 0, false},
+        {"除数为零", 10, 0, 0, true},
+        {"负数", -10, 2, -5, false},
+    }
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            result, err := Divide(tt.a, tt.b)
+
+            if tt.wantErr {
+                if err == nil {
+                    t.Error("期望错误但未得到")
+                }
+                return
+            }
+
+            if err != nil {
+                t.Errorf("不期望错误: %v", err)
+            }
+
+            if result != tt.expected {
+                t.Errorf("结果 = %d; 期望 %d", result, tt.expected)
+            }
+        })
+    }
+}
+
+// ========== 子测试 ==========
+// t.Run 组织层次化测试
+
+func TestIsEven(t *testing.T) {
+    t.Run("偶数", func(t *testing.T) {
+        if !IsEven(4) {
+            t.Error("4 应为偶数")
+        }
+        if !IsEven(0) {
+            t.Error("0 应为偶数")
+        }
+    })
+
+    t.Run("奇数", func(t *testing.T) {
+        if IsEven(3) {
+            t.Error("3 应为奇数")
+        }
+    })
+}
+
+// ========== 测试辅助函数 ==========
+func assertEqual(t *testing.T, got, want interface{}) {
+    t.Helper()  // 标记为辅助函数, 报错行号为调用处
+    if got != want {
+        t.Errorf("got %v, want %v", got, want)
+    }
+}
+
+func TestWithHelper(t *testing.T) {
+    assertEqual(t, Add(1, 1), 2)
+    assertEqual(t, Add(0, 0), 0)
+}
+
+// ========== 跳过测试 ==========
+func TestSkip(t *testing.T) {
+    if testing.Short() {
+        t.Skip("跳过: -short 模式")
+    }
+    // 耗时测试...
+}
+
+// ========== 并行测试 ==========
+func TestParallel(t *testing.T) {
+    tests := []struct {
+        name string
+        fn   func(*testing.T)
+    }{
+        {"test1", func(t *testing.T) { /* ... */ }},
+        {"test2", func(t *testing.T) { /* ... */ }},
+    }
+
+    for _, tt := range tests {
+        tt := tt  // 复制 (Go <1.22 必须)
+        t.Run(tt.name, func(t *testing.T) {
+            t.Parallel()  // 标记为并行
+            tt.fn(t)
+        })
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>Testify 断言</h2>
+        <div class="code">// ========== testify ==========
+// 流行的测试工具包
+// go get github.com/stretchr/testify
+
+import (
+    "testing"
+    "github.com/stretchr/testify/assert"
+    "github.com/stretchr/testify/require"
+    "github.com/stretchr/testify/suite"
+)
+
+// ========== assert ==========
+// 失败继续执行
+
+func TestWithAssert(t *testing.T) {
+    result := Add(2, 3)
+
+    assert.Equal(t, 5, result)
+    assert.NotEqual(t, 0, result)
+    assert.True(t, IsEven(4))
+    assert.False(t, IsEven(3))
+
+    // 带消息
+    assert.Equal(t, 5, result, "Add(2, 3) 应等于 %d", 5)
+}
+
+// ========== require ==========
+// 失败立即停止 (适合 setup)
+
+func TestWithRequire(t *testing.T) {
+    result, err := Divide(10, 2)
+
+    require.NoError(t, err)    // 失败则停止
+    require.Equal(t, 5, result)
+
+    // 以下在执行 result 不为 nil 时安全
+    // ...
+}
+
+// ========== suite ==========
+// 测试套件 (setup/teardown)
+
+type ExampleSuite struct {
+    suite.Suite
+    db *DB
+}
+
+// 每个测试前执行
+func (s *ExampleSuite) SetupTest() {
+    s.db = NewTestDB()
+}
+
+// 每个测试后执行
+func (s *ExampleSuite) TearDownTest() {
+    s.db.Close()
+}
+
+// 全套件前执行
+func (s *ExampleSuite) SetupSuite() {
+    // 初始化数据库连接等
+}
+
+// 全套件后执行
+func (s *ExampleSuite) TearDownSuite() {
+    // 清理资源
+}
+
+// 测试方法 (以 Test 开头)
+func (s *ExampleSuite) TestFindUser() {
+    user, err := s.db.FindUser(1)
+    s.NoError(err)
+    s.Equal("Alice", user.Username)
+}
+
+func (s *ExampleSuite) TestCreateUser() {
+    user := &User{Username: "Bob"}
+    err := s.db.CreateUser(user)
+    s.NoError(err)
+    s.NotZero(user.ID)
+}
+
+// 运行套件
+func TestExampleSuite(t *testing.T) {
+    suite.Run(t, new(ExampleSuite))
+}
+
+// ========== mock ==========
+// testify/mock 模拟接口
+
+type UserService interface {
+    GetUser(id int) (*User, error)
+}
+
+type MockUserService struct {
+    mock.Mock
+}
+
+func (m *MockUserService) GetUser(id int) (*User, error) {
+    args := m.Called(id)
+    return args.Get(0).(*User), args.Error(1)
+}
+
+func TestHandler(t *testing.T) {
+    mockSvc := new(MockUserService)
+    mockSvc.On("GetUser", 1).Return(&User{Username: "Alice"}, nil)
+
+    handler := NewHandler(mockSvc)
+    user := handler.GetUser(1)
+
+    assert.Equal(t, "Alice", user.Username)
+    mockSvc.AssertExpectations(t)
+}</div>
+    </div>
+    <div class="card">
+        <h2>基准测试与 HTTP 测试</h2>
+        <div class="code">// ========== 基准测试 (Benchmark) ==========
+// 性能测试
+// 函数: func BenchmarkXxx(b *testing.B)
+// 运行: go test -bench=.
+
+// 被测试函数
+func Sum(numbers []int) int {
+    total := 0
+    for _, n := range numbers {
+        total += n
+    }
+    return total
+}
+
+// 基准测试
+func BenchmarkSum(b *testing.B) {
+    numbers := make([]int, 1000)
+    for i := range numbers {
+        numbers[i] = i
+    }
+
+    // b.N 由框架自动调整
+    for i := 0; i < b.N; i++ {
+        Sum(numbers)
+    }
+}
+
+// 不同数据规模
+func BenchmarkSumLarge(b *testing.B) {
+    numbers := make([]int, 100000)
+    for i := range numbers {
+        numbers[i] = i
+    }
+    b.ResetTimer()  // 重置计时器
+
+    for i := 0; i < b.N; i++ {
+        Sum(numbers)
+    }
+}
+
+// 运行:
+// go test -bench=. -benchmem
+// go test -bench=Sum -benchtime=5s -count=3
+
+// 结果:
+// BenchmarkSum-8         5000000   320 ns/op   0 B/op   0 allocs/op
+//   ↑核心数               ↑次数    ↑每次耗时   ↑内存   ↑分配次数
+
+// ========== 测试覆盖率 ==========
+// go test -cover
+// go test -coverprofile=coverage.out
+// go tool cover -html=coverage.out  // 浏览器查看
+
+// 运行: go test -cover -covermode=count
+
+// ========== httptest ==========
+// HTTP 测试
+
+import "net/http/httptest"
+
+func TestHandler(t *testing.T) {
+    // 创建测试请求
+    req := httptest.NewRequest("GET", "/api/users", nil)
+
+    // 创建响应记录器
+    w := httptest.NewRecorder()
+
+    // 调用 handler
+    handler(w, req)
+
+    // 断言
+    resp := w.Result()
+    body, _ := io.ReadAll(resp.Body)
+
+    assert.Equal(t, 200, resp.StatusCode)
+    assert.Contains(t, string(body), "users")
+}
+
+// ========== 完整 HTTP 测试示例 ==========
+func TestUserHandler(t *testing.T) {
+    tests := []struct {
+        name       string
+        method     string
+        path       string
+        body       string
+        statusCode int
+        contains   string
+    }{
+        {"获取用户列表", "GET", "/api/users", "", 200, "users"},
+        {"创建用户", "POST", "/api/users", `{"name":"Alice"}`, 201, "Alice"},
+        {"无效请求", "POST", "/api/users", `{}`, 400, "error"},
+    }
+
+    router := setupRouter()  // 初始化路由
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            var req *http.Request
+            if tt.body != "" {
+                req = httptest.NewRequest(tt.method, tt.path,
+                    strings.NewReader(tt.body))
+                req.Header.Set("Content-Type", "application/json")
+            } else {
+                req = httptest.NewRequest(tt.method, tt.path, nil)
+            }
+
+            w := httptest.NewRecorder()
+            router.ServeHTTP(w, req)
+
+            assert.Equal(t, tt.statusCode, w.Code)
+            assert.Contains(t, w.Body.String(), tt.contains)
+        })
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>测试命令与最佳实践</h2>
+        <div class="code">// ========== go test 命令 ==========
+// go test                        # 当前包
+// go test -v                     # 详细输出
+// go test ./...                  # 所有包
+// go test -run TestAdd           # 运行特定测试
+// go test -run "TestAdd|TestSum" # 多个
+// go test -short                 # 跳过耗时测试
+// go test -parallel 4            # 并行数
+//
+// go test -bench=.               # 基准测试
+// go test -bench=Sum -benchtime=5s
+// go test -benchmem              # 内存分配
+//
+// go test -cover                 # 覆盖率
+// go test -coverprofile=out      # 输出文件
+// go tool cover -html=out        # 可视化
+//
+// go test -race                  # 竞态检测
+
+// ========== 测试最佳实践 ==========
+
+// ========== 1. 文件命名 ==========
+// source.go → source_test.go
+// 测试文件与被测试文件同包
+
+// ========== 2. 函数命名 ==========
+// TestXxx: 单元测试
+// BenchmarkXxx: 基准测试
+// ExampleXxx: 示例测试
+
+// ========== 3. 表格驱动测试 ==========
+// Go 的推荐模式, 易于添加新用例
+
+// ========== 4. t.Helper() ==========
+// 在辅助函数中标记, 报错行号指向调用处
+
+// ========== 5. 使用 testify ==========
+// assert 失败继续, require 失败停止
+// suite 组织测试套件
+// mock 模拟接口
+
+// ========== 6. 测试覆盖率 ==========
+// 目标: 核心逻辑 > 80%
+// 关注: 分支覆盖而非行覆盖
+// 每次 CI 运行覆盖率
+
+// ========== 7. 示例测试 ==========
+// 函数的可运行示例, 同时作为文档
+
+func ExampleAdd() {
+    result := Add(2, 3)
+    fmt.Println(result)
+    // Output: 5
+}
+
+// go test -run ExampleAdd
+
+// ========== 8. fuzz 测试 (Go 1.18+) ==========
+func FuzzAdd(f *testing.F) {
+    f.Add(1, 2)     // 种子输入
+    f.Add(-1, 1)
+
+    f.Fuzz(func(t *testing.T, a, b int) {
+        result := Add(a, b)
+        // Fuzz 会尝试各种输入
+        if result != a+b {
+            t.Errorf("Add(%d,%d) = %d", a, b, result)
+        }
+    })
+}
+
+// go test -fuzz=FuzzAdd -fuzztime=30s</div>
+        <div class="note">💡 测试要点: _test.go 文件; 表格驱动测试; t.Run 子测试; assert vs require; suite 套件; Benchmark 基准测试; httptest HTTP 测试; testify mock; -race 竞态; -cover 覆盖率; Fuzz 模糊测试; testing.Short 跳过耗时测试; t.Helper 辅助函数。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoTest()">单元测试</button>
+        <button onclick="demoBench()">基准测试</button>
+        <button onclick="demoHTTP()">HTTP 测试</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoTest() {
+            result.innerHTML = '';
+            log('# Go 单元测试');
+            log('');
+            log('规则:');
+            log('  文件: source_test.go');
+            log('  函数: func TestXxx(t *testing.T)');
+            log('  运行: go test -v');
+            log('');
+            log('表格驱动测试:');
+            log('  tests := []struct{');
+            log('    name string');
+            log('    input int');
+            log('    want  int');
+            log('  }{...}');
+            log('  for _, tt := range tests {');
+            log('    t.Run(tt.name, func(t *testing.T) {');
+            log('      assert.Equal(t, tt.want, fn(tt.input))');
+            log('    })');
+            log('  }');
+        }
+
+        function demoBench() {
+            result.innerHTML = '';
+            log('# 基准测试');
+            log('');
+            log('func BenchmarkSum(b *testing.B) {');
+            log('  for i := 0; i < b.N; i++ {');
+            log('    Sum(data)');
+            log('  }');
+            log('}');
+            log('');
+            log('命令:');
+            log('  go test -bench=.');
+            log('  go test -bench=Sum -benchmem');
+            log('  go test -benchtime=5s');
+            log('');
+            log('结果:');
+            log('  BenchmarkSum-8 5000000 320 ns/op 0 B/op');
+        }
+
+        function demoHTTP() {
+            result.innerHTML = '';
+            log('# HTTP 测试');
+            log('');
+            log('创建请求:');
+            log('  req := httptest.NewRequest("GET", "/api", nil)');
+            log('');
+            log('响应记录:');
+            log('  w := httptest.NewRecorder()');
+            log('  handler(w, req)');
+            log('');
+            log('断言:');
+            log('  resp := w.Result()');
+            log('  assert.Equal(t, 200, w.Code)');
+            log('  assert.Contains(t, w.Body.String(), "data")');
+            log('');
+            log('完整性测试: router.ServeHTTP(w, req)');
+        }
+    </script>
+</body>
+</html>

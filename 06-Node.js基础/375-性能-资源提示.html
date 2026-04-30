@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>性能-资源提示</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>性能-资源提示</h2><p>preload/prefetch/preconnect/dns-prefetch/modulepreload、优先级。</p></div>
+    <div class="card">
+        <h2>资源提示 API</h2>
+        <div class="code">// ========== <link rel=""> 资源提示 ==========
+<link rel="preload"       href="font.woff2" as="font" crossorigin>
+<link rel="prefetch"      href="next-page.js">
+<link rel="preconnect"    href="https://api.example.com">
+<link rel="dns-prefetch"  href="//cdn.example.com">
+<link rel="modulepreload" href="app.mjs">
+<link rel="preload"       href="hero.jpg" as="image" media="(min-width: 768px)">
+<link rel="preload"       href="style.css" as="style">
+<link rel="preload"       href="critical.js" as="script">
+
+// ========== HTTP 头等价 ==========
+Link: </font.woff2>; rel=preload; as=font; crossorigin
+Link: </style.css>; rel=preload; as=style
+
+// ========== 优先级 ==========
+// preload > modulepreload > prefetch
+// preconnect > dns-prefetch</div>
+    </div>
+    <div class="card">
+        <h2>演示：资源提示</h2>
+        <button onclick="demoPreload()">Preload</button>
+        <button onclick="demoPrefetch()">Prefetch</button>
+        <button onclick="demoPreconnect()">Preconnect</button>
+        <button onclick="demoPriority()">优先级</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoPreload() {
+            result.innerHTML = '';
+            log('🔮 preload:');
+            log('');
+
+            log('1️⃣ 作用:');
+            log('   浏览器提前加载关键资源');
+            log('   优先级: 高 (浏览器必须尽快加载)');
+            log('   适用于: 当前页面需要的资源');
+            log('');
+
+            log('2️⃣ as 属性:');
+            log('   as="image"     — 图片');
+            log('   as="font"      — 字体 (需 crossorigin)');
+            log('   as="style"     — CSS 样式');
+            log('   as="script"    — JavaScript');
+            log('   as="fetch"     — XHR/Fetch 请求');
+            log('   as="document"  — HTML 文档');
+            log('   as="video"     — 视频');
+            log('   as="audio"     — 音频');
+            log('   as="track"     — 字幕');
+            log('   as="worker"    — Web Worker');
+            log('');
+
+            log('3️⃣ 应用场景:');
+            log('   <!-- 提前加载首屏大图 -->');
+            log('   <link rel="preload" href="hero.jpg" as="image">');
+            log('');
+            log('   <!-- 提前加载字体 (防 FOIT) -->');
+            log('   <link rel="preload" href="font.woff2" as="font" crossorigin>');
+            log('');
+            log('   <!-- 响应式 preload -->');
+            log('   <link rel="preload" href="hero-mobile.jpg" as="image"');
+            log('         media="(max-width: 768px)">');
+            log('');
+
+            log('4️⃣ HTTP 头方式:');
+            log('   Link: </critical.css>; rel=preload; as=style');
+            log('   Link: </critical.js>; rel=preload; as=script');
+            log('   优势: 服务端推送, 减少 HTML 传输');
+            log('');
+
+            log('5️⃣ 注意事项:');
+            log('   • 不要过度使用 (抢带宽)');
+            log('   • 加载后 3s 未使用, 会触发警告');
+            log('   • font 必须加 crossorigin');
+        }
+
+        function demoPrefetch() {
+            result.innerHTML = '';
+            log('🔮 prefetch / prerender:');
+            log('');
+
+            log('1️⃣ prefetch (预获取):');
+            log('   <link rel="prefetch" href="next-page.js">');
+            log('   优先级: 低 (浏览器空闲时加载)');
+            log('   用途: 下一页可能用到的资源');
+            log('');
+
+            log('2️⃣ prefetch 适用场景:');
+            log('   • 下一页的 JS/CSS');
+            log('   • 详情页的图片');
+            log('   • 搜索结果第 2 页');
+            log('   • 用户悬停在链接上时');
+            log('');
+
+            log('3️⃣ prerender (预渲染):');
+            log('   <link rel="prerender" href="/next-page">');
+            log('   浏览器预先渲染整个页面 (包括 JS)');
+            log('   资源消耗大, 谨慎使用');
+            log('   注意: 已废弃, 使用 Speculation Rules API');
+            log('');
+
+            log('4️⃣ Speculation Rules API (新):')
+            log('   <script type="speculationrules">');
+            log('   {');
+            log('     "prefetch": [');
+            log('       { "source": "list", "urls": ["/next", "/about"] }');
+            log('     ],');
+            log('     "prerender": [');
+            log('       { "source": "list", "urls": ["/next"] }');
+            log('     ]');
+            log('   }');
+            log('   </script>');
+            log('');
+
+            log('5️⃣ preload vs prefetch:');
+            log('   ┌──────────┬─────────────┬────────────┐');
+            log('   │          │ preload     │ prefetch   │');
+            log('   ├──────────┼─────────────┼────────────┤');
+            log('   │ 用途     │ 当前页面    │ 将来页面   │');
+            log('   │ 优先级   │ 高          │ 低         │');
+            log('   │ 触发时机 │ 立即        │ 空闲时     │');
+            log('   │ 带宽     │ 竞争        │ 非竞争     │');
+            log('   └──────────┴─────────────┴────────────┘');
+        }
+
+        function demoPreconnect() {
+            result.innerHTML = '';
+            log('🔗 preconnect / dns-prefetch:');
+            log('');
+
+            log('1️⃣ preconnect (预连接):');
+            log('   <link rel="preconnect" href="https://api.example.com">');
+            log('   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>');
+            log('');
+            log('   作用: 提前完成 DNS + TCP + TLS');
+            log('   节省: 100-300ms (跨域请求)');
+            log('');
+
+            log('2️⃣ preconnect 建立:');
+            log('   ① DNS 查询 → ② TCP 握手 → ③ TLS 握手');
+            log('   ├─ preconnect ────────────────→');
+            log('   └─ 不使用: DNS → TCP → TLS → 请求');
+            log('');
+
+            log('3️⃣ dns-prefetch (DNS 预解析):');
+            log('   <link rel="dns-prefetch" href="//cdn.example.com">');
+            log('   仅做 DNS 解析, 不做 TCP/TLS');
+            log('   比 preconnect 轻量');
+            log('   兼容性更好 (IE10+)');
+            log('');
+
+            log('4️⃣ preconnect vs dns-prefetch:');
+            log('   • preconnect: 完整连接 (DNS+TCP+TLS)');
+            log('   • dns-prefetch: 仅 DNS');
+            log('   • 建议: 对于关键第三方, 用 preconnect');
+            log('   • 建议: 对于非关键, 用 dns-prefetch');
+            log('');
+
+            log('5️⃣ 最佳实践:');
+            log('   <!-- 优先使用 preconnect -->');
+            log('   <link rel="preconnect" href="https://api.example.com">');
+            log('   <!-- dns-prefetch 作为 fallback -->');
+            log('   <link rel="dns-prefetch" href="//api.example.com">');
+        }
+
+        function demoPriority() {
+            result.innerHTML = '';
+            log('📊 资源优先级:');
+            log('');
+
+            log('1️⃣ 浏览器默认优先级:');
+            log('   最高: preload + as=style');
+            log('   高:   HTML/CSS/字体 (blocking)');
+            log('   中:   script (非 async/defer)');
+            log('   低:   script async/defer');
+            log('   最低: images / prefetch');
+            log('');
+
+            log('2️⃣ preload 优先级 (as 影响):');
+            log('   极高: as=style (阻塞渲染)');
+            log('   高:   as=font');
+            log('   中:   as=script');
+            log('   低:   as=image');
+            log('   最低: as=fetch');
+            log('');
+
+            log('3️⃣ 优先级总结:');
+            log('   ┌──────────────────┬──────────┐');
+            log('   │ 提示             │ 优先级   │');
+            log('   ├──────────────────┼──────────┤');
+            log('   │ preload (style)  │ 极高     │');
+            log('   │ preload (font)   │ 高       │');
+            log('   │ preload (script) │ 中       │');
+            log('   │ modulepreload    │ 中       │');
+            log('   │ preconnect       │ N/A      │');
+            log('   │ dns-prefetch     │ N/A      │');
+            log('   │ preload (image)  │ 低       │');
+            log('   │ prefetch         │ 最低     │');
+            log('   └──────────────────┴──────────┘');
+            log('');
+
+            log('4️⃣ 使用建议:');
+            log('   • LCP 图片: preload');
+            log('   • 关键字体: preload + crossorigin');
+            log('   • API 服务: preconnect');
+            log('   • 第三方资源: preconnect/dns-prefetch');
+            log('   • 下一页资源: prefetch');
+            log('   • 频繁访问页面: prerender');
+            log('');
+
+            log('5️⃣ 注意:');
+            log('   • 每个 preload 都会抢占带宽');
+            log('   • 移动端限制连接数 (一般 6 个)');
+            log('   • 大量 preload 反而降低性能');
+            log('   • 使用 Fetch Priority API:');
+            log('     <img src="hero.jpg" fetchpriority="high">');
+            log('     <script src="analytics.js" fetchpriority="low">');
+        }
+
+        console.log('=== 性能-资源提示 ===');
+        document.getElementById('output').textContent =
+            `资源提示: preload / prefetch / preconnect / dns-prefetch / modulepreload\n` +
+            `✅ 资源提示演示完成！`;
+    </script>
+</body>
+</html>

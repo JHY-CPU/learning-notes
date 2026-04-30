@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>环境变量</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #env-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>环境变量</h2><p>dotenv 库、process.env、.env 文件、环境区分 (dev/prod)。</p></div>
+    <div class="card">
+        <h2>环境变量管理</h2>
+        <div class="code">// ========== process.env ==========
+// 所有环境变量
+console.log(process.env.NODE_ENV);
+console.log(process.env.PORT);
+console.log(process.env.DB_URL);
+
+// 设置环境变量 (运行时)
+// $ NODE_ENV=production PORT=3000 node app.js
+
+// ========== 环境区分 ==========
+// 常见环境:
+// development — 开发
+// production  — 生产
+// test        — 测试
+// staging     — 预发布
+
+const config = {
+    development: {
+        port: 3000,
+        db: 'mongodb://localhost/dev',
+    },
+    production: {
+        port: process.env.PORT || 8080,
+        db: process.env.DB_URL,
+    },
+};
+
+const env = process.env.NODE_ENV || 'development';
+const appConfig = config[env];
+
+// ========== .env 文件 ==========
+// .env           — 通用配置
+// .env.local     — 本地覆盖 (不提交 git)
+// .env.development — 开发环境
+// .env.production  — 生产环境
+
+// .env 示例:
+// PORT=3000
+// DB_HOST=localhost
+// DB_USER=admin
+// DB_PASS=secret123
+
+// ========== dotenv 加载 ==========
+require('dotenv').config();                 // 加载 .env
+require('dotenv').config({ path: '.env.local' }); // 指定路径
+require('dotenv').config({ path: `.env.${process.env.NODE_ENV}` });
+
+// 访问
+const port = process.env.PORT;
+const dbUrl = `mongodb://${process.env.DB_HOST}:27017/myapp`;</div>
+        <div class="note">⚠️ .env 文件包含敏感信息，不要提交到 git。<br>
+        💡 提交 .env.example 作为模板。<br>
+        💡 Node 18+ 支持 --env-file 参数。</div>
+    </div>
+    <div class="card">
+        <h2>演示：环境变量</h2>
+        <button onclick="demoEnv()">环境变量演示</button>
+        <button onclick="demoDotenv()">.env 文件模拟</button>
+        <div id="env-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const envResult = document.getElementById('env-result');
+
+        function log(msg) {
+            envResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoEnv() {
+            envResult.innerHTML = '';
+            log('🔧 环境变量演示:');
+            log('');
+
+            // 模拟 process.env
+            const mockEnv = {
+                NODE_ENV: 'development',
+                PORT: '3000',
+                DB_HOST: 'localhost',
+                DB_PORT: '27017',
+                DB_NAME: 'myapp',
+                DB_USER: 'admin',
+                REDIS_URL: 'redis://localhost:6379',
+                LOG_LEVEL: 'debug',
+                API_KEY: 'sk-xxxxxxxxxxxx',
+            };
+
+            log('1️⃣ 当前环境 (NODE_ENV):');
+            log(`   ${mockEnv.NODE_ENV || 'development'} (默认)`);
+            log('');
+
+            log('2️⃣ 环境配置:');
+            const configs = {
+                development: {
+                    port: 3000,
+                    db: 'mongodb://localhost/dev',
+                    logLevel: 'debug',
+                    cors: '*',
+                },
+                production: {
+                    port: parseInt(mockEnv.PORT) || 8080,
+                    db: `mongodb://${mockEnv.DB_HOST}:${mockEnv.DB_PORT}/${mockEnv.DB_NAME}`,
+                    logLevel: mockEnv.LOG_LEVEL || 'info',
+                    cors: 'https://example.com',
+                },
+            };
+
+            const env = mockEnv.NODE_ENV || 'development';
+            const config = configs[env];
+
+            log(`   ${env} 配置:`);
+            Object.entries(config).forEach(([k, v]) => log(`   ${k}: ${v}`));
+            log('');
+
+            log('3️⃣ 常用环境变量:');
+            log(`   NODE_ENV — 运行环境 (dev/prod/test)`);
+            log(`   PORT — 服务端口`);
+            log(`   DB_URL — 数据库连接`);
+            log(`   LOG_LEVEL — 日志级别`);
+            log(`   API_KEY — API 密钥`);
+            log('');
+
+            log('📌 12-Factor App 原则:');
+            log('   • 配置存储于环境变量');
+            log('   • 不硬编码配置');
+            log('   • 安全: .env 加入 .gitignore');
+        }
+
+        function demoDotenv() {
+            envResult.innerHTML = '';
+            log('📄 .env 文件加载模拟:');
+            log('');
+
+            const envFile = `# 应用配置
+PORT=4000
+NODE_ENV=development
+
+# 数据库
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=myapp_dev
+DB_USER=postgres
+DB_PASS=secret123
+
+# Redis
+REDIS_URL=redis://localhost:6379
+
+# 日志
+LOG_LEVEL=debug`;
+
+            log('1️⃣ .env 文件内容:');
+            log(envFile);
+            log('');
+
+            // 模拟 dotenv 解析
+            function parseEnv(content) {
+                const result = {};
+                content.split('\n').forEach(line => {
+                    const trimmed = line.trim();
+                    if (!trimmed || trimmed.startsWith('#')) return;
+                    const eqIdx = trimmed.indexOf('=');
+                    if (eqIdx === -1) return;
+                    const key = trimmed.slice(0, eqIdx).trim();
+                    let value = trimmed.slice(eqIdx + 1).trim();
+                    if ((value.startsWith("'") && value.endsWith("'")) ||
+                        (value.startsWith('"') && value.endsWith('"'))) {
+                        value = value.slice(1, -1);
+                    }
+                    result[key] = value;
+                });
+                return result;
+            }
+
+            const parsed = parseEnv(envFile);
+
+            log('2️⃣ 解析后的环境变量:');
+            Object.entries(parsed).forEach(([key, val]) => {
+                const display = key.includes('PASS') || key.includes('SECRET')
+                    ? '****' : val;
+                log(`   ${key}=${display}`);
+            });
+            log('');
+
+            log('3️⃣ 安全注意事项:');
+            log('   • .env 不提交 git (放 .gitignore)');
+            log('   • 提交 .env.example (不含真实密码)');
+            log('   • 生产环境用 CI/CD 注入变量');
+            log('   • 敏感信息使用密钥管理服务');
+        }
+
+        console.log('=== 环境变量 ===');
+
+        document.getElementById('output').textContent =
+            `环境变量: process.env / .env / dotenv / NODE_ENV\n` +
+            `环境区分: development / production / test / staging\n` +
+            `✅ 环境变量演示完成！`;
+    </script>
+</body>
+</html>

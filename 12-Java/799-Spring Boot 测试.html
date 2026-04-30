@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot 测试</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🧪 Spring Boot 测试</h2><p>@SpringBootTest 集成测试、@WebMvcTest 切片测试、@MockBean/@SpyBean、MockMvc 执行 HTTP 请求、TestRestTemplate、测试数据库。</p></div>
+    <div class="card">
+        <h2>测试切片</h2>
+        <div class="code">// ========== Spring Boot 测试 ==========
+// spring-boot-starter-test 自动包含:
+// JUnit 5 + Mockito + AssertJ + Hamcrest + MockMvc
+
+// ========== 测试切片 ==========
+// 只加载需要的部分, 加速测试
+
+// ┌─────────────────────┬──────────────────────────────────┐
+// │ 注解                │ 加载范围                         │
+// ├─────────────────────┼──────────────────────────────────┤
+// │ @SpringBootTest     │ 完整应用上下文 (集成测试)        │
+// │ @WebMvcTest         │ Web 层 (Controller)              │
+// │ @DataJpaTest        │ JPA 层 (Repository)              │
+// │ @JsonTest           │ JSON 序列化                      │
+// │ @RestClientTest     │ REST 客户端                      │
+// │ @WebFluxTest        │ WebFlux 控制器                   │
+// └─────────────────────┴──────────────────────────────────┘
+
+// ========== @SpringBootTest (全量集成) ==========
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class UserServiceIntegrationTest {
+
+    @Autowired
+    private TestRestTemplate restTemplate;
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @BeforeEach
+    void setUp() {
+        userRepository.deleteAll();
+    }
+
+    @Test
+    void shouldCreateAndFindUser() {
+        // 使用 TestRestTemplate 发送真实 HTTP 请求
+        User user = new User("Alice", "alice@test.com");
+        ResponseEntity&lt;User&gt; response = restTemplate.postForEntity(
+            "/api/users", user, User.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(response.getBody().getName()).isEqualTo("Alice");
+
+        // 验证数据库
+        assertThat(userRepository.count()).isEqualTo(1);
+    }
+}
+
+// ========== @WebMvcTest (Controller 切片) ==========
+// 只加载 Controller + 安全配置, 不加载 Service/Repository
+@WebMvcTest(UserController.class)              // 只测试 UserController
+class UserControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;                   // 模拟 HTTP 请求
+
+    @MockBean                                 // 模拟 Service 层
+    private UserService userService;
+
+    @Test
+    void shouldReturnUserList() throws Exception {
+        // 模拟 Service 行为
+        when(userService.findAll()).thenReturn(List.of(
+            new User(1L, "Alice", "alice@test.com"),
+            new User(2L, "Bob", "bob@test.com")
+        ));
+
+        // MockMvc 执行 GET 请求
+        mockMvc.perform(get("/api/users")
+                .accept(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())                 // 期望 200
+            .andExpect(jsonPath("$.data").isArray())
+            .andExpect(jsonPath("$.data[0].username").value("Alice"))
+            .andExpect(jsonPath("$.data[1].username").value("Bob"));
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>MockMvc 详解</h2>
+        <div class="code">// ========== MockMvc ==========
+// 模拟 HTTP 请求, 不启动服务器
+// 快速测试 Controller
+
+// ========== 请求构建 ==========
+mockMvc.perform(get("/api/users"))                   // GET
+mockMvc.perform(post("/api/users"))                  // POST
+mockMvc.perform(put("/api/users/{id}", 1L))          // PUT
+mockMvc.perform(delete("/api/users/{id}", 1L))       // DELETE
+
+// ========== 请求配置 ==========
+mockMvc.perform(get("/api/users")
+    .param("page", "0")                              // 查询参数
+    .param("size", "20")
+    .header("Authorization", "Bearer token")         // 请求头
+    .contentType(MediaType.APPLICATION_JSON)         // 内容类型
+    .content("{\"username\":\"Alice\"}")             // 请求体
+    .accept(MediaType.APPLICATION_JSON)              // 接受类型
+    .sessionAttr("userId", 1L)                       // Session 属性
+    .cookie(new Cookie("token", "abc"))               // Cookie
+);
+
+// ========== 响应断言 ==========
+mockMvc.perform(get("/api/users/1"))
+    // 状态码
+    .andExpect(status().isOk())                       // 200
+    .andExpect(status().isCreated())                  // 201
+    .andExpect(status().isNoContent())                // 204
+    .andExpect(status().isBadRequest())               // 400
+    .andExpect(status().isNotFound())                 // 404
+    .andExpect(status().isForbidden())                // 403
+
+    // 响应头
+    .andExpect(header().string("Content-Type", "application/json"))
+    .andExpect(header().exists("Location"))
+
+    // JSON 路径 (JSON Path)
+    .andExpect(jsonPath("$.code").value(200))
+    .andExpect(jsonPath("$.data.id").value(1))
+    .andExpect(jsonPath("$.data.username").value("Alice"))
+    .andExpect(jsonPath("$.data.email").value("alice@test.com"))
+
+    // JSON Path 高级匹配
+    .andExpect(jsonPath("$.data").isNotEmpty())
+    .andExpect(jsonPath("$.data.tags").isArray())
+    .andExpect(jsonPath("$.data.tags.length()").value(3))
+    .andExpect(jsonPath("$.data.roles[*]", containsInAnyOrder("admin", "user")));
+
+// ========== 异步结果 ==========
+mockMvc.perform(get("/api/users/async"))
+    .andExpect(request().asyncStarted())
+    .andDo(MockMvcRequestBuilders.asyncDispatch())
+    .andExpect(status().isOk());</div>
+    </div>
+    <div class="card">
+        <h2>@MockBean 与 @SpyBean</h2>
+        <div class="code">// ========== @MockBean ==========
+// 向 Spring 容器中注入 Mock 对象
+// 替换已有的 Bean
+
+@WebMvcTest(UserController.class)
+class UserControllerTest {
+
+    @Autowired
+    private MockMvc mockMvc;
+
+    @MockBean                              // 替换 UserService Bean
+    private UserService userService;
+
+    @Test
+    void testGetUser() throws Exception {
+        // 模拟返回
+        when(userService.findById(1L)).thenReturn(
+            Optional.of(new User(1L, "Alice", "alice@test.com"))
+        );
+
+        mockMvc.perform(get("/api/users/1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.username").value("Alice"));
+
+        // 验证调用
+        verify(userService).findById(1L);
+    }
+
+    @Test
+    void testUserNotFound() throws Exception {
+        when(userService.findById(999L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/api/users/999"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(404));
+    }
+
+    @Test
+    void testCreateUser() throws Exception {
+        when(userService.create(any())).thenReturn(
+            new User(1L, "Alice", "alice@test.com")
+        );
+
+        String body = """
+            {"username":"Alice","email":"alice@test.com","password":"123456"}
+            """;
+
+        mockMvc.perform(post("/api/users")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.data.id").value(1));
+    }
+}
+
+// ========== @SpyBean ==========
+// 部分模拟: 真实调用 + 可覆写特定方法
+
+@SpringBootTest
+class OrderServiceTest {
+
+    @SpyBean                                 // Spry: 真实 Bean + 可覆写
+    private OrderService orderService;
+
+    @MockBean
+    private PaymentClient paymentClient;     // 外部服务 Mock
+
+    @Test
+    void testCreateOrder() {
+        // 覆写真实的 sendNotification
+        doNothing().when(orderService).sendNotification(any());
+
+        // 其他方法真实调用, 只有 sendNotification 被 Mock
+        orderService.createOrder(new Order());
+        verify(orderService).sendNotification(any());
+    }
+}
+
+// ========== Mockito 常用 ==========
+when(obj.method()).thenReturn(value);        // 返回指定值
+when(obj.method()).thenThrow(ex);            // 抛异常
+when(obj.method()).thenAnswer(invocation);   // 动态返回
+
+doNothing().when(obj).method();              // void 方法无操作
+doThrow(ex).when(obj).method();              // void 方法抛异常
+
+verify(obj).method();                        // 验证调用
+verify(obj, times(3)).method();              // 调用次数
+verify(obj, never()).method();               // 从未调用
+verify(obj, timeout(100)).method();          // 超时内调用
+
+any() / anyString() / anyLong() / anyList()  // 任意匹配器
+eq(value)                                     // 特定值匹配</div>
+    </div>
+    <div class="card">
+        <h2>@DataJpaTest 与数据库测试</h2>
+        <div class="code">// ========== @DataJpaTest ==========
+// JPA 切片: 只加载 Repository + 实体
+// 默认使用嵌入式数据库 (H2)
+// 每个测试自动回滚
+
+@DataJpaTest
+class UserRepositoryTest {
+
+    @Autowired
+    private TestEntityManager entityManager;  // 测试专用 EntityManager
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Test
+    void shouldSaveAndFindUser() {
+        // 使用 EntityManager 保存
+        User user = new User("Alice", "alice@test.com");
+        Long id = entityManager.persistAndGetId(user, Long.class);
+
+        // 验证查询
+        Optional&lt;User&gt; found = userRepository.findById(id);
+        assertThat(found).isPresent();
+        assertThat(found.get().getUsername()).isEqualTo("Alice");
+    }
+
+    @Test
+    void shouldFindByEmail() {
+        // 准备数据
+        entityManager.persist(new User("Alice", "alice@test.com"));
+        entityManager.persist(new User("Bob", "bob@test.com"));
+
+        // 测试查询方法
+        Optional&lt;User&gt; user = userRepository.findByEmail("alice@test.com");
+        assertThat(user).isPresent();
+        assertThat(user.get().getUsername()).isEqualTo("Alice");
+    }
+
+    @Test
+    void shouldReturnEmptyWhenNotFound() {
+        Optional&lt;User&gt; user = userRepository.findById(999L);
+        assertThat(user).isEmpty();
+    }
+}
+
+// ========== 使用真实数据库 ==========
+// 自动回滚, 不影响数据库
+@DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+// 不替换数据库, 使用配置的真实数据库
+class UserRepositoryRealDbTest { ... }
+
+// ========== Testcontainers ==========
+@SpringBootTest
+@Testcontainers
+class UserRepositoryContainerTest {
+
+    @Container
+    static PostgreSQLContainer&lt;?&gt; postgres = new PostgreSQLContainer&lt;&gt;("postgres:16")
+        .withDatabaseName("testdb");
+
+    @DynamicPropertySource
+    static void configureProperties(DynamicPropertyRegistry registry) {
+        registry.add("spring.datasource.url", postgres::getJdbcUrl);
+        registry.add("spring.datasource.username", postgres::getUsername);
+        registry.add("spring.datasource.password", postgres::getPassword);
+    }
+
+    @Autowired
+    private UserRepository userRepository;
+
+    @Test
+    void shouldWorkWithPostgres() {
+        userRepository.save(new User("Alice", "alice@test.com"));
+        assertThat(userRepository.count()).isEqualTo(1);
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>最佳实践</h2>
+        <div class="code">// ========== 测试最佳实践 ==========
+
+// ========== 1. 测试分层 ==========
+// Controller: @WebMvcTest + MockMvc + @MockBean
+// Service:    @SpringBootTest + @MockBean (外部依赖)
+// Repository: @DataJpaTest + TestEntityManager
+// 集成:      @SpringBootTest + TestRestTemplate
+
+// ========== 2. 使用 AssertJ ==========
+// assertThat 比 JUnit assertEquals 更可读
+assertThat(result).isNotNull()
+    .extracting(User::getUsername).isEqualTo("Alice");
+
+// ========== 3. 测试命名 ==========
+// should[预期行为]_when[条件]
+@Test
+void shouldReturnUser_whenIdExists() { ... }
+
+@Test
+void shouldThrowException_whenUserNotFound() { ... }
+
+// ========== 4. 独立测试 ==========
+// 不依赖其他测试的执行顺序
+// @BeforeEach 初始化数据
+
+// ========== 5. JSON 响应对比 ==========
+// 使用文件中的预期 JSON
+@Test
+void shouldMatchExpectedJson() throws Exception {
+    mockMvc.perform(get("/api/users/1"))
+        .andExpect(content().json(
+            Files.readString(Path.of("src/test/resources/expected/user.json"))
+        ));
+}
+
+// ========== 6. 测试 Profile ==========
+// application-test.yml 中配置测试专用参数
+// @ActiveProfiles("test")
+
+// ========== 7. @TestPropertySource ==========
+// 覆盖特定属性
+@SpringBootTest
+@TestPropertySource(properties = {
+    "myapp.feature.enabled=false"
+})
+class FeatureTest { ... }
+
+// ========== 8. 覆盖报告 ==========
+// JaCoCo 插件: mvn verify 时生成报告
+// build/reports/jacoco/index.html</div>
+        <div class="note">💡 测试要点: @SpringBootTest 全量集成; @WebMvcTest Controller 切片; @DataJpaTest Repository 切片; @MockBean 替换 Bean; MockMvc 模拟 HTTP; TestRestTemplate 真实 HTTP; TestEntityManager 数据准备; AssertJ 链式断言; @Testcontainers 真实数据库; 测试命名 shouldXxx_whenYyy。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSlice()">测试切片</button>
+        <button onclick="demoMockMvc()">MockMvc</button>
+        <button onclick="demoMock()">MockBean</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSlice() {
+            result.innerHTML = '';
+            log('# Spring Boot 测试切片');
+            log('');
+            log('@SpringBootTest — 完整集成');
+            log('@WebMvcTest     — Controller 层');
+            log('@DataJpaTest    — JPA Repository');
+            log('@JsonTest       — JSON 序列化');
+            log('@RestClientTest — REST 客户端');
+            log('');
+            log('切片测试更快, 只加载需要部分');
+        }
+
+        function demoMockMvc() {
+            result.innerHTML = '';
+            log('# MockMvc 测试 Controller');
+            log('');
+            log('mockMvc.perform(get("/api/users"))');
+            log('  .param("page", "0")');
+            log('  .header("Authorization", "Bearer xxx")');
+            log('  .andExpect(status().isOk())');
+            log('  .andExpect(jsonPath("$.data").isArray())');
+            log('');
+            log('常用: get/post/put/delete, jsonPath');
+        }
+
+        function demoMock() {
+            result.innerHTML = '';
+            log('# @MockBean');
+            log('');
+            log('替换容器中的 Bean 为 Mock 对象');
+            log('');
+            log('when(obj.method()).thenReturn(value)');
+            log('verify(obj).method()');
+            log('');
+            log('@SpyBean: 真实对象 + 部分方法覆写');
+            log('  doNothing().when(obj).method()');
+        }
+    </script>
+</body>
+</html>

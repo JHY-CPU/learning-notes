@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSH密钥与配置</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔑 SSH 密钥与配置</h2><p>SSH 原理、密钥对生成、ssh-copy-id、~/.ssh/config、sshd_config 安全配置。</p></div>
+    <div class="card">
+        <h2>SSH 基础</h2>
+        <div class="code">// ========== SSH 概述 ==========
+// SSH = Secure Shell
+// 加密的远程登录协议 (取代 Telnet/FTP)
+// 端口: 22
+// 提供: 远程 Shell、文件传输 (SFTP/SCP)、端口转发、隧道
+
+// ========== 基本用法 ==========
+ssh user@hostname               # 基本登录
+ssh user@192.168.1.100          # IP 登录
+ssh -p 2222 user@hostname       # 指定端口
+ssh -i ~/.ssh/id_rsa user@host  # 指定密钥文件
+ssh user@hostname command       # 远程执行命令 (不登录)
+
+// ========== 远程执行命令 ==========
+ssh user@server "uptime"                     # 远程执行
+ssh user@server "df -h | grep /dev/sda1      # 管道也支持
+ssh user@server "sudo systemctl restart nginx"
+ssh user@server 'bash -s' < script.sh        # 在远程执行本地脚本
+
+// ========== SCP — 文件传输 ==========
+scp file.txt user@server:/home/user/          # 上传
+scp user@server:/home/user/file.txt ./        # 下载
+scp -r project/ user@server:/home/user/       # 递归上传目录
+scp -P 2222 file.txt user@server:/tmp/        # 指定端口
+scp -3 user1@server1:/file user2@server2:/    # 通过本机中转
+
+// ========== SFTP — 安全 FTP ==========
+sftp user@server                              # 交互式会话
+# sftp> ls            # 列出文件
+# sftp> get file.txt  # 下载
+# sftp> put file.txt  # 上传
+# sftp> bye           # 退出
+
+// ========== SSH 命令选项 ==========
+ssh -v user@hostname       # 调试模式 (详细信息)
+ssh -vvv user@hostname     # 极其详细
+ssh -C user@hostname       # 压缩传输
+ssh -q user@hostname       # 静默模式
+ssh -t user@hostname       # 即使没有终端也分配 TTY</div>
+    </div>
+    <div class="card">
+        <h2>SSH 密钥认证</h2>
+        <div class="code">// ========== 密钥对 ==========
+// 公钥 (public key):  放在服务器上 ~/.ssh/authorized_keys
+// 私钥 (private key): 留在本地,绝不外传
+
+// ========== 生成密钥 ==========
+ssh-keygen -t rsa -b 4096 -C "alice@example.com"    # RSA 4096 位
+ssh-keygen -t ed25519 -C "alice@example.com"        # ED25519 (推荐)
+ssh-keygen -t ecdsa -b 256                          # ECDSA
+
+// 交互式:
+// Enter file in which to save the key (~/.ssh/id_ed25519):
+// Enter passphrase (empty for no passphrase): ****
+// Enter same passphrase again: ****
+
+// 生成的密钥文件:
+// ~/.ssh/id_ed25519        # 私钥 (权限 600)
+// ~/.ssh/id_ed25519.pub    # 公钥 (权限 644)
+
+// ========== 复制公钥到服务器 ==========
+ssh-copy-id user@server                   # 自动添加到 ~/.ssh/authorized_keys
+ssh-copy-id -i ~/.ssh/mykey.pub user@server  # 指定公钥
+
+// 手动方式:
+cat ~/.ssh/id_ed25519.pub | ssh user@server "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"
+
+// ========== 密钥类型对比 ==========
+// ed25519:   高速,高安全性,推荐 (OpenSSH 6.5+)
+// rsa 4096:  兼容性好,但密钥较大
+// ecdsa:     可能含有 NSA 后门争议
+// dsa:       已不安全,不推荐
+
+// 查看本机公钥指纹:
+ssh-keygen -lf ~/.ssh/id_ed25519.pub
+// 256 SHA256:abc123... alice@example.com (ED25519)
+
+// ========== SSH 代理 (避免重复输入密码) ==========
+// SSH Agent 缓存私钥,免密码使用
+eval "$(ssh-agent -s)"              # 启动代理
+ssh-add ~/.ssh/id_ed25519          # 添加私钥
+ssh-add -l                          # 列出已加载密钥
+ssh-add -D                          # 清除所有密钥
+
+// macOS 自动使用 Keychain:
+ssh-add --apple-use-keychain ~/.ssh/id_ed25519</div>
+        <div class="note">💡 密钥认证是最佳实践:永远不要用密码登录 SSH。建议用 ed25519 算法,密钥更短更安全。为不同的服务器使用不同的密钥对,用 ~/.ssh/config 管理。一定要设置私钥权限为 600 (chmod 600 ~/.ssh/id_ed25519)。</div>
+    </div>
+    <div class="card">
+        <h2>~/.ssh/config</h2>
+        <div class="code">// ========== SSH Config ==========
+// 简化 SSH 连接,避免记忆 IP 和选项
+// 文件: ~/.ssh/config
+// 权限: 600
+
+// ========== 基本配置 ==========
+Host myserver
+    HostName 192.168.1.100
+    User alice
+    Port 2222
+    IdentityFile ~/.ssh/id_ed25519
+
+// 然后可直接:
+ssh myserver
+scp file.txt myserver:/home/alice/
+
+// ========== 多主机配置 ==========
+# 默认配置 (匹配所有)
+Host *
+    ServerAliveInterval 60
+    ServerAliveCountMax 3
+    TCPKeepAlive yes
+    Compression yes
+
+# GitHub
+Host github.com
+    HostName github.com
+    User git
+    IdentityFile ~/.ssh/github_key
+    IdentitiesOnly yes
+
+# 公司 GitLab
+Host gitlab.company.com
+    HostName gitlab.company.com
+    User git
+    IdentityFile ~/.ssh/gitlab_key
+    ProxyCommand nc -X connect -x proxy.company.com:8080 %h %p
+
+# 跳板机环境
+Host jumpbox
+    HostName jump.company.com
+    User alice
+    Port 2222
+
+# 通过跳板机访问内部服务器
+Host app-*
+    User appadmin
+    ProxyJump jumpbox
+    ForwardAgent yes
+
+// ========== 通配符匹配 ==========
+Host *.internal.company.com
+    User admin
+    IdentityFile ~/.ssh/internal_key
+
+Host 10.0.*
+    User deploy
+    IdentityFile ~/.ssh/deploy_key
+
+// ========== 代理跳板 ==========
+# ProxyJump: 通过跳板机连接 (OpenSSH 7.3+)
+ssh -J jumpbox target-server
+
+# ~/.ssh/config 配置:
+Host internal
+    HostName 10.0.0.50
+    User admin
+    ProxyJump jumpbox
+
+# ProxyCommand: 通用方式
+Host target
+    HostName 10.0.0.50
+    User admin
+    ProxyCommand ssh jumpbox -W %h:%p</div>
+    </div>
+    <div class="card">
+        <h2>sshd_config — 服务器安全</h2>
+        <div class="code">// ========== SSH 服务器安全配置 ==========
+// 文件: /etc/ssh/sshd_config
+// 修改后: sudo systemctl restart sshd
+
+// ========== 安全加固 ==========
+# 禁止 root 直接登录 (重要!)
+PermitRootLogin no
+
+# 只允许密钥认证
+PasswordAuthentication no
+PubkeyAuthentication yes
+ChallengeResponseAuthentication no
+
+# 指定允许的用户
+AllowUsers alice bob admin
+# 或者 AllowGroups ssh-users
+
+# 更改端口 (减少扫描)
+Port 2222
+
+# 协议版本
+Protocol 2
+
+# 登录前显示警告
+Banner /etc/ssh/banner
+
+# 空闲超时断开
+ClientAliveInterval 300
+ClientAliveCountMax 2
+
+# 最大认证尝试
+MaxAuthTries 3
+MaxSessions 10
+
+# 不解析客户端 DNS (加速)
+UseDNS no
+
+# 禁用不必要的功能
+X11Forwarding no
+AllowAgentForwarding no
+PermitTunnel no
+
+// ========== 检查配置 ==========
+sshd -t                              # 检查语法
+sudo systemctl restart sshd          # 重启服务
+sudo journalctl -u sshd              # 查看日志
+
+// ========== 查看登录日志 ==========
+# 成功登录
+sudo grep "Accepted" /var/log/auth.log
+
+# 失败尝试
+sudo grep "Failed password" /var/log/auth.log
+
+# 汇总失败 IP
+sudo grep "Failed password" /var/log/auth.log | awk '{print $(NF-3)}' | sort | uniq -c | sort -nr | head -10
+
+// ========== 常用安全措施 ==========
+# fail2ban — 自动封禁暴力破解
+apt install fail2ban
+# 配置 /etc/fail2ban/jail.local:
+# [sshd]
+# enabled = true
+# port = ssh
+# maxretry = 5
+# bantime = 3600
+
+# UFW — 防火墙白名单
+ufw allow 2222/tcp
+ufw enable</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSSH()">SSH 演示</button>
+        <button onclick="demoConfig()">SSH Config 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSSH() {
+            result.innerHTML = '';
+            log('# SSH 密钥认证演示');
+            log('');
+            log('# 1. 生成密钥');
+            log('$ ssh-keygen -t ed25519 -C "alice@example.com"');
+            log('  Generating public/private ed25519 key pair.');
+            log('  Your identification has been saved in ~/.ssh/id_ed25519');
+            log('  Your public key has been saved in ~/.ssh/id_ed25519.pub');
+            log('');
+            log('# 2. 复制到服务器');
+            log('$ ssh-copy-id -i ~/.ssh/id_ed25519.pub user@server');
+            log('  Number of key(s) added: 1');
+            log('');
+            log('# 3. 测试登录 (不再需要密码)');
+            log('$ ssh user@server');
+            log('  Welcome to Ubuntu 22.04 LTS!');
+            log('');
+            log('# 4. 密钥指纹查看');
+            log('$ ssh-keygen -lf ~/.ssh/id_ed25519.pub');
+            log('  256 SHA256:abcdef12345 alice@example.com (ED25519)');
+        }
+
+        function demoConfig() {
+            result.innerHTML = '';
+            log('# ~/.ssh/config 配置演示');
+            log('');
+            log('Host web-prod');
+            log('    HostName 203.0.113.10');
+            log('    User deploy');
+            log('    Port 2222');
+            log('    IdentityFile ~/.ssh/prod_key');
+            log('');
+            log('Host db-prod');
+            log('    HostName 203.0.113.20');
+            log('    User dbadmin');
+            log('    IdentityFile ~/.ssh/prod_key');
+            log('    ProxyJump web-prod');
+            log('');
+            log('Host github.com');
+            log('    HostName github.com');
+            log('    User git');
+            log('    IdentityFile ~/.ssh/github_key');
+            log('');
+            log('# 简化的连接方式:');
+            log('$ ssh web-prod            # 代替 ssh deploy@203.0.113.10 -p 2222');
+            log('$ ssh db-prod             # 通过跳板机连接到数据库');
+            log('$ scp app.tar.gz web-prod:~/  # 上传文件');
+        }
+    </script>
+</body>
+</html>

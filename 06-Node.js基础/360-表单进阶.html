@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>表单进阶</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        form { max-width: 400px; margin: 10px 0; }
+        .form-group { margin: 10px 0; }
+        .form-group label { display: block; margin-bottom: 4px; color: #2c3e50; font-size: 13px; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 8px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 13px; box-sizing: border-box; }
+        .form-group input:focus { border-color: #3498db; outline: none; box-shadow: 0 0 0 2px rgba(52,152,219,0.2); }
+        .form-group .error { color: #e74c3c; font-size: 12px; margin-top: 2px; }
+        .form-group .hint { color: #95a5a6; font-size: 11px; margin-top: 2px; }
+        .form-group input.invalid { border-color: #e74c3c; }
+        .form-group input.valid { border-color: #2ecc71; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>表单进阶</h2><p>input 事件深入、compositionstart/compositionend、IME 输入、自动填充。</p></div>
+    <div class="card">
+        <h2>表单进阶 API</h2>
+        <div class="code">// ========== Input 事件 ==========
+// input — 值变化 (实时)
+// change — 值变化 (失焦后)
+// compositionstart — IME 开始输入
+// compositionend — IME 输入结束
+// beforeinput — 输入前 (可拦截)
+
+// ========== IME 输入处理 ==========
+let isComposing = false;
+input.addEventListener('compositionstart', () => { isComposing = true; });
+input.addEventListener('compositionend', () => { isComposing = false; handleInput(); });
+input.addEventListener('input', () => { if (!isComposing) handleInput(); });
+
+// ========== 自动填充检测 ==========
+// animationstart → onAutoFillStart
+// CSS :auto-fill 伪类
+
+// ========== 输入验证 ==========
+input.validity         // ValidityState 对象
+input.validationMessage // 验证消息
+input.checkValidity()  // 触发验证
+input.setCustomValidity(msg) // 自定义错误</div>
+    </div>
+    <div class="card">
+        <h2>演示：表单进阶</h2>
+        <button onclick="demoInputEvents()">输入事件</button>
+        <button onclick="demoIME()">IME 输入</button>
+        <button onclick="demoAutofill()">自动填充</button>
+        <button onclick="demoValidity()">验证 API</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoInputEvents() {
+            result.innerHTML = '';
+            log('⌨️ 输入事件:');
+            log('');
+
+            log('1️⃣ input 事件列表:');
+            log('   • input           — 值变化时实时触发');
+            log('   • change          — 值变化 + 失焦后触发');
+            log('   • beforeinput     — 输入发生前 (可取消)');
+            log('   • focus           — 获得焦点');
+            log('   • blur            — 失去焦点');
+            log('   • select          — 选中文字');
+            log('');
+
+            log('2️⃣ input vs change:');
+            log('   input 事件: 每次输入都触发');
+            log('   change 事件: 失焦时触发 (仅值变化时)');
+            log('');
+
+            log('3️⃣ beforeinput 事件:');
+            log('   inputType: 输入类型');
+            log('   • "insertText"         — 插入文本');
+            log('   • "deleteContentBackward" — 退格');
+            log('   • "insertFromPaste"    — 粘贴');
+            log('   • "insertFromDrop"     — 拖放');
+            log('   • "insertCompositionText" — IME 输入');
+            log('   • "formatBold"         — 加粗');
+            log('');
+
+            log('4️⃣ 事件触发顺序:');
+            log('   聚焦 → beforeinput → input → change → blur');
+            log('   键盘输入: keydown → beforeinput → input → keyup');
+            log('');
+
+            log('5️⃣ 实时过滤示例:');
+            log('   // 只允许数字');
+            log('   input.addEventListener("beforeinput", (e) => {');
+            log('     if (e.data && !/^\\d$/.test(e.data)) {');
+            log('       e.preventDefault();  // 阻止输入');
+            log('     }');
+            log('   });');
+            log('');
+
+            log('6️⃣ input 事件属性:');
+            log('   e.data         — 输入的数据');
+            log('   e.inputType    — 输入类型');
+            log('   e.target       — 触发元素');
+            log('   e.target.value — 当前值');
+            log('   e.isTrusted    — 是否用户触发');
+        }
+
+        function demoIME() {
+            result.innerHTML = '';
+            log('🈳 IME 输入处理:');
+            log('');
+
+            log('1️⃣ 什么是 IME?');
+            log('   • Input Method Editor (输入法编辑器)');
+            log('   • 中文、日文、韩文等需要组合输入');
+            log('   • 用户输入拼音 → 选词 → 确认');
+            log('');
+
+            log('2️⃣ IME 相关事件:');
+            log('   compositionstart — IME 开始 (拼音模式)');
+            log('   compositionupdate — IME 候选更新');
+            log('   compositionend   — IME 结束 (选中文字)');
+            log('');
+
+            log('3️⃣ 处理 IME 的 input 事件:');
+            log('   let isComposing = false;');
+            log('');
+            log('   input.addEventListener("compositionstart", () => {');
+            log('     isComposing = true;');
+            log('     console.log("IME 开始");');
+            log('   });');
+            log('');
+            log('   input.addEventListener("compositionend", (e) => {');
+            log('     isComposing = false;');
+            log('     console.log("IME 结束:", e.data);');
+            log('     doSearch(e.target.value);  // 确认后触发搜索');
+            log('   });');
+            log('');
+            log('   input.addEventListener("input", () => {');
+            log('     if (!isComposing) {');
+            log('       doSearch(input.value);  // 非 IME 时实时搜索');
+            log('     }');
+            log('   });');
+            log('');
+
+            log('4️⃣ 不使用 IME 处理的问题:');
+            log('   用户输入 "nihao":');
+            log('   ❌ 每次 input 触发搜索 → "n" "ni" "nih" "niha" "nihao"');
+            log('   ✅ IME 结束时触发一次 → 搜索 "你好"');
+            log('');
+
+            log('5️⃣ 事件顺序示例:');
+            log('   1. compositionstart (开始拼音)');
+            log('   2. compositionupdate (拼音: ni)');
+            log('   3. compositionupdate (拼音: nihao)');
+            log('   4. compositionend (选中: 你好)');
+            log('   5. input (触发真正的处理)');
+            log('');
+
+            log('6️⃣ isComposing 属性:');
+            log('   e.isComposing — 事件对象上的标志');
+            log('   可在 compositionend 的 input 事件中判断');
+        }
+
+        function demoAutofill() {
+            result.innerHTML = '';
+            log('🤖 自动填充:');
+            log('');
+
+            log('1️⃣ autocomplete 属性:');
+            log('   <input autocomplete="username">');
+            log('   <input autocomplete="new-password">');
+            log('   <input autocomplete="email">');
+            log('   <input autocomplete="tel">');
+            log('   <input autocomplete="street-address">');
+            log('   <input autocomplete="cc-number">');
+            log('');
+
+            log('2️⃣ 常用 autocomplete 值:');
+            log('   • name / given-name / family-name');
+            log('   • email / username / current-password');
+            log('   • new-password / one-time-code');
+            log('   • tel / tel-country-code / tel-national');
+            log('   • street-address / address-level1 / postal-code');
+            log('   • cc-number / cc-exp / cc-csc');
+            log('   • bday / bday-day / bday-month / bday-year');
+            log('');
+
+            log('3️⃣ 检测自动填充:');
+            log('   // 通过 CSS animation 检测');
+            log('   @keyframes onAutoFillStart {');
+            log('     from { /**/ } to { /**/ }');
+            log('   }');
+            log('   @keyframes onAutoFillCancel {');
+            log('     from { /**/ } to { /**/ }');
+            log('   }');
+            log('');
+            log('   input:-webkit-autofill {');
+            log('     animation-name: onAutoFillStart;');
+            log('   }');
+            log('');
+
+            log('4️⃣ 自动填充安全问题:');
+            log('   • 敏感字段设置 autocomplete="off"');
+            log('   • 一次性密码使用 autocomplete="one-time-code"');
+            log('   • 使用 hidden 字段防止自动填充');
+            log('');
+
+            log('5️⃣ 密码管理器最佳实践:');
+            log('   // 登录: autocomplete="current-password"');
+            log('   // 注册: autocomplete="new-password"');
+            log('   // 确保表单有 submit 按钮');
+            log('   // 使用正确的 type (email/tel/...)');
+        }
+
+        function demoValidity() {
+            result.innerHTML = '';
+            log('✅ 验证 API:');
+            log('');
+
+            log('1️⃣ ValidityState 属性:');
+            log('   input.validity.valueMissing   — 必填字段为空');
+            log('   input.validity.typeMismatch   — 类型不匹配 (email/url)');
+            log('   input.validity.patternMismatch — 正则不匹配');
+            log('   input.validity.tooLong         — 超长');
+            log('   input.validity.tooShort        — 不足');
+            log('   input.validity.rangeUnderFlow  — 小于 min');
+            log('   input.validity.rangeOverFlow   — 大于 max');
+            log('   input.validity.stepMismatch    — step 不匹配');
+            log('   input.validity.badInput        — 输入格式错误');
+            log('   input.validity.customError     — 自定义错误');
+            log('   input.validity.valid           — 是否有效');
+            log('');
+
+            log('2️⃣ 验证方法:');
+            log('   input.checkValidity()      // 返回 boolean');
+            log('   input.reportValidity()     // 显示验证消息');
+            log('   input.setCustomValidity(msg) // 自定义错误');
+            log('   input.validationMessage    // 获取错误消息');
+            log('');
+
+            log('3️⃣ HTML 验证属性:');
+            log('   <input required                 — 必填');
+            log('          minlength="3"            — 最小长度');
+            log('          maxlength="10"           — 最大长度');
+            log('          pattern="[A-Z]+"         — 正则');
+            log('          min="0" max="100"        — 范围');
+            log('          step="5"                 — 步长');
+            log('          type="email">            — 类型');
+            log('');
+
+            log('4️⃣ 实时验证示例:');
+            log('   input.addEventListener("input", () => {');
+            log('     if (input.validity.valid) {');
+            log('       input.classList.remove("invalid");');
+            log('       input.classList.add("valid");');
+            log('       error.textContent = "";');
+            log('     } else {');
+            log('       input.classList.remove("valid");');
+            log('       input.classList.add("invalid");');
+            log('       error.textContent = input.validationMessage;');
+            log('     }');
+            log('   });');
+            log('');
+
+            log('5️⃣ 验证触发时机:');
+            log('   • input 事件 — 实时验证 (用户体验好)');
+            log('   • blur 事件 — 失焦验证 (可容忍临时错误)');
+            log('   • submit 事件 — 提交前最终验证');
+            log('');
+
+            log('6️⃣ 自定义验证:');
+            log('   input.addEventListener("input", () => {');
+            log('     if (input.value === "test") {');
+            log('       input.setCustomValidity("不能使用 test");');
+            log('     } else {');
+            log('       input.setCustomValidity("");  // 清除');
+            log('     }');
+            log('   });');
+        }
+
+        console.log('=== 表单进阶 ===');
+        document.getElementById('output').textContent =
+            `表单进阶: input事件 / IME输入 / compositionstart/end / 自动填充 / 验证API\n` +
+            `✅ 表单进阶演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Worker基础</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Web Worker 基础</h2><p>Worker 创建、postMessage 通信、onmessage、terminate、限制。</p></div>
+    <div class="card">
+        <h2>Web Worker API</h2>
+        <div class="code">// ========== 创建 Worker ==========
+const worker = new Worker('worker.js');
+
+// ========== 发送消息 ==========
+worker.postMessage({ type: 'compute', data: 42 });
+
+// ========== 接收消息 ==========
+worker.onmessage = (e) => {
+    console.log('收到:', e.data);
+};
+
+// ========== 错误处理 ==========
+worker.onerror = (e) => {
+    console.error('Worker 错误:', e.message);
+};
+
+// ========== 终止 Worker ==========
+worker.terminate();
+
+// ========== Worker 内部 (self) ==========
+// self.onmessage / self.postMessage
+// importScripts('lib.js')
+// 注意: 不能访问 DOM / window / document</div>
+    </div>
+    <div class="card">
+        <h2>演示：Web Worker</h2>
+        <button onclick="demoCreate()">Worker 通信</button>
+        <button onclick="demoCompute()">计算任务</button>
+        <button onclick="demoRestrictions()">限制说明</button>
+        <button onclick="demoPool()">Worker 池</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        // ========== 模拟 Worker ==========
+        class MockWorker {
+            constructor(handler) {
+                this.onmessage = null;
+                this.onerror = null;
+                this._taskId = 0;
+                this._handler = handler || this._defaultHandler;
+            }
+
+            _defaultHandler(data) {
+                if (data.type === 'compute') {
+                    const n = data.data;
+                    // 模拟耗时计算: 斐波那契
+                    function fib(x) { return x <= 1 ? x : fib(x - 1) + fib(x - 2); }
+                    // 使用简化的计算来避免太慢
+                    let result = 0;
+                    for (let i = 0; i <= Math.min(n, 40); i++) result += i;
+                    return { type: 'result', data: result, taskId: data.taskId };
+                }
+                if (data.type === 'sort') {
+                    const arr = [...data.data];
+                    arr.sort((a, b) => a - b);
+                    return { type: 'result', data: arr, taskId: data.taskId };
+                }
+                return { type: 'result', data: `收到: ${JSON.stringify(data)}` };
+            }
+
+            postMessage(data) {
+                log(`   [主线程 → Worker] 发送: ${JSON.stringify(data)}`);
+                setTimeout(() => {
+                    try {
+                        const result_ = this._handler(data);
+                        log(`   [Worker → 主线程] 回复: ${JSON.stringify(result_)}`);
+                        if (this.onmessage) this.onmessage({ data: result_ });
+                    } catch (err) {
+                        if (this.onerror) this.onerror({ message: err.message });
+                    }
+                }, 200);
+            }
+
+            terminate() {
+                log(`   [Worker] 已终止`);
+            }
+        }
+
+        function demoCreate() {
+            result.innerHTML = '';
+            log('🔗 Worker 通信:');
+            log('');
+
+            log('1️⃣ 创建 Worker:');
+            const worker = new MockWorker();
+            worker.onmessage = (e) => {
+                log(`   ✅ 收到结果: ${JSON.stringify(e.data)}`);
+            };
+
+            log('');
+            log('2️⃣ 发送消息:');
+            worker.postMessage({ type: 'greet', text: 'Hello Worker!' });
+
+            log('');
+            log('3️⃣ 发送数据:');
+            worker.postMessage({ type: 'compute', data: 100 });
+
+            log('');
+            log('4️⃣ 终止 Worker:');
+            setTimeout(() => {
+                worker.terminate();
+            }, 500);
+
+            log('');
+            log('📌 Worker 通信模式:');
+            log('   • postMessage — 发送消息 (结构化克隆)');
+            log('   • onmessage — 接收消息');
+            log('   • onerror — 错误处理');
+            log('   • terminate — 终止 Worker');
+        }
+
+        function demoCompute() {
+            result.innerHTML = '';
+            log('🧮 计算任务模拟:');
+            log('');
+
+            function createComputeWorker() {
+                let taskId = 0;
+                return {
+                    computeTask(data) {
+                        const id = ++taskId;
+                        log(`   [任务 ${id}] 开始: ${JSON.stringify(data)}`);
+                        return new Promise((resolve) => {
+                            setTimeout(() => {
+                                let result;
+                                if (data.type === 'sum') {
+                                    result = data.values.reduce((a, b) => a + b, 0);
+                                } else if (data.type === 'multiply') {
+                                    result = data.values.reduce((a, b) => a * b, 1);
+                                } else if (data.type === 'prime') {
+                                    result = countPrimes(data.max);
+                                }
+                                log(`   [任务 ${id}] 完成: ${result}`);
+                                resolve(result);
+                            }, 300);
+                        });
+                    },
+                    terminate() { log('   Worker 已终止'); }
+                };
+            }
+
+            function countPrimes(max) {
+                let count = 0;
+                for (let i = 2; i <= max; i++) {
+                    let isPrime = true;
+                    for (let j = 2; j * j <= i; j++) {
+                        if (i % j === 0) { isPrime = false; break; }
+                    }
+                    if (isPrime) count++;
+                }
+                return count;
+            }
+
+            const worker = createComputeWorker();
+
+            log('并发执行多个计算任务:');
+            log('');
+            Promise.all([
+                worker.computeTask({ type: 'sum', values: [1, 2, 3, 4, 5] }),
+                worker.computeTask({ type: 'multiply', values: [2, 3, 4] }),
+                worker.computeTask({ type: 'prime', max: 100 }),
+            ]).then(([sum, mul, prime]) => {
+                log('');
+                log(`汇总结果:`);
+                log(`   求和: ${sum}`);
+                log(`   乘积: ${mul}`);
+                log(`   质数计数: ${prime}`);
+            });
+        }
+
+        function demoRestrictions() {
+            result.innerHTML = '';
+            log('🚫 Worker 限制:');
+            log('');
+
+            log('❌ Worker 不能访问:');
+            log('   • DOM (document, element)');
+            log('   • window 对象');
+            log('   • parent 对象');
+            log('   • localStorage/sessionStorage');
+            log('   • XHR (可以用 fetch)');
+            log('');
+
+            log('✅ Worker 可以访问:');
+            log('   • navigator (部分)');
+            log('   • location (只读)');
+            log('   • setTimeout/setInterval');
+            log('   • fetch (网络请求)');
+            log('   • importScripts (加载脚本)');
+            log('   • WebSocket');
+            log('   • IndexedDB');
+            log('   • Canvas (OffscreenCanvas)');
+            log('');
+
+            log('📌 importScripts:');
+            log('   importScripts("lib.js");');
+            log('   importScripts("a.js", "b.js");');
+            log('   同步加载, 会阻塞 Worker');
+            log('');
+
+            log('📌 Worker 上下文:');
+            log('   • self === DedicatedWorkerGlobalScope');
+            log('   • 没有 window/全局对象污染');
+            log('   • 通过 postMessage 通信');
+            log('');
+
+            log('📌 数据传递:');
+            log('   • 结构化克隆 (Structured Clone)');
+            log('   • 可以传递: Object, Array, Map, Set, Blob, ...');
+            log('   • 不能传递: DOM 元素, 函数');
+            log('   • Transferable Objects (零拷贝)');
+        }
+
+        function demoPool() {
+            result.innerHTML = '';
+            log('🏊 Worker 池:');
+            log('');
+
+            class WorkerPool {
+                constructor(size = 4) {
+                    this.size = size;
+                    this.queue = [];
+                    this.active = 0;
+                }
+
+                exec(task) {
+                    return new Promise((resolve) => {
+                        this.queue.push({ task, resolve });
+                        this._processNext();
+                    });
+                }
+
+                _processNext() {
+                    if (this.active >= this.size || this.queue.length === 0) return;
+                    this.active++;
+                    const { task, resolve } = this.queue.shift();
+                    log(`   [池] 执行任务 (活跃: ${this.active}/${this.size})`);
+
+                    setTimeout(() => {
+                        let result;
+                        if (task.type === 'square') result = task.data * task.data;
+                        else if (task.type === 'double') result = task.data * 2;
+                        else result = task.data;
+
+                        log(`   [池] 任务完成: ${task.data} → ${result}`);
+                        this.active--;
+                        resolve(result);
+                        this._processNext();
+                    }, 300);
+                }
+
+                get status() {
+                    return `活跃: ${this.active}/${this.size}, 队列: ${this.queue.length}`;
+                }
+            }
+
+            const pool = new WorkerPool(2);
+            log('创建 Worker 池 (大小=2):');
+            log(`   初始状态: ${pool.status}`);
+            log('');
+
+            log('提交 5 个任务:');
+            const tasks = [1, 2, 3, 4, 5].map(n =>
+                pool.exec({ type: 'square', data: n })
+            );
+
+            log('');
+            log('池状态更新:');
+            const interval = setInterval(() => {
+                log(`   ${pool.status}`);
+                if (pool.active === 0 && pool.queue.length === 0) {
+                    clearInterval(interval);
+                    log('');
+                    log('✅ 所有任务完成');
+                }
+            }, 350);
+
+            Promise.all(tasks).then(results => {
+                log(`结果: [${results}]`);
+            });
+        }
+
+        console.log('=== Web Worker 基础 ===');
+        document.getElementById('output').textContent =
+            `Web Worker: 创建 / postMessage / onmessage / terminate\n` +
+            `限制: 无DOM / 无window / importScripts / 结构化克隆\n` +
+            `✅ Web Worker 演示完成！`;
+    </script>
+</body>
+</html>

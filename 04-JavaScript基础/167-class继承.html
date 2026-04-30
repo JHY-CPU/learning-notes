@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>class继承</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>class 继承（extends）</h2><p>通过 extends 关键字实现继承，super 调用父类。</p></div>
+    <div class="card">
+        <h2>extends 基本用法</h2>
+        <div class="code">// 父类
+class Animal {
+    constructor(name) {
+        this.name = name;
+    }
+    eat() {
+        console.log(this.name + ' 在吃东西');
+    }
+    sound() {
+        console.log(this.name + ' 发出了声音');
+    }
+}
+
+// 子类继承
+class Dog extends Animal {
+    constructor(name, breed) {
+        super(name);  // 必须调用 super()
+        this.breed = breed;
+    }
+    // 重写方法
+    sound() {
+        console.log(this.name + ' 汪汪叫');
+    }
+    // 子类特有方法
+    fetch() {
+        console.log(this.name + ' 在捡球');
+    }
+}
+
+const dog = new Dog('旺财', '金毛');
+dog.eat();     // '旺财 在吃东西'（继承）
+dog.sound();   // '旺财 汪汪叫'（重写）
+dog.fetch();   // '旺财 在捡球'（特有）
+console.log(dog instanceof Dog);     // true
+console.log(dog instanceof Animal);  // true</div>
+    </div>
+    <div class="card">
+        <h2>super 关键字</h2>
+        <div class="code">// super 有两种用法：
+// 1. super() — 调用父类构造函数
+// 2. super.method() — 调用父类方法
+
+class Animal {
+    constructor(name) {
+        this.name = name;
+    }
+    info() {
+        return '动物: ' + this.name;
+    }
+}
+
+class Bird extends Animal {
+    constructor(name, wingspan) {
+        super(name);        // 调用父类构造函数
+        this.wingspan = wingspan;
+    }
+    info() {
+        return super.info() + ', 翼展: ' + this.wingspan + 'cm';
+    }
+}
+
+const bird = new Bird('老鹰', 200);
+console.log(bird.info());  // '动物: 老鹰, 翼展: 200cm'
+
+// ⚠️ 在 constructor 中必须先调用 super() 才能使用 this
+class Wrong extends Animal {
+    constructor(name) {
+        // this.name = name;  // ❌ ReferenceError（super 之前不能访问 this）
+        super(name);
+        this.name = name;  // ✅
+    }
+}
+
+// ⚠️ 如果子类没有 constructor，会自动生成
+class Cat extends Animal {}
+const cat = new Cat('咪咪');
+cat.eat();  // '咪咪 在吃东西'</div>
+    </div>
+    <div class="card">
+        <h2>方法重写与调用链</h2>
+        <div class="code">class Base {
+            method() {
+                console.log('Base.method');
+            }
+        }
+
+        class Middle extends Base {
+            method() {
+                console.log('Middle.method');
+                super.method();  // 调用父类方法
+            }
+        }
+
+        class Child extends Middle {
+            method() {
+                console.log('Child.method');
+                super.method();  // 调用 Middle.method
+            }
+        }
+
+        const c = new Child();
+        c.method();
+        // 输出：
+        // Child.method
+        // Middle.method
+        // Base.method
+
+        // super 的指向是动态的，但在方法中始终指向父类的 prototype
+        // super.method() 相当于 Base.prototype.method.call(this)</div>
+    </div>
+    <div class="card">
+        <h2>extends 内置类</h2>
+        <div class="code">// 继承 Array
+class MyArray extends Array {
+    first() {
+        return this[0];
+    }
+    last() {
+        return this[this.length - 1];
+    }
+    sum() {
+        return this.reduce((a, b) => a + b, 0);
+    }
+}
+
+const arr = new MyArray(1, 2, 3, 4, 5);
+console.log(arr.first());  // 1
+console.log(arr.last());   // 5
+console.log(arr.sum());    // 15
+console.log(arr.length);   // 5（所有数组方法都可用）
+
+// 继承 Error
+class ValidationError extends Error {
+    constructor(message, field) {
+        super(message);
+        this.name = 'ValidationError';
+        this.field = field;
+    }
+}
+
+// 继承 RegExp
+class MyRegExp extends RegExp {
+    constructor(pattern, flags, name) {
+        super(pattern, flags);
+        this.patternName = name;
+    }
+}
+
+// ⚠️ 尽量别继承 Proxy（不能代理 this）</div>
+    </div>
+    <div class="card">
+        <h2>混入（Mixin）— 多重继承替代</h2>
+        <div class="code">// JavaScript 只支持单继承
+// 通过 mixin 实现多重"继承"
+
+// mixin 是包含方法的对象
+const FlyMixin = {
+    fly() {
+        console.log(this.name + ' 在飞');
+    },
+    land() {
+        console.log(this.name + ' 降落了');
+    }
+};
+
+const SwimMixin = {
+    swim() {
+        console.log(this.name + ' 在游泳');
+    }
+};
+
+class Animal {
+    constructor(name) { this.name = name; }
+}
+
+class Duck extends Animal {
+    constructor(name) { super(name); }
+}
+
+// 混入 mixin（把方法复制到 prototype）
+Object.assign(Duck.prototype, FlyMixin, SwimMixin);
+
+const duck = new Duck('唐老鸭');
+duck.fly();   // '唐老鸭 在飞'
+duck.swim();  // '唐老鸭 在游泳'
+
+// 更优雅的方式：创建 mixin 函数
+function withFly(Base) {
+    return class extends Base {
+        fly() { console.log(this.name + ' 在飞'); }
+    };
+}
+function withSwim(Base) {
+    return class extends Base {
+        swim() { console.log(this.name + ' 在游泳'); }
+    };
+}
+class SuperDuck extends withSwim(withFly(Animal)) {
+    constructor(name) { super(name); }
+}</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== 继承基本用法 ===');
+        class Animal {
+            constructor(name) { this.name = name; }
+            eat() { return this.name + ' 在吃东西'; }
+            sound() { return this.name + ' 发出了声音'; }
+        }
+        class Dog extends Animal {
+            constructor(name, breed) {
+                super(name);
+                this.breed = breed;
+            }
+            sound() { return this.name + ' 汪汪叫'; }
+            fetch() { return this.name + ' 在捡球'; }
+        }
+        const dog = new Dog('旺财', '金毛');
+        console.log(dog.eat());
+        console.log(dog.sound());
+        console.log(dog.fetch());
+        console.log('instanceof Dog:', dog instanceof Dog);
+        console.log('instanceof Animal:', dog instanceof Animal);
+
+        console.log('=== super 调用父类方法 ===');
+        class Bird extends Animal {
+            info() { return super.eat() + '（小鸟版）'; }
+        }
+        const bird = new Bird('小鸟');
+        console.log(bird.info());
+
+        console.log('=== 继承内置类 ===');
+        class MyArray extends Array {
+            first() { return this[0]; }
+        }
+        const arr = new MyArray(10, 20, 30);
+        console.log('first:', arr.first(), 'length:', arr.length);
+
+        console.log('=== Mixin ===');
+        const FlyMixin = { fly() { return this.name + ' 飞了'; } };
+        class Duck extends Animal {}
+        Object.assign(Duck.prototype, FlyMixin);
+        const duck = new Duck('鸭子');
+        console.log(duck.fly());
+
+        document.getElementById('output').textContent =
+            `dog: ${dog.sound()}\n` +
+            `继承检查: ${dog instanceof Animal}\n` +
+            `MyArray.first: ${arr.first()}\n` +
+            `✅ class 继承演示完成！`;
+    </script>
+</body>
+</html>

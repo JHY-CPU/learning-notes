@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 注入与防御</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>💉 SQL 注入与防御</h2><p>SQL 注入原理与示例、参数化查询、ORM 安全、NoSQL 注入、OS 命令注入、输入验证与白名单。</p></div>
+    <div class="card">
+        <h2>SQL 注入原理</h2>
+        <div class="code">// ========== SQL 注入是什么 ==========
+// 攻击者通过输入恶意 SQL 代码, 操纵数据库查询
+// 利用: 未正确转义用户输入直接拼接 SQL
+
+// ========== 经典示例 ==========
+// ❌ 不安全: 字符串拼接
+username := r.Form.Get("username")
+password := r.Form.Get("password")
+
+query := fmt.Sprintf("SELECT * FROM users WHERE username='%s' AND password='%s'",
+    username, password)
+
+// 正常输入: username=admin, password=secret
+// SELECT * FROM users WHERE username='admin' AND password='secret'
+
+// 注入输入: username=admin'--, password=任意
+// SELECT * FROM users WHERE username='admin'--' AND password='xxx'
+// -- 是 SQL 注释, 密码检查被绕过!
+
+// 更严重的注入:
+// username=' OR '1'='1
+// SELECT * FROM users WHERE username='' OR '1'='1' AND password='xxx'
+// 返回所有用户!
+
+// 表删除:
+// username='; DROP TABLE users; --
+// SELECT * FROM users WHERE username=''; DROP TABLE users; --'
+
+// ========== 注入攻击类型 ==========
+// 1. 基于布尔的盲注
+//    ' OR 1=1 --  (返回真)
+//    ' OR 1=2 --  (返回假)
+
+// 2. 基于时间的盲注
+//    ' OR IF(1=1, SLEEP(5), 0) --  (MySQL)
+//    ' OR pg_sleep(5) --            (PostgreSQL)
+
+// 3. UNION 查询注入
+//    ' UNION SELECT username,password FROM users --
+
+// 4. 报错注入
+//    ' OR 1=CAST((SELECT password FROM users LIMIT 1) AS int) --
+
+// 5. 堆叠查询
+//    '; DROP TABLE users; --</div>
+    </div>
+    <div class="card">
+        <h2>参数化查询 (Prepared Statement)</h2>
+        <div class="code">// ========== Go 参数化查询 ==========
+// ✅ 安全: 参数化查询
+
+// PostgreSQL ($1, $2):
+db.QueryRow("SELECT * FROM users WHERE username=$1 AND password=$2",
+    username, password)
+
+// MySQL (?, ?):
+db.QueryRow("SELECT * FROM users WHERE username=? AND password=?",
+    username, password)
+
+// GORM (安全):
+db.Where("username = ? AND password = ?", username, password).First(&user)
+
+// ========== Python 参数化查询 ==========
+// psycopg2:
+// cur.execute("SELECT * FROM users WHERE username = %s AND password = %s",
+//     (username, password))
+
+// Django ORM (安全):
+// User.objects.filter(username=username, password=password)
+
+// SQLAlchemy (安全):
+// session.query(User).filter(User.username == username).all()
+
+// ========== Node.js 参数化查询 ==========
+// pg:
+// await db.query('SELECT * FROM users WHERE username = $1 AND password = $2',
+//     [username, password])
+
+// Sequelize (安全):
+// User.findAll({ where: { username, password } })
+
+// ========== 什么事参数化查询 ==========
+// 1. 查询模板发送到数据库
+// 2. 数据库编译查询 (确定语义)
+// 3. 参数作为数据传入 (不改变语义)
+
+// 结果: 即使用户输入含 SQL 代码, 也被当作字符串处理
+// ' OR '1'='1 → 被当作字符串值, 不是代码
+
+// ========== 参数化查询的局限 ==========
+// 以下场景仍需额外防护:
+// 1. 动态表名/列名
+//    - ORDER BY ${column} 需要白名单验证
+// 2. LIKE 查询
+//    - LIKE '%' + $1 + '%' 需要转义 % 和 _
+// 3. IN 子句
+//    - WHERE id IN ($1, $2, $3) 需要动态生成占位符
+// 4. 全文搜索
+//    - 使用专门的搜索引擎 (Elasticsearch)</div>
+    </div>
+    <div class="card">
+        <h2>ORM 与 NoSQL 注入</h2>
+        <div class="code">// ========== ORM 注入风险 ==========
+// ORM 不是万能的, 某些操作仍有注入风险
+
+// ❌ 危险的 ORM 用法:
+// GORM 原生 SQL:
+db.Exec("SELECT * FROM users WHERE id = " + id)  // 注入!
+
+// Django 原始 SQL:
+// User.objects.raw("SELECT * FROM users WHERE id = %s" % id)  // 注入!
+
+// ❌ 动态字段:
+db.Where(fmt.Sprintf("%s = ?", userInput), value).First(&user)
+// 如果 userInput = "1 OR 1=1", 查询变成:
+// WHERE 1 OR 1=1 = ?  → 不可预测!
+
+// ✅ 安全的 ORM:
+db.Where("id = ?", id).First(&user)
+User.objects.filter(id=id)
+
+// ========== NoSQL 注入 (MongoDB) ==========
+// ❌ MongoDB 注入:
+// 如果直接拼接 JSON:
+// query := `{"username": "` + username + `", "password": "` + password + `"}`
+
+// 注入: username = admin", "role": "admin"}, {"$gt": ""
+// {"username": "admin", "role": "admin"}, {"$gt": "", "password": "..."}
+// MongoDB 解析为两个条件! role=admin 被注入
+
+// ✅ MongoDB 安全用法:
+// db.collection.Find(map[string]interface{}{
+//     "username": username,
+//     "password": password,
+// })
+
+// 使用 BSON 构造器:
+// filter := bson.M{"username": username, "password": password}
+
+// ========== OS 命令注入 ==========
+// ❌ 危险:
+// cmd := exec.Command("sh", "-c", "ping "+hostname)
+// hostname = 127.0.0.1; cat /etc/passwd
+
+// ✅ 安全:
+// 1. 避免调用 shell
+// 2. 使用白名单
+// 3. 输入验证
+
+// 白名单验证:
+// var allowedHosts = map[string]bool{
+//     "google.com": true,
+//     "github.com": true,
+// }
+// if !allowedHosts[hostname] {
+//     return errors.New("invalid host")
+// }
+
+// 路径穿越防护:
+// path := filepath.Join(baseDir, filename)
+// if !strings.HasPrefix(path, baseDir) {
+//     return errors.New("invalid path")
+// }</div>
+    </div>
+    <div class="card">
+        <h2>输入验证与防御清单</h2>
+        <div class="code">// ========== 输入验证策略 ==========
+// 1. 白名单 (推荐)
+//    只允许已知合法值
+//    country := []string{"US", "CN", "JP"}
+
+// 2. 类型验证
+//    age, err := strconv.Atoi(input)
+
+// 3. 长度限制
+//    len(username) >= 3 && len(username) <= 50
+
+// 4. 格式验证
+//    regexp.MatchString(`^[\w@.]+$`, email)
+
+// 5. 编码/转义
+//    HTMLEscapeString / URLQueryEscape
+
+// ========== 各语言注入防护 ==========
+// Go:
+//   database/sql: 参数化查询 $1, $2
+//   GORM: Where("col = ?", val)
+//   gin: ShouldBindJSON 验证
+//   html/template: 自动转义
+
+// Python:
+//   psycopg2: %s 占位符
+//   Django ORM: 自动参数化
+//   Jinja2: 自动转义
+
+// Node.js:
+//   pg: $1, $2 占位符
+//   Sequelize/TypeORM: 参数化
+//   Helmet: 安全头
+
+// Java:
+//   JDBC: PreparedStatement
+//   JPA/Hibernate: 参数化
+//   Spring Validation: @Valid
+
+// ========== SQL 注入防御清单 ==========
+// [ ] 永远不要拼接 SQL
+// [ ] 使用参数化查询 (PreparedStatement)
+// [ ] ORM 使用参数化方法
+// [ ] 动态表名列名用白名单
+// [ ] LIKE 查询转义 % 和 _
+// [ ] IN 子句动态生成占位符
+// [ ] 最小数据库权限
+// [ ] 输入验证 + 白名单
+// [ ] WAF 规则 (ModSecurity)
+// [ ] 定期渗透测试</div>
+        <div class="note">💡 SQL 注入要点: 永远不拼接 SQL; 参数化查询 $1/?/%s 是核心防线; ORM 也不是绝对安全 (原生SQL/动态字段); NoSQL 注入通过 BSON 构造器防范; OS 命令注入用白名单; 输入验证 (白名单/类型/长度/格式); LIKE 和 IN 子句需特殊处理; WAF 作为额外防护层。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoInject()">注入示例</button>
+        <button onclick="demoParam()">参数化</button>
+        <button onclick="demoValidation()">输入验证</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoInject() {
+            result.innerHTML = '';
+            log('# SQL 注入示例');
+            log('');
+            log('❌ 不安全:');
+            log('  fmt.Sprintf("SELECT * FROM users WHERE id=%s", input)');
+            log("  输入: 1 OR 1=1");
+            log("  结果: 所有用户泄露");
+            log('');
+            log('攻击类型:');
+            log('  布尔盲注 / 时间盲注');
+            log('  UNION 查询');
+            log('  堆叠查询 (DROP TABLE)');
+        }
+
+        function demoParam() {
+            result.innerHTML = '';
+            log('# 参数化查询');
+            log('');
+            log('Go:');
+            log('  db.Query("SELECT * FROM users WHERE id=$1", id)');
+            log('');
+            log('Python:');
+            log('  cur.execute("SELECT * FROM users WHERE id=%s", (id,))');
+            log('');
+            log('Node.js:');
+            log('  db.query("SELECT * FROM users WHERE id=$1", [id])');
+            log('');
+            log('原理:');
+            log('  SQL 模板先编译, 参数后传入');
+            log('  用户输入始终是数据, 不是代码');
+        }
+
+        function demoValidation() {
+            result.innerHTML = '';
+            log('# 输入验证');
+            log('');
+            log('白名单:');
+            log('  allowed := ["US", "CN", "JP"]');
+            log('  if !contains(allowed, input) { reject }');
+            log('');
+            log('类型验证:');
+            log('  age, err := strconv.Atoi(input)');
+            log('');
+            log('格式验证:');
+            log('  regexp.MatchString(`^[a-z]+$`, input)');
+            log('');
+            log('转义:');
+            log('  html.EscapeString(input)');
+        }
+    </script>
+</body>
+</html>

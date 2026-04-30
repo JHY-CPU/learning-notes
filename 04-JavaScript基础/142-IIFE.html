@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IIFE</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e67e22; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>IIFE — 立即执行函数表达式</h2><p>Immediately Invoked Function Expression，定义后立即执行的函数。</p></div>
+    <div class="card">
+        <h2>IIFE 语法</h2>
+        <div class="code">// 写法1（推荐）：包裹在 () 中，末尾调用
+(function() {
+    console.log('立即执行');
+})();
+
+// 写法2：调用括号在外面（Douglas Crockford 风格）
+(function() {
+    console.log('立即执行');
+}());
+
+// 箭头函数 IIFE
+(() => {
+    console.log('箭头函数 IIFE');
+})();
+
+// 带参数
+(function(name) {
+    console.log('Hello, ' + name);
+})('Alice');</div>
+    </div>
+    <div class="card">
+        <h2>通过 IIFE 创建私有作用域</h2>
+        <div class="code">// IIFE 内部的变量不会污染全局
+(function() {
+    let privateVar = '只有IIFE内部能访问';
+    console.log(privateVar);  // ✅
+})();
+
+// console.log(privateVar);    // ❌ 报错！
+
+// 多个 IIFE 互不干扰
+(function() {
+    let counter = 0;
+    console.log('IIFE 1:', ++counter);  // 1
+})();
+
+(function() {
+    let counter = 0;
+    console.log('IIFE 2:', ++counter);  // 1（互不影响）
+})();</div>
+    </div>
+    <div class="card">
+        <h2>IIFE 模块模式</h2>
+        <div class="code">const Counter = (function() {
+    // 私有变量
+    let count = 0;
+
+    // 私有函数
+    function log(msg) {
+        console.log(`[Counter] ${msg}`);
+    }
+
+    // 公开接口
+    return {
+        increment() {
+            count++;
+            log(`count → ${count}`);
+        },
+        decrement() {
+            count--;
+            log(`count → ${count}`);
+        },
+        getCount() {
+            return count;
+        }
+    };
+})();
+
+Counter.increment();  // [Counter] count → 1
+Counter.increment();  // [Counter] count → 2
+console.log(Counter.getCount());  // 2
+// console.log(Counter.count);    // undefined（不能访问）</div>
+        <div class="note">💡 IIFE 模块模式是 ES6 模块出现前最常用的封装方式。</div>
+    </div>
+    <div class="card">
+        <h2>经典应用：循环中的闭包</h2>
+        <div class="code">// 用 IIFE 创建独立作用域
+for (var i = 0; i < 3; i++) {
+    (function(j) {
+        setTimeout(function() {
+            console.log(j);  // 0, 1, 2
+        }, 100);
+    })(i);
+}
+
+// 现在直接用 let 即可
+for (let i = 0; i < 3; i++) {
+    setTimeout(() => console.log(i), 100);  // 0, 1, 2
+}</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== IIFE 基本用法 ===');
+        (function() {
+            console.log('IIFE 立即执行了！');
+        })();
+
+        (function(name) {
+            console.log('带参数的 IIFE:', name);
+        })('JavaScript');
+
+        console.log('=== 私有作用域 ===');
+        (function() {
+            let secret = '这是秘密';
+            console.log('IIFE 内部的 secret:', secret);
+        })();
+        // console.log(secret);  // ❌ 报错
+
+        console.log('=== IIFE 模块模式 ===');
+        const Utils = (function() {
+            function format(str) {
+                return str.trim().toLowerCase();
+            }
+            function capitalize(str) {
+                return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
+            }
+            return {
+                format,
+                capitalize
+            };
+        })();
+
+        console.log('Utils.format:', Utils.format('  HELLO  '));
+        console.log('Utils.capitalize:', Utils.capitalize('javaScript'));
+
+        document.getElementById('output').textContent =
+            `IIFE 模块: Utils.format('  HELLO  ') = '${Utils.format('  HELLO  ')}'\n` +
+            `Utils.capitalize('javaScript') = ${Utils.capitalize('javaScript')}\n` +
+            `✅ IIFE 演示完成！`;
+    </script>
+</body>
+</html>

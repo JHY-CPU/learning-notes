@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 实战: Dockerfile 与部署</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🐳 Go 实战: Dockerfile 与部署</h2><p>多阶段构建、Docker Compose 编排、健康检查、环境配置、生产部署最佳实践、CI/CD 流水线。</p></div>
+    <div class="card">
+        <h2>Go 多阶段 Dockerfile</h2>
+        <div class="code">// ========== 最优 Go Dockerfile ==========
+// Dockerfile
+
+// === 阶段 1: 编译 ===
+FROM golang:1.22-alpine AS builder
+
+RUN apk add --no-cache git ca-certificates
+
+WORKDIR /app
+
+// 利用 Docker 层缓存
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+// 静态编译, 禁用 CGO, 去除调试信息
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-w -s" -o /app/server .
+
+// === 阶段 2: 运行 ===
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata
+
+// 非 root 用户运行
+RUN adduser -D -g '' appuser
+
+COPY --from=builder /app/server /app/server
+COPY --from=builder /etc/ssl/certs /etc/ssl/certs
+
+USER appuser
+WORKDIR /app
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+
+ENTRYPOINT ["/app/server"]
+
+// ========== 更小的镜像: distroless ==========
+// FROM golang:1.22-alpine AS builder
+// ...
+//
+// FROM gcr.io/distroless/static-debian12:nonroot
+// COPY --from=builder /app/server /server
+// EXPOSE 8080
+// ENTRYPOINT ["/server"]
+
+// distroless 只有应用 + 运行时依赖
+// 没有 shell, 没有包管理器, 攻击面最小
+
+// ========== 更小的镜像: scratch ==========
+// FROM scratch
+// COPY --from=builder /app/server /server
+// COPY --from=builder /etc/ssl/certs /etc/ssl/certs
+// EXPOSE 8080
+// ENTRYPOINT ["/server"]
+
+// scratch 完全空镜像, 最小可能
+// 注意: 没有 shell, 调试困难
+
+// ========== Docker 构建命令 ==========
+// docker build -t myapp:latest .
+// docker build --platform linux/amd64 -t myapp:latest .
+// docker build --build-arg VERSION=1.0.0 -t myapp:latest .
+
+// 使用 buildx 多架构:
+// docker buildx build \
+//   --platform linux/amd64,linux/arm64 \
+//   -t myapp:latest --push .</div>
+    </div>
+    <div class="card">
+        <h2>Docker Compose 编排</h2>
+        <div class="code">// ========== docker-compose.yml ==========
+// version: "3.9"  // Docker Compose v2 不需要 version
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVER_PORT=:8080
+      - DATABASE_DSN=host=db port=5432 user=postgres password=postgres dbname=todo sslmode=disable
+      - REDIS_ADDR=redis:6379
+      - JWT_SECRET=${JWT_SECRET}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=todo
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - app-network
+
+volumes:
+  postgres-data:
+  redis-data:
+
+networks:
+  app-network:
+    driver: bridge
+
+// ========== 开发环境 Compose ==========
+// docker-compose.override.yml (自动覆盖)
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    volumes:
+      - .:/app          // 热重载
+      - /app/target
+    environment:
+      - GIN_MODE=debug
+    ports:
+      - "2345:2345"     // dlv 远程调试
+
+// Dockerfile.dev 带 dlv:
+// FROM golang:1.22-alpine
+// RUN go install github.com/go-delve/delve/cmd/dlv@latest
+// WORKDIR /app
+// COPY . .
+// CMD ["dlv", "debug", "--headless", "--listen=:2345", "--api-version=2", "--accept-multiclient"]
+
+// ========== 启动命令 ==========
+// docker compose up -d           // 后台启动
+// docker compose up -d --build   // 重新构建后启动
+// docker compose logs -f         // 查看日志
+// docker compose down            // 停止并删除
+// docker compose down -v         // 停止并删除卷
+// docker compose ps              // 查看状态
+
+// ========== 生产 Compose 调整 ==========
+// docker-compose.prod.yml
+
+// services:
+//   app:
+//     image: registry.example.com/myapp:latest
+//     restart: always
+//     deploy:
+//       replicas: 3
+//       resources:
+//         limits:
+//           memory: 512M
+//     logging:
+//       driver: "json-file"
+//       options:
+//         max-size: "10m"
+//         max-file: "3"
+
+// 使用:
+// docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d</div>
+    </div>
+    <div class="card">
+        <h2>生产环境配置</h2>
+        <div class="code">// ========== 12-Factor App 配置 ==========
+// 1. 环境变量存储配置
+// 2. 不硬编码敏感信息
+// 3. 默认值可本地开发
+
+func loadConfig() *Config {
+    return &Config{
+        Port:    getEnv("PORT", ":8080"),
+        DSN:     getEnv("DATABASE_DSN", ""),
+        Redis:   getEnv("REDIS_ADDR", "localhost:6379"),
+        Secret:  getEnv("JWT_SECRET", "dev-secret"),
+    }
+}
+
+// ========== 健康检查端点 ==========
+func healthHandler(c *gin.Context) {
+    status := "ok"
+    code := 200
+
+    // 检查数据库
+    if err := db.Ping(); err != nil {
+        status = "degraded"
+        code = 503
+    }
+
+    c.JSON(code, gin.H{
+        "status":  status,
+        "version": Version,
+        "time":    time.Now().Unix(),
+    })
+}
+
+// ========== 优雅关闭 ==========
+func gracefulShutdown(srv *http.Server) {
+    quit := make(chan os.Signal, 1)
+    signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+    <-quit
+
+    log.Println("正在关闭服务器...")
+    ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+    defer cancel()
+
+    if err := srv.Shutdown(ctx); err != nil {
+        log.Fatalf("强制关闭: %v", err)
+    }
+    log.Println("服务器已退出")
+}
+
+// main 函数整合:
+func main() {
+    cfg := loadConfig()
+    db := initDB(cfg.DSN)
+    r := setupRouter(db)
+
+    srv := &http.Server{
+        Addr:         cfg.Port,
+        Handler:      r,
+        ReadTimeout:  10 * time.Second,
+        WriteTimeout: 15 * time.Second,
+        IdleTimeout:  60 * time.Second,
+    }
+
+    go func() {
+        log.Printf("服务启动在 %s", cfg.Port)
+        if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+            log.Fatalf("启动失败: %v", err)
+        }
+    }()
+
+    gracefulShutdown(srv)
+}
+
+// ========== Nginx 反向代理配置 ==========
+// /etc/nginx/sites-available/myapp
+
+// server {
+//     listen 80;
+//     server_name api.example.com;
+//
+//     location / {
+//         proxy_pass http://127.0.0.1:8080;
+//         proxy_set_header Host $host;
+//         proxy_set_header X-Real-IP $remote_addr;
+//         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+//         proxy_set_header X-Forwarded-Proto $scheme;
+//
+//         proxy_read_timeout 30s;
+//         proxy_connect_timeout 5s;
+//     }
+//
+//     location /health {
+//         proxy_pass http://127.0.0.1:8080/health;
+//     }
+// }
+
+// ========== .env 文件 ==========
+// .env (不上传 git)
+// JWT_SECRET=your-production-secret
+// DATABASE_DSN=host=... password=...
+// REDIS_ADDR=redis:6379
+// GIN_MODE=release
+
+// .env.example (上传 git, 不含敏感信息)
+// JWT_SECRET=change-me
+// DATABASE_DSN=host=localhost port=5432 user=postgres dbname=todo
+// REDIS_ADDR=localhost:6379</div>
+    </div>
+    <div class="card">
+        <h2>CI/CD 部署流水线</h2>
+        <div class="code">// ========== GitHub Actions ==========
+// .github/workflows/deploy.yml
+
+// name: Build and Deploy
+//
+// on:
+//   push:
+//     branches: [main]
+//
+// jobs:
+//   test:
+//     runs-on: ubuntu-latest
+//     steps:
+//       - uses: actions/checkout@v4
+//       - uses: actions/setup-go@v5
+//         with:
+//           go-version: '1.22'
+//       - run: go mod download
+//       - run: go vet ./...
+//       - run: go test -race -coverprofile=coverage.out ./...
+//       - uses: codecov/codecov-action@v3
+//
+//   build-and-deploy:
+//     needs: test
+//     runs-on: ubuntu-latest
+//     steps:
+//       - uses: actions/checkout@v4
+//
+//       - name: Docker Buildx
+//         uses: docker/setup-buildx-action@v3
+//
+//       - name: Login to Registry
+//         uses: docker/login-action@v3
+//         with:
+//           registry: ghcr.io
+//           username: ${{ github.actor }}
+//           password: ${{ secrets.GITHUB_TOKEN }}
+//
+//       - name: Build and Push
+//         uses: docker/build-push-action@v5
+//         with:
+//           context: .
+//           platforms: linux/amd64,linux/arm64
+//           push: true
+//           tags: |
+//             ghcr.io/${{ github.repository }}:latest
+//             ghcr.io/${{ github.repository }}:${{ github.sha }}
+
+// ========== 部署到服务器 ==========
+// 方式 1: SSH + Docker
+// ssh user@host "cd /app && docker compose pull && docker compose up -d"
+
+// 方式 2: Ansible Playbook
+// - name: Deploy application
+//   hosts: app-servers
+//   tasks:
+//     - name: Pull latest image
+//       docker_image:
+//         name: ghcr.io/myorg/myapp
+//         source: pull
+//     - name: Restart container
+//       docker_container:
+//         name: myapp
+//         image: ghcr.io/myorg/myapp:latest
+//         state: started
+//         restart: yes
+
+// ========== 部署检查清单 ==========
+// [ ] 多阶段 Dockerfile (builder + distroless/alpine)
+// [ ] 非 root 用户运行
+// [ ] 健康检查端点 + Docker HEALTHCHECK
+// [ ] 优雅关闭 (signal.Notify + Shutdown)
+// [ ] 环境变量配置 (12-Factor)
+// [ ] Docker Compose 编排 (app + db + redis)
+// [ ] 资源限制 (CPU/内存)
+// [ ] 日志驱动配置
+// [ ] SSL/TLS (Nginx + Let's Encrypt)
+// [ ] CI/CD 自动化
+// [ ] 数据库迁移自动化
+// [ ] 备份策略</div>
+        <div class="note">💡 部署要点: 多阶段构建 (builder → alpine/distroless/scratch); 最小镜像 (~10MB); 非 root 用户 USER appuser; HEALTHCHECK 健康检查; 环境变量配置 (12-Factor); Docker Compose 编排多服务; depends_on + condition: service_healthy; 优雅关闭 Shutdown; Nginx 反向代理; CI/CD GitHub Actions Build + Push; 生产资源限制; 跨平台构建 buildx。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoDocker()">Dockerfile</button>
+        <button onclick="demoCompose()">Compose</button>
+        <button onclick="demoDeploy()">部署</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoDocker() {
+            result.innerHTML = '';
+            log('# Go Dockerfile');
+            log('');
+            log('多阶段构建:');
+            log('  Stage 1: golang:alpine → go build');
+            log('  Stage 2: alpine/distroless/scratch');
+            log('');
+            log('关键:');
+            log('  CGO_ENABLED=0');
+            log('  -ldflags="-w -s"');
+            log('  USER appuser');
+            log('  HEALTHCHECK');
+            log('');
+            log('镜像体积: ~10-20MB');
+        }
+
+        function demoCompose() {
+            result.innerHTML = '';
+            log('# Docker Compose');
+            log('');
+            log('服务:');
+            log('  app:  Go API 服务');
+            log('  db:   PostgreSQL 16');
+            log('  redis: Redis 7');
+            log('');
+            log('关键:');
+            log('  depends_on + condition');
+            log('  volumes (持久化数据)');
+            log('  networks (隔离)');
+            log('  restart: unless-stopped');
+            log('');
+            log('命令:');
+            log('  docker compose up -d');
+            log('  docker compose down');
+        }
+
+        function demoDeploy() {
+            result.innerHTML = '';
+            log('# 生产部署');
+            log('');
+            log('配置:');
+            log('  .env 文件 + 环境变量');
+            log('  GIN_MODE=release');
+            log('');
+            log('健康检查:');
+            log('  GET /health → {"status":"ok"}');
+            log('  检查 DB/Redis 连接');
+            log('');
+            log('CI/CD:');
+            log('  GitHub Actions → Build → Push');
+            log('  Docker Compose pull → up -d');
+            log('');
+            log('Nginx:');
+            log('  proxy_pass → http://127.0.0.1:8080');
+            log('  SSL: Let\'s Encrypt + certbot');
+        }
+    </script>
+</body>
+</html>

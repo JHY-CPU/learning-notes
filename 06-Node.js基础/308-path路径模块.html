@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>path路径模块</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #path-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; margin: 5px 0; width: 350px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>path 路径模块</h2><p>join / resolve / basename / dirname / extname / parse / format / sep / delimiter。</p></div>
+    <div class="card">
+        <h2>path 模块 API</h2>
+        <div class="code">// ========== path 路径操作 ==========
+const path = require('path');
+
+// ========== 路径拼接 ==========
+path.join('/base', 'dir', 'file.txt');
+// '/base/dir/file.txt' (自动处理分隔符)
+
+path.resolve('dist', 'js', 'app.js');
+// '/current/working/dir/dist/js/app.js' (绝对路径)
+
+// ========== 路径解析 ==========
+path.basename('/a/b/file.txt');      // 'file.txt'
+path.basename('/a/b/file.txt', '.txt'); // 'file'
+path.dirname('/a/b/file.txt');       // '/a/b'
+path.extname('/a/b/file.txt');       // '.txt'
+
+// ========== 路径对象 ==========
+const parsed = path.parse('/home/user/app.js');
+// { root: '/', dir: '/home/user', base: 'app.js',
+//   ext: '.js', name: 'app' }
+
+const formatted = path.format({
+    dir: '/home/user',
+    base: 'app.js'
+});
+// '/home/user/app.js'
+
+// ========== 路径信息 ==========
+path.isAbsolute('/a/b');  // true
+path.isAbsolute('a/b');   // false
+path.relative('/a/b', '/a/c'); // '../c'
+
+// ========== 分隔符 ==========
+path.sep;       // '/' (POSIX) 或 '\' (Windows)
+path.delimiter; // ':' (POSIX) 或 ';' (Windows)</div>
+    </div>
+    <div class="card">
+        <h2>演示：路径操作</h2>
+        <input id="pathInput" value="/home/user/projects/node-app/src/utils/helper.js" placeholder="输入路径">
+        <button onclick="demoPath()">解析路径</button>
+        <button onclick="demoJoin()">join vs resolve</button>
+        <div id="path-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const pathResult = document.getElementById('path-result');
+
+        function log(msg) {
+            pathResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // 模拟 path 模块 (POSIX)
+        const mockPath = {
+            sep: '/',
+            delimiter: ':',
+
+            basename(p, ext) {
+                const base = p.split('/').pop() || '';
+                return ext && base.endsWith(ext) ? base.slice(0, -ext.length) : base;
+            },
+
+            dirname(p) {
+                const parts = p.split('/');
+                parts.pop();
+                return parts.join('/') || '/';
+            },
+
+            extname(p) {
+                const base = p.split('/').pop() || '';
+                const i = base.lastIndexOf('.');
+                return i > 0 ? base.slice(i) : '';
+            },
+
+            join(...parts) {
+                return parts.join('/').replace(/\/+/g, '/');
+            },
+
+            resolve(...parts) {
+                // 简化实现: 假设当前目录为 /home/user
+                const cwd = '/home/user';
+                if (parts[0]?.startsWith('/')) {
+                    return this.join(...parts);
+                }
+                return this.join(cwd, ...parts);
+            },
+
+            parse(p) {
+                const root = p.startsWith('/') ? '/' : '';
+                const dir = this.dirname(p);
+                const base = p.split('/').pop() || '';
+                const ext = this.extname(p);
+                const name = base.slice(0, -ext.length) || base;
+                return { root, dir, base, ext, name };
+            },
+
+            isAbsolute(p) {
+                return p.startsWith('/');
+            },
+
+            relative(from, to) {
+                const f = from.split('/');
+                const t = to.split('/');
+                while (f.length && f[0] === t[0]) { f.shift(); t.shift(); }
+                return [...f.map(() => '..'), ...t].join('/') || '.';
+            }
+        };
+
+        function demoPath() {
+            pathResult.innerHTML = '';
+            const inputPath = document.getElementById('pathInput').value || '/home/user/projects/app.js';
+            log(`📋 输入路径: "${inputPath}"`);
+            log('');
+
+            const parsed = mockPath.parse(inputPath);
+            log('1️⃣ path.parse():');
+            Object.entries(parsed).forEach(([k, v]) => log(`   ${k}: "${v}"`));
+            log('');
+
+            log('2️⃣ path.basename():');
+            log(`   basename: "${mockPath.basename(inputPath)}"`);
+            log(`   basename(无扩展名): "${mockPath.basename(inputPath, '.js')}"`);
+            log('');
+
+            log('3️⃣ path.dirname():');
+            log(`   dirname: "${mockPath.dirname(inputPath)}"`);
+            log(`   dirname(dirname): "${mockPath.dirname(mockPath.dirname(inputPath))}"`);
+            log('');
+
+            log('4️⃣ path.extname():');
+            log(`   extname: "${mockPath.extname(inputPath)}"`);
+            log('');
+
+            log('5️⃣ path.isAbsolute():');
+            log(`   "${inputPath}": ${mockPath.isAbsolute(inputPath)}`);
+            log(`   "relative/path": ${mockPath.isAbsolute('relative/path')}`);
+        }
+
+        function demoJoin() {
+            pathResult.innerHTML = '';
+            log('🔗 join vs resolve:');
+            log('');
+
+            log('1️⃣ path.join() (拼接):');
+            const joins = [
+                ['/base', 'dir', 'file.txt'],
+                ['base', 'dir', '..', 'file.txt'],
+                ['/a', '/b', 'c'],
+            ];
+            joins.forEach(parts => {
+                log(`   join(${parts.join(', ')}) → "${mockPath.join(...parts)}"`);
+            });
+            log('');
+
+            log('2️⃣ path.resolve() (绝对路径):');
+            const resolves = [
+                ['dist', 'app.js'],
+                ['/etc', 'config.json'],
+                ['..', 'sibling'],
+            ];
+            resolves.forEach(parts => {
+                log(`   resolve(${parts.join(', ')}) → "${mockPath.resolve(...parts)}"`);
+            });
+            log('');
+
+            log('3️⃣ path.relative():');
+            log(`   relative("/a/b", "/a/c") → "${mockPath.relative('/a/b', '/a/c')}"`);
+            log(`   relative("/a/b/c", "/a/d") → "${mockPath.relative('/a/b/c', '/a/d')}"`);
+            log('');
+
+            log('4️⃣ 路径格式:');
+            log(`   sep: "${mockPath.sep}"`);
+            log(`   delimiter: "${mockPath.delimiter}"`);
+        }
+
+        console.log('=== path 路径模块 ===');
+
+        document.getElementById('output').textContent =
+            `path 模块: join / resolve / basename / dirname / extname / parse / format\n` +
+            `sep / delimiter / isAbsolute / relative\n` +
+            `✅ path 路径模块演示完成！`;
+    </script>
+</body>
+</html>

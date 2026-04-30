@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>74-数据结构的池化 (Object Pool)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Object Pool</h2>
+  <div class="code">对象池模式复用对象减少内存分配和GC压力，适合频繁创建/销毁的场景。</div>
+  <pre>class ObjectPool {
+  constructor(factory, reset, initialSize=10) {
+    this.factory = factory;
+    this.reset = reset;
+    this.pool = [];
+    for (let i = 0; i < initialSize; i++) this.pool.push(factory());
+  }
+  acquire() {
+    if (this.pool.length > 0) return this.pool.pop();
+    return this.factory();
+  }
+  release(obj) {
+    this.reset(obj);
+    this.pool.push(obj);
+  }
+  size() { return this.pool.length; }
+}
+// 用法示例
+const vecPool = new ObjectPool(
+  () => ({x:0, y:0}),
+  (v) => { v.x=0; v.y=0; }
+);</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  class Pool{
+    constructor(f,r,n=5){this.f=f;this.r=r;this.p=[];for(let i=0;i<n;i++)this.p.push(f());}
+    acquire(){return this.p.length>0?this.p.pop():this.f();}
+    release(o){this.r(o);this.p.push(o);}
+  }
+  const p=new Pool(()=>({x:0,y:0}),v=>{v.x=0;v.y=0;});
+  const v=p.acquire();v.x=10;v.y=20;
+  p.release(v);
+  const v2=p.acquire();
+  document.getElementById('result').textContent = `获取对象: x=${v2.x}, y=${v2.y} (已重置)`;
+}
+</script>
+</body>
+</html>

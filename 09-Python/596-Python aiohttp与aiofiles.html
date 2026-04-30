@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python aiohttp与aiofiles</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📡 aiohttp 与 aiofiles</h2><p>aiohttp ClientSession GET/POST、并发请求、超时与重试、aiofiles 异步文件操作、下载文件实战。</p></div>
+    <div class="card">
+        <h2>aiohttp 客户端基础</h2>
+        <div class="code">// ========== aiohttp GET 请求 ==========
+# pip install aiohttp
+
+import asyncio
+import aiohttp
+
+async def fetch_url(url):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as response:
+            # 等待响应
+            print(f"状态: {response.status}")
+            print(f"头信息: {response.headers}")
+
+            # 读取响应体
+            text = await response.text()      # 文本
+            # data = await response.json()    # JSON
+            # binary = await response.read()  # 二进制
+
+            return text[:100]
+
+async def main():
+    html = await fetch_url("https://httpbin.org/get")
+    print(html)
+
+asyncio.run(main())
+
+# ========== POST 请求 ==========
+async def post_data():
+    async with aiohttp.ClientSession() as session:
+        # JSON 请求体
+        async with session.post(
+            "https://httpbin.org/post",
+            json={"name": "Alice", "age": 30}
+        ) as resp:
+            result = await resp.json()
+            print(result)
+
+        # 表单数据
+        async with session.post(
+            "https://httpbin.org/post",
+            data={"key": "value"}
+        ) as resp:
+            print(await resp.json())
+
+        # 自定义头
+        headers = {"Authorization": "Bearer token123"}
+        async with session.get(
+            "https://httpbin.org/headers",
+            headers=headers
+        ) as resp:
+            print(await resp.json())</div>
+    </div>
+    <div class="card">
+        <h2>会话管理与参数</h2>
+        <div class="code">// ========== ClientSession 配置 ==========
+import asyncio
+import aiohttp
+
+# 共享会话: 连接复用 (推荐)
+async def shared_session():
+    # 公共配置
+    timeout = aiohttp.ClientTimeout(total=30)
+    connector = aiohttp.TCPConnector(limit=10)  # 最大并发连接
+
+    async with aiohttp.ClientSession(
+        base_url="https://api.example.com",
+        timeout=timeout,
+        connector=connector,
+        headers={"User-Agent": "MyApp/1.0"},
+        cookies={"session_id": "abc123"},
+    ) as session:
+        # 所有请求自动使用 base_url
+        async with session.get("/users") as resp:
+            users = await resp.json()
+        async with session.post("/users", json={"name": "Bob"}) as resp:
+            user = await resp.json()
+
+# ========== 查询参数 ==========
+async def query_params():
+    async with aiohttp.ClientSession() as session:
+        # 方式 1: URL 字符串
+        async with session.get("https://httpbin.org/get?page=1&limit=10") as resp:
+            print(await resp.json())
+
+        # 方式 2: params 参数
+        params = {"page": 2, "limit": 20, "sort": "-created_at"}
+        async with session.get("https://httpbin.org/get", params=params) as resp:
+            print(await resp.json())
+
+# ========== 超时设置 ==========
+async def timeout_demo():
+    # 全局超时
+    timeout = aiohttp.ClientTimeout(total=10)  # 总超时 10 秒
+
+    # 请求级超时 (覆盖)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        try:
+            async with session.get(
+                "https://httpbin.org/delay/5",
+                timeout=aiohttp.ClientTimeout(total=3)  # 3 秒超时
+            ) as resp:
+                print(await resp.json())
+        except asyncio.TimeoutError:
+            print("请求超时!")</div>
+    </div>
+    <div class="card">
+        <h2>并发请求</h2>
+        <div class="code">// ========== 批量请求 ==========
+import asyncio
+import aiohttp
+
+async def fetch_one(session, url):
+    try:
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+            return {"url": url, "status": resp.status, "data": await resp.text()[:50]}
+    except Exception as e:
+        return {"url": url, "error": str(e)}
+
+async def fetch_all(urls):
+    async with aiohttp.ClientSession() as session:
+        tasks = [fetch_one(session, url) for url in urls]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        return results
+
+async def main():
+    urls = [
+        "https://httpbin.org/delay/1",
+        "https://httpbin.org/delay/2",
+        "https://httpbin.org/delay/3",
+    ]
+    start = asyncio.get_event_loop().time()
+    results = await fetch_all(urls)
+    elapsed = asyncio.get_event_loop().time() - start
+
+    for r in results:
+        if isinstance(r, dict):
+            print(f"{r['url']}: {r.get('status', 'ERROR')}")
+
+    print(f"总耗时: {elapsed:.1f}s")  # ≈ 3s (最慢的请求)
+
+asyncio.run(main())
+
+# ========== 信号量限制并发 ==========
+sem = asyncio.Semaphore(5)  # 最多 5 个并发
+
+async def fetch_with_limit(session, url):
+    async with sem:
+        return await fetch_one(session, url)
+
+async def main():
+    async with aiohttp.ClientSession() as session:
+        tasks = [fetch_with_limit(session, url) for url in range(20)]
+        await asyncio.gather(*tasks)</div>
+    </div>
+    <div class="card">
+        <h2>aiofiles 异步文件操作</h2>
+        <div class="code">// ========== aiofiles ==========
+# pip install aiofiles
+
+import asyncio
+import aiofiles
+
+# 异步读写文件 (不阻塞事件循环)
+
+async def read_file():
+    async with aiofiles.open("example.txt", "r", encoding="utf-8") as f:
+        content = await f.read()
+        print(content)
+
+async def write_file():
+    async with aiofiles.open("output.txt", "w", encoding="utf-8") as f:
+        await f.write("Hello, World!\n")
+        await f.write("第二行\n")
+
+# 逐行读取大文件
+async def read_lines():
+    async with aiofiles.open("large.log", "r") as f:
+        async for line in f:
+            print(line.strip())
+
+# 二进制文件
+async def copy_binary():
+    async with aiofiles.open("source.png", "rb") as src:
+        async with aiofiles.open("dest.png", "wb") as dst:
+            while chunk := await src.read(8192):
+                await dst.write(chunk)
+
+# ========== 综合: 下载并保存文件 ==========
+import aiohttp
+
+async def download_file(url, filename):
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url) as resp:
+            if resp.status == 200:
+                async with aiofiles.open(filename, "wb") as f:
+                    while chunk := await resp.content.read(8192):
+                        await f.write(chunk)
+                print(f"下载完成: {filename} ({resp.content_length} bytes)")
+            else:
+                print(f"下载失败: {resp.status}")
+
+async def main():
+    await download_file(
+        "https://httpbin.org/image/png",
+        "downloaded_image.png"
+    )
+
+asyncio.run(main())</div>
+    </div>
+    <div class="card">
+        <h2>aiohttp 高级用法</h2>
+        <div class="code">// ========== 重试机制 ==========
+import asyncio
+import aiohttp
+
+async def fetch_with_retry(url, max_retries=3):
+    async with aiohttp.ClientSession() as session:
+        for attempt in range(max_retries):
+            try:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:
+                    if resp.status >= 500:  # 服务端错误,重试
+                        await asyncio.sleep(2 ** attempt)  # 指数退避
+                        continue
+                    return await resp.text()
+            except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+                if attempt == max_retries - 1:
+                    raise
+                await asyncio.sleep(2 ** attempt)
+        return None
+
+# ========== 流式响应 ==========
+async def stream_response():
+    async with aiohttp.ClientSession() as session:
+        async with session.get("https://httpbin.org/stream/5") as resp:
+            # 逐行读取流式响应
+            async for line in resp.content:
+                print(f"行: {line.decode().strip()}")
+
+# ========== 文件上传 ==========
+async def upload_file():
+    async with aiohttp.ClientSession() as session:
+        # 上传文件
+        with open("photo.jpg", "rb") as f:
+            data = aiohttp.FormData()
+            data.add_field("file", f, filename="photo.jpg", content_type="image/jpeg")
+            async with session.post("https://httpbin.org/post", data=data) as resp:
+                print(await resp.json())
+
+# ========== Cookie 持久化 ==========
+async def cookies_demo():
+    jar = aiohttp.CookieJar()
+    async with aiohttp.ClientSession(cookie_jar=jar) as session:
+        await session.get("https://httpbin.org/cookies/set?name=value")
+        # jar 自动保存 cookies
+        for cookie in jar:
+            print(f"{cookie.key} = {cookie.value}")</div>
+        <div class="note">💡 aiohttp: ClientSession 复用连接,支持 JSON/表单/文件上传,超时/重试/并发控制。aiofiles: 异步文件 I/O,不阻塞事件循环。组合使用实现高性能下载器。</div>
+    </div>
+    <div class="card">
+        <h2>完整示例: 并发下载器</h2>
+        <div class="code">// ========== 并发下载器 ==========
+import asyncio
+import aiohttp
+import aiofiles
+from pathlib import Path
+
+class AsyncDownloader:
+    def __init__(self, max_concurrent=5):
+        self.sem = asyncio.Semaphore(max_concurrent)
+        self.total = 0
+        self.completed = 0
+
+    async def download_one(self, session, url, dest_dir):
+        async with self.sem:
+            try:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=30)) as resp:
+                    if resp.status != 200:
+                        return {"url": url, "status": resp.status, "error": f"HTTP {resp.status}"}
+
+                    filename = url.split("/")[-1] or "index.html"
+                    filepath = Path(dest_dir) / filename
+
+                    async with aiofiles.open(filepath, "wb") as f:
+                        async for chunk in resp.content.iter_chunked(8192):
+                            await f.write(chunk)
+
+                    self.completed += 1
+                    return {"url": url, "status": resp.status, "file": str(filepath)}
+            except Exception as e:
+                return {"url": url, "error": str(e)}
+
+    async def download_many(self, urls, dest_dir="downloads"):
+        Path(dest_dir).mkdir(exist_ok=True)
+        self.total = len(urls)
+
+        async with aiohttp.ClientSession() as session:
+            tasks = [self.download_one(session, url, dest_dir) for url in urls]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        return results
+
+async def main():
+    urls = [
+        f"https://httpbin.org/delay/{i}" for i in range(1, 6)
+    ]
+    downloader = AsyncDownloader(max_concurrent=3)
+    results = await downloader.download_many(urls, dest_dir="./downloads")
+
+    print(f"完成: {downloader.completed}/{downloader.total}")
+    for r in results:
+        print(f"  {r.get('url', '?'):30} → {r.get('file', r.get('error', '?'))}")
+
+asyncio.run(main())</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSession()">会话管理演示</button>
+        <button onclick="demoConcurrent()">并发请求演示</button>
+        <button onclick="demoDownload()">下载器演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSession() {
+            result.innerHTML = '';
+            log('# aiohttp 会话管理');
+            log('');
+            log('async with aiohttp.ClientSession() as s:');
+            log('    async with s.get(url) as resp:');
+            log('        text = await resp.text()');
+            log('        data = await resp.json()');
+            log('        blob = await resp.read()');
+            log('');
+            log('配置会话:');
+            log('  base_url, headers, cookies');
+            log('  timeout, connector(limit)');
+        }
+
+        function demoConcurrent() {
+            result.innerHTML = '';
+            log('# 并发请求');
+            log('');
+            log('tasks = [fetch(s, url) for url in urls]');
+            log('results = await asyncio.gather(*tasks)');
+            log('');
+            log('信号量限制:');
+            log('  sem = asyncio.Semaphore(5)');
+            log('  async with sem:');
+            log('      await fetch(url)');
+            log('');
+            log('总耗时 ≈ 最慢请求的耗时');
+        }
+
+        function demoDownload() {
+            result.innerHTML = '';
+            log('# 异步下载器');
+            log('');
+            log('async with session.get(url) as resp:');
+            log('    async with aiofiles.open(file, "wb") as f:');
+            log('        async for chunk in resp.content:');
+            log('            await f.write(chunk)');
+            log('');
+            log('特点:');
+            log('  - 非阻塞下载');
+            log('  - 并发控制');
+            log('  - 流式写入不占用内存');
+        }
+    </script>
+</body>
+</html>

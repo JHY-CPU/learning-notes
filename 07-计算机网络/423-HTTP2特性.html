@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTTP2特性</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚡ HTTP/2 特性</h2><p>二进制分帧、多路复用、HPACK 头部压缩、服务器推送、HTTP/2 性能优化。</p></div>
+    <div class="card">
+        <h2>HTTP/2 核心改进</h2>
+        <p>HTTP/2 基于 Google SPDY 协议，主要解决 HTTP/1.1 的性能瓶颈。</p>
+        <div class="code">// ========== HTTP/1.1 的问题 ==========
+// 1. 队头阻塞 (HOL):
+//    一个请求响应慢,阻塞后面的所有请求
+//
+// 2. 头部冗余:
+//    每个请求重复发送相同的头部
+//    平均头部 size: 600-800 bytes
+//
+// 3. 无法优先级:
+//    不能标记重要请求优先处理
+//
+// 4. 只能客户端发起:
+//    服务器无法主动推送资源
+
+// ========== HTTP/2 的改进 ==========
+// 1. 二进制分帧 → 解决队头阻塞
+// 2. HPACK 压缩 → 减少头部开销
+// 3. 流优先级  → 关键资源优先
+// 4. 服务器推送 → 主动发送资源
+
+// ========== 升级方式 ==========
+// 使用 TLS ALPN (Application-Layer Protocol Negotiation):
+//   客户端在 TLS 握手中声明支持 h2
+//   服务器选择 h2 (HTTP/2) 或 http/1.1
+//
+// 明文 h2c (不推荐,几乎无浏览器支持)
+//   需要在 HTTP/1.1 中 Upgrade 升级</div>
+    </div>
+    <div class="card">
+        <h2>二进制分帧与多路复用</h2>
+        <div class="code">// ========== 二进制分帧 ==========
+// HTTP/1.1: 文本协议, 以换行符分隔
+// HTTP/2:   二进制协议, 以帧 (Frame) 为单位
+//
+// 帧类型:
+//   DATA:       传输 HTTP 消息体
+//   HEADERS:    传输 HTTP 头部
+//   PRIORITY:   设置流优先级
+//   RST_STREAM: 终止流 (取消请求)
+//   SETTINGS:   协商配置参数
+//   PUSH_PROMISE: 服务器推送
+//   PING:       测量 RTT
+//   GOAWAY:     优雅关闭连接
+//   WINDOW_UPDATE: 流量控制
+
+// ========== 多路复用 ==========
+// HTTP/1.1 连接:
+//   [请求1→] [←响应1] [请求2→] [←响应2] [请求3→]
+//   串行,前一个完成才能发下一个
+//
+// HTTP/2 连接 (单 TCP):
+//   │ 请求1(流1) │ ←→ │ 响应1(流1) │
+//   │ 请求2(流2) │ ←→ │ 响应2(流2) │
+//   │ 请求3(流3) │ ←→ │ 响应3(流3) │
+//   并行交错,无顺序依赖
+//
+// 实际传输:
+//   [HEADERS(流1)][DATA(流2)][DATA(流1)][HEADERS(流3)]
+//   帧可交错,接收端按流 ID 重组
+
+// ========== 流 (Stream) ==========
+// 每个 HTTP 请求/响应对 = 一个流
+// 流 ID 奇数: 客户端发起, 偶数: 服务器推送
+// 流有优先级: 0-255, 高优先级的先发送
+// 流可取消: RST_STREAM 帧取消,不影响其他流</div>
+        <div class="note">⚡ 多路复用是 HTTP/2 最大的性能改进——一个 TCP 连接可同时传输多个请求/响应,不再有 HTTP/1.1 的队头阻塞。但注意: TCP 级别的队头阻塞仍然存在(HTTP/3 才真正解决)。</div>
+    </div>
+    <div class="card">
+        <h2>HPACK 头部压缩</h2>
+        <div class="code">// ========== HPACK 原理 ==========
+// 静态表: 预定义的 61 个常见头部
+//   如: :method: GET, :status: 200, content-type: application/json
+//
+// 动态表: 协商更新的头部
+//   首次发送完整头部,后续用索引引用
+//
+// Huffman 编码: 进一步压缩
+//   常见字符用更少 bits 表示
+//
+// ========== 压缩效果 ==========
+// 请求 1 (首次,建立动态表):
+//   :method: GET
+//   :path: /index.html
+//   :scheme: https
+//   user-agent: Mozilla/5.0 ...
+//   ≈ 700 bytes → ~300 bytes (首次)
+//
+// 请求 2 (后续):
+//   :path: /style.css  (仅路径不同)
+//   ≈ 700 bytes → ~50 bytes (大部分用索引)
+
+// ========== HTTP/2 伪头部 ==========
+// HTTP/2 将请求行/状态行编码为伪头部
+// 以 : 开头,区别于普通头部
+//
+// 请求伪头:
+//   :method: GET
+//   :path: /index.html
+//   :scheme: https
+//   :authority: example.com
+//
+// 响应伪头:
+//   :status: 200
+
+// ========== 服务器推送 ==========
+// 服务器预测客户端将需要的资源
+// 在客户端请求前主动推送
+//
+// 例: 客户端请求 index.html
+//   服务器响应 index.html + 推送 style.css 和 app.js
+//
+// 注意: 浏览器可能有缓存,推送浪费带宽
+// 实际使用率不高,HTTP/3 中未特别优化</div>
+    </div>
+    <div class="card">
+        <h2>HTTP/2 优化建议</h2>
+        <div class="code">// ========== HTTP/2 下不再需要的优化 ==========
+// HTTP/1.1 时代的优化技巧:
+//
+// ❌ Domain Sharding (域名分片):
+//    把资源分散到多个域名增加并发
+//    HTTP/2 不需要,一个连接足够
+//
+// ❌ CSS Sprites (雪碧图):
+//    合并小图标减少请求数
+//    多路复用下请求开销已很小
+//
+// ❌ 资源内联 (inline/Data URI):
+//    将小资源嵌入 HTML
+//    无必要,甚至可能有害 (缓存粒度)
+
+// ========== HTTP/2 新优化 ==========
+// ✅ 减少连接数 (单一连接)
+// ✅ 服务器推送关键 CSS/JS
+// ✅ 流优先级设置
+// ✅ 小资源分开请求 (独立缓存)
+// ✅ 使用 CDN (保持连接)
+
+// ========== 检测 HTTP/2 ==========
+// 浏览器 DevTools:
+//   协议列显示 "h2"
+//
+// curl:
+//   $ curl -I --http2 https://example.com
+//   $ curl -v https://example.com 2>&1 | grep ALPN
+//   ALPN, negotiated h2
+
+// ========== 支持现状 ==========
+// 所有现代浏览器支持 HTTP/2
+// 约 40% 网站使用 HTTP/2
+// 服务器: Nginx, Apache, Caddy 均支持
+// CDN: Cloudflare, Fastly, Akamai 均支持</div>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('⚡ HTTP/2 特性');
+        log('');
+        log('二进制分帧: 帧 (Frame) 取代文本行');
+        log('多路复用: 一个连接并行传输多个流');
+        log('HPACK: 静态表 + 动态表 + Huffman, 头部压缩 90%+');
+        log('服务器推送: 主动推送客户端需要的资源');
+        log('HTTP/1.1 优化不再必要: 域名分片/雪碧图/内联');
+    </script>
+</body>
+</html>

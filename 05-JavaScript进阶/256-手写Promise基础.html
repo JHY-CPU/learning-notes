@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手写Promise基础</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #myPromise-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>手写 Promise 基础</h2><p>实现 Promise 状态机、resolve/reject、then/catch、微任务调度。</p></div>
+    <div class="card">
+        <h2>简易 Promise 实现</h2>
+        <div class="code">// ========== 简易 Promise (MyPromise) ==========
+const PENDING = 'pending';
+const FULFILLED = 'fulfilled';
+const REJECTED = 'rejected';
+
+class MyPromise {
+    constructor(executor) {
+        this.state = PENDING;
+        this.value = undefined;
+        this.reason = undefined;
+        this.onFulfilledCallbacks = [];
+        this.onRejectedCallbacks = [];
+
+        const resolve = (value) => {
+            if (this.state === PENDING) {
+                this.state = FULFILLED;
+                this.value = value;
+                this.onFulfilledCallbacks.forEach(fn => fn());
+            }
+        };
+
+        const reject = (reason) => {
+            if (this.state === PENDING) {
+                this.state = REJECTED;
+                this.reason = reason;
+                this.onRejectedCallbacks.forEach(fn => fn());
+            }
+        };
+
+        try {
+            executor(resolve, reject);
+        } catch (err) {
+            reject(err);
+        }
+    }
+
+    then(onFulfilled, onRejected) {
+        // 值穿透处理
+        onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : v => v;
+        onRejected = typeof onRejected === 'function' ? onRejected : e => { throw e; };
+
+        if (this.state === FULFILLED) {
+            queueMicrotask(() => onFulfilled(this.value));
+        }
+        if (this.state === REJECTED) {
+            queueMicrotask(() => onRejected(this.reason));
+        }
+        if (this.state === PENDING) {
+            this.onFulfilledCallbacks.push(() => {
+                queueMicrotask(() => onFulfilled(this.value));
+            });
+            this.onRejectedCallbacks.push(() => {
+                queueMicrotask(() => onRejected(this.reason));
+            });
+        }
+    }
+
+    catch(onRejected) {
+        return this.then(null, onRejected);
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：手写 Promise</h2>
+        <button onclick="demoMyPromise()">测试 MyPromise</button>
+        <button onclick="demoAsync()">异步场景</button>
+        <div id="myPromise-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const myPromiseResult = document.getElementById('myPromise-result');
+
+        function log(msg) {
+            myPromiseResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // ========== 手写 Promise ==========
+        const PENDING = 'pending';
+        const FULFILLED = 'fulfilled';
+        const REJECTED = 'rejected';
+
+        class MyPromise {
+            constructor(executor) {
+                this.state = PENDING;
+                this.value = undefined;
+                this.reason = undefined;
+                this.onFulfilledCallbacks = [];
+                this.onRejectedCallbacks = [];
+
+                const resolve = (value) => {
+                    if (this.state === PENDING) {
+                        this.state = FULFILLED;
+                        this.value = value;
+                        this.onFulfilledCallbacks.forEach(fn => fn());
+                    }
+                };
+
+                const reject = (reason) => {
+                    if (this.state === PENDING) {
+                        this.state = REJECTED;
+                        this.reason = reason;
+                        this.onRejectedCallbacks.forEach(fn => fn());
+                    }
+                };
+
+                try {
+                    executor(resolve, reject);
+                } catch (err) {
+                    reject(err);
+                }
+            }
+
+            then(onFulfilled, onRejected) {
+                onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : v => v;
+                onRejected = typeof onRejected === 'function' ? onRejected : e => { throw e; };
+
+                if (this.state === FULFILLED) {
+                    queueMicrotask(() => onFulfilled(this.value));
+                }
+                if (this.state === REJECTED) {
+                    queueMicrotask(() => onRejected(this.reason));
+                }
+                if (this.state === PENDING) {
+                    this.onFulfilledCallbacks.push(() => {
+                        queueMicrotask(() => onFulfilled(this.value));
+                    });
+                    this.onRejectedCallbacks.push(() => {
+                        queueMicrotask(() => onRejected(this.reason));
+                    });
+                }
+            }
+
+            catch(onRejected) {
+                return this.then(null, onRejected);
+            }
+        }
+
+        function demoMyPromise() {
+            myPromiseResult.innerHTML = '';
+            log('📦 测试 MyPromise (手写 Promise):');
+            log('');
+
+            // 同步 resolve
+            log('1️⃣ 同步 resolve:');
+            const p1 = new MyPromise((resolve) => resolve('✅ 成功!'));
+            p1.then(v => log(`   then: ${v}`));
+
+            // 同步 reject
+            log('2️⃣ 同步 reject:');
+            const p2 = new MyPromise((_, reject) => reject('❌ 失败!'));
+            p2.catch(e => log(`   catch: ${e}`));
+
+            // 值穿透
+            log('3️⃣ 值穿透:');
+            const p3 = new MyPromise(resolve => resolve(42));
+            p3.then().then(v => log(`   值穿透: ${v}`));
+
+            // 状态不可变
+            log('4️⃣ 状态不可变:');
+            const p4 = new MyPromise((resolve, reject) => {
+                resolve('第一次');
+                resolve('第二次'); // 忽略
+                reject('错误');   // 忽略
+            });
+            p4.then(v => log(`   只收到: ${v}`));
+        }
+
+        function demoAsync() {
+            myPromiseResult.innerHTML = '';
+            log('⏳ MyPromise 异步场景:');
+            log('');
+
+            // 异步 resolve
+            log('1️⃣ 异步 (setTimeout):');
+            const p1 = new MyPromise(resolve => {
+                setTimeout(() => resolve('延迟结果'), 300);
+            });
+            p1.then(v => log(`   then: ${v}`));
+
+            // 多个 then
+            log('2️⃣ 多个 then 注册:');
+            const p2 = new MyPromise(resolve => {
+                setTimeout(() => resolve('多 then'), 200);
+            });
+            p2.then(v => log(`   then A: ${v}`));
+            p2.then(v => log(`   then B: ${v}`));
+            p2.then(v => log(`   then C: ${v}`));
+
+            // catch 错误
+            log('3️⃣ 错误处理:');
+            const p3 = new MyPromise((_, reject) => {
+                setTimeout(() => reject('异步错误'), 400);
+            });
+            p3.catch(e => log(`   catch: ${e}`));
+
+            setTimeout(() => {
+                log('');
+                log('📌 MyPromise 实现要点:');
+                log('   • 状态机: pending → fulfilled / rejected');
+                log('   • 状态不可逆 (只能改变一次)');
+                log('   • 支持异步: 回调数组存储');
+                log('   • 值穿透: then(null) 返回 value');
+                log('   • 微任务: queueMicrotask 调度');
+            }, 500);
+        }
+
+        console.log('=== 手写 Promise 基础 ===');
+
+        document.getElementById('output').textContent =
+            `手写 Promise: 状态机 / resolve/reject / then/catch / 微任务\n` +
+            `PENDING → FULFILLED / REJECTED / 不可逆 / 值穿透\n` +
+            `✅ 手写 Promise 基础演示完成！`;
+    </script>
+</body>
+</html>

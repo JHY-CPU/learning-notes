@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>哈希表</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>哈希表</h2><p>哈希函数(字符串/数字)、冲突处理(链地址/开放地址)、负载因子。</p></div>
+    <div class="card">
+        <h2>哈希表实现</h2>
+        <div class="code">// ========== 哈希表 (链地址法) ==========
+class HashTable {
+    constructor(capacity = 32) {
+        this.buckets = new Array(capacity);
+        this.capacity = capacity;
+        this.size = 0;
+    }
+
+    _hash(key) {
+        // 字符串哈希: djb2
+        let hash = 5381;
+        for (const ch of String(key)) {
+            hash = (hash * 33) ^ ch.charCodeAt(0);
+        }
+        return hash >>> 0;
+    }
+
+    set(key, value) {
+        const index = this._hash(key) % this.capacity;
+        if (!this.buckets[index]) this.buckets[index] = [];
+        // 链地址法: 链表存储冲突项
+        const bucket = this.buckets[index];
+        for (const entry of bucket) {
+            if (entry.key === key) {
+                entry.value = value; // 更新
+                return;
+            }
+        }
+        bucket.push({ key, value });
+        this.size++;
+    }
+
+    get(key) {
+        const index = this._hash(key) % this.capacity;
+        const bucket = this.buckets[index];
+        if (!bucket) return undefined;
+        for (const entry of bucket) {
+            if (entry.key === key) return entry.value;
+        }
+        return undefined;
+    }
+
+    delete(key) { /* 类似实现 */ }
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：哈希表</h2>
+        <button onclick="demoHashTable()">哈希表实现</button>
+        <button onclick="demoHashFunc()">哈希函数</button>
+        <button onclick="demoCollision()">冲突处理</button>
+        <button onclick="demoLoadFactor()">负载因子与性能</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        // ========== 哈希表实现 (链地址法) ==========
+        class HashTable {
+            constructor(capacity = 16) {
+                this.buckets = new Array(capacity).fill(null).map(() => []);
+                this.capacity = capacity;
+                this.size = 0;
+                this.threshold = 0.75;
+            }
+
+            _hash(key) {
+                const str = String(key);
+                let hash = 5381;
+                for (const ch of str) hash = (hash * 33) ^ ch.charCodeAt(0);
+                return (hash >>> 0) % this.capacity;
+            }
+
+            set(key, value) {
+                const index = this._hash(key);
+                const bucket = this.buckets[index];
+                for (const entry of bucket) {
+                    if (entry.key === key) { entry.value = value; return; }
+                }
+                bucket.push({ key, value });
+                this.size++;
+                if (this.size > this.capacity * this.threshold) this._resize();
+            }
+
+            get(key) {
+                const bucket = this.buckets[this._hash(key)];
+                for (const entry of bucket) {
+                    if (entry.key === key) return entry.value;
+                }
+                return undefined;
+            }
+
+            delete(key) {
+                const index = this._hash(key);
+                const bucket = this.buckets[index];
+                for (let i = 0; i < bucket.length; i++) {
+                    if (bucket[i].key === key) {
+                        bucket.splice(i, 1);
+                        this.size--;
+                        return true;
+                    }
+                }
+                return false;
+            }
+
+            has(key) { return this.get(key) !== undefined; }
+
+            _resize() {
+                const oldBuckets = this.buckets;
+                this.capacity *= 2;
+                this.buckets = new Array(this.capacity).fill(null).map(() => []);
+                this.size = 0;
+                for (const bucket of oldBuckets) {
+                    for (const entry of bucket) this.set(entry.key, entry.value);
+                }
+            }
+
+            stats() {
+                const used = this.buckets.filter(b => b.length > 0).length;
+                const maxChain = Math.max(...this.buckets.map(b => b.length));
+                const avgChain = this.size / Math.max(used, 1);
+                return { capacity: this.capacity, size: this.size, used, maxChain, avgChain: avgChain.toFixed(2) };
+            }
+
+            entries() {
+                const result = [];
+                for (const bucket of this.buckets) {
+                    for (const entry of bucket) result.push(entry);
+                }
+                return result;
+            }
+        }
+
+        function demoHashTable() {
+            result.innerHTML = '';
+            log('🗂️ 哈希表实现 (链地址法):');
+            log('');
+
+            const ht = new HashTable(8);
+            log('1️⃣ 插入数据:');
+            log('   set("name", "Alice")');
+            log('   set("age", 25)');
+            log('   set("city", "Beijing")');
+            log('   set("job", "Engineer")');
+            ht.set('name', 'Alice'); ht.set('age', 25);
+            ht.set('city', 'Beijing'); ht.set('job', 'Engineer');
+
+            log('');
+            log('2️⃣ 读取数据:');
+            log(`   get("name") → ${ht.get('name')}`);
+            log(`   get("age") → ${ht.get('age')}`);
+            log(`   get("unknown") → ${ht.get('unknown')}`);
+
+            log('');
+            log('3️⃣ 更新:');
+            ht.set('name', 'Bob');
+            log(`   set("name", "Bob") → get("name") = ${ht.get('name')}`);
+
+            log('');
+            log('4️⃣ 删除:');
+            log(`   delete("city") → ${ht.delete('city')}`);
+            log(`   has("city") → ${ht.has('city')}`);
+
+            log('');
+            log('5️⃣ 所有条目:');
+            ht.entries().forEach(({ key, value }) => log(`   ${key}: ${value}`));
+        }
+
+        function demoHashFunc() {
+            result.innerHTML = '';
+            log('🔑 哈希函数:');
+            log('');
+
+            // djb2 哈希
+            function hashDjb2(str) {
+                let hash = 5381;
+                for (const ch of str) hash = (hash * 33) ^ ch.charCodeAt(0);
+                return hash >>> 0;
+            }
+
+            // 简单哈希 (取模)
+            function hashSimple(str, mod) {
+                let hash = 0;
+                for (const ch of str) hash += ch.charCodeAt(0);
+                return hash % mod;
+            }
+
+            // 多项式哈希
+            function hashPoly(str, base = 31, mod = 1000000007) {
+                let hash = 0;
+                for (const ch of str) hash = (hash * base + ch.charCodeAt(0)) % mod;
+                return hash;
+            }
+
+            const testKeys = ['hello', 'world', 'hello', 'HashTable', 'JavaScript', '你好', 'a', 'A'];
+
+            log('不同哈希函数对比:');
+            log('');
+            log('djb2 哈希:');
+            testKeys.forEach(k => log(`   "${k}" → ${hashDjb2(k) % 100}`));
+
+            log('');
+            log('简单求和哈希 (mod 100):');
+            testKeys.forEach(k => log(`   "${k}" → ${hashSimple(k, 100)}`));
+
+            log('');
+            log('djb2 特点:');
+            log('   • 由 Daniel J. Bernstein 提出');
+            log('   • 简单快速, 分布均匀');
+            log('   • 广泛用于哈希表实现');
+            log('   • 使用 5381 作为初始值');
+            log('   • 使用 33 作为乘数');
+            log('');
+            log('📌 好的哈希函数:');
+            log('   • 计算快速 (不能太复杂)');
+            log('   • 均匀分布 (减少冲突)');
+            log('   • 确定性 (相同输入相同输出)');
+        }
+
+        function demoCollision() {
+            result.innerHTML = '';
+            log('💥 冲突处理:');
+            log('');
+
+            log('1️⃣ 链地址法 (Separate Chaining):');
+            log('   每个桶是一个链表');
+            log('   冲突的键值对放入同一个桶');
+            log('   查找时遍历桶中的链表');
+            log('');
+
+            const smallHT = new HashTable(4);
+            smallHT.set('a', 1); smallHT.set('b', 2);
+            smallHT.set('c', 3); smallHT.set('d', 4);
+            smallHT.set('e', 5); smallHT.set('f', 6);
+
+            const stats = smallHT.stats();
+            log(`   容量: ${stats.capacity}, 元素: ${stats.size}`);
+            log(`   已用桶: ${stats.used}, 最大链长: ${stats.maxChain}`);
+            log(`   平均链长: ${stats.avgChain}`);
+            log('');
+
+            log('2️⃣ 开放地址法 (Open Addressing):');
+            log('   线性探测: index + 1, +2, +3, ...');
+            log('   二次探测: index + 1², +2², +3², ...');
+            log('   双重哈希: 用第二个哈希函数决定步长');
+            log('');
+
+            // 模拟线性探测
+            class LinearProbingHash {
+                constructor(cap = 8) {
+                    this.keys = new Array(cap);
+                    this.values = new Array(cap);
+                    this.cap = cap;
+                    this.size = 0;
+                }
+                _hash(key) { return String(key).length % this.cap; }
+                set(key, value) {
+                    let idx = this._hash(key);
+                    while (this.keys[idx] !== undefined && this.keys[idx] !== key) {
+                        idx = (idx + 1) % this.cap;
+                    }
+                    if (this.keys[idx] === undefined) this.size++;
+                    this.keys[idx] = key;
+                    this.values[idx] = value;
+                }
+                get(key) {
+                    let idx = this._hash(key);
+                    while (this.keys[idx] !== undefined) {
+                        if (this.keys[idx] === key) return this.values[idx];
+                        idx = (idx + 1) % this.cap;
+                    }
+                    return undefined;
+                }
+                display() {
+                    for (let i = 0; i < this.cap; i++) {
+                        log(`      [${i}]: ${this.keys[i] !== undefined ? `${this.keys[i]}:${this.values[i]}` : '空'}`);
+                    }
+                }
+            }
+
+            log('线性探测模拟:');
+            const lp = new LinearProbingHash(8);
+            lp.set('name', 'Alice'); lp.set('age', 25);
+            lp.set('city', 'Beijing'); lp.set('job', 'Engineer');
+            lp.display();
+            log(`   get("city") → ${lp.get('city')}`);
+
+            log('');
+            log('3️⃣ 冲突解决对比:');
+            log('   链地址法: 简单, 无集群, 适合高负载');
+            log('   线性探测: 缓存友好, 有集群问题');
+            log('   二次探测: 减少集群, 但可能找不到空位');
+            log('   双重哈希: 最均匀, 计算开销大');
+        }
+
+        function demoLoadFactor() {
+            result.innerHTML = '';
+            log('📊 负载因子与性能:');
+            log('');
+
+            log('负载因子 = 元素数量 / 桶数量');
+            log('');
+
+            // 性能模拟
+            function testLoadFactor(loadFactor) {
+                const cap = 100;
+                const ht = new HashTable(cap);
+                const count = Math.floor(cap * loadFactor);
+
+                const start = performance.now();
+                for (let i = 0; i < count; i++) ht.set(`key${i}`, i);
+                const insertTime = performance.now() - start;
+
+                const start2 = performance.now();
+                for (let i = 0; i < count; i++) ht.get(`key${i}`);
+                const searchTime = performance.now() - start2;
+
+                const s = ht.stats();
+                return { insertTime, searchTime, maxChain: s.maxChain, avgChain: s.avgChain };
+            }
+
+            const loadFactors = [0.25, 0.5, 0.75, 0.9, 0.99];
+
+            log('不同负载因子性能 (容量=100):');
+            log('');
+            log('负载因子'.padEnd(12) + '插入(ms)'.padEnd(12) + '查询(ms)'.padEnd(12) + '最大链长'.padEnd(12) + '平均链长');
+            loadFactors.forEach(lf => {
+                const r = testLoadFactor(lf);
+                log(`${(lf * 100 + '%').padEnd(12)} ${r.insertTime.toFixed(2)}ms${' '.padEnd(6)} ${r.searchTime.toFixed(2)}ms${' '.padEnd(6)} ${String(r.maxChain).padEnd(12)} ${r.avgChain}`);
+            });
+
+            log('');
+            log('📌 负载因子经验值:');
+            log('   • < 0.5: 空间浪费, 但速度快');
+            log('   • 0.75:  大多数语言默认值 (Java/CPP)');
+            log('   • > 0.9:  空间节约, 但冲突剧增');
+            log('');
+            log('📌 扩容 (Rehashing):');
+            log('   • 当负载因子超过阈值时扩容');
+            log('   • 通常将容量翻倍');
+            log('   • 重新计算所有元素的哈希值');
+            log('   • 均摊时间复杂度 O(1)');
+        }
+
+        console.log('=== 哈希表 ===');
+        document.getElementById('output').textContent = `哈希表: 哈希函数 / 链地址法 / 开放地址 / 负载因子 / 扩容\n✅ 哈希表演示完成！`;
+    </script>
+</body>
+</html>

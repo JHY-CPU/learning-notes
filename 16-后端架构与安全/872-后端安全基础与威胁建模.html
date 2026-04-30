@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>后端安全基础与威胁建模</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔒 后端安全基础与威胁建模</h2><p>安全思维方式、CIA 三元组、STRIDE 威胁建模、OWASP Top 10 2021、认证 vs 授权、最小权限与纵深防御。</p></div>
+    <div class="card">
+        <h2>安全基础概念</h2>
+        <div class="code">// ========== CIA 三元组 ==========
+// Confidentiality (机密性)
+//   - 数据只能被授权方访问
+//   - 加密 (传输 TLS, 存储 AES)
+//   - 访问控制
+
+// Integrity (完整性)
+//   - 数据不被篡改
+//   - 哈希 (SHA-256)
+//   - 数字签名
+//   - 校验和
+
+// Availability (可用性)
+//   - 系统正常运行
+//   - 冗余 / 负载均衡
+//   - DDoS 防护
+//   - 灾备恢复
+
+// ========== 安全原则 ==========
+// 1. 最小权限 (Least Privilege)
+//    只给完成任务所需的最小权限
+//    - 数据库只读账户
+//    - RBAC 最小角色
+//    - 容器非 root
+
+// 2. 纵深防御 (Defense in Depth)
+//    多层安全, 单层失效不影响整体
+//    - WAF → 认证 → 授权 → 输入验证 → 加密 → 审计
+
+// 3. 默认安全 (Secure by Default)
+//    默认配置是安全的
+//    - 默认拒绝
+//    - 显式允许
+
+// 4. 永不信任用户输入
+//    - 验证 / 净化 / 转义
+
+// 5. 安全的失败 (Fail Secure)
+//    出错时默认拒绝访问
+
+// ========== STRIDE 威胁模型 ==========
+// Spoofing      冒充      认证
+// Tampering     篡改      完整性
+// Repudiation   抵赖      不可否认性
+// Information Disclosure 信息泄露 机密性
+// Denial of Service 拒绝服务 可用性
+// Elevation of Privilege 权限提升 授权
+
+// STRIDE 威胁 → 对应的安全属性:
+// Spoofing        → 认证 (Authentication)
+// Tampering       → 完整性 (Integrity)
+// Repudiation     → 不可否认性 (Non-repudiation)
+// Info Disclosure → 机密性 (Confidentiality)
+// DoS             → 可用性 (Availability)
+// Elevation       → 授权 (Authorization)</div>
+    </div>
+    <div class="card">
+        <h2>OWASP Top 10 2021</h2>
+        <div class="code">// ========== OWASP Top 10 (2021) ==========
+// 1. 失效的访问控制 (Broken Access Control)
+//    - 越权漏洞 (IDOR)
+//    - 未授权访问管理员功能
+//    防护: 每次请求检查权限
+
+// 2. 加密失效 (Cryptographic Failures)
+//    - 明文密码/信用卡
+//    - 弱加密算法 (MD5/SHA1)
+//    防护: bcrypt/argon2, TLS 1.3
+
+// 3. 注入 (Injection)
+//    - SQL / NoSQL / OS / LDAP 注入
+//    防护: 参数化查询, 输入验证
+
+// 4. 不安全的设计 (Insecure Design)
+//    - 缺少威胁建模
+//    - 缺少速率限制
+//    防护: 安全设计评审
+
+// 5. 安全配置错误 (Security Misconfiguration)
+//    - 默认密码/目录列表/调试模式
+//    防护: 最小化配置, 自动化扫描
+
+// 6. 易受攻击的组件 (Vulnerable Components)
+//    - 过期的库/框架
+//    防护: 依赖扫描, 定期更新
+
+// 7. 认证与身份验证失败
+//    - 弱密码/暴力破解/Session 固定
+//    防护: MFA, 密码策略, 限流
+
+// 8. 数据完整性失败
+//    - 软件更新未签名
+//    - CI/CD 不安全
+//    防护: 签名验证, SBOM
+
+// 9. 日志与监控不足
+//    - 无法检测攻击
+//    防护: 审计日志, 告警
+
+// 10. SSRF (服务端请求伪造)
+//     - 服务器发起未预期的请求
+//     防护: URL 白名单, 禁止内网</div>
+    </div>
+    <div class="card">
+        <h2>认证 vs 授权</h2>
+        <div class="code">// ========== 认证 (Authentication) ==========
+// 你是谁?
+// 验证用户身份
+
+// 认证方式:
+// 1. 密码 (Password)
+//    - 复杂度要求
+//    - bcrypt/argon2 哈希
+//    - 禁止明文存储
+
+// 2. 多因素认证 (MFA)
+//    - TOTP (Google Authenticator)
+//    - SMS 验证码
+//    - 硬件密钥 (YubiKey)
+//    - 生物识别
+
+// 3. 无密码认证 (Passwordless)
+//    - WebAuthn / FIDO2
+//    - 魔法链接 (Magic Link)
+//    - OAuth 第三方登录
+
+// 4. 单点登录 (SSO)
+//    - SAML / OpenID Connect
+//    - 集中身份管理
+
+// ========== 授权 (Authorization) ==========
+// 你能做什么?
+// 验证用户权限
+
+// 授权模型:
+// 1. RBAC (Role-Based Access Control)
+//    角色 → 权限
+//    admin, editor, viewer
+
+// 2. ABAC (Attribute-Based Access Control)
+//    属性 → 权限
+//    用户属性 + 资源属性 + 环境条件
+
+// 3. ACL (Access Control List)
+//    资源 → 用户权限列表
+
+// 4. PBAC (Policy-Based Access Control)
+//    策略引擎 (如 OPA)
+
+// ========== 认证 vs 授权 对比 ==========
+// 认证: 验证身份 (你是谁)
+// 授权: 验证权限 (你能做什么)
+
+// 认证在前, 授权在后
+// 先登录 (认证), 后检查权限 (授权)
+
+// 中间件顺序:
+// router.Use(AuthMiddleware)       // 1. 认证
+// router.Use(AuthorizationMiddleware) // 2. 授权</div>
+    </div>
+    <div class="card">
+        <h2>最小权限与纵深防御</h2>
+        <div class="code">// ========== 最小权限实践 ==========
+// 操作系统:
+//   - 非 root 运行应用
+//   - 专用用户 (appuser)
+
+// 数据库:
+//   - 只读账户 (SELECT)
+//   - 读写账户 (SELECT/INSERT/UPDATE)
+//   - DDL 单独权限 (迁移用)
+
+// 文件系统:
+//   - 可执行文件: 755
+//   - 配置文件: 640
+//   - 密钥文件: 600
+
+// 网络:
+//   - 只开放必要端口
+//   - 内部服务不暴露公网
+//   - 网络隔离 (VPC/防火墙)
+
+// API:
+//   - 每个端点最小权限
+//   - 禁止全局 admin 账号共享
+
+// ========== 纵深防御层次 ==========
+// 层级 1: 网络层
+//   - 防火墙 / WAF / DDoS 防护
+//   - VPN / VPC 隔离
+
+// 层级 2: 传输层
+//   - TLS 1.3
+//   - HSTS / 证书固定
+
+// 层级 3: 应用层
+//   - 认证 / 授权 / 限流
+//   - 输入验证 / 参数化查询
+//   - CSRF 保护 / CORS
+
+// 层级 4: 数据层
+//   - 加密存储 (AES-256)
+//   - 备份加密
+//   - 访问审计
+
+// 层级 5: 监控层
+//   - 审计日志
+//   - 入侵检测 (IDS)
+//   - 异常告警
+
+// ========== 安全开发流程 ==========
+// 1. 设计阶段: 威胁建模 (STRIDE)
+// 2. 开发阶段: 安全编码规范
+// 3. 测试阶段: SAST/DAST 扫描, 渗透测试
+// 4. 部署阶段: 镜像扫描, 配置审计
+// 5. 运维阶段: 监控, 事件响应</div>
+        <div class="note">💡 安全要点: CIA (机密性/完整性/可用性); STRIDE 威胁建模; OWASP Top 10 (访问控制/加密/注入/配置/组件); 认证 (你是谁) vs 授权 (你能做什么); 最小权限 (非 root/只读账户/端口最小); 纵深防御 5 层 (网络→传输→应用→数据→监控); bcrypt 哈希密码; 参数化查询防注入; 安全开发生命周期。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCIA()">CIA 三元组</button>
+        <button onclick="demoOWASP()">OWASP Top 10</button>
+        <button onclick="demoDefense()">纵深防御</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCIA() {
+            result.innerHTML = '';
+            log('# CIA 三元组');
+            log('');
+            log('Confidentiality 机密性');
+            log('  加密 + 访问控制');
+            log('');
+            log('Integrity 完整性');
+            log('  哈希 + 数字签名');
+            log('');
+            log('Availability 可用性');
+            log('  冗余 + 负载均衡');
+            log('');
+            log('原则:');
+            log('  最小权限 / 纵深防御');
+            log('  默认安全 / 永不信任输入');
+        }
+
+        function demoOWASP() {
+            result.innerHTML = '';
+            log('# OWASP Top 10 2021');
+            log('');
+            log('1.  失效的访问控制');
+            log('2.  加密失效');
+            log('3.  注入攻击');
+            log('4.  不安全的设计');
+            log('5.  安全配置错误');
+            log('6.  易受攻击的组件');
+            log('7.  认证失败');
+            log('8.  数据完整性失败');
+            log('9.  日志与监控不足');
+            log('10. SSRF');
+        }
+
+        function demoDefense() {
+            result.innerHTML = '';
+            log('# 纵深防御');
+            log('');
+            log('Layer 1: 网络层');
+            log('  防火墙 / WAF / DDoS');
+            log('');
+            log('Layer 2: 传输层');
+            log('  TLS 1.3 / HSTS');
+            log('');
+            log('Layer 3: 应用层');
+            log('  认证 / 授权 / 限流');
+            log('');
+            log('Layer 4: 数据层');
+            log('  AES-256 / 审计');
+            log('');
+            log('Layer 5: 监控层');
+            log('  日志 / IDS / 告警');
+        }
+    </script>
+</body>
+</html>

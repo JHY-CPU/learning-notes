@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>83-数据结构的并发安全 (Concurrent Safety)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Concurrent Safety</h2>
+  <div class="code">多线程环境下操作数据结构需要保证并发安全，常见方法有锁、CAS、无锁数据结构。</div>
+  <pre>// 使用锁的线程安全队列（概念示例）
+class ConcurrentQueue {
+  constructor() { this.items = []; this.locked = false; }
+  async enqueue(x) {
+    while (this.locked) await new Promise(r => setTimeout(r, 1));
+    this.locked = true;
+    this.items.push(x);
+    this.locked = false;
+  }
+  async dequeue() {
+    while (this.locked) await new Promise(r => setTimeout(r, 1));
+    this.locked = true;
+    const val = this.items.shift();
+    this.locked = false;
+    return val;
+  }
+}
+console.log('并发安全队列（使用自旋锁概念）');</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  document.getElementById('result').textContent =
+    `并发安全策略:\n1. 互斥锁 - 简单但可能阻塞\n2. 读写锁 - 读多写少优化\n3. CAS无锁 - ABA问题\n4. 细粒度锁 - 分段锁\n5. 函数式持久化 - 天然线程安全`;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>常用工具函数库</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>常用工具函数库</h2><p>debounce/throttle/clone/type/format/深拷贝/事件总线等封装。</p></div>
+    <div class="card">
+        <h2>工具函数集</h2>
+        <div class="code">// ========== 类型检测 ==========
+function type(v) {
+    return Object.prototype.toString.call(v).slice(8, -1).toLowerCase();
+}
+
+// ========== 深拷贝 ==========
+function deepClone(obj, map = new WeakMap()) {
+    if (obj === null || typeof obj !== 'object') return obj;
+    if (map.has(obj)) return map.get(obj);
+    const result = Array.isArray(obj) ? [] : {};
+    map.set(obj, result);
+    for (const key of Object.keys(obj)) {
+        result[key] = deepClone(obj[key], map);
+    }
+    return result;
+}
+
+// ========== 防抖 ==========
+function debounce(fn, delay, leading = false) {
+    let timer = null;
+    return function (...args) {
+        if (leading && !timer) fn.apply(this, args);
+        clearTimeout(timer);
+        timer = setTimeout(() => {
+            if (!leading) fn.apply(this, args);
+            timer = null;
+        }, delay);
+    };
+}
+
+// ========== 节流 ==========
+function throttle(fn, interval) {
+    let last = 0;
+    return function (...args) {
+        const now = Date.now();
+        if (now - last >= interval) {
+            last = now;
+            fn.apply(this, args);
+        }
+    };
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：工具函数</h2>
+        <button onclick="demoType()">类型检测</button>
+        <button onclick="demoClone()">深拷贝</button>
+        <button onclick="demoEventBus()">事件总线</button>
+        <button onclick="demoFormat()">格式化工具</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        // ========== 工具函数库 ==========
+        const Utils = {
+            // 类型检测
+            type(v) { return Object.prototype.toString.call(v).slice(8, -1).toLowerCase(); },
+            isString(v) { return typeof v === 'string'; },
+            isNumber(v) { return typeof v === 'number' && !isNaN(v); },
+            isArray(v) { return Array.isArray(v); },
+            isObject(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); },
+            isFunction(v) { return typeof v === 'function'; },
+            isEmpty(v) {
+                if (v == null) return true;
+                if (typeof v === 'string' || Array.isArray(v)) return v.length === 0;
+                if (typeof v === 'object') return Object.keys(v).length === 0;
+                return false;
+            },
+
+            // 深拷贝
+            deepClone(obj, map = new WeakMap()) {
+                if (obj === null || typeof obj !== 'object') return obj;
+                if (map.has(obj)) return map.get(obj);
+                const result = Array.isArray(obj) ? [] : {};
+                map.set(obj, result);
+                for (const key of Object.keys(obj)) result[key] = Utils.deepClone(obj[key], map);
+                // 拷贝 Symbol 属性
+                for (const sym of Object.getOwnPropertySymbols(obj)) result[sym] = Utils.deepClone(obj[sym], map);
+                return result;
+            },
+
+            // 防抖
+            debounce(fn, delay, leading = false) {
+                let timer = null;
+                return function (...args) {
+                    if (leading && !timer) fn.apply(this, args);
+                    clearTimeout(timer);
+                    timer = setTimeout(() => {
+                        if (!leading) fn.apply(this, args);
+                        timer = null;
+                    }, delay);
+                };
+            },
+
+            // 节流
+            throttle(fn, interval) {
+                let last = 0;
+                return function (...args) {
+                    const now = Date.now();
+                    if (now - last >= interval) { last = now; fn.apply(this, args); }
+                };
+            },
+
+            // 深合并
+            deepMerge(target, ...sources) {
+                if (!sources.length) return target;
+                const source = sources.shift();
+                if (Utils.isObject(target) && Utils.isObject(source)) {
+                    for (const key of Object.keys(source)) {
+                        if (Utils.isObject(source[key])) {
+                            if (!target[key]) target[key] = {};
+                            Utils.deepMerge(target[key], source[key]);
+                        } else {
+                            target[key] = source[key];
+                        }
+                    }
+                }
+                return Utils.deepMerge(target, ...sources);
+            },
+
+            // 节流 (带 trailing)
+            throttleTrailing(fn, delay) {
+                let timer, lastArgs;
+                return function (...args) {
+                    lastArgs = args;
+                    if (!timer) {
+                        fn.apply(this, args);
+                        timer = setTimeout(() => {
+                            if (lastArgs !== args) fn.apply(this, lastArgs);
+                            timer = null;
+                        }, delay);
+                    }
+                };
+            },
+
+            // 事件总线
+            createEventBus() {
+                const events = {};
+                return {
+                    on(event, cb) {
+                        if (!events[event]) events[event] = [];
+                        events[event].push(cb);
+                        return () => this.off(event, cb);
+                    },
+                    off(event, cb) {
+                        if (!events[event]) return;
+                        events[event] = events[event].filter(c => c !== cb);
+                    },
+                    emit(event, ...args) {
+                        if (!events[event]) return;
+                        events[event].forEach(cb => cb(...args));
+                    },
+                    once(event, cb) {
+                        const wrapper = (...args) => { cb(...args); this.off(event, wrapper); };
+                        this.on(event, wrapper);
+                    },
+                    clear() { Object.keys(events).forEach(k => delete events[k]); }
+                };
+            },
+
+            // 千分位
+            formatNumber(n) {
+                return n.toLocaleString('zh-CN');
+            },
+
+            // 截断字符串
+            truncate(str, maxLen, suffix = '...') {
+                if (str.length <= maxLen) return str;
+                return str.slice(0, maxLen) + suffix;
+            },
+
+            // 驼峰转连字符
+            camelToKebab(str) {
+                return str.replace(/([A-Z])/g, '-$1').toLowerCase();
+            },
+
+            // 连字符转驼峰
+            kebabToCamel(str) {
+                return str.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+            },
+
+            // 生成唯一 ID
+            uid() {
+                return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+            },
+
+            // 睡眠
+            sleep(ms) { return new Promise(resolve => setTimeout(resolve, ms)); },
+
+            // 重试
+            async retry(fn, maxRetries = 3, delay = 1000) {
+                for (let i = 0; i < maxRetries; i++) {
+                    try { return await fn(); }
+                    catch (err) {
+                        if (i === maxRetries - 1) throw err;
+                        await Utils.sleep(delay * Math.pow(2, i));
+                    }
+                }
+            },
+
+            // 管道
+            pipe(...fns) { return x => fns.reduce((v, fn) => fn(v), x); },
+
+            // 组合
+            compose(...fns) { return x => fns.reduceRight((v, fn) => fn(v), x); },
+        };
+
+        function demoType() {
+            result.innerHTML = '';
+            log('📋 类型检测:');
+            log('');
+
+            const tests = [
+                42, 'hello', true, null, undefined,
+                [1, 2, 3], { a: 1 }, new Date(), /test/,
+                new Map(), new Set(), function() {},
+            ];
+
+            log('值'.padEnd(22) + 'type()'.padEnd(16) + '判断');
+            log('-'.repeat(50));
+            tests.forEach(v => {
+                const t = Utils.type(v);
+                let checks = '';
+                if (Utils.isString(v)) checks = 'isString';
+                else if (Utils.isNumber(v)) checks = 'isNumber';
+                else if (Utils.isArray(v)) checks = 'isArray';
+                else if (Utils.isObject(v)) checks = 'isObject';
+                else if (Utils.isFunction(v)) checks = 'isFunction';
+                else if (Utils.isEmpty(v)) checks = 'isEmpty';
+                log(`   ${String(v).padEnd(20)} ${t.padEnd(16)} ${checks}`);
+            });
+
+            log('');
+            log('📌 typeof 陷阱:');
+            log('   typeof null → "object" ❌');
+            log('   typeof [] → "object" ❌');
+            log('   Object.toString → 正确 ✅');
+        }
+
+        function demoClone() {
+            result.innerHTML = '';
+            log('📦 深拷贝与合并:');
+            log('');
+
+            const original = {
+                name: 'Alice',
+                age: 25,
+                hobbies: ['reading', 'coding'],
+                address: { city: 'Beijing', zip: '100000' },
+                nested: { a: { b: { c: 'deep' } } },
+            };
+
+            log('1️⃣ 深拷贝:');
+            const cloned = Utils.deepClone(original);
+            cloned.name = 'Bob';
+            cloned.hobbies.push('swimming');
+            cloned.address.city = 'Shanghai';
+
+            log(`   原始: ${JSON.stringify(original, null, 2)}`);
+            log(`   克隆: ${JSON.stringify(cloned, null, 2)}`);
+            log(`   修改克隆不影响原始 ✅`);
+            log('');
+
+            log('2️⃣ 循环引用:');
+            const cyclic = { name: 'cyclic' };
+            cyclic.self = cyclic;
+            const cyclicClone = Utils.deepClone(cyclic);
+            log(`   循环引用克隆: ${cyclicClone.name} (self=${cyclicClone.self === cyclicClone ? '✓ 正确' : '✗ 错误'})`);
+            log('');
+
+            log('3️⃣ 深合并:');
+            const target = { a: 1, b: { c: 2, d: 3 } };
+            const source = { b: { c: 4, e: 5 }, f: 6 };
+            Utils.deepMerge(target, source);
+            log(`   合并: ${JSON.stringify(target)}`);
+            log('');
+
+            log('4️⃣ 浅拷贝 vs 深拷贝:');
+            log('   浅拷贝: Object.assign, 展开运算符 ...');
+            log('   深拷贝: JSON.parse(JSON.stringify(obj)) 有陷阱');
+            log('   • 不支持函数/undefined/Symbol');
+            log('   • 不支持循环引用');
+            log('   • Date → 字符串, RegExp → {}');
+        }
+
+        function demoEventBus() {
+            result.innerHTML = '';
+            log('🔌 事件总线 (Event Bus):');
+            log('');
+
+            const bus = Utils.createEventBus();
+
+            log('1️⃣ 注册事件:');
+            const unsub1 = bus.on('user:login', (name) => {
+                log(`   [事件1] 用户登录: ${name}`);
+            });
+            bus.on('user:login', (name) => {
+                log(`   [事件2] 登录时间: ${new Date().toLocaleTimeString()}`);
+            });
+            bus.on('user:logout', (name) => {
+                log(`   [事件] 用户登出: ${name}`);
+            });
+            bus.once('app:init', (ver) => {
+                log(`   [once] 应用初始化 v${ver} (只触发一次)`);
+            });
+            log('');
+
+            log('2️⃣ 触发事件:');
+            log('   触发 user:login("Alice"):');
+            bus.emit('user:login', 'Alice');
+
+            log('');
+            log('   触发 app:init("1.0.0"):');
+            bus.emit('app:init', '1.0.0');
+            log('   再次触发 app:init:');
+            bus.emit('app:init', '2.0.0'); // 不会触发 (once)
+
+            log('');
+            log('3️⃣ 取消订阅:');
+            log('   取消事件1, 再次触发:');
+            unsub1();
+            bus.emit('user:login', 'Bob');
+
+            log('');
+            log('4️⃣ 清空事件:');
+            bus.clear();
+            log('   清空后触发 user:logout:');
+            bus.emit('user:logout', 'Alice');
+
+            log('');
+            log('📌 事件总线应用:');
+            log('   • 跨组件通信');
+            log('   • 解耦发布者和订阅者');
+            log('   • Vue $on/$emit 原理');
+        }
+
+        function demoFormat() {
+            result.innerHTML = '';
+            log('🛠️ 格式化与实用工具:');
+            log('');
+
+            log('1️⃣ 字符串工具:');
+            log(`   truncate("Hello World", 5) → "${Utils.truncate('Hello World', 5)}"`);
+            log(`   camelToKebab("helloWorld") → "${Utils.camelToKebab('helloWorld')}"`);
+            log(`   kebabToCamel("hello-world") → "${Utils.kebabToCamel('hello-world')}"`);
+            log('');
+
+            log('2️⃣ 唯一 ID:');
+            for (let i = 0; i < 3; i++) log(`   uid() → ${Utils.uid()}`);
+            log('');
+
+            log('3️⃣ 管道组合:');
+            const add1 = x => x + 1;
+            const double = x => x * 2;
+            const square = x => x * x;
+            const pipeline = Utils.pipe(add1, double, square);
+            log(`   pipe(add1, double, square)(3) → ${pipeline(3)}`);
+            log('');
+
+            log('4️⃣ 睡眠与重试:');
+            log(`   sleep(100) → 等待 100ms`);
+            log(`   retry(fn, 3, 1000) → 失败重试 (带指数退避)`);
+            log('');
+
+            log('5️⃣ 空值检测:');
+            const empties = [null, undefined, '', [], {}, 0];
+            empties.forEach(v => {
+                log(`   isEmpty(${JSON.stringify(v)}) → ${Utils.isEmpty(v)}`);
+            });
+
+            log('');
+            log('6️⃣ 数字格式化:');
+            log(`   formatNumber(1234567.89) → "${Utils.formatNumber(1234567.89)}"`);
+        }
+
+        console.log('=== 常用工具函数库 ===');
+        document.getElementById('output').textContent = `工具函数: 类型检测 / 深拷贝 / 防抖节流 / 事件总线 / 格式化\n✅ 工具函数库演示完成！`;
+    </script>
+</body>
+</html>

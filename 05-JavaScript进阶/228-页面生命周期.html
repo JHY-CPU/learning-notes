@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>页面生命周期</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        #lifecycle-log { background: #1e1e1e; color: #d4d4d4; padding: 10px; border-radius: 4px; font-size: 12px; max-height: 200px; overflow-y: auto; font-family: monospace; }
+        #state-indicator { padding: 15px; border-radius: 8px; text-align: center; font-size: 18px; font-weight: bold; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>页面生命周期</h2><p>页面从加载到卸载的完整生命周期事件。</p></div>
+    <div class="card">
+        <h2>生命周期阶段</h2>
+        <div class="code">// 各阶段的转换：
+// 加载 → active（活跃） ↔ passive（不可见） ↔ frozen（冻结） → terminated（终止）
+//
+// active:    页面可见，用户可交互
+// passive:   页面不可见（切换标签/最小化），但可能仍在运行
+// frozen:    页面资源被冻结（移动端 Safari / 后台标签）
+// terminated: 页面被关闭或导航离开
+
+// 关键事件：
+document.addEventListener('readystatechange', () => {
+    document.readyState;
+    // 'loading' → 'interactive' → 'complete'
+});
+
+window.addEventListener('DOMContentLoaded', () => {
+    // HTML 解析完成，DOM 可用
+});
+
+window.addEventListener('load', () => {
+    // 所有资源（图片/样式）加载完成
+});
+
+document.addEventListener('visibilitychange', () => {
+    document.visibilityState;  // 'visible' | 'hidden'
+    document.hidden;           // true/false
+});
+
+window.addEventListener('beforeunload', (e) => {
+    // 用户即将离开页面（可阻止）
+    e.preventDefault();
+    e.returnValue = '';
+});
+
+window.addEventListener('unload', () => {
+    // 页面正在卸载（可以做最后的数据保存）
+    // ⚠️ 只能做同步操作（async 不保证执行）
+});
+
+// 页面冻结/恢复（Safari / Chrome 后台）
+document.addEventListener('freeze', () => { });
+document.addEventListener('resume', () => { });
+
+// 页面往返缓存（bfcache）
+window.addEventListener('pageshow', (e) => {
+    if (e.persisted) console.log('从 bfcache 恢复');
+});
+window.addEventListener('pagehide', (e) => {
+    if (e.persisted) console.log('页面被存入 bfcache');
+});</div>
+        <div class="note">💡 visibilitychange 是推荐的事件：可以暂停/恢复视频、动画、WebSocket。<br>
+        ⚠️ beforeunload 大部分浏览器已忽略自定义消息。<br>
+        💡 bfcache (Back-Forward Cache) 使页面可以在返回时瞬间恢复。</div>
+    </div>
+    <div class="card">
+        <h2>实时状态</h2>
+        <div id="state-indicator" style="background:#d5f5e3;color:#27ae60;">🟢 active</div>
+        <div id="lifecycle-log">事件日志：<br></div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const indicator = document.getElementById('state-indicator');
+        const log = document.getElementById('lifecycle-log');
+        let eventCount = 0;
+
+        function logEvent(eventName, detail = '') {
+            eventCount++;
+            const time = new Date().toLocaleTimeString();
+            const msg = `[${time}] ${eventName} ${detail}`;
+            log.innerHTML += `${msg}<br>`;
+            log.scrollTop = log.scrollHeight;
+            if (eventCount > 30) {
+                log.innerHTML = log.innerHTML.split('<br>').slice(-20).join('<br>');
+                eventCount = 20;
+            }
+            console.log(msg);
+        }
+
+        function updateState() {
+            if (document.hidden) {
+                indicator.textContent = '🟡 hidden（页面不可见）';
+                indicator.style.background = '#fef9e7';
+                indicator.style.color = '#f39c12';
+            } else {
+                indicator.textContent = '🟢 visible（页面可见）';
+                indicator.style.background = '#d5f5e3';
+                indicator.style.color = '#27ae60';
+            }
+        }
+
+        // 初始化
+        logEvent('页面加载', `readyState: ${document.readyState}`);
+
+        // DOM ready
+        document.addEventListener('DOMContentLoaded', () => {
+            logEvent('DOMContentLoaded');
+        });
+
+        // 页面加载完成
+        window.addEventListener('load', () => {
+            logEvent('load', '所有资源加载完成');
+        });
+
+        // 可见性变化
+        document.addEventListener('visibilitychange', () => {
+            logEvent('visibilitychange', document.hidden ? '→ hidden' : '→ visible');
+            updateState();
+        });
+
+        // beforeunload
+        window.addEventListener('beforeunload', (e) => {
+            logEvent('beforeunload', '用户正在离开页面');
+            // 注意：不调用 e.preventDefault() 大多数浏览器也不会弹窗了
+        });
+
+        // unload
+        window.addEventListener('unload', () => {
+            // 注意：这里不能做异步操作
+            logEvent('unload', '页面正在卸载');
+        });
+
+        // pageshow / pagehide (bfcache)
+        window.addEventListener('pageshow', (e) => {
+            if (e.persisted) {
+                logEvent('pageshow', '🔄 从 bfcache 恢复');
+                updateState();
+            }
+        });
+        window.addEventListener('pagehide', (e) => {
+            logEvent('pagehide', e.persisted ? '存入 bfcache' : '正常卸载');
+        });
+
+        // readystatechange
+        document.addEventListener('readystatechange', () => {
+            logEvent('readystatechange', `→ ${document.readyState}`);
+        });
+
+        updateState();
+        logEvent('生命周期监听已启动');
+
+        // 键盘快捷键提示
+        logEvent('💡 试试切换标签页/最小化窗口观察状态变化');
+
+        console.log('=== 页面生命周期 ===');
+        console.log('当前 readyState:', document.readyState);
+        console.log('hidden:', document.hidden);
+        console.log('visibilityState:', document.visibilityState);
+
+        document.getElementById('output').textContent =
+            `页面生命周期: load/DOMContentLoaded/beforeunload/unload\n` +
+            `visibilitychange/pageshow/pagehide/readystatechange\n` +
+            `生命周期: active → passive → frozen → terminated\n` +
+            `✅ 页面生命周期演示完成！`;
+    </script>
+</body>
+</html>

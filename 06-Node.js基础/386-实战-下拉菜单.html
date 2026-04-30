@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实战-下拉菜单</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; max-width: 500px; margin: 0 auto; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        /* Dropdown 基础样式 */
+        .dropdown { position: relative; display: inline-block; }
+        .dropdown-trigger { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-size: 14px; }
+        .dropdown-trigger:hover { opacity: 0.9; }
+        .dropdown-trigger::after { content: ' ▾'; font-size: 10px; }
+        .dropdown-menu { display: none; position: absolute; top: 100%; left: 0; min-width: 180px; background: white; border: 1px solid #e0e0e0; border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); z-index: 100; margin-top: 4px; padding: 4px 0; animation: dropIn 0.15s ease; }
+        .dropdown-menu.open { display: block; }
+        .dropdown-menu a { display: block; padding: 8px 16px; color: #2c3e50; text-decoration: none; font-size: 13px; cursor: pointer; transition: background 0.15s; }
+        .dropdown-menu a:hover { background: #f0f4f8; color: #3498db; }
+        .dropdown-menu a.disabled { color: #bbb; cursor: not-allowed; pointer-events: none; }
+        .dropdown-divider { height: 1px; background: #e0e0e0; margin: 4px 0; }
+        .dropdown-header { padding: 6px 16px; font-size: 11px; color: #95a5a6; text-transform: uppercase; letter-spacing: 0.5px; }
+        /* 分层菜单 (nested) */
+        .dropdown-submenu { position: relative; }
+        .dropdown-submenu > a::after { content: ' ▸'; float: right; color: #95a5a6; }
+        .dropdown-submenu .dropdown-menu { left: 100%; top: -4px; margin-left: 2px; display: none; }
+        .dropdown-submenu:hover > .dropdown-menu { display: block; }
+        /* 点击外部关闭 */
+        /* hover 触发 */
+        .dropdown-hover:hover .dropdown-menu { display: block; }
+        /* 模式切换 */
+        .controls { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; flex-wrap: wrap; }
+        .controls button { padding: 6px 14px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-size: 12px; }
+        .controls button:hover { opacity: 0.9; }
+        .controls button.active { background: #2c3e50; }
+        /* demo 行 */
+        .demo-row { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; margin: 16px 0; padding: 16px; background: #f8f9fa; border-radius: 8px; min-height: 200px; }
+        /* 右侧弹出 */
+        .dropdown-menu.right { left: auto; right: 0; }
+        /* 动画 */
+        @keyframes dropIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>📂 下拉菜单</h2>
+        <p style="color:#7f8c8d;font-size:13px;">Dropdown 菜单、hover/click 触发、分层菜单、点击外部关闭。</p>
+        <div class="controls">
+            <button onclick="setMode('click')" class="active" id="modeClick">Click 模式</button>
+            <button onclick="setMode('hover')" id="modeHover">Hover 模式</button>
+            <button onclick="toggleAll()">展开/折叠全部</button>
+        </div>
+        <div class="demo-row" id="demoRow">
+            <!-- Dropdown 1: 基础菜单 -->
+            <div class="dropdown" id="dropdown1" data-dropdown>
+                <button class="dropdown-trigger" onclick="toggleDropdown(this)">文件</button>
+                <div class="dropdown-menu">
+                    <a onclick="log('📄 新建文件')">📄 新建</a>
+                    <a onclick="log('📂 打开文件')">📂 打开</a>
+                    <a onclick="log('💾 保存文件')">💾 保存</a>
+                    <a onclick="log('🖨️ 打印')">🖨️ 打印</a>
+                    <div class="dropdown-divider"></div>
+                    <a onclick="log('❌ 退出')">❌ 退出</a>
+                </div>
+            </div>
+            <!-- Dropdown 2: 带禁用项 -->
+            <div class="dropdown" id="dropdown2" data-dropdown>
+                <button class="dropdown-trigger" onclick="toggleDropdown(this)">编辑</button>
+                <div class="dropdown-menu">
+                    <a onclick="log('↩️ 撤销')">↩️ 撤销</a>
+                    <a onclick="log('↪️ 重做')">↪️ 重做</a>
+                    <div class="dropdown-divider"></div>
+                    <a onclick="log('✂️ 剪切')">✂️ 剪切</a>
+                    <a onclick="log('📋 复制')">📋 复制</a>
+                    <a onclick="log('📋 粘贴')">📋 粘贴</a>
+                    <a class="disabled">🔒 粘贴为纯文本</a>
+                </div>
+            </div>
+            <!-- Dropdown 3: 分层菜单 -->
+            <div class="dropdown" id="dropdown3" data-dropdown>
+                <button class="dropdown-trigger" onclick="toggleDropdown(this)">视图</button>
+                <div class="dropdown-menu">
+                    <a onclick="log('🔍 放大')">🔍 放大</a>
+                    <a onclick="log('🔍 缩小')">🔍 缩小</a>
+                    <a onclick="log('🔍 重置缩放')">🔍 重置缩放</a>
+                    <div class="dropdown-divider"></div>
+                    <div class="dropdown-submenu">
+                        <a>面板 ▸</a>
+                        <div class="dropdown-menu">
+                            <a onclick="log('📋 侧边栏')">📋 侧边栏</a>
+                            <a onclick="log('📋 输出面板')">📋 输出面板</a>
+                            <a onclick="log('📋 调试控制台')">📋 调试控制台</a>
+                            <a onclick="log('📋 终端')">📋 终端</a>
+                        </div>
+                    </div>
+                    <div class="dropdown-submenu">
+                        <a>主题 ▸</a>
+                        <div class="dropdown-menu">
+                            <a onclick="log('🎨 浅色主题')">🎨 浅色主题</a>
+                            <a onclick="log('🎨 深色主题')">🎨 深色主题</a>
+                            <a onclick="log('🎨 高对比度')">🎨 高对比度</a>
+                        </div>
+                    </div>
+                    <div class="dropdown-divider"></div>
+                    <a onclick="log('⛶ 全屏')">⛶ 全屏</a>
+                </div>
+            </div>
+            <!-- Dropdown 4: 右侧对齐 -->
+            <div class="dropdown" id="dropdown4" data-dropdown>
+                <button class="dropdown-trigger" onclick="toggleDropdown(this)">👤 用户</button>
+                <div class="dropdown-menu right">
+                    <div class="dropdown-header">账号</div>
+                    <a onclick="log('👤 个人资料')">👤 个人资料</a>
+                    <a onclick="log('⚙️ 设置')">⚙️ 设置</a>
+                    <div class="dropdown-divider"></div>
+                    <a onclick="log('🚪 退出登录')" style="color:#e74c3c;">🚪 退出登录</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('📂 下拉菜单演示:');
+        log('');
+
+        let currentMode = 'click'; // 'click' | 'hover'
+
+        // ========== Click 模式 ==========
+        function toggleDropdown(trigger) {
+            if (currentMode === 'hover') return;
+            const menu = trigger.nextElementSibling;
+            const isOpen = menu.classList.contains('open');
+            // 关闭其他
+            document.querySelectorAll('.dropdown-menu.open').forEach(m => {
+                if (m !== menu) m.classList.remove('open');
+            });
+            menu.classList.toggle('open');
+            log(isOpen ? '🔽 关闭菜单' : '🔼 打开菜单');
+        }
+
+        // ========== 点击外部关闭 ==========
+        document.addEventListener('click', (e) => {
+            const dropdown = e.target.closest('[data-dropdown]');
+            if (!dropdown) {
+                document.querySelectorAll('.dropdown-menu.open').forEach(m => m.classList.remove('open'));
+            }
+        });
+
+        // ========== ESC 关闭 ==========
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.dropdown-menu.open').forEach(m => {
+                    m.classList.remove('open');
+                    log('⌨️ ESC 关闭菜单');
+                });
+            }
+        });
+
+        // ========== Hover 模式 ==========
+        function setMode(mode) {
+            currentMode = mode;
+            document.getElementById('modeClick').classList.toggle('active', mode === 'click');
+            document.getElementById('modeHover').classList.toggle('active', mode === 'hover');
+            // 关闭所有
+            document.querySelectorAll('.dropdown-menu.open').forEach(m => m.classList.remove('open'));
+
+            document.querySelectorAll('[data-dropdown]').forEach(dd => {
+                if (mode === 'hover') {
+                    dd.classList.add('dropdown-hover');
+                    // hover 打开时记录
+                    dd.addEventListener('mouseenter', () => log('🔼 Hover 打开菜单'));
+                    dd.addEventListener('mouseleave', () => log('🔽 Hover 关闭菜单'));
+                } else {
+                    dd.classList.remove('dropdown-hover');
+                }
+            });
+            log(`🔄 切换为: ${mode === 'click' ? 'Click 模式' : 'Hover 模式'}`);
+        }
+
+        // ========== 展开/折叠全部 ==========
+        function toggleAll() {
+            const menus = document.querySelectorAll('.dropdown-menu');
+            const anyOpen = Array.from(menus).some(m => m.classList.contains('open'));
+            menus.forEach(m => m.classList.toggle('open', !anyOpen));
+            log(anyOpen ? '📂 折叠全部' : '📂 展开全部');
+        }
+
+        // ========== 阻止分层菜单点击关闭 ==========
+        document.querySelectorAll('.dropdown-submenu').forEach(sub => {
+            sub.addEventListener('click', (e) => e.stopPropagation());
+        });
+
+        log('✅ 下拉菜单就绪 (支持 Click/Hover 模式切换)');
+    </script>
+</body>
+</html>

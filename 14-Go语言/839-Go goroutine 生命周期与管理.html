@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go goroutine 生命周期与管理</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔄 Go goroutine 生命周期与管理</h2><p>goroutine 状态模型、调度器 GMP 模型、goroutine 泄漏预防、优雅退出模式、panic 传播与 recover、GOMAXPROCS 控制。</p></div>
+    <div class="card">
+        <h2>GMP 调度模型</h2>
+        <div class="code">// ========== GMP 调度模型 ==========
+// Go 调度器管理 goroutine 的生命周期
+//
+// G (Goroutine): 协程, 包含栈/指令指针/状态
+// M (Machine):    OS 线程, 执行 Go 代码
+// P (Processor):  逻辑处理器, 本地 G 队列
+//
+// 调度流程:
+// 1. G 在 P 的本地队列等待
+// 2. M 从 P 获取 G 执行
+// 3. G 阻塞时 (syscall), M 和 P 解绑
+// 4. P 从全局队列或 other P 偷取 G (work stealing)
+
+// GOMAXPROCS 控制同时可执行的 P 数量
+// 默认 = CPU 核心数
+
+func gomaxprocs() {
+    // 查看/设置
+    fmt.Println(runtime.GOMAXPROCS(0))  // 当前值
+
+    // 设置: runtime.GOMAXPROCS(8)
+    // - IO 密集型: 可大于 CPU 核心数
+    // - CPU 密集型: = CPU 核心数通常最优
+    // - 注意: 不是上限, 是并行度
+}
+
+// ========== goroutine 状态 ==========
+// goroutine 生命周期:
+// 创建 (Goroutine) → 可运行 (Runnable) → 运行中 (Running)
+// → 阻塞 (Waiting: chan/syscall/lock) → 可运行 → ... → 结束 (Dead)
+
+// == 创建 vs 运行 ==
+// go func() 创建成功: goroutine 进入可运行队列
+// 实际开始执行: 取决于调度器
+
+// ========== goroutine 栈 ==========
+// 初始栈: 2KB (可动态增长)
+// 最大栈: 1GB (64位)
+// 对比 OS 线程栈: 默认 8MB (1MB Mac)
+
+func stackInfo() {
+    // 查看当前 goroutine 数量
+    fmt.Println(runtime.NumGoroutine())
+
+    // 查看栈信息
+    buf := make([]byte, 1024)
+    n := runtime.Stack(buf, false)  // false = 仅当前
+    fmt.Println(string(buf[:n]))
+}
+
+// ========== goroutine 退出 ==========
+// goroutine 在以下情况退出:
+// 1. 函数返回
+// 2. 调用 runtime.Goexit()
+// 3. main 函数返回 (所有 goroutine 强制终止)
+
+func goroutineExit() {
+    go func() {
+        defer fmt.Println("goroutine 退出")
+        fmt.Println("工作...")
+        // 函数结束后 goroutine 退出
+    }()
+
+    go func() {
+        defer fmt.Println("Goexit 触发 defer")
+        runtime.Goexit()  // 优雅退出 goroutine (运行 defer)
+        fmt.Println("这行不会执行")
+    }()
+    time.Sleep(time.Millisecond)
+}</div>
+    </div>
+    <div class="card">
+        <h2>goroutine 泄漏</h2>
+        <div class="code">// ========== goroutine 泄漏 ==========
+// goroutine 启动后永远无法退出 → 内存泄漏
+
+// ❌ 泄漏模式 1: channel 发送阻塞, 无接收者
+func leakSend() {
+    ch := make(chan int)
+    go func() {
+        ch <- 42  // 永远阻塞! 没有人接收
+        fmt.Println("不会执行")
+    }()
+    // goroutine 永不会退出
+}
+
+// ❌ 泄漏模式 2: 从 channel 接收, 无发送者
+func leakRecv() {
+    ch := make(chan int)
+    go func() {
+        <-ch  // 永远阻塞! 没有人发送
+    }()
+}
+
+// ❌ 泄漏模式 3: 忘记关闭 channel, range 不退出
+func leakRange() {
+    ch := make(chan int)
+    go func() {
+        for v := range ch {  // ch 永不关闭
+            fmt.Println(v)
+        }
+    }()
+    ch <- 1
+    // 未 close(ch), goroutine 永远等待
+}
+
+// ❌ 泄漏模式 4: select 阻塞
+func leakSelect() {
+    done := make(chan struct{})
+    go func() {
+        select {
+        case <-done:
+        // 没有 default, 没有超时, done 永不关闭
+        }
+    }()
+}
+
+// ❌ 泄漏模式 5: ticker 未停止
+func leakTicker() {
+    ticker := time.NewTicker(time.Second)
+    go func() {
+        for range ticker.C {  // 永远循环
+            fmt.Println("tick")
+        }
+    }()
+    // 没有 ticker.Stop()
+}
+
+// ========== 防止泄漏 ==========
+// ✅ 方案 1: 使用 context 控制生命周期
+func safeGoroutine(ctx context.Context) {
+    go func() {
+        for {
+            select {
+            case <-ctx.Done():
+                fmt.Println("退出")
+                return
+            default:
+                // 工作...
+            }
+        }
+    }()
+}
+
+// ✅ 方案 2: done channel 模式
+func safeDone() {
+    done := make(chan struct{})
+    ch := make(chan int)
+
+    go func() {
+        defer fmt.Println("goroutine 退出")
+        for {
+            select {
+            case v := <-ch:
+                fmt.Println(v)
+            case <-done:
+                return
+            }
+        }
+    }()
+
+    ch <- 1
+    close(done)  // 通知 goroutine 退出
+    time.Sleep(time.Millisecond)
+}
+
+// ✅ 方案 3: 超时保护
+func safeTimeout() {
+    ch := make(chan int)
+    go func() {
+        select {
+        case ch <- result():
+        case <-time.After(5 * time.Second):
+            fmt.Println("超时, goroutine 放弃")
+        }
+    }()
+}
+
+// ✅ 方案 4: ticker 正确停止
+func safeTicker() {
+    ticker := time.NewTicker(time.Second)
+    done := make(chan struct{})
+
+    go func() {
+        defer ticker.Stop()
+        for {
+            select {
+            case <-ticker.C:
+                fmt.Println("tick")
+            case <-done:
+                fmt.Println("停止")
+                return
+            }
+        }
+    }()
+
+    time.Sleep(3 * time.Second)
+    close(done)
+}</div>
+    </div>
+    <div class="card">
+        <h2>panic 与 recover</h2>
+        <div class="code">// ========== goroutine 中的 panic ==========
+// 未 recover 的 panic 会使整个进程崩溃!
+
+// ❌ 一个 goroutine panic 导致整个程序退出
+func panicCrashesAll() {
+    go func() {
+        panic("出错!")  // 整个程序退出
+    }()
+    time.Sleep(time.Second)
+    fmt.Println("不可达")  // 不会执行
+}
+
+// ✅ 每个 goroutine 独立 recover
+func safePanic() {
+    go func() {
+        defer func() {
+            if r := recover(); r != nil {
+                fmt.Println("goroutine 恢复:", r)
+            }
+        }()
+        // 可能 panic 的代码
+        panic("出错了")
+    }()
+    time.Sleep(time.Millisecond)
+    fmt.Println("主 goroutine 继续")  // 正常执行
+}
+
+// ========== goroutine 池管理 ==========
+// 控制 goroutine 数量, 防止资源耗尽
+
+type GoPool struct {
+    sem chan struct{}    // 信号量
+    wg  sync.WaitGroup
+}
+
+func NewGoPool(maxSize int) *GoPool {
+    return &GoPool{
+        sem: make(chan struct{}, maxSize),
+    }
+}
+
+func (p *GoPool) Go(fn func()) {
+    p.sem <- struct{}{}  // 获取令牌 (满则阻塞)
+    p.wg.Add(1)
+
+    go func() {
+        defer func() {
+            <-p.sem   // 释放令牌
+            p.wg.Done()
+        }()
+        fn()
+    }()
+}
+
+func (p *GoPool) Wait() {
+    p.wg.Wait()
+}
+
+// 使用:
+// pool := NewGoPool(10)
+// for i := 0; i < 100; i++ {
+//     pool.Go(func() {
+//         fmt.Println("work")
+//     })
+// }
+// pool.Wait()
+
+// ========== 追踪 goroutine ==========
+// 使用 runtime.NumGoroutine 检测泄漏
+
+func detectLeak() {
+    before := runtime.NumGoroutine()
+    // 执行可能泄漏的代码...
+    after := runtime.NumGoroutine()
+
+    if after > before {
+        fmt.Printf("可能的 goroutine 泄漏: %d -> %d\n",
+            before, after)
+    }
+}
+
+// 生产环境: pprof 分析
+// import _ "net/http/pprof"
+// 访问 /debug/pprof/goroutine</div>
+        <div class="note">💡 goroutine 管理要点: GMP 模型 (Goroutine/Machine/Processor), P 数量由 GOMAXPROCS 控制; 初始栈 2KB 动态增长; goroutine 泄漏 5 种模式 (chan 发送/接收阻塞、range 未 close、select 阻塞、ticker 未停); ctx.Done()/done channel/超时 防止泄漏; goroutine 的 panic 会崩溃整个进程, 每个 goroutine 需独立 recover; goroutine 池用信号量限制并发; runtime.NumGoroutine() 检测泄漏; pprof 生产分析。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoGMP()">GMP 模型</button>
+        <button onclick="demoLeak()">泄漏检测</button>
+        <button onclick="demoPool()">Goroutine 池</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoGMP() {
+            result.innerHTML = '';
+            log('# GMP 调度模型');
+            log('');
+            log('G (Goroutine) — 协程, 轻量级线程');
+            log('M (Machine)   — OS 线程');
+            log('P (Processor) — 逻辑处理器');
+            log('');
+            log('调度策略:');
+            log('  work stealing: P 从其他 P 偷 G');
+            log('  syscall 阻塞: M+P 解绑');
+            log('');
+            log('GOMAXPROCS:');
+            log('  默认 = CPU 核心数');
+            log('  IO 密集型可 > CPU 核心数');
+        }
+
+        function demoLeak() {
+            result.innerHTML = '';
+            log('# goroutine 泄漏模式');
+            log('');
+            log('泄漏 = goroutine 永远无法退出');
+            log('');
+            log('5 种泄漏:');
+            log('  1. chan 发送, 无接收');
+            log('  2. chan 接收, 无发送');
+            log('  3. range chan, 未 close');
+            log('  4. select 全阻塞, 无 default');
+            log('  5. Ticker/C.Timer 未 Stop');
+            log('');
+            log('预防: context, done channel, 超时');
+            log('检测: runtime.NumGoroutine()');
+        }
+
+        function demoPool() {
+            result.innerHTML = '';
+            log('# Goroutine 池');
+            log('');
+            log('type GoPool struct {');
+            log('  sem chan struct{}  // 信号量');
+            log('  wg  sync.WaitGroup');
+            log('}');
+            log('');
+            log('pool := NewGoPool(10)');
+            log('for i := 0; i < 100; i++ {');
+            log('  pool.Go(func() {');
+            log('    fmt.Println("work")');
+            log('  })');
+            log('}');
+            log('pool.Wait()');
+            log('');
+            log('信号量 (buffered chan) = 限制并发');
+            log('WaitGroup = 等待完成');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>25-指数查找 (Exponential Search)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; white-space: pre-wrap; }
+</style></head>
+<body>
+<div class="card">
+  <h2>指数查找 (Exponential Search)</h2>
+  <p>指数查找先通过指数增长的方式快速缩小查找范围，然后在确定的区间内执行二分查找。</p>
+  <div class="note">
+    <strong>时间复杂度：</strong>O(log n)。特别适合<strong>无界数据</strong>（如无限流）或目标靠近数组开头的情况。
+  </div>
+</div>
+
+<div class="card">
+  <h2>算法步骤</h2>
+  <ol>
+    <li>从下标 1 开始，以指数增长（i = 1, 2, 4, 8, 16...）检查 arr[i]</li>
+    <li>如果 arr[i] > target 或超出数组范围，则找到区间 [i/2, min(i, n-1)]</li>
+    <li>在该区间内执行二分查找</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h2>代码实现</h2>
+  <pre>function exponentialSearch(arr, target) {
+  const n = arr.length;
+  if (arr[0] === target) return 0;
+
+  let i = 1;
+  while (i < n && arr[i] <= target) {
+    i *= 2;
+  }
+
+  // 在 [i/2, min(i, n-1)] 区间进行二分查找
+  return binarySearch(arr, target, Math.floor(i / 2), Math.min(i, n - 1));
+}
+
+function binarySearch(arr, target, left, right) {
+  while (left <= right) {
+    const mid = Math.floor((left + right) / 2);
+    if (arr[mid] === target) return mid;
+    if (arr[mid] < target) left = mid + 1;
+    else right = mid - 1;
+  }
+  return -1;
+}</pre>
+</div>
+
+<div class="card">
+  <h2>交互演示</h2>
+  <button onclick="runExponentialSearch()">运行指数查找</button>
+  <div id="result"></div>
+</div>
+
+<script>
+function exponentialSearch(arr, target) {
+  const n = arr.length;
+  if (arr[0] === target) return { index: 0, steps: ['arr[0]=' + arr[0] + ' 就是目标!'] };
+
+  let i = 1;
+  const steps = [];
+
+  while (i < n && arr[i] <= target) {
+    steps.push('指数扩大: i=' + i + ', arr[' + i + ']=' + arr[i] + ' ≤ ' + target);
+    i *= 2;
+  }
+
+  const left = Math.floor(i / 2);
+  const right = Math.min(i, n - 1);
+  steps.push('确定区间: [' + left + ', ' + right + ']，值范围 [' + arr[left] + ', ' + arr[right] + ']');
+
+  // 二分查找
+  let l = left, r = right;
+  while (l <= r) {
+    const mid = Math.floor((l + r) / 2);
+    steps.push('二分: mid=' + mid + ', arr[' + mid + ']=' + arr[mid]);
+    if (arr[mid] === target) {
+      steps.push('找到目标 ' + target + ' 在位置 ' + mid);
+      return { index: mid, steps };
+    }
+    if (arr[mid] < target) {
+      steps.push(arr[mid] + ' < ' + target + '，向右查找');
+      l = mid + 1;
+    } else {
+      steps.push(arr[mid] + ' > ' + target + '，向左查找');
+      r = mid - 1;
+    }
+  }
+  steps.push('未找到目标 ' + target);
+  return { index: -1, steps };
+}
+
+function runExponentialSearch() {
+  const arr = Array.from({length: 20}, (_, i) => i * 4 + Math.floor(Math.random() * 3));
+  arr.sort((a, b) => a - b);
+  const target = arr[Math.floor(Math.random() * arr.length)];
+
+  const result = exponentialSearch(arr, target);
+  const el = document.getElementById('result');
+
+  let html = '<strong>有序数组：</strong>[' + arr.join(', ') + ']<br>';
+  html += '<strong>查找目标：</strong>' + target + '<br><br>';
+  html += '<strong>查找过程：</strong><br>';
+  html += result.steps.map(s => '&emsp;' + s).join('<br>');
+  html += '<br><br><strong>查找结果：</strong>' +
+    (result.index !== -1 ? '下标 ' + result.index + '，值 ' + arr[result.index] : '未找到');
+
+  document.getElementById('result').innerHTML = html;
+}
+</script>
+</body></html>

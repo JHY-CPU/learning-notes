@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IndexedDB基础</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #idb-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>IndexedDB 基础</h2><p>浏览器本地数据库，支持结构化数据存储和索引。</p></div>
+    <div class="card">
+        <h2>基本操作</h2>
+        <div class="code">// 1. 打开数据库
+const request = indexedDB.open('MyDB', 1); // 数据库名, 版本号
+
+request.onupgradeneeded = (event) => {
+    // 数据库创建或版本升级时调用
+    const db = event.target.result;
+    const store = db.createObjectStore('users', {
+        keyPath: 'id',           // 主键字段
+        autoIncrement: false,    // 是否自增
+    });
+    // 创建索引
+    store.createIndex('email', 'email', { unique: true });
+    store.createIndex('name', 'name', { unique: false });
+};
+
+request.onsuccess = (event) => {
+    const db = event.target.result;
+    // 操作数据库
+};
+
+request.onerror = (event) => {
+    console.error('数据库打开失败:', event.target.error);
+};
+
+// 2. 增删改查（在事务中进行）
+const tx = db.transaction('users', 'readwrite'); // 'readonly' | 'readwrite'
+const store = tx.objectStore('users');
+
+// 增
+store.add({ id: 1, name: 'Alice', email: 'alice@test.com' });
+
+// 删
+store.delete(1);
+
+// 改
+store.put({ id: 1, name: 'Alice Updated', email: 'alice@test.com' });
+
+// 查（单个）
+const getRequest = store.get(1);
+getRequest.onsuccess = () => console.log(getRequest.result);
+
+// 查（所有）
+const allRequest = store.getAll();
+allRequest.onsuccess = () => console.log(allRequest.result);
+
+// 事务结束
+tx.oncomplete = () => console.log('事务完成');
+tx.onerror = () => console.error('事务出错');
+
+// 3. 关闭数据库
+db.close();</div>
+        <div class="note">💡 IndexedDB 是异步的，不会阻塞主线程。<br>
+        ⚠️ 大部分操作基于事件回调（不是 Promise），需要封装。<br>
+        ⚠️ 部分浏览器隐私模式下不可用。<br>
+        💡 每个源（origin）的存储空间独立，通常没有大小限制（根据磁盘空间）。</div>
+    </div>
+    <div class="card">
+        <h2>封装为 Promise</h2>
+        <div class="code">// 封装简化 IndexedDB 操作
+class DB {
+    constructor(dbName, version = 1) {
+        this.dbName = dbName;
+        this.version = version;
+    }
+    async open(upgradeFn) {
+        return new Promise((resolve, reject) => {
+            const req = indexedDB.open(this.dbName, this.version);
+            req.onupgradeneeded = (e) => upgradeFn?.(e.target.result);
+            req.onsuccess = (e) => { this.instance = e.target.result; resolve(this.instance); };
+            req.onerror = (e) => reject(e.target.error);
+        });
+    }
+    async get(storeName, key) { /* ... */ }
+    async set(storeName, value) { /* ... */ }
+    async delete(storeName, key) { /* ... */ }
+    async getAll(storeName) { /* ... */ }
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：IndexedDB CRUD</h2>
+        <button onclick="demoIDB()">初始化并写入数据</button>
+        <button onclick="readData()">读取数据</button>
+        <div id="idb-result">点击按钮操作 IndexedDB</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const idbResult = document.getElementById('idb-result');
+        let db = null;
+
+        function log(msg) {
+            idbResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        async function initDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open('DemoDB', 1);
+                req.onupgradeneeded = (e) => {
+                    const d = e.target.result;
+                    if (!d.objectStoreNames.contains('notes')) {
+                        const store = d.createObjectStore('notes', { keyPath: 'id', autoIncrement: true });
+                        store.createIndex('title', 'title', { unique: false });
+                    }
+                    log('📦 数据库/对象仓库已创建');
+                };
+                req.onsuccess = (e) => { db = e.target.result; resolve(db); };
+                req.onerror = (e) => reject(e.target.error);
+            });
+        }
+
+        async function demoIDB() {
+            idbResult.innerHTML = '';
+            try {
+                await initDB();
+                log('✅ 数据库已打开');
+
+                // 写入数据
+                const tx = db.transaction('notes', 'readwrite');
+                const store = tx.objectStore('notes');
+
+                store.add({ title: '学习 IndexedDB', content: '这是一个笔记', tags: ['js', 'db'] });
+                store.add({ title: '购物清单', content: '牛奶、面包、水果' });
+                store.add({ title: '工作计划', content: '完成项目报告' });
+
+                tx.oncomplete = () => log('✅ 3 条笔记已写入');
+                tx.onerror = (e) => log(`❌ 写入失败: ${e.target.error}`);
+            } catch (err) {
+                log(`❌ 错误: ${err.message}`);
+            }
+        }
+
+        async function readData() {
+            idbResult.innerHTML = '';
+            if (!db) {
+                try { await initDB(); } catch (err) { log(`❌ ${err.message}`); return; }
+            }
+
+            const tx = db.transaction('notes', 'readonly');
+            const store = tx.objectStore('notes');
+            const req = store.getAll();
+
+            req.onsuccess = () => {
+                const data = req.result;
+                if (data.length === 0) {
+                    log('📭 没有数据，请先点击"初始化并写入数据"');
+                } else {
+                    log(`📋 共 ${data.length} 条笔记:`);
+                    data.forEach(n => log(`  #${n.id} ${n.title} — ${n.content.substring(0, 20)}`));
+                }
+            };
+            req.onerror = (e) => log(`❌ 读取失败: ${e.target.error}`);
+        }
+
+        console.log('=== IndexedDB 基础 ===');
+        console.log('IndexedDB 支持:', !!indexedDB);
+
+        document.getElementById('output').textContent =
+            `IndexedDB: 浏览器本地数据库\n` +
+            `indexedDB.open() → onupgradeneeded → createObjectStore\n` +
+            `事务: transaction('store', 'readwrite') → add/get/put/delete\n` +
+            `✅ IndexedDB 基础演示完成！\n` +
+            `⚠️ 部分浏览器隐私模式下不可用`;
+    </script>
+</body>
+</html>

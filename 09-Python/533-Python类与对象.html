@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python类与对象</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🏛️ Python 类与对象</h2><p>class 定义、__init__ 构造方法与 self、实例变量 vs 类变量、实例方法/类方法/静态方法、@classmethod/@staticmethod、dunder 属性。</p></div>
+    <div class="card">
+        <h2>类的基础</h2>
+        <div class="code">// ========== 定义类 ==========
+// class 关键字定义类
+// __init__ 是构造方法,创建对象时自动调用
+
+class Student:
+    """学生类"""
+
+    # 类变量 (所有实例共享)
+    school = "Python 大学"
+
+    def __init__(self, name, age):
+        """初始化方法,创建实例时自动调用"""
+        self.name = name       # 实例变量
+        self.age = age
+
+    def introduce(self):       # 实例方法
+        return f"我叫{self.name}, 今年{self.age}岁"
+
+// 创建实例:
+alice = Student("Alice", 20)
+bob = Student("Bob", 22)
+
+print(alice.name)              # Alice
+print(alice.introduce())       # 我叫Alice, 今年20岁
+
+// ========== self 是什么? ==========
+// self 就是实例本身
+// Python 调用方法时自动传入实例作为第一个参数
+
+alice.introduce()
+// 等价于:
+Student.introduce(alice)       # 手动传 self
+
+// self 只是约定名称,可以叫别的
+// 但强烈建议用 self!
+
+// ========== __init__ 详解 ==========
+// __init__ 不是真正的构造器
+// 真正的构造是 __new__ (稍后讲)
+// __init__ 用于初始化实例属性
+
+class Point:
+    def __init__(self, x=0, y=0):  # 可以有默认参数
+        self.x = x
+        self.y = y
+        # __init__ 不能 return 非 None 值
+
+p = Point()                  # 使用默认值
+print(p.x, p.y)              # 0 0
+
+p = Point(3, 4)              # 传参
+print(p.x, p.y)              # 3 4</div>
+    </div>
+    <div class="card">
+        <h2>实例变量 vs 类变量</h2>
+        <div class="code">// ========== 类变量 ==========
+// 定义在类中,方法外的变量
+// 所有实例共享
+
+class Dog:
+    species = "Canine"       # 类变量
+    count = 0                # 用于计数
+
+    def __init__(self, name):
+        self.name = name     # 实例变量
+        Dog.count += 1       # 每创建一个实例+1
+
+print(Dog.species)           # Canine
+print(Dog.count)             # 0
+
+d1 = Dog("Buddy")
+d2 = Dog("Max")
+print(Dog.count)             # 2 (两个实例)
+
+// ========== 变量查找顺序 ==========
+// 先找实例变量,再找类变量
+
+class Cat:
+    species = "Feline"
+    def __init__(self, name):
+        self.name = name
+
+c = Cat("Kitty")
+print(c.name)                # Kitty (实例变量)
+print(c.species)             # Feline (类变量)
+
+c.species = "特殊猫"         # 创建了实例变量,遮蔽类变量!
+print(c.species)             # 特殊猫
+print(Cat.species)           # Feline (类变量不变)
+
+// ========== 注意事项 ==========
+// 类变量用可变对象要小心!
+
+class BadExample:
+    items = []               # ❌ 类变量,所有实例共享
+
+a = BadExample()
+b = BadExample()
+a.items.append("x")
+print(b.items)               # ["x"] 被影响!
+
+// ✅ 应该用实例变量:
+class GoodExample:
+    def __init__(self):
+        self.items = []      # 每个实例独立
+
+a = GoodExample()
+b = GoodExample()
+a.items.append("x")
+print(b.items)               # [] 不受影响</div>
+    </div>
+    <div class="card">
+        <h2>实例/类/静态方法</h2>
+        <div class="code">// ========== 三种方法对比 ==========
+class MyClass:
+    # 1. 实例方法
+    def instance_method(self):
+        """需要 self,可以访问实例和类"""
+        return f"实例方法: {self}"
+
+    # 2. 类方法
+    @classmethod
+    def class_method(cls):
+        """需要 cls,只能访问类,不能访问实例"""
+        return f"类方法: {cls}"
+
+    # 3. 静态方法
+    @staticmethod
+    def static_method():
+        """不需要 self/cls,就是一个普通函数"""
+        return "静态方法"
+
+obj = MyClass()
+print(obj.instance_method())  # 实例方法: ...
+print(obj.class_method())     # 类方法: &lt;class 'MyClass'&gt;
+print(obj.static_method())    # 静态方法
+
+// ========== @classmethod 用途 ==========
+// 1. 工厂方法: 用不同方式创建实例
+class Person:
+    def __init__(self, name, age):
+        self.name = name
+        self.age = age
+
+    @classmethod
+    def from_birth_year(cls, name, birth_year):
+        """用出生年份创建 Person"""
+        age = 2026 - birth_year
+        return cls(name, age)   # 用 cls() 创建实例
+
+    @classmethod
+    def from_string(cls, data):
+        """从 "name,age" 字符串创建"""
+        name, age = data.split(",")
+        return cls(name.strip(), int(age))
+
+p1 = Person.from_birth_year("Alice", 2000)
+p2 = Person.from_string("Bob, 25")
+
+print(p1.age)                 # 26
+print(p2.name)                # Bob
+
+// 2. 访问类变量
+class Config:
+    settings = {"debug": True}
+
+    @classmethod
+    def is_debug(cls):
+        return cls.settings.get("debug")
+
+// ========== @staticmethod 用途 ==========
+// 工具函数,与类相关但不需要访问类或实例
+class MathUtils:
+    @staticmethod
+    def is_even(n):
+        return n % 2 == 0
+
+    @staticmethod
+    def validate_age(age):
+        return 0 <= age <= 150
+
+print(MathUtils.is_even(4))   # True
+print(MathUtils.validate_age(200))  # False</div>
+    </div>
+    <div class="card">
+        <h2>dunder 属性与特殊方法</h2>
+        <div class="code">// ========== 类的内置属性 ==========
+class Example:
+    """示例类"""
+    x = 10
+    def __init__(self):
+        self.y = 20
+
+obj = Example()
+
+print(Example.__name__)       # "Example"
+print(Example.__doc__)        # "示例类"
+print(Example.__module__)     # "__main__" (或模块名)
+print(Example.__dict__)       # 类的属性字典
+print(obj.__dict__)           # 实例的属性字典 {"y": 20}
+print(obj.__class__)          # &lt;class 'Example'&gt;
+
+// ========== __dict__ 详解 ==========
+// 类和实例都有 __dict__,存储属性和方法
+
+class User:
+    role = "user"             # 存在 User.__dict__
+
+    def __init__(self, name):
+        self.name = name      # 存在实例.__dict__
+
+u = User("Alice")
+
+# 实例属性:
+print(u.__dict__)             # {"name": "Alice"}
+
+# 类属性:
+print(User.__dict__)
+# {"__module__": "__main__", "role": "user", "__init__": &lt;func&gt;, ...}
+
+// ========== type() 和 isinstance() ==========
+print(type(u))                # &lt;class 'User'&gt;
+print(type(u) is User)        # True
+print(isinstance(u, User))    # True
+
+// type() 检查精确类型
+// isinstance() 检查继承关系 (更常用)</div>
+        <div class="note">💡 类与对象要点: (1) class 定义类,__init__ 初始化实例; (2) self 是实例本身,Python 自动传入; (3) 类变量所有实例共享,实例变量各自独立; (4) @classmethod 传 cls 用于工厂方法,@staticmethod 是普通工具函数; (5) __dict__ 存储属性和方法,isinstance 比 type 更灵活。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoClass()">类与对象演示</button>
+        <button onclick="demoMethods()">方法类型演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoClass() {
+            result.innerHTML = '';
+            log('# 类与对象演示');
+            log('');
+            log('class Student:');
+            log('    school = "Python大学"  # 类变量');
+            log('    def __init__(self, name):');
+            log('        self.name = name   # 实例变量');
+            log('');
+            log('s = Student("Alice")');
+            log('s.name → Alice');
+            log('s.school → Python大学');
+            log('');
+            log('self 是实例本身');
+            log('Python 自动将实例传给第一个参数');
+        }
+
+        function demoMethods() {
+            result.innerHTML = '';
+            log('# 三种方法演示');
+            log('');
+            log('实例方法:');
+            log('  def method(self):');
+            log('    return self.x');
+            log('');
+            log('类方法 @classmethod:');
+            log('  @classmethod');
+            log('  def from_string(cls, data):');
+            log('    return cls(*data.split())');
+            log('  用途: 工厂方法、访问类变量');
+            log('');
+            log('静态方法 @staticmethod:');
+            log('  @staticmethod');
+            log('  def is_even(n):');
+            log('    return n % 2 == 0');
+            log('  用途: 工具函数,与类相关');
+            log('');
+            log('传参区别:');
+            log('  实例方法: 自动传 self');
+            log('  类方法:   自动传 cls');
+            log('  静态方法: 什么都不传');
+        }
+    </script>
+</body>
+</html>

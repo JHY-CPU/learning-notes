@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java NIO 与文件操作</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📁 Java NIO 与文件操作</h2><p>Path/Paths/Files 核心 API、readAllLines/walk/find、Files 创建/复制/移动/删除、BufferedReader/BufferedWriter、Scanner、标准流 System.in/out/err。</p></div>
+    <div class="card">
+        <h2>Path 与 Files</h2>
+        <div class="code">// ========== NIO.2 (Java 7+) ==========
+// java.nio.file 包: Path, Files, FileSystem
+// 替代旧的 java.io.File, 更强大易用
+
+import java.io.*;
+import java.nio.file.*;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+
+public class NIODemo {
+
+    public static void main(String[] args) throws IOException {
+        // ========== Path (不可变路径) ==========
+        Path path = Path.of("C:/test/example.txt");   // Java 11+
+        Path path2 = Paths.get("C:/test/example.txt"); // Java 7+
+
+        // 路径操作
+        System.out.println(path.getFileName());       // "example.txt"
+        System.out.println(path.getParent());         // "C:/test"
+        System.out.println(path.getRoot());           // "C:"
+        System.out.println(path.getName(0));          // "test"
+        System.out.println(path.getNameCount());      // 2
+
+        // 路径组合
+        Path dir = Path.of("C:/test");
+        Path file = dir.resolve("subdir/file.txt");   // C:/test/subdir/file.txt
+        Path sibling = dir.resolveSibling("other.txt"); // C:/other.txt
+
+        // 相对化
+        Path p1 = Path.of("C:/a/b/c");
+        Path p2 = Path.of("C:/a/d/e");
+        System.out.println(p1.relativize(p2));  // "../../d/e"
+
+        // ========== Files 工具类 ==========
+        // 读取所有行
+        List<String> lines = Files.readAllLines(
+            Path.of("input.txt"), StandardCharsets.UTF_8
+        );
+
+        // 读取全部文本
+        String content = Files.readString(
+            Path.of("input.txt")  // Java 11+
+        );
+
+        // 写入
+        Files.writeString(Path.of("output.txt"), "Hello, NIO!");  // Java 11+
+        Files.write(Path.of("lines.txt"), List.of("a", "b", "c"));
+
+        // 复制
+        Files.copy(Path.of("src.txt"), Path.of("dst.txt"),
+            StandardCopyOption.REPLACE_EXISTING);
+
+        // 移动/重命名
+        Files.move(Path.of("old.txt"), Path.of("new.txt"),
+            StandardCopyOption.ATOMIC_MOVE);
+
+        // 删除
+        Files.delete(Path.of("trash.txt"));       // 不存在抛异常
+        Files.deleteIfExists(Path.of("maybe.txt")); // 安全删除
+
+        // 创建目录
+        Files.createDirectory(Path.of("newdir"));
+        Files.createDirectories(Path.of("a/b/c/d"));  // 多级
+
+        // 属性
+        System.out.println(Files.size(path));
+        System.out.println(Files.exists(path));
+        System.out.println(Files.isDirectory(path));
+        System.out.println(Files.isRegularFile(path));
+        System.out.println(Files.getLastModifiedTime(path));
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>文件遍历与目录操作</h2>
+        <div class="code">// ========== 目录遍历 ==========
+
+public class FileWalk {
+    public static void main(String[] args) throws IOException {
+        Path dir = Path.of("C:/project/src");
+
+        // ========== list: 列出目录 (1层) ==========
+        try (Stream<Path> stream = Files.list(dir)) {
+            stream.forEach(System.out::println);
+        }
+
+        // ========== walk: 递归遍历 (深度) ==========
+        try (Stream<Path> stream = Files.walk(dir, 3)) {  // 深度 3
+            stream
+                .filter(p -> p.toString().endsWith(".java"))
+                .forEach(System.out::println);
+        }
+
+        // ========== find: 查找文件 ==========
+        try (Stream<Path> stream = Files.find(
+                dir, Integer.MAX_VALUE,
+                (path, attrs) -> attrs.isRegularFile()
+                    && path.toString().endsWith(".java"))) {
+            stream.forEach(System.out::println);
+        }
+
+        // ========== 传统 File 遍历 ==========
+        File file = new File("C:/project");
+        File[] files = file.listFiles((dir1, name) ->
+            name.endsWith(".java"));  // 过滤
+
+        // 递归遍历 (File 方式)
+        listFiles(file, 0);
+    }
+
+    static void listFiles(File dir, int depth) {
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        for (File f : files) {
+            String indent = "  ".repeat(depth);
+            System.out.println(indent + f.getName());
+            if (f.isDirectory()) {
+                listFiles(f, depth + 1);
+            }
+        }
+    }
+}
+
+// ========== BufferedReader / BufferedWriter ==========
+class BufferedRW {
+    public static void main(String[] args) throws IOException {
+        // ========== BufferedReader (读文本, 按行) ==========
+        try (BufferedReader reader = Files.newBufferedReader(
+                Path.of("input.txt"), StandardCharsets.UTF_8)) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                System.out.println(line);
+            }
+        }
+
+        // 简便: Files.newBufferedReader(path) → BufferedReader
+        // 简便: Files.newBufferedWriter(path) → BufferedWriter
+
+        // ========== BufferedWriter (写文本) ==========
+        try (BufferedWriter writer = Files.newBufferedWriter(
+                Path.of("output.txt"), StandardCharsets.UTF_8)) {
+            writer.write("Line 1");
+            writer.newLine();
+            writer.write("Line 2");
+        }
+    }
+}
+
+// ========== 临时文件 ==========
+class TempFile {
+    public static void main(String[] args) throws IOException {
+        // 创建临时文件
+        Path temp = Files.createTempFile("prefix-", ".tmp");
+        System.out.println(temp);  // C:/Users/.../prefix-123456789.tmp
+
+        Path tempDir = Files.createTempDirectory("app-");
+        // 程序退出后自动清理 (或手动 delete)
+        Files.deleteIfExists(temp);
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>Scanner 与标准流</h2>
+        <div class="code">// ========== Scanner ==========
+// 灵活解析文本/输入
+
+import java.util.Scanner;
+
+public class ScannerDemo {
+    public static void main(String[] args) throws Exception {
+        // ========== 从文件读取 ==========
+        try (Scanner sc = new Scanner(Path.of("data.txt"))) {
+            while (sc.hasNextLine()) {
+                String line = sc.nextLine();
+                System.out.println(line);
+            }
+        }
+
+        // ========== 按分隔符解析 ==========
+        String data = "Alice 25 85.5 Bob 30 92.0";
+        try (Scanner sc = new Scanner(data)) {
+            while (sc.hasNext()) {
+                String name = sc.next();
+                int age = sc.nextInt();
+                double score = sc.nextDouble();
+                System.out.printf("%s (%d): %.1f%n", name, age, score);
+            }
+        }
+
+        // ========== 设置分隔符 ==========
+        Scanner sc = new Scanner("a,b,c,d");
+        sc.useDelimiter(",");
+        while (sc.hasNext()) {
+            System.out.println(sc.next());
+        }
+
+        // ========== System.in (控制台输入) ==========
+        try (Scanner console = new Scanner(System.in)) {
+            System.out.print("Enter name: ");
+            String name = console.nextLine();
+            System.out.print("Enter age: ");
+            int age = console.nextInt();
+            System.out.println("Hello, " + name + " (" + age + ")");
+        }
+    }
+}
+
+// ========== 标准流 ==========
+// System.in:  标准输入 (InputStream)
+// System.out: 标准输出 (PrintStream)
+// System.err: 标准错误 (PrintStream)
+
+class StandardStreams {
+    public static void main(String[] args) throws IOException {
+        // System.in 读取
+        BufferedReader reader = new BufferedReader(
+            new InputStreamReader(System.in)
+        );
+        String line = reader.readLine();
+
+        // System.out 输出
+        System.out.println("Normal output");
+        System.out.printf("Formatted: %s%n", "value");
+
+        // System.err 错误
+        System.err.println("Error message");
+
+        // 重定向
+        // java Main < input.txt > output.txt 2> error.txt
+
+        // ========== 读取资源文件 (classpath) ==========
+        // 使用 ClassLoader 获取资源
+        InputStream is = StandardStreams.class
+            .getClassLoader()
+            .getResourceAsStream("config.properties");
+        if (is != null) {
+            Properties props = new Properties();
+            props.load(is);
+        }
+    }
+}
+
+// ========== 文件操作总结 ==========
+// 文件很小 → Files.readString() / Files.readAllLines()
+// 按行处理 → BufferedReader / Files.newBufferedReader()
+// 二进制 → Files.readAllBytes() / InputStream
+// 遍历 → Files.list() / Files.walk() / Files.find()
+// 需要随机访问 → RandomAccessFile / SeekableByteChannel
+// 需要监控 → WatchService (文件变化监听)</div>
+        <div class="note">💡 NIO 要点: Path + Files 替代 File; readString/writeString (Java 11+) 极简文件读写; Files.walk 递归遍历; BufferedReader 按行读取; Scanner 灵活解析; System.in/out/err 标准流; Files.list/walk/find 目录遍历; createTempFile/Directory 临时文件; NIO.2 比 java.io.File 更安全易用。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoNIO()">Path/Files</button>
+        <button onclick="demoWalk()">目录遍历</button>
+        <button onclick="demoScan()">Scanner</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoNIO() {
+            result.innerHTML = '';
+            log('# Path & Files (NIO.2)');
+            log('');
+            log('Path path = Path.of("C:/test/a.txt");');
+            log('');
+            log('Files.readString(path)        // 读全部');
+            log('Files.writeString(path, str)  // 写全部');
+            log('Files.readAllLines(path)      // 读行');
+            log('Files.copy(src, dest)         // 复制');
+            log('Files.move(src, dest)         // 移动');
+            log('Files.delete(path)            // 删除');
+            log('Files.walk(dir)               // 遍历');
+        }
+
+        function demoWalk() {
+            result.innerHTML = '';
+            log('# 目录遍历');
+            log('');
+            log('// 列出 1 层');
+            log('Files.list(dir).forEach(...)');
+            log('');
+            log('// 递归遍历');
+            log('Files.walk(dir, maxDepth)');
+            log('  .filter(p -> p.endsWith(".java"))');
+            log('');
+            log('// 查找');
+            log('Files.find(dir, depth, matcher)');
+        }
+
+        function demoScan() {
+            result.innerHTML = '';
+            log('# Scanner');
+            log('');
+            log('Scanner sc = new Scanner(System.in);');
+            log('sc.nextLine();     // 读一行');
+            log('sc.nextInt();      // 读整数');
+            log('sc.nextDouble();   // 读浮点');
+            log('sc.useDelimiter(","); // 分隔符');
+            log('');
+            log('从文件:');
+            log('  new Scanner(Path.of("file.txt"))');
+        }
+    </script>
+</body>
+</html>

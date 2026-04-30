@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>滚动操作</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #2ecc71; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        .scroll-area { background: #ecf0f1; border: 2px solid #bdc3c7; border-radius: 8px; padding: 10px; width: 100%; height: 200px; overflow: auto; margin: 10px 0; }
+        .scroll-area .content { height: 800px; padding: 10px; }
+        .scroll-area .section { padding: 30px; margin: 10px 0; background: #3498db; color: white; border-radius: 8px; text-align: center; font-size: 18px; }
+        .scroll-area .section:nth-child(2n) { background: #2ecc71; }
+        .scroll-area .section:nth-child(3n) { background: #e67e22; }
+        #scroll-info { font-size: 13px; color: #7f8c8d; margin: 5px 0; }
+        .progress-bar { height: 4px; background: #ecf0f1; border-radius: 2px; margin: 5px 0; }
+        .progress-bar .fill { height: 100%; background: #2ecc71; border-radius: 2px; width: 0%; transition: width 0.1s; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>滚动操作</h2><p>scrollTo / scrollBy / scrollIntoView / 滚动事件与优化。</p></div>
+    <div class="card">
+        <h2>窗口滚动方法</h2>
+        <div class="code">// window.scrollTo — 滚动到指定位置
+window.scrollTo(x, y);            // 绝对坐标
+window.scrollTo({                 // 选项对象
+    top: 0,
+    left: 0,
+    behavior: 'smooth'            // 'auto' | 'smooth'
+});
+
+// window.scrollBy — 相对当前位置滚动
+window.scrollBy(0, 100);          // 向下滚 100px
+window.scrollBy({
+    top: -50,                     // 向上滚 50px
+    left: 0,
+    behavior: 'smooth'
+});
+
+// 滚动到页面顶部
+window.scrollTo({ top: 0, behavior: 'smooth' });
+
+// 滚动到页面底部
+window.scrollTo({
+    top: document.documentElement.scrollHeight,
+    behavior: 'smooth'
+});
+
+// 当前滚动位置
+window.scrollX    // 水平滚动距离（别名 pageXOffset）
+window.scrollY    // 垂直滚动距离（别名 pageYOffset）</div>
+    </div>
+    <div class="card">
+        <h2>元素滚动</h2>
+        <div class="code">// 元素滚动方法（同 window）
+element.scrollTo(x, y);
+element.scrollBy(x, y);
+element.scrollTop = 100;  // 直接设置属性
+element.scrollLeft = 0;
+
+// scrollIntoView — 将元素滚动到视口
+element.scrollIntoView();
+element.scrollIntoView(false);  // 底部对齐
+element.scrollIntoView({
+    behavior: 'smooth',    // 'auto' | 'smooth'
+    block: 'start',        // 'start' | 'center' | 'end' | 'nearest'
+    inline: 'nearest'      // 'start' | 'center' | 'end' | 'nearest'
+});
+
+// block 控制垂直对齐：
+// start — 元素顶部与视口顶部对齐（默认）
+// center — 元素居中
+// end — 元素底部与视口底部对齐
+// nearest — 就近对齐
+
+// scroll 事件
+element.addEventListener('scroll', function(e) {
+    console.log('滚动位置:', this.scrollTop);
+});
+
+// ⚠️ scroll 事件触发频率很高，需要防抖/节流</div>
+    </div>
+    <div class="card">
+        <h2>滚动优化（passive 与防抖/节流）</h2>
+        <div class="code">// 1. passive 监听 — 告诉浏览器不调用 preventDefault
+// 浏览器可以提前优化，滚动更流畅
+window.addEventListener('scroll', handler, { passive: true });
+// passive: true 表示不会调用 preventDefault
+// 如果调用了 preventDefault，会被忽略
+
+// 2. 防抖（debounce）— 等用户停止滚动后再执行
+function debounce(fn, delay = 200) {
+    let timer;
+    return function(...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+}
+window.addEventListener('scroll', debounce(() => {
+    console.log('用户停止滚动');
+}, 150));
+
+// 3. 节流（throttle）— 限制执行频率
+function throttle(fn, interval = 100) {
+    let last = 0;
+    return function(...args) {
+        const now = Date.now();
+        if (now - last >= interval) {
+            last = now;
+            fn.apply(this, args);
+        }
+    };
+}
+window.addEventListener('scroll', throttle(() => {
+    console.log('滚动位置:', window.scrollY);
+}, 200));
+
+// 4. requestAnimationFrame + 节流（推荐）
+let ticking = false;
+window.addEventListener('scroll', () => {
+    if (!ticking) {
+        requestAnimationFrame(() => {
+            console.log('滚动:', window.scrollY);
+            ticking = false;
+        });
+        ticking = true;
+    }
+});</div>
+    </div>
+    <div class="scroll-area" id="scroll-area">
+        <div class="content">
+            <div class="section" id="section-1">区块 1</div>
+            <div class="section" id="section-2">区块 2</div>
+            <div class="section" id="section-3">区块 3</div>
+            <div class="section" id="section-4">区块 4</div>
+            <div class="section" id="section-5">区块 5</div>
+        </div>
+    </div>
+    <div id="scroll-info">
+        <div class="progress-bar"><div class="fill" id="scroll-progress"></div></div>
+        滚动位置: <span id="scroll-pos">0</span>px / <span id="scroll-max">0</span>px
+    </div>
+    <div style="display:flex;gap:10px;margin:10px 0;flex-wrap:wrap;">
+        <button onclick="scrollToTop()">scrollTo 顶部</button>
+        <button onclick="scrollToBottom()">scrollTo 底部</button>
+        <button onclick="scrollBy100()">scrollBy 下滚 100</button>
+        <button onclick="scrollIntoView2()">scrollIntoView 区块3</button>
+        <button onclick="smoothCenter()">平滑居中 区块5</button>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const scrollArea = document.getElementById('scroll-area');
+        const scrollPos = document.getElementById('scroll-pos');
+        const scrollMax = document.getElementById('scroll-max');
+        const progressFill = document.getElementById('scroll-progress');
+
+        console.log('=== 窗口滚动 ===');
+        console.log('scrollX:', window.scrollX, 'scrollY:', window.scrollY);
+
+        console.log('=== 元素滚动属性 ===');
+        console.log('scrollArea.scrollTop:', scrollArea.scrollTop);
+        console.log('scrollArea.scrollHeight:', scrollArea.scrollHeight);
+
+        function scrollToTop() {
+            scrollArea.scrollTo({ top: 0, behavior: 'smooth' });
+            console.log('scrollTo 顶部');
+        }
+        function scrollToBottom() {
+            scrollArea.scrollTo({
+                top: scrollArea.scrollHeight,
+                behavior: 'smooth'
+            });
+            console.log('scrollTo 底部');
+        }
+        function scrollBy100() {
+            scrollArea.scrollBy({ top: 100, behavior: 'smooth' });
+            console.log('scrollBy 100');
+        }
+        function scrollIntoView2() {
+            const section3 = document.getElementById('section-3');
+            section3.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center'
+            });
+            console.log('scrollIntoView 区块3');
+        }
+        function smoothCenter() {
+            const section5 = document.getElementById('section-5');
+            section5.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+                inline: 'center'
+            });
+            console.log('scrollIntoView 区块5(居中)');
+        }
+
+        // 滚动事件（passive + requestAnimationFrame 优化）
+        let ticking = false;
+        scrollArea.addEventListener('scroll', () => {
+            if (!ticking) {
+                requestAnimationFrame(() => {
+                    const pos = scrollArea.scrollTop;
+                    const max = scrollArea.scrollHeight - scrollArea.clientHeight;
+                    scrollPos.textContent = pos;
+                    scrollMax.textContent = max;
+                    const percent = max > 0 ? (pos / max * 100) : 0;
+                    progressFill.style.width = percent + '%';
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        }, { passive: true });
+
+        // 初始化显示
+        setTimeout(() => {
+            scrollMax.textContent = scrollArea.scrollHeight - scrollArea.clientHeight;
+        }, 100);
+
+        console.log('=== 滚动优化 ===');
+        const opts = [
+            'passive: true 提高滚动性能',
+            'requestAnimationFrame 节流',
+            'debounce（防抖）— 停滞后触发',
+            'throttle（节流）— 固定频率触发',
+        ];
+        opts.forEach(o => console.log('  -', o));
+
+        document.getElementById('output').textContent =
+            `scrollTo / scrollBy / scrollIntoView\n` +
+            `passive 监听 + rAF 优化滚动事件\n` +
+            `✅ 滚动操作演示完成！`;
+    </script>
+</body>
+</html>

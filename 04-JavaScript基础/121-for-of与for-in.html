@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>for...of与for...in</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #1abc9c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>for...of 和 for...in</h2>
+        <p>两种遍历语法，用途不同。</p>
+    </div>
+
+    <div class="card">
+        <h2>for...of — 遍历值</h2>
+        <p>遍历可迭代对象（数组、字符串、Set、Map等）的<strong>值</strong>。</p>
+        <div class="code">
+// 遍历数组
+let fruits = ['apple', 'banana', 'cherry'];
+for (let fruit of fruits) {
+    console.log(fruit);
+}
+// 'apple', 'banana', 'cherry'
+
+// 遍历字符串
+for (let char of 'Hello') {
+    console.log(char);
+}
+// 'H', 'e', 'l', 'l', 'o'
+        </div>
+        <div class="note">💡 for...of 用于获取集合的值，比 for 循环更简洁。</div>
+    </div>
+
+    <div class="card">
+        <h2>for...in — 遍历键</h2>
+        <p>遍历对象的<strong>可枚举属性名</strong>（键）。</p>
+        <div class="code">
+// 遍历对象
+let user = { name: 'Alice', age: 25, role: 'admin' };
+for (let key in user) {
+    console.log(key, ':', user[key]);
+}
+// 'name : Alice', 'age : 25', 'role : admin'
+
+// 遍历数组（不推荐！）
+let arr = ['a', 'b', 'c'];
+for (let index in arr) {
+    console.log(index);  // '0', '1', '2'（字符串！不是数字）
+}
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>for...in 的注意事项</h2>
+        <div class="code">
+// 1. 遍历的顺序不保证（虽然现在几乎所有浏览器都按创建顺序）
+// 2. 会遍历继承的可枚举属性
+// 3. 不遍历 Symbol 键
+
+let obj = { b: 2, a: 1, c: 3 };
+for (let key in obj) {
+    console.log(key);  // 'b', 'a', 'c'（按创建顺序）
+}
+
+// 只遍历自身的属性（排除继承的）
+for (let key in obj) {
+    if (obj.hasOwnProperty(key)) {
+        console.log(key, '是自己的属性');
+    }
+}
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>对比：遍历数组的四种方式</h2>
+        <div class="code">
+let arr = ['a', 'b', 'c'];
+
+// 1. for 循环（最灵活，需要索引）
+for (let i = 0; i < arr.length; i++) {
+    console.log(i, arr[i]);  // 0 'a', 1 'b', 2 'c'
+}
+
+// 2. for...of（直接取值，不需要索引）
+for (let val of arr) {
+    console.log(val);  // 'a', 'b', 'c'
+}
+
+// 3. for...in（不推荐数组用）
+for (let idx in arr) {
+    console.log(idx, arr[idx]);  // '0' 'a', '1' 'b', '2' 'c'
+}
+
+// 4. forEach（数组方法）
+arr.forEach((val, idx) => console.log(idx, val));
+        </div>
+        <div class="note">数组遍历推荐：需要索引用 forEach，只需要值用 for...of。</div>
+    </div>
+
+    <div class="card">
+        <h2>for...of 的更多用法</h2>
+        <div class="code">
+// Set
+let set = new Set([1, 2, 3]);
+for (let val of set) {
+    console.log(val);  // 1, 2, 3
+}
+
+// Map
+let map = new Map([['a', 1], ['b', 2]]);
+for (let [key, val] of map) {
+    console.log(key, val);  // 'a' 1, 'b' 2
+}
+
+// 字符串
+for (let char of '你好') {
+    console.log(char);  // '你', '好'
+}
+
+// arguments（函数内）
+function showArgs() {
+    for (let arg of arguments) {
+        console.log(arg);
+    }
+}
+        </div>
+    </div>
+
+    <pre id="output"></pre>
+
+    <script>
+        // ====================
+        // for...of 和 for...in 演示
+        // ====================
+
+        console.log('=== for...of 遍历数组（值） ===');
+        let colors = ['red', 'green', 'blue'];
+        for (let color of colors) {
+            console.log('颜色:', color);
+        }
+
+        console.log('\n=== for...of 遍历字符串 ===');
+        for (let char of '你好JS') {
+            console.log('字符:', char);
+        }
+
+        console.log('\n=== for...in 遍历对象（键） ===');
+        let user = { name: 'Alice', age: 25, role: 'admin' };
+        for (let key in user) {
+            console.log(`${key}: ${user[key]}`);
+        }
+
+        console.log('\n=== for...in 遍历数组（不推荐） ===');
+        let arr = ['x', 'y', 'z'];
+        for (let index in arr) {
+            console.log(`索引 ${index} (类型: ${typeof index}): ${arr[index]}`);
+        }
+
+        document.getElementById('output').textContent =
+            `for...of 遍历颜色: ${colors.join(', ')}\n` +
+            `for...in 遍历用户: ${Object.keys(user).join(', ')}\n` +
+            `✅ for...of 与 for...in 演示完成！`;
+    </script>
+</body>
+</html>

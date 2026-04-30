@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 指针与 unsafe 编程</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📌 Go 指针与 unsafe 编程</h2><p>指针基础 &/*、new vs make、nil 指针、栈 vs 堆逃逸分析、uintptr unsafe.Pointer 安全使用、指针运算模式。</p></div>
+    <div class="card">
+        <h2>指针基础</h2>
+        <div class="code">// ========== 指针 ==========
+// 指针存的是内存地址, 零值为 nil
+
+func pointerBasic() {
+    x := 42
+
+    p := &x        // 取地址
+    fmt.Println(p)  // 0xc00001a098 (内存地址)
+
+    v := *p        // 解引用
+    fmt.Println(v) // 42
+
+    *p = 100       // 通过指针修改
+    fmt.Println(x) // 100
+}
+
+// ========== 指针类型 ==========
+func pointerTypes() {
+    var p1 *int                    // 指向 int 的指针
+    var p2 **int                   // 指向指针的指针
+    var p3 *[]string               // 指向切片的指针
+    var p4 *map[string]int         // 指向 map 的指针
+    var p5 *func(a, b int) int     // 指向函数的指针
+
+    // 指向数组的指针 vs 切片
+    var arrPtr *[3]int             // 指向固定长度数组
+    var sliPtr *[]int              // 指向切片头
+}
+
+// ========== 零值保护模式 ==========
+// 指针的零值是 nil, 解引用 nil 指针导致 panic
+
+type Config struct {
+    Host string
+    Port int
+}
+
+func nilCheck() {
+    var c *Config  // nil 指针
+
+    // ❌ panic: runtime error: invalid memory address
+    // fmt.Println(c.Host)
+
+    // ✅ 安全模式
+    if c != nil {
+        fmt.Println(c.Host)
+    } else {
+        fmt.Println("config is nil")
+    }
+
+    // 工厂函数避免 nil
+    c = NewConfig()
+    fmt.Println(c.Host)  // 安全
+}
+
+func NewConfig() *Config {
+    return &Config{
+        Host: "localhost",
+        Port: 8080,
+    }
+}
+
+// ========== 指针 vs 值的选择 ==========
+// 何时用指针:
+// 1. 需要修改原值
+// 2. 大结构体 (避免复制)
+// 3. 需要表示 nil (区分零值和不存在)
+// 4. 实现某个接口 (指针接收者实现接口)
+
+// 何时用值:
+// 1. 小结构体 (如 Point{int,int})
+// 2. 不可变类型 (安全)
+// 3. 无需 nil 语义
+// 4. 基础类型 (int/bool/float64) 通常用值
+
+// ========== 切片指针 vs 切片值 ==========
+// 切片本身包含底层数组指针, 很少需要切片指针
+
+func processItems(items []int) {
+    // 切片是引用类型, 传切片值 (24 字节头)
+    // 修改元素影响调用方
+    items[0] = 99
+}
+
+func processItemsPtr(items *[]int) {
+    // 需要修改切片本身 (如 append 改变 len/cap) 时
+    *items = append(*items, 100)
+}</div>
+    </div>
+    <div class="card">
+        <h2>new vs make</h2>
+        <div class="code">// ========== new vs make ==========
+// new(T):  分配零值内存, 返回 *T (适用于所有类型)
+// make(T): 初始化引用类型, 返回 T (仅 slice/map/chan)
+
+func newVsMake() {
+    // new: 分配零值, 返回指针
+    p1 := new(int)       // *int, 值为 0
+    p2 := new(Config)    // *Config, 值为零值 Config
+    p3 := new([]int)     // *[]int, 指向 nil slice
+
+    fmt.Println(*p1)    // 0
+    fmt.Println(p2.Host) // "" (零值)
+    fmt.Println(*p3 == nil) // true
+
+    // make: 初始化内部结构, 返回值
+    s := make([]int, 5)      // [0,0,0,0,0]
+    m := make(map[string]int) // 空的 map
+    c := make(chan int, 10)   // 缓冲 channel
+
+    // 注意:
+    // var s1 []int        // nil slice, len=0
+    // s2 := make([]int, 0) // empty slice, len=0
+    // 两者 json.Marshal 结果不同!
+}
+
+// ========== 变量生命周期与逃逸 ==========
+// Go 编译器自动决定变量在栈还是堆
+
+// 栈 (安全) — 变量不逃逸
+func stackAlloc() int {
+    x := 42
+    return x  // x 的值复制出去, x 本身可栈分配
+}
+
+// 堆 (逃逸) — 变量生命周期超出函数
+func heapAlloc() *int {
+    x := 42
+    return &x  // x 的地址逃逸到堆
+}
+// 编译器自动将 x 移到堆上 (并非 C 的悬垂指针)
+
+// 逃逸分析:
+// go build -gcflags="-m" main.go
+// 会显示: ./main.go:10:6: moved to heap: x
+
+// 常见的逃逸情况:
+// 1. 返回局部变量指针
+// 2. 将指针存入接口
+// 3. 闭包引用外部变量
+// 4. 大对象 (> 64KB)
+
+func escapeCases() {
+    // 2. 接口逃逸
+    var i interface{} = 42  // int → interface{} 导致逃逸
+
+    // 3. 闭包逃逸
+    fn := func() int {
+        x := 42
+        return x
+    }
+    _ = fn  // 闭包引用的变量可能逃逸
+
+    // 4. 大对象
+    // 超过 64KB 的局部变量直接堆分配
+}</div>
+    </div>
+    <div class="card">
+        <h2>unsafe.Pointer 与 uintptr</h2>
+        <div class="code">// ========== unsafe 三类型 ==========
+// 1. *T: 普通指针
+// 2. unsafe.Pointer: 通用指针类型, 可转换任意 *T
+// 3. uintptr: 整数, 可做算术运算
+
+// 转换规则:
+// *T ↔ unsafe.Pointer (双向)
+// unsafe.Pointer ↔ uintptr (双向)
+// *T → uintptr 需通过 unsafe.Pointer 中转
+
+// ========== 安全模式: 访问结构体字段 ==========
+type Point struct {
+    X int64
+    Y int64
+    Z int64
+}
+
+func fieldOffset() {
+    p := Point{X: 10, Y: 20, Z: 30}
+
+    // 通过偏移访问 — 等价于 p.Y
+    yPtr := (*int64)(unsafe.Pointer(
+        uintptr(unsafe.Pointer(&p)) + unsafe.Offsetof(p.Y),
+    ))
+    fmt.Println(*yPtr)  // 20
+}
+
+// ========== 切片和字符串的零拷贝转换 ==========
+// 修改切片头实现零拷贝转换
+
+func sliceStringZeroCopy() {
+    // []byte ↔ string 零拷贝 (只读!)
+    b := []byte("hello")
+    s := *(*string)(unsafe.Pointer(&b))
+    fmt.Println(s)  // "hello"
+
+    // float64 ↔ uint64 位模式转换
+    f := 3.14
+    u := *(*uint64)(unsafe.Pointer(&f))
+    fmt.Printf("0x%x\n", u)  // 0x40091eb851eb851f
+}
+
+// ========== 安全的 uintptr 使用 ==========
+// uintptr 是整数, GC 不将其视为引用!
+// 关键规则: uintptr 表达式必须在一行内完成
+
+// ✅ 安全: 一行内完成转换, GC 无介入机会
+func safeUintptr(p *Point) *int64 {
+    return (*int64)(unsafe.Pointer(
+        uintptr(unsafe.Pointer(p)) + unsafe.Offsetof(p.X),
+    ))
+}
+
+// ❌ 危险: uintptr 存为中间变量
+// func dangerUintptr(p *Point) {
+//     addr := uintptr(unsafe.Pointer(p)) + unsafe.Offsetof(p.X)
+//     // 此时 p 可能被 GC 移动, addr 变成悬垂地址
+//     ptr := (*int64)(unsafe.Pointer(addr))  // 危险!
+// }
+
+// ========== 原子操作中的指针 ==========
+// atomic.Value 可原子读写任意类型指针
+var config atomic.Value
+
+func loadConfig() {
+    c := &Config{Host: "server", Port: 8080}
+    config.Store(c)
+}
+
+func getConfig() *Config {
+    return config.Load().(*Config)
+}</div>
+    </div>
+    <div class="card">
+        <h2>指针最佳实践</h2>
+        <div class="code">// ========== 指针赋值与比较 ==========
+func pointerAssignment() {
+    // 两个指针相等 = 指向同一地址
+    x := 42
+    p1 := &x
+    p2 := &x
+    fmt.Println(p1 == p2)  // true (同一变量)
+
+    // 不同变量即使值相等, 地址不同
+    a := 42
+    b := 42
+    fmt.Println(&a == &b)  // false
+}
+
+// ========== 指针在接口中 ==========
+// 接口值包含 (type, data) 对
+// nil 接口 vs nil 指针接口
+
+func nilInterfacePtr() {
+    var p *Config = nil  // nil 指针
+    var i interface{} = p  // 接口包含 (*Config, nil)
+
+    fmt.Println(i == nil)  // false!
+    // 因为接口有类型信息 (*Config) 即使数据为 nil
+
+    // 正确检查:
+    if i != nil {
+        // 需要进一步通过反射检查值
+        fmt.Println(reflect.ValueOf(i).IsNil())  // true
+    }
+}
+
+// ========== 常用指针模式 ==========
+
+// 1. Optional 模式 (用指针表示可选值)
+type UpdateUserRequest struct {
+    Username *string `json:"username,omitempty"` // nil = 不更新
+    Email    *string `json:"email,omitempty"`
+    Age      *int    `json:"age,omitempty"`
+}
+
+// 2. 链表
+type ListNode[T any] struct {
+    Val  T
+    Next *ListNode[T]
+}
+
+// 3. 共享状态
+type Counter struct {
+    mu    sync.Mutex
+    value int
+}
+
+func NewCounter() *Counter {
+    return &Counter{}  // 返回指针, 避免复制 mutex
+}
+
+// 注意: sync.Mutex 不可复制 (复制后锁失效)
+
+// ========== 指针性能 ==========
+// 小对象指针: 间接访问可能更慢 (cache miss)
+// 大对象指针: 避免复制, 通常更快
+
+// go test -bench=. 测试:
+// BenchmarkCopySmall-8   10亿   0.3 ns/op  (值传递 8 字节)
+// BenchmarkPtrSmall-8    5亿    0.8 ns/op  (指针间接访问)</div>
+        <div class="note">💡 指针要点: & 取地址, * 解引用; new 分配零值返回指针, make 初始化引用类型; 编译器决定栈/堆 (逃逸分析) — 返回局部变量指针触发逃逸; unsafe.Pointer 通用指针类型可转换任意 *T; uintptr 是整数可运算但 GC 不追踪; 指针转换 uintptr 应在一行内完成; nil 指针接口 ≠ nil 接口; sync.Mutex 必须用指针 (不可复制); 可选参数用指针表示 nil = 不更新。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoPtr()">指针基础</button>
+        <button onclick="demoNew()">new vs make</button>
+        <button onclick="demoUnsafe()">unsafe 安全</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoPtr() {
+            result.innerHTML = '';
+            log('# 指针基础');
+            log('');
+            log('x := 42');
+            log('p := &x   // 取地址, p 的类型是 *int');
+            log('v := *p   // 解引用, v == 42');
+            log('*p = 100  // 通过指针修改');
+            log('fmt.Println(x) // 100');
+            log('');
+            log('指针选择的通用准则:');
+            log('  用指针: 修改原值, 大结构体, nil 语义, 接口实现');
+            log('  用值:   小结构体, 不可变, 无需 nil, 基础类型');
+        }
+
+        function demoNew() {
+            result.innerHTML = '';
+            log('# new vs make');
+            log('');
+            log('new(T)        → *T  (零值指针)');
+            log('  p := new(int)    // *int, 值为 0');
+            log('  p := new(Config) // *Config, 零值');
+            log('');
+            log('make(T)       → T   (初始化)');
+            log('  s := make([]int, 5)     // 5 个零值');
+            log('  m := make(map[string]int) // 空 map');
+            log('  c := make(chan int, 10) // 缓冲 channel');
+            log('');
+            log('逃逸分析: go build -gcflags="-m"');
+            log('  返回局部指针 → 逃逸到堆');
+            log('  小对象栈分配, 大对象堆分配');
+        }
+
+        function demoUnsafe() {
+            result.innerHTML = '';
+            log('# unsafe 安全指南');
+            log('');
+            log('三种指针类型:');
+            log('  *T              // 类型安全指针');
+            log('  unsafe.Pointer  // 通用指针, 可转换');
+            log('  uintptr         // 整数, 可算术运算');
+            log('');
+            log('转换规则: *T ↔ unsafe.Pointer ↔ uintptr');
+            log('');
+            log('⚠ 安全红线:');
+            log('  uintptr 不当作引用, GC 不追踪');
+            log('  unsafe.Pointer → uintptr → 运算 → unsafe.Pointer');
+            log('  必须在一行内完成!');
+            log('');
+            log('常见用途:');
+            log('  reflect 替代 (反射优先)');
+            log('  零拷贝 string/[]byte 转换');
+            log('  syscall 内存映射');
+        }
+    </script>
+</body>
+</html>

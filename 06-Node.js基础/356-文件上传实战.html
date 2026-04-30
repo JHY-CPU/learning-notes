@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件上传实战</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        .drop-zone { border: 2px dashed #3498db; border-radius: 8px; padding: 30px; text-align: center; color: #7f8c8d; margin: 10px 0; transition: all 0.3s; background: #f8f9fa; }
+        .drop-zone.dragover { border-color: #2ecc71; background: #eafaf1; }
+        .drop-zone .icon { font-size: 40px; }
+        .progress-bar { width: 100%; height: 8px; background: #ecf0f1; border-radius: 4px; overflow: hidden; margin: 8px 0; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #3498db, #2ecc71); border-radius: 4px; width: 0; transition: width 0.3s; }
+        .file-list { margin: 10px 0; }
+        .file-item { display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: #f8f9fa; border-radius: 4px; margin: 4px 0; font-size: 13px; }
+        .file-item .name { flex: 1; }
+        .file-item .size { color: #95a5a6; margin: 0 12px; }
+        .file-item .status { font-size: 12px; }
+        .file-item .status.done { color: #2ecc71; }
+        .file-item .status.error { color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>文件上传实战</h2><p>拖拽上传、文件类型/大小校验、进度条、多文件并行上传。</p></div>
+    <div class="card">
+        <h2>文件上传 API</h2>
+        <div class="code">// ========== HTML 文件输入 ==========
+&lt;input type="file" accept="image/*" multiple&gt;
+
+// ========== 拖拽上传 ==========
+element.addEventListener('dragover', (e) => e.preventDefault());
+element.addEventListener('drop', (e) => {
+    const files = e.dataTransfer.files;
+});
+
+// ========== FormData 上传 ==========
+const formData = new FormData();
+formData.append('file', file);
+formData.append('field', 'value');
+fetch('/upload', { method: 'POST', body: formData });
+
+// ========== 文件校验 ==========
+file.type         // MIME 类型
+file.size         // 文件大小 (字节)
+file.name         // 文件名
+file.lastModified // 修改时间
+
+// ========== 进度监听 ==========
+xhr.upload.onprogress = (e) => {
+    const pct = (e.loaded / e.total) * 100;
+};</div>
+    </div>
+    <div class="card">
+        <h2>演示：文件上传</h2>
+        <button onclick="demoInput()">文件选择</button>
+        <button onclick="demoDragDrop()">拖拽上传</button>
+        <button onclick="demoValidation()">文件校验</button>
+        <button onclick="demoProgress()">进度上传</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <div id="upload-demo"></div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        const uploadDemo = document.getElementById('upload-demo');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+        function clearUpload() { uploadDemo.innerHTML = ''; }
+
+        // Mock File class
+        class MockFile {
+            constructor(name, size, type) {
+                this.name = name;
+                this.size = size;
+                this.type = type;
+                this.lastModified = Date.now();
+                this.lastModifiedDate = new Date();
+                this.webkitRelativePath = '';
+            }
+            slice() { return new Blob(); }
+        }
+
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function demoInput() {
+            clearUpload();
+            result.innerHTML = '';
+            log('📁 文件选择:');
+            log('');
+
+            log('1️⃣ input 标签属性:');
+            log('   <input type="file">                    — 单文件');
+            log('   <input type="file" multiple>           — 多文件');
+            log('   <input type="file" accept="image/*">   — 限制图片');
+            log('   <input type="file" capture="environment"> — 相机');
+            log('');
+
+            log('2️⃣ accept 值:');
+            log('   image/*       — 所有图片');
+            log('   image/png,image/jpeg — 指定格式');
+            log('   .pdf,.doc     — 文件扩展名');
+            log('   video/*       — 所有视频');
+            log('   audio/*       — 所有音频');
+            log('');
+
+            log('3️⃣ File 对象属性:');
+            const mockFiles = [
+                new MockFile('photo.jpg', 2.5 * 1024 * 1024, 'image/jpeg'),
+                new MockFile('document.pdf', 500 * 1024, 'application/pdf'),
+                new MockFile('video.mp4', 50 * 1024 * 1024, 'video/mp4'),
+            ];
+
+            mockFiles.forEach(f => {
+                log(`   • ${f.name}`);
+                log(`     大小: ${formatSize(f.size)}`);
+                log(`     类型: ${f.type}`);
+                log(`     修改: ${new Date(f.lastModified).toLocaleString()}`);
+                log('');
+            });
+
+            log('4️⃣ 获取文件:');
+            log('   const input = document.querySelector("input[type=file]");');
+            log('   const files = input.files;  // FileList');
+            log('   const file = files[0];      // File');
+            log('   const count = files.length; // 文件数');
+            log('');
+
+            log('5️⃣ 文件读取:');
+            log('   const reader = new FileReader();');
+            log('   reader.readAsDataURL(file);    // Base64');
+            log('   reader.readAsText(file);       // 文本');
+            log('   reader.readAsArrayBuffer(file); // 二进制');
+        }
+
+        function demoDragDrop() {
+            clearUpload();
+            result.innerHTML = '';
+            log('🎯 拖拽上传:');
+            log('');
+
+            // Interactive drop zone
+            const dropZone = document.createElement('div');
+            dropZone.className = 'drop-zone';
+            dropZone.innerHTML = '<div class="icon">📂</div><div>拖拽文件到此处</div><div style="font-size:12px;margin-top:8px;">或点击选择文件</div>';
+            uploadDemo.appendChild(dropZone);
+
+            // Simulate drag events
+            log('1️⃣ 拖拽事件:');
+            log('   dragenter — 拖拽进入目标');
+            log('   dragover  — 在目标上拖动 (需 preventDefault)');
+            log('   dragleave — 离开目标');
+            log('   drop      — 释放文件');
+            log('');
+
+            log('2️⃣ 基本实现:');
+            log('   dropZone.addEventListener("dragover", (e) => {');
+            log('     e.preventDefault();');
+            log('     dropZone.classList.add("dragover");');
+            log('   });');
+            log('   dropZone.addEventListener("dragleave", () => {');
+            log('     dropZone.classList.remove("dragover");');
+            log('   });');
+            log('   dropZone.addEventListener("drop", (e) => {');
+            log('     e.preventDefault();');
+            log('     const files = e.dataTransfer.files;');
+            log('     handleFiles(files);');
+            log('   });');
+            log('');
+
+            // Simulate drop
+            setTimeout(() => {
+                dropZone.classList.add('dragover');
+                log('   模拟: 文件拖入区域...');
+                setTimeout(() => {
+                    dropZone.classList.remove('dragover');
+                    const files = [
+                        { name: 'screenshot.png', size: 1.2 * 1024 * 1024 },
+                        { name: 'report.pdf', size: 300 * 1024 },
+                    ];
+                    const list = document.createElement('div');
+                    list.className = 'file-list';
+                    files.forEach(f => {
+                        const item = document.createElement('div');
+                        item.className = 'file-item';
+                        item.innerHTML = `<span class="name">📄 ${f.name}</span><span class="size">${formatSize(f.size)}</span><span class="status done">✅ 已添加</span>`;
+                        list.appendChild(item);
+                    });
+                    uploadDemo.appendChild(list);
+                    log(`   释放了 ${files.length} 个文件`);
+                    log('   ✅ 拖拽上传就绪');
+                }, 500);
+            }, 500);
+
+            log('');
+
+            log('3️⃣ DataTransfer 属性和方法:');
+            log('   e.dataTransfer.files        — 文件列表');
+            log('   e.dataTransfer.items         — 拖拽项 (含非文件)');
+            log('   e.dataTransfer.types         — 数据类型');
+            log('   e.dataTransfer.getData("text") — 文本数据');
+            log('');
+
+            log('4️⃣ 拖拽区域 UI 反馈:');
+            log('   • 虚线边框 + 提示文字');
+            log('   • 拖入时高亮 (颜色/边框变化)');
+            log('   • 释放后显示文件列表');
+            log('   • 错误状态反馈');
+        }
+
+        function demoValidation() {
+            clearUpload();
+            result.innerHTML = '';
+            log('🔍 文件校验:');
+            log('');
+
+            log('1️⃣ 文件类型校验:');
+            log('   const allowedTypes = ["image/jpeg", "image/png", "image/webp"];');
+            log('   if (!allowedTypes.includes(file.type)) {');
+            log('     showError("不支持的文件类型");');
+            log('     return;');
+            log('   }');
+            log('');
+
+            // Validate demo
+            const testFiles = [
+                { name: 'photo.jpg', type: 'image/jpeg', size: 2 * 1024 * 1024 },
+                { name: 'script.exe', type: 'application/x-msdownload', size: 5 * 1024 * 1024 },
+                { name: 'doc.pdf', type: 'application/pdf', size: 15 * 1024 * 1024 },
+                { name: 'big_video.mp4', type: 'video/mp4', size: 200 * 1024 * 1024 },
+            ];
+
+            const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+            const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf'];
+
+            testFiles.forEach(f => {
+                const typeOk = ALLOWED_TYPES.includes(f.type);
+                const sizeOk = f.size <= MAX_SIZE;
+                const status = typeOk && sizeOk ? '✅ 通过' : (typeOk ? '❌ 超尺寸' : (sizeOk ? '❌ 类型禁止' : '❌ 类型+尺寸'));
+                log(`   ${f.name.padEnd(20)} ${formatSize(f.size).padEnd(10)} ${f.type.padEnd(30)} ${status}`);
+            });
+
+            log('');
+            log('2️⃣ 文件大小校验:');
+            log('   const maxSize = 10 * 1024 * 1024;  // 10MB');
+            log('   if (file.size > maxSize) {');
+            log('     showError("文件不能超过 10MB");');
+            log('     return;');
+            log('   }');
+            log('');
+
+            log('3️⃣ 文件数量校验:');
+            log('   const maxCount = 5;');
+            log('   if (files.length > maxCount) {');
+            log('     showError("最多上传 5 个文件");');
+            log('     return;');
+            log('   }');
+            log('');
+
+            log('4️⃣ 综合校验函数:');
+            log('   function validateFile(file) {');
+            log('     const rules = [');
+            log('       { test: () => ALLOWED_TYPES.includes(file.type), msg: "类型不支持" },');
+            log('       { test: () => file.size <= MAX_SIZE, msg: `最大 ${formatSize(MAX_SIZE)}` },');
+            log('       { test: () => !file.name.includes(".."), msg: "文件名不合法" },');
+            log('     ];');
+            log('     return rules.filter(r => !r.test()).map(r => r.msg);');
+            log('   }');
+        }
+
+        function demoProgress() {
+            clearUpload();
+            result.innerHTML = '';
+            log('📊 上传进度:');
+            log('');
+
+            log('1️⃣ XHR 进度监听:');
+            log('   const xhr = new XMLHttpRequest();');
+            log('   xhr.upload.onprogress = (e) => {');
+            log('     if (e.lengthComputable) {');
+            log('       const pct = Math.round((e.loaded / e.total) * 100);');
+            log('       progressBar.style.width = pct + "%";');
+            log('     }');
+            log('   };');
+            log('');
+
+            log('2️⃣ fetch 进度 (需自己实现):');
+            log('   // 通过 Response.body 读取流');
+            log('   const response = await fetch(url);');
+            log('   const reader = response.body.getReader();');
+            log('   const contentLength = +response.headers.get("Content-Length");');
+            log('   let received = 0;');
+            log('   while (true) {');
+            log('     const { done, value } = await reader.read();');
+            log('     if (done) break;');
+            log('     received += value.length;');
+            log('     const pct = (received / contentLength) * 100;');
+            log('   }');
+            log('');
+
+            // Progress bar demo
+            const container = document.createElement('div');
+            container.style.margin = '16px 0';
+
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            fileItem.innerHTML = '<span class="name">📄 large-file.zip</span><span class="size">45.2 MB</span><span class="status" id="progStatus">上传中...</span>';
+            container.appendChild(fileItem);
+
+            const bar = document.createElement('div');
+            bar.className = 'progress-bar';
+            const fill = document.createElement('div');
+            fill.className = 'progress-fill';
+            bar.appendChild(fill);
+            container.appendChild(bar);
+
+            const statText = document.createElement('div');
+            statText.style.cssText = 'font-size:12px;color:#7f8c8d;text-align:center;margin:4px 0;';
+            statText.textContent = '0% - 0 MB / 45.2 MB';
+            container.appendChild(statText);
+
+            uploadDemo.appendChild(container);
+
+            // Animate progress
+            let pct = 0;
+            const interval = setInterval(() => {
+                pct += Math.random() * 15 + 2;
+                if (pct >= 100) {
+                    pct = 100;
+                    clearInterval(interval);
+                    document.getElementById('progStatus').textContent = '✅ 上传完成';
+                    document.getElementById('progStatus').className = 'status done';
+                    statText.textContent = '100% - 45.2 MB / 45.2 MB';
+                }
+                fill.style.width = pct + '%';
+                const loaded = (pct / 100) * 45.2;
+                statText.textContent = `${Math.round(pct)}% - ${loaded.toFixed(1)} MB / 45.2 MB`;
+            }, 200);
+
+            log('3️⃣ 上传状态管理:');
+            log('   等待中 → 上传中 → 完成/失败');
+            log('   ⬆️ 上传进度条 (实时更新)');
+            log('');
+
+            log('4️⃣ FormData 上传:');
+            log('   const formData = new FormData();');
+            log('   formData.append("file", file);');
+            log('   formData.append("category", "images");');
+            log('');
+            log('   const xhr = new XMLHttpRequest();');
+            log('   xhr.open("POST", "/api/upload");');
+            log('   xhr.send(formData);');
+            log('');
+
+            log('5️⃣ 多文件并发上传:');
+            log('   const uploads = files.map(file => {');
+            log('     const formData = new FormData();');
+            log('     formData.append("file", file);');
+            log('     return fetch("/upload", { method: "POST", body: formData });');
+            log('   });');
+            log('   await Promise.all(uploads);');
+            log('');
+
+            log('6️⃣ 上传取消:');
+            log('   const controller = new AbortController();');
+            log('   fetch("/upload", { signal: controller.signal });');
+            log('   controller.abort();  // 取消上传');
+        }
+
+        console.log('=== 文件上传实战 ===');
+        document.getElementById('output').textContent =
+            `文件上传: 文件选择 / 拖拽上传 / 类型校验 / 进度条 / 多文件并发\n` +
+            `✅ 文件上传实战演示完成！`;
+    </script>
+</body>
+</html>

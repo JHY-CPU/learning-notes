@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>时序数据库 InfluxDB</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📈 时序数据库 InfluxDB</h2><p>时序数据库概念、InfluxDB 数据模型（Measurement/Tag/Field/Time）、InfluxQL/Flux 查询、保留策略 RP、连续查询 CQ、数据压缩、TimescaleDB（PostgreSQL 时序扩展）、Prometheus 时序模型、选型对比。</p></div>
+    <div class="card">
+        <h2>时序数据库概述</h2>
+        <div class="code">// ========== 时序数据库 ==========
+// 专门处理时间序列数据的数据库
+// 特点: 持续写入 + 时间范围查询 + 聚合降采样
+
+// ========== 时序数据特点 ==========
+// 1. 持续写入 (append-only, 很少更新/删除)
+// 2. 按时间顺序写入
+// 3. 近期数据查询频繁 (老数据自动降采样)
+// 4. 聚合查询多 (平均值/最大值/百分位)
+// 5. 数据量大 (自动压缩)
+
+// ========== 应用场景 ==========
+// - 监控指标 (CPU/内存/QPS/延迟)
+// - IoT 传感器数据
+// - 金融行情 (股价/汇率)
+// - 应用性能监控 (APM)
+// - 日志时间序列
+// - 实时分析仪表盘
+
+// ========== 代表产品 ==========
+// ┌──────────────┬──────────────────────────┐
+// │ 产品          │ 特点                    │
+// ├──────────────┼──────────────────────────┤
+// │ InfluxDB     │ 专业时序, Flux 查询      │
+// │ TimescaleDB  │ PostgreSQL 扩展          │
+// │ Prometheus   │ 监控专用, Pull 模型      │
+// │ VictoriaMetrics│ 高性能, 兼容 PromQL    │
+// │ ClickHouse   │ 列存, 聚合极快           │
+// │ DolphinDB    │ 高性能, 量化交易         │
+// └──────────────┴──────────────────────────┘</div>
+    </div>
+    <div class="card">
+        <h2>InfluxDB 数据模型</h2>
+        <div class="code">// ========== InfluxDB (2.x) ==========
+// 开源时序数据库, Go 语言编写
+// Flux 查询语言 (功能强大)
+
+// ========== 数据模型 ==========
+// ┌────────────────────────────────────┐
+// │ Bucket (类似数据库)                │
+// │ └── Measurement (类似表)           │
+// │     ├── Tags (标签, 索引)          │
+// │     │   ├── host=web-server-01     │
+// │     │   └── region=us-east         │
+// │     ├── Fields (字段, 值)          │
+// │     │   ├── cpu_usage=85.5         │
+// │     │   └── memory_used=16384      │
+// │     └── Time (时间戳, 主索引)      │
+// │         2024-01-01T00:00:00Z       │
+// └────────────────────────────────────┘
+
+// Tag: 索引, 用于过滤/分组 (字符串, 少用)
+// Field: 实际数值, 用于聚合 (可多种类型)
+// Time: 时间戳, 精度纳秒
+
+// ========== 行协议 (Line Protocol) ==========
+// 写入格式: measurement,tag=val field=val timestamp
+
+// 示例:
+cpu,host=server01,region=us-east cpu_usage=85.5,memory_used=16384 1704067200000000000
+
+// 批量写入 (一行一个):
+cpu,host=server01 cpu_usage=85.5 1704067200
+cpu,host=server01 cpu_usage=87.2 1704067300
+mem,host=server01 used=8192,available=16384 1704067200
+
+// ========== 读取 ==========
+// Flux 查询:
+from(bucket: "my_bucket")
+  |> range(start: -1h)
+  |> filter(fn: (r) => r._measurement == "cpu" and r.host == "server01")
+  |> aggregateWindow(every: 5m, fn: mean)
+  |> yield(name: "mean_cpu")</div>
+    </div>
+    <div class="card">
+        <h2>InfluxQL 与保留策略</h2>
+        <div class="code">// ========== InfluxQL (1.x 兼容) ==========
+// 类 SQL 查询 (2.x 推荐 Flux, 但也支持 InfluxQL)
+
+// 查询最近 1 小时 CPU 平均使用率:
+SELECT MEAN(cpu_usage) AS avg_cpu
+FROM cpu
+WHERE host = 'server01'
+  AND time > now() - 1h
+GROUP BY time(5m);
+
+// 按 host 分组:
+SELECT MEAN(cpu_usage)
+FROM cpu
+WHERE time > now() - 6h
+GROUP BY time(10m), host;
+
+// 百分位:
+SELECT PERCENTILE(cpu_usage, 95)
+FROM cpu
+WHERE time > now() - 24h;
+
+// ========== 保留策略 RP (Retention Policy) ==========
+// 数据自动过期删除
+
+// 1.x 定义 RP:
+CREATE RETENTION POLICY "one_week"
+ON "mydb"
+DURATION 7d                       // 保留 7 天
+REPLICATION 1
+DEFAULT;
+
+// 2.x 使用 Bucket 设置:
+// Bucket: my_bucket
+// Retention: 30 days
+
+// ========== 连续查询 CQ (Continuous Query) ==========
+// 自动降采样 (定期聚合老数据)
+
+CREATE CONTINUOUS QUERY "cq_cpu_1h"
+ON "mydb"
+BEGIN
+  SELECT MEAN(cpu_usage) AS cpu_usage, MAX(cpu_usage) AS cpu_max
+  INTO "one_week"."cpu_1h"        // 存入另一个 RP
+  FROM "cpu"
+  GROUP BY time(1h), host
+END;
+
+// ========== 数据压缩 ==========
+// InfluxDB 磁盘压缩率 ~10x-20x
+// 时间戳: delta-of-delta 编码
+// 浮点数:  Gorilla 压缩 (Facebook)
+// 整数:    ZigZag + 变长编码
+// 字符串:  Snappy 压缩</div>
+    </div>
+    <div class="card">
+        <h2>TimescaleDB 与 Prometheus</h2>
+        <div class="code">// ========== TimescaleDB ==========
+// PostgreSQL 扩展, 时序 + 关系型
+
+// 安装:
+CREATE EXTENSION IF NOT EXISTS timescaledb;
+
+// 创建超表:
+CREATE TABLE cpu_metrics (
+    time       TIMESTAMPTZ NOT NULL,
+    host       TEXT NOT NULL,
+    cpu_usage  DOUBLE PRECISION,
+    memory_used BIGINT
+);
+
+SELECT create_hypertable('cpu_metrics', 'time');
+
+// 查询 (标准 SQL):
+SELECT time_bucket('5m', time) AS bucket,
+       host,
+       AVG(cpu_usage) AS avg_cpu,
+       MAX(cpu_usage) AS max_cpu
+FROM cpu_metrics
+WHERE time > now() - INTERVAL '24 hours'
+GROUP BY bucket, host
+ORDER BY bucket;
+
+// 优势: 支持 JOIN/ACID/时序混合
+// 适合: 已有 PostgreSQL 需要时序功能
+
+// ========== Prometheus ==========
+// CNCF 毕业项目, 云原生监控标准
+// Pull 模型 (主动抓取指标)
+
+// 数据模型:
+// metric_name{label1="val1", label2="val2"} value timestamp
+
+http_requests_total{method="GET", path="/api", status="200"} 1024
+
+// PromQL 查询:
+avg(rate(cpu_usage[5m])) by (host)
+histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
+
+// ========== 时序数据库选型 ==========
+// ┌────────────┬────────────────────────────────┐
+// │ 场景        │ 推荐                          │
+// ├────────────┼────────────────────────────────┤
+// │ 监控指标    │ Prometheus + VictoriaMetrics  │
+// │ IoT 传感器  │ InfluxDB                      │
+// │ 需要 SQL    │ TimescaleDB (PG 扩展)         │
+// │ 大规模分析  │ ClickHouse                    │
+// │ 金融量化    │ DolphinDB                     │
+// └────────────┴────────────────────────────────┘
+
+// ========== 最佳实践 ==========
+// 1. Tag 基数不要太高 (< 100k)
+// 2. 设置合理保留期 (自动清理)
+// 3. 降采样策略 (热数据高精度, 冷数据聚合)
+// 4. 批量写入 (每条请求几千点)
+// 5. 监控写入速率/磁盘使用</div>
+        <div class="note">💡 时序数据库要点: 专为时序设计, 写入性能远高于普通数据库; InfluxDB 使用 Tag+Field+Time 模型; Tag 用于过滤(要加索引), Field 存数值; 保留策略自动清理过期数据; 连续查询自动降采样; TimescaleDB 是 PG 扩展, 支持 SQL; Prometheus 是云原生监控标准; 选型看是否需要 SQL 和分析能力。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoTSDB()">时序概念</button>
+        <button onclick="demoInflux()">InfluxDB</button>
+        <button onclick="demoCompare()">选型对比</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoTSDB() {
+            result.innerHTML = '';
+            log('# 时序数据库特点');
+            log('');
+            log('1. 持续写入 (append-only)');
+            log('2. 时间范围查询');
+            log('3. 聚合降采样');
+            log('4. 自动过期清理');
+            log('5. 高压缩率 (10-20x)');
+            log('');
+            log('场景: 监控/IoT/金融/APM');
+        }
+
+        function demoInflux() {
+            result.innerHTML = '';
+            log('# InfluxDB 数据模型');
+            log('');
+            log('Measurement: cpu');
+            log('Tags: host=server01, region=us-east');
+            log('Fields: cpu_usage=85.5');
+            log('Time: 1704067200000000000');
+            log('');
+            log('SELECT MEAN(cpu_usage)');
+            log('FROM cpu');
+            log('WHERE time > now() - 1h');
+            log('GROUP BY time(5m)');
+        }
+
+        function demoCompare() {
+            result.innerHTML = '';
+            log('# 时序数据库选型');
+            log('');
+            log('InfluxDB: 专业时序, Flux');
+            log('TimescaleDB: PG 扩展, SQL');
+            log('Prometheus: 云原生监控, Pull');
+            log('ClickHouse: 大规模分析');
+            log('');
+            log('最佳实践:');
+            log('- Tag 基数 < 100k');
+            log('- 设置保留期');
+            log('- 降采样策略');
+            log('- 批量写入');
+        }
+    </script>
+</body>
+</html>

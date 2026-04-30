@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CORS深入</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>CORS 深入</h2><p>简单/复杂请求区分、预检请求缓存、withCredentials、通配符限制。</p></div>
+    <div class="card">
+        <h2>CORS API</h2>
+        <div class="code">// ========== 简单请求 ==========
+// 方法: GET / HEAD / POST
+// Content-Type: application/x-www-form-urlencoded
+//              multipart/form-data
+//              text/plain
+// 无自定义头
+
+// ========== 复杂请求 ==========
+// 方法: PUT / DELETE / PATCH
+// Content-Type: application/json
+// 自定义头
+// → 先发 OPTIONS 预检
+
+// ========== 服务端 CORS 头 ==========
+Access-Control-Allow-Origin: https://example.com
+Access-Control-Allow-Methods: GET, POST, PUT
+Access-Control-Allow-Headers: Content-Type, Authorization
+Access-Control-Max-Age: 86400
+Access-Control-Allow-Credentials: true
+Access-Control-Expose-Headers: X-Total-Count</div>
+    </div>
+    <div class="card">
+        <h2>演示：CORS</h2>
+        <button onclick="demoSimple()">简单请求</button>
+        <button onclick="demoPreflight()">预检请求</button>
+        <button onclick="demoCredentials()">凭据</button>
+        <button onclick="demoWildcard()">通配符限制</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoSimple() {
+            result.innerHTML = '';
+            log('✅ 简单请求:');
+            log('');
+
+            log('1️⃣ 满足条件:');
+            log('   • 方法: GET, HEAD, POST');
+            log('   • 仅能设置这些头:');
+            log('     - Accept');
+            log('     - Accept-Language');
+            log('     - Content-Language');
+            log('     - Content-Type (仅限三种)');
+            log('     - Range');
+            log('   • Content-Type 限制:');
+            log('     - text/plain');
+            log('     - multipart/form-data');
+            log('     - application/x-www-form-urlencoded');
+            log('');
+
+            log('2️⃣ 简单请求流程:');
+            log('   浏览器:');
+            log('   ─────────────────────────────→');
+            log('   GET /api/data');
+            log('   Origin: https://myapp.com');
+            log('   Host: api.example.com');
+            log('');
+            log('   服务器响应:');
+            log('   ←─────────────────────────────');
+            log('   Access-Control-Allow-Origin: https://myapp.com');
+            log('   或: Access-Control-Allow-Origin: *');
+            log('');
+
+            log('3️⃣ 浏览器处理:');
+            log('   检查 Origin 是否在 Allow-Origin 中');
+            log('   是 → 正常响应');
+            log('   否 → 触发 CORS 错误 (fetch 失败)');
+            log('');
+
+            log('4️⃣ 示例代码:');
+            log('   // 简单 GET 请求');
+            log('   fetch("https://api.example.com/data", {');
+            log('     method: "GET"');
+            log('   });');
+            log('');
+            log('   // 简单 POST (form)');
+            log('   fetch("https://api.example.com/submit", {');
+            log('     method: "POST",');
+            log('     body: new URLSearchParams({ name: "test" })');
+            log('   });');
+        }
+
+        function demoPreflight() {
+            result.innerHTML = '';
+            log('🔍 预检请求 (Preflight):');
+            log('');
+
+            log('1️⃣ 触发条件:');
+            log('   • 使用 PUT/DELETE/PATCH 等方法');
+            log('   • Content-Type: application/json');
+            log('   • 设置自定义头 (Authorization, X-Requested-With 等)');
+            log('');
+
+            log('2️⃣ 预检流程:');
+            log('   ┌──────┐              ┌──────┐');
+            log('   │ 浏览器 │              │ 服务器 │');
+            log('   └──┬───┘              └──┬───┘');
+            log('      │                     │');
+            log('      │  OPTIONS /api/data  │');
+            log('      │  Origin: myapp      │');
+            log('      │  Access-Control-    │');
+            log('      │  Request-Method:PUT │');
+            log('      │────────────────────→│');
+            log('      │                     │');
+            log('      │  204 No Content     │');
+            log('      │  Allow-Origin: *    │');
+            log('      │  Allow-Methods: PUT │');
+            log('      │  Allow-Headers:     │');
+            log('      │   Content-Type      │');
+            log('      │  Max-Age: 86400     │');
+            log('      │←────────────────────│');
+            log('      │                     │');
+            log('      │  PUT /api/data      │');
+            log('      │  Content-Type:json  │');
+            log('      │────────────────────→│');
+            log('      │  200 OK             │');
+            log('      │←────────────────────│');
+            log('');
+
+            log('3️⃣ OPTIONS 请求头:');
+            log('   Access-Control-Request-Method: PUT');
+            log('   Access-Control-Request-Headers: content-type, authorization');
+            log('   Origin: https://myapp.com');
+            log('');
+
+            log('4️⃣ 预检响应头:');
+            log('   Access-Control-Allow-Origin: https://myapp.com');
+            log('   Access-Control-Allow-Methods: GET, POST, PUT, DELETE');
+            log('   Access-Control-Allow-Headers: Content-Type, Authorization');
+            log('   Access-Control-Max-Age: 86400  // 缓存 24h');
+            log('   Access-Control-Expose-Headers: X-Total-Count');
+        }
+
+        function demoCredentials() {
+            result.innerHTML = '';
+            log('🔑 CORS 与凭据:');
+            log('');
+
+            log('1️⃣ 带凭据的请求:');
+            log('   // 前端设置');
+            log('   fetch("https://api.example.com/data", {');
+            log('     credentials: "include"  // 携带 Cookie');
+            log('   });');
+            log('');
+            log('   // 或 XHR');
+            log('   xhr.withCredentials = true;');
+            log('');
+
+            log('2️⃣ credentials 选项:');
+            log('   • omit       — 不发送凭据 (默认)');
+            log('   • same-origin — 仅同源发送');
+            log('   • include    — 跨域也发送');
+            log('');
+
+            log('3️⃣ 服务器要求 (withCredentials):');
+            log('   // 必须明确指定 Origin (不能为 *)');
+            log('   Access-Control-Allow-Origin: https://myapp.com');
+            log('   Access-Control-Allow-Credentials: true');
+            log('');
+
+            log('4️⃣ 通配符与凭据冲突:');
+            log('   ❌ Access-Control-Allow-Origin: *');
+            log('   ❌ Access-Control-Allow-Credentials: true');
+            log('');
+            log('   ✅ Access-Control-Allow-Origin: https://myapp.com');
+            log('   ✅ Access-Control-Allow-Credentials: true');
+            log('');
+
+            log('5️⃣ Vary: Origin 头:');
+            log('   服务器应返回:');
+            log('   Vary: Origin');
+            log('   通知 CDN/缓存根据 Origin 区分');
+            log('   防止缓存投毒');
+            log('');
+
+            log('6️⃣ 安全注意事项:');
+            log('   • credentials: include 可能泄露用户数据');
+            log('   • 仅在可信域名使用');
+            log('   • 配合 SameSite Cookie 使用');
+            log('   • 避免反射性设置 Allow-Origin: req.headers.origin');
+        }
+
+        function demoWildcard() {
+            result.innerHTML = '';
+            log('⚠️ 通配符限制:');
+            log('');
+
+            log('1️⃣ 允许使用通配符的场景:');
+            log('   Access-Control-Allow-Origin: *');
+            log('   Access-Control-Allow-Methods: *');
+            log('   Access-Control-Allow-Headers: *');
+            log('');
+
+            log('2️⃣ * 的限制:');
+            log('   以下情况不能使用 *:');
+            log('   • withCredentials: true (必须指定 Origin)');
+            log('   • Access-Control-Expose-Headers (部分浏览器)');
+            log('');
+
+            log('3️⃣ 动态 Origin 方案:');
+            log('   // 服务端检查 Origin 白名单');
+            log('   const allowedOrigins = [');
+            log('     "https://myapp.com",');
+            log('     "https://admin.myapp.com",');
+            log('     "https://staging.myapp.com"');
+            log('   ];');
+            log('');
+            log('   const origin = req.headers.origin;');
+            log('   if (allowedOrigins.includes(origin)) {');
+            log('     res.setHeader("Access-Control-Allow-Origin", origin);');
+            log('     res.setHeader("Access-Control-Allow-Credentials", "true");');
+            log('     res.setHeader("Vary", "Origin");');
+            log('   }');
+            log('');
+
+            log('4️⃣ Access-Control-Expose-Headers:');
+            log('   默认浏览器只暴露 6 个响应头:');
+            log('   Cache-Control, Content-Language, Content-Type,');
+            log('   Expires, Last-Modified, Pragma');
+            log('');
+            log('   要暴露自定义头:');
+            log('   Access-Control-Expose-Headers: X-Total-Count, X-Request-Id');
+            log('');
+
+            log('5️⃣ 常见 CORS 错误:');
+            log('   • No "Access-Control-Allow-Origin" header');
+            log('   • Method not allowed by preflight');
+            log('   • Request header field not allowed');
+            log('   • Credentials flag is true, but Allow-Origin is *');
+            log('');
+
+            log('6️⃣ 开发调试:');
+            log('   // 方式1: 使用 CORS 代理');
+            log('   https://cors-anywhere.herokuapp.com/');
+            log('');
+            log('   // 方式2: Chrome 禁用 CORS (开发用)');
+            log('   // --disable-web-security --user-data-dir="~/chrome-dev"');
+            log('');
+            log('   // 方式3: 本地反向代理');
+            log('   // nginx 配置 proxy_pass + add_header');
+        }
+
+        console.log('=== CORS 深入 ===');
+        document.getElementById('output').textContent =
+            `CORS 深入: 简单请求 / 预检 OPTIONS / withCredentials / 通配符限制 / Vary: Origin\n` +
+            `✅ CORS 深入演示完成！`;
+    </script>
+</body>
+</html>

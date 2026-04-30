@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stream流</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #stream-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Stream 流</h2><p>Readable / Writable、pipe 链式、大文件处理、背压 backpressure。</p></div>
+    <div class="card">
+        <h2>Stream 类型</h2>
+        <div class="code">// ========== 四种流 ==========
+// Readable  — 可读流 (读取数据)
+// Writable  — 可写流 (写入数据)
+// Duplex    — 双向流 (既是可读也是可写)
+// Transform — 转换流 (读写过程中可修改)
+
+// ========== 可读流 Readable ==========
+const readable = fs.createReadStream('file.txt', {
+    highWaterMark: 64 * 1024, // 每次读取 64KB
+    encoding: 'utf-8'
+});
+
+readable.on('data', (chunk) => {
+    console.log('收到数据:', chunk.length);
+});
+readable.on('end', () => console.log('读取完成'));
+readable.on('error', (err) => console.error(err));
+
+// ========== 可写流 Writable ==========
+const writable = fs.createWriteStream('output.txt');
+writable.write('hello');
+writable.write('world');
+writable.end();
+writable.on('finish', () => console.log('写入完成'));
+
+// ========== pipe 管道 ==========
+// 自动处理背压 (backpressure)
+readable.pipe(writable);
+
+// 链式 pipe
+readable
+    .pipe(transformStream)
+    .pipe(writable);
+
+// ========== 背压 ==========
+// 当写入速度 > 读取速度时触发
+// writable.write() 返回 false 表示需要暂停
+// 'drain' 事件表示可以继续写入</div>
+    </div>
+    <div class="card">
+        <h2>演示：Stream 流</h2>
+        <button onclick="demoStream()">模拟 Stream 处理</button>
+        <button onclick="demoPipe()">Pipe 链式</button>
+        <div id="stream-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const streamResult = document.getElementById('stream-result');
+
+        function log(msg) {
+            streamResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // 模拟流
+        class MockReadable {
+            constructor(data, chunkSize = 10) {
+                this.data = data;
+                this.chunkSize = chunkSize;
+                this.pos = 0;
+                this.listeners = {};
+                this.paused = false;
+            }
+
+            on(event, fn) {
+                (this.listeners[event] ||= []).push(fn);
+                if (event === 'data' && !this.paused) this._emitData();
+                return this;
+            }
+
+            _emitData() {
+                const emit = (event, ...args) => {
+                    this.listeners[event]?.forEach(fn => fn(...args));
+                };
+
+                while (this.pos < this.data.length && !this.paused) {
+                    const chunk = this.data.slice(this.pos, this.pos + this.chunkSize);
+                    this.pos += this.chunkSize;
+                    emit('data', chunk);
+                }
+                if (this.pos >= this.data.length) {
+                    emit('end');
+                }
+            }
+
+            pause() { this.paused = true; return this; }
+            resume() { this.paused = false; this._emitData(); return this; }
+
+            pipe(writable) {
+                this.on('data', chunk => {
+                    const canContinue = writable.write(chunk);
+                    if (!canContinue) this.pause();
+                });
+                this.on('end', () => writable.end());
+                writable.on('drain', () => this.resume());
+                return writable;
+            }
+        }
+
+        class MockWritable {
+            constructor() {
+                this.data = [];
+                this.listeners = {};
+                this._canWrite = true;
+            }
+
+            on(event, fn) {
+                (this.listeners[event] ||= []).push(fn);
+                return this;
+            }
+
+            write(chunk) {
+                this.data.push(chunk);
+                log(`   📝 写入: "${chunk}" (长度: ${chunk.length})`);
+                // 模拟背压
+                if (this.data.length >= 3) {
+                    this._canWrite = false;
+                    setTimeout(() => {
+                        this._canWrite = true;
+                        this.listeners['drain']?.forEach(fn => fn());
+                    }, 500);
+                    return false;
+                }
+                return true;
+            }
+
+            end() {
+                log(`\n✅ 写入完成, 共 ${this.data.length} 块`);
+                this.listeners['finish']?.forEach(fn => fn());
+            }
+        }
+
+        function demoStream() {
+            streamResult.innerHTML = '';
+            log('📊 Stream 流处理演示:');
+            log('');
+
+            const data = '这是从流中读取的较大数据，会被分成多个小块处理。每个块的大小有限。';
+            log(`原始数据: "${data}" (${data.length} 字符)`);
+            log('');
+
+            const readable = new MockReadable(data, 10);
+            const writable = new MockWritable();
+
+            log('开始读取...\n');
+            readable.on('data', chunk => {
+                log(`   📖 读取: "${chunk}"`);
+            });
+            readable.on('end', () => log('\n📖 读取完成'));
+        }
+
+        function demoPipe() {
+            streamResult.innerHTML = '';
+            log('🔗 pipe 管道 + 背压处理:');
+            log('');
+
+            const data = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+            log(`数据: "${data}"`);
+
+            const readable = new MockReadable(data, 5);
+            const writable = new MockWritable();
+
+            log('\n通过 pipe 连接 (自动处理背压):\n');
+            readable.pipe(writable);
+
+            setTimeout(() => {
+                log('');
+                log('📌 Stream 优势:');
+                log('   • 内存友好 (不分批加载全部数据)');
+                log('   • 时间高效 (边读边处理)');
+                log('   • 背压控制 (防止溢出)');
+                log('   • 适合: 大文件/网络数据/视频流');
+            }, 2000);
+        }
+
+        console.log('=== Stream 流 ===');
+
+        document.getElementById('output').textContent =
+            `Stream 流: Readable / Writable / Duplex / Transform\n` +
+            `pipe / 背压 / highWaterMark / 大文件处理\n` +
+            `✅ Stream 流演示完成！`;
+    </script>
+</body>
+</html>

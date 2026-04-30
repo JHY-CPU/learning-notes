@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>单例模式</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>单例模式 Singleton</h2><p>确保一个类只有一个实例，并提供全局访问点。适用于全局状态管理、日志记录、配置管理等场景。</p></div>
+    <div class="card"><h2>IIFE闭包实现</h2><p>利用立即执行函数和闭包保存实例引用，通过 getInstance 方法获取唯一实例。</p><div class="code">const Singleton = (function() { let instance; function init() { return { name: '实例' }; } return { getInstance() { if (!instance) instance = init(); return instance; } }; })();</div></div>
+    <div class="card"><h2>Class静态方法实现</h2><p>ES6 class 配合 static getInstance 方法，实现更优雅的单例。</p><div class="code">class Singleton { static #instance; constructor() { if (Singleton.#instance) return Singleton.#instance; Singleton.#instance = this; } }</div></div>
+    <div class="card"><h2>模块单例与懒加载</h2><p>ES Module 天然支持单例（模块只执行一次），结合懒加载避免不必要的资源消耗。</p></div>
+    <pre id="output"></pre>
+    <script>
+        // ========== 1. IIFE + 闭包实现单例 ==========
+        const SingletonIIFE = (function() {
+            let instance = null; // 闭包中保存实例引用
+            function init() {
+                // 私有属性和方法
+                let counter = 0;
+                return {
+                    name: 'IIFE单例',
+                    getCounter: () => counter,
+                    increment: () => ++counter,
+                    reset: () => { counter = 0; }
+                };
+            }
+            return {
+                getInstance() {
+                    if (!instance) {
+                        instance = init();
+                        console.log('IIFE: 首次创建实例');
+                    } else {
+                        console.log('IIFE: 返回已有实例');
+                    }
+                    return instance;
+                }
+            };
+        })();
+
+        // ========== 2. Class静态方法 + 私有字段实现 ==========
+        class SingletonClass {
+            static #instance = null; // 私有静态字段存储实例
+
+            constructor(name = 'Class单例') {
+                if (SingletonClass.#instance) {
+                    console.log('Class: 返回已有实例');
+                    return SingletonClass.#instance;
+                }
+                this.name = name;
+                this.createdAt = new Date();
+                SingletonClass.#instance = this;
+                console.log('Class: 首次创建实例');
+            }
+
+            getInfo() {
+                return `名称: ${this.name}, 创建时间: ${this.createdAt.toLocaleString()}`;
+            }
+
+            // 静态工厂方法
+            static getInstance(name) {
+                if (!SingletonClass.#instance) {
+                    SingletonClass.#instance = new SingletonClass(name);
+                }
+                return SingletonClass.#instance;
+            }
+        }
+
+        // ========== 3. 懒加载单例（按需初始化，减少资源消耗） ==========
+        class LazySingleton {
+            static #instance = null;
+            static #initialized = false;
+
+            constructor() {
+                if (LazySingleton.#initialized) return LazySingleton.#instance;
+                this.data = { heavy: '延迟加载的数据' };
+                LazySingleton.#initialized = true;
+                LazySingleton.#instance = this;
+            }
+
+            static getInstance() {
+                if (!LazySingleton.#instance) {
+                    console.log('懒加载: 实例尚未创建，正在初始化...');
+                    LazySingleton.#instance = new LazySingleton();
+                }
+                return LazySingleton.#instance;
+            }
+        }
+
+        // ========== 4. 全局状态管理（实际应用示例） ==========
+        class AppState {
+            static #instance = null;
+            constructor() {
+                if (AppState.#instance) return AppState.#instance;
+                this.state = { user: null, theme: 'light', language: 'zh-CN' };
+                this.listeners = [];
+                AppState.#instance = this;
+            }
+
+            get(key) { return this.state[key]; }
+            set(key, value) {
+                this.state[key] = value;
+                this.listeners.forEach(fn => fn(key, value));
+                this.#render();
+            }
+            subscribe(fn) { this.listeners.push(fn); }
+
+            #render() {
+                document.getElementById('state-output').textContent = JSON.stringify(this.state, null, 2);
+            }
+        }
+
+        // ========== 页面交互与输出 ==========
+        const output = document.getElementById('output');
+        let lines = [];
+
+        function log(msg) {
+            lines.push(msg);
+            output.textContent = lines.join('\n');
+        }
+
+        log('=== 单例模式 演示 ===\n');
+
+        // 测试 IIFE 单例
+        log('--- IIFE 闭包单例 ---');
+        const a = SingletonIIFE.getInstance();
+        const b = SingletonIIFE.getInstance();
+        a.increment();
+        a.increment();
+        b.increment();
+        log(`a === b: ${a === b}`);
+        log(`计数器值: ${a.getCounter()}`);
+        log(`实例名: ${a.name}`);
+
+        log('\n--- Class 静态字段单例 ---');
+        const c = new SingletonClass('实例A');
+        const d = new SingletonClass('实例B');
+        log(`c === d: ${c === d}`);
+        log(`c === d: ${c === d}`); // 两次赋值是同一个
+        log(`c 信息: ${c.getInfo()}`);
+
+        log('\n--- 懒加载单例 ---');
+        log('LazySingleton 尚未初始化...');
+        const lazy1 = LazySingleton.getInstance();
+        const lazy2 = LazySingleton.getInstance();
+        log(`lazy1 === lazy2: ${lazy1 === lazy2}`);
+
+        log('\n--- 全局状态管理 ---');
+        const state = new AppState();
+        state.set('user', '张三');
+        state.set('theme', 'dark');
+        log('状态已更新，见下方面板 ↓');
+
+        // DOM 渲染
+        const container = document.createElement('div');
+        container.innerHTML = `
+            <div class="card">
+                <h2>全局状态演示</h2>
+                <div id="state-output" style="background:#1e1e1e;color:#d4d4d4;padding:15px;border-radius:4px;"></div>
+                <div style="margin-top:10px;">
+                    <button onclick="window.appState.set('theme', 'light')">浅色主题</button>
+                    <button onclick="window.appState.set('theme', 'dark')">深色主题</button>
+                    <button onclick="window.appState.set('language', 'en')">English</button>
+                    <button onclick="window.appState.set('language', 'zh-CN')">中文</button>
+                </div>
+            </div>
+        `;
+        document.body.insertBefore(container, document.querySelector('pre#output'));
+        window.appState = new AppState();
+        window.appState.set('theme', 'dark');
+    </script>
+</body>
+</html>

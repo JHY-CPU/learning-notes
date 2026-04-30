@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>对象方法</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>对象方法</h2><p>作为对象属性的函数称为方法。</p></div>
+    <div class="card">
+        <h2>定义方法</h2>
+        <div class="code">const user = {
+    name: 'Alice',
+    // 方式一：传统
+    sayHi: function() {
+        console.log('Hi!');
+    },
+    // 方式二：ES6 简写（推荐）
+    sayHello() {
+        console.log('Hello!');
+    },
+    // 方式三：箭头函数（注意 this 问题）
+    greet: () => {
+        console.log('Greetings!');
+    }
+};
+
+user.sayHi();     // 'Hi!'
+user.sayHello();  // 'Hello!'</div>
+    </div>
+    <div class="card">
+        <h2>方法中的 this</h2>
+        <div class="code">const user = {
+    name: 'Alice',
+    age: 25,
+    // 方法中的 this 指向调用方法的对象
+    introduce() {
+        console.log(`我叫${this.name}，今年${this.age}岁`);
+    },
+    // 箭头函数没有自己的 this
+    // this 指向外层（这里指向 window/全局）
+    arrowIntro: () => {
+        // console.log(this.name);  // undefined
+    }
+};
+
+user.introduce();  // '我叫Alice，今年25岁'
+
+// this 的值取决于如何调用
+const fn = user.introduce;
+fn();  // 此时 this 是 undefined（严格模式）或 window</div>
+    </div>
+    <div class="card">
+        <h2>链式调用</h2>
+        <div class="code">// 方法返回 this 就可以链式调用
+const calculator = {
+    value: 0,
+    add(n) {
+        this.value += n;
+        return this;  // 返回自身
+    },
+    subtract(n) {
+        this.value -= n;
+        return this;
+    },
+    multiply(n) {
+        this.value *= n;
+        return this;
+    },
+    getResult() {
+        return this.value;
+    }
+};
+
+calculator.add(5).subtract(2).multiply(3).getResult();
+// (0 + 5 - 2) × 3 = 9</div>
+    </div>
+    <div class="card">
+        <h2>动态添加方法</h2>
+        <div class="code">const car = { brand: 'Toyota' };
+
+// 添加方法
+car.drive = function() {
+    console.log(`${this.brand} 在行驶`);
+};
+
+car.drive();  // 'Toyota 在行驶'
+
+// 也可以用方括号
+car['stop'] = function() {
+    console.log('刹车');
+};</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== 方法定义 ===');
+        const user = {
+            name: 'Alice',
+            age: 25,
+            introduce() {
+                return `我叫${this.name}，今年${this.age}岁`;
+            },
+            setName(name) {
+                this.name = name;
+                return this;
+            },
+            setAge(age) {
+                this.age = age;
+                return this;
+            }
+        };
+        console.log(user.introduce());
+
+        console.log('=== 链式调用 ===');
+        user.setName('Bob').setAge(30);
+        console.log('链式修改后:', user.introduce());
+
+        console.log('=== Object 自带方法 ===');
+        console.log('Object.keys():', Object.keys(user));
+        console.log('Object.values():', Object.values(user));
+        console.log('Object.entries():', Object.entries(user));
+
+        console.log('=== 动态方法 ===');
+        const car = { brand: 'Tesla' };
+        car.start = function() { return `${this.brand} 启动了`; };
+        car.drive = function() { return `${this.brand} 行驶中`; };
+        console.log(car.start());
+        console.log(car.drive());
+
+        document.getElementById('output').textContent =
+            `${user.introduce()}\n` +
+            `Object.keys: ${Object.keys(user).join(', ')}\n` +
+            `动态方法: ${car.start()}\n` +
+            `✅ 对象方法演示完成！`;
+    </script>
+</body>
+</html>

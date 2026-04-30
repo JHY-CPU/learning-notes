@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>通知Notification</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #notif-status { background: #f8f9fa; padding: 15px; border-radius: 4px; font-size: 14px; }
+        #permission-status { font-weight: bold; padding: 3px 8px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Notification API</h2><p>浏览器桌面通知推送。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 检查支持
+if ('Notification' in window) {
+    // 支持桌面通知
+}
+
+// 请求权限（必须用户手势触发）
+Notification.requestPermission().then(permission => {
+    // 'granted' | 'denied' | 'default'
+});
+
+// 发送通知
+const notif = new Notification('标题', {
+    body: '通知正文内容',           // 正文
+    icon: '/icon.png',              // 图标 URL
+    image: '/image.png',            // 大图 URL
+    badge: '/badge.png',            // 标记图标（移动端）
+    tag: 'unique-tag',              // 标签（相同 tag 会替换前一个）
+    data: { key: 'value' },         // 自定义数据
+    vibrate: [200, 100, 200],       // 震动模式 [振, 停, 振]
+    silent: false,                  // 静音
+    requireInteraction: true,       // 不自动关闭
+    actions: [                      // 按钮（移动端）
+        { action: 'open', title: '打开' },
+        { action: 'close', title: '关闭' },
+    ],
+});
+
+// 事件
+notif.onshow = () => {};     // 已显示（已弃用）
+notif.onclick = () => {};    // 点击通知
+notif.onclose = () => {};    // 关闭通知
+notif.onerror = () => {};    // 出错
+
+// 关闭通知
+notif.close();
+
+// 检查当前权限
+Notification.permission; // 'granted' | 'denied' | 'default'</div>
+        <div class="note">⚠️ 必须通过用户手势（click/touch）请求权限。<br>
+        ⚠️ HTTPS 下才能使用（localhost 开发环境可以）。<br>
+        ⚠️ 移动端支持有限，iOS Safari 不支持。<br>
+        💡 tag 属性可用于去重：多条通知用相同 tag 只会显示最新一条。</div>
+    </div>
+    <div class="card">
+        <h2>演示：发送通知</h2>
+        <button onclick="requestPermission()">📢 请求通知权限</button>
+        <button onclick="sendSimple()">发送简单通知</button>
+        <button onclick="sendRich()">发送富通知（含图标+按钮）</button>
+        <button onclick="sendDelayed()">延迟 3 秒通知</button>
+        <div id="notif-status">
+            <div>权限状态: <span id="permission-status">未请求</span></div>
+            <div>点击"请求通知权限"按钮开始</div>
+        </div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const permStatus = document.getElementById('permission-status');
+
+        function updatePermStatus() {
+            if (!('Notification' in window)) {
+                permStatus.textContent = '❌ 不支持';
+                permStatus.style.color = '#e74c3c';
+                return;
+            }
+            const p = Notification.permission;
+            if (p === 'granted') {
+                permStatus.textContent = '✅ 已授权';
+                permStatus.style.color = '#2ecc71';
+            } else if (p === 'denied') {
+                permStatus.textContent = '❌ 已拒绝';
+                permStatus.style.color = '#e74c3c';
+            } else {
+                permStatus.textContent = '🔶 未请求';
+                permStatus.style.color = '#f39c12';
+            }
+        }
+        updatePermStatus();
+
+        function requestPermission() {
+            if (!('Notification' in window)) {
+                alert('浏览器不支持 Notification API');
+                return;
+            }
+            Notification.requestPermission().then(perm => {
+                updatePermStatus();
+                console.log('通知权限:', perm);
+            });
+        }
+
+        function sendSimple() {
+            if (Notification.permission !== 'granted') {
+                alert('请先授权通知权限');
+                return;
+            }
+            const notif = new Notification('简单通知', {
+                body: '这是一条桌面通知！',
+            });
+            notif.onclick = () => {
+                window.focus();
+                notif.close();
+                console.log('通知被点击');
+            };
+            console.log('发送简单通知');
+        }
+
+        function sendRich() {
+            if (Notification.permission !== 'granted') {
+                alert('请先授权通知权限');
+                return;
+            }
+            const notif = new Notification('📬 新消息', {
+                body: '你收到了 3 条新消息，点击查看详情。',
+                tag: 'message-notif',
+                requireInteraction: true,
+                actions: [
+                    { action: 'view', title: '查看' },
+                    { action: 'dismiss', title: '忽略' },
+                ],
+            });
+            notif.onclick = (e) => {
+                e.preventDefault();
+                window.focus();
+                notif.close();
+                console.log('点击通知');
+            };
+            console.log('发送富通知');
+        }
+
+        function sendDelayed() {
+            if (Notification.permission !== 'granted') {
+                alert('请先授权通知权限');
+                return;
+            }
+            setTimeout(() => {
+                new Notification('延迟通知', {
+                    body: '这条通知延迟了 3 秒出现',
+                });
+                console.log('延迟通知已发送');
+            }, 3000);
+            console.log('将在 3 秒后发送通知...');
+        }
+
+        console.log('=== Notification API ===');
+        console.log('支持通知:', 'Notification' in window);
+        console.log('当前权限:', Notification.permission);
+
+        document.getElementById('output').textContent =
+            `Notification: 桌面通知推送\n` +
+            `requestPermission / new Notification / close\n` +
+            `选项: body/icon/tag/data/actions/requireInteraction\n` +
+            `✅ Notification 演示完成！`;
+    </script>
+</body>
+</html>

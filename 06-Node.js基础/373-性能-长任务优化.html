@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>性能-长任务优化</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        .frame-diagram { font-family: monospace; font-size: 12px; line-height: 1.8; background: #f8f9fa; padding: 12px; border-radius: 4px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>性能-长任务优化</h2><p>Long Tasks API、任务分片(yield)、空闲执行、Scheduler API。</p></div>
+    <div class="card">
+        <h2>长任务优化 API</h2>
+        <div class="code">// ========== Long Tasks API ==========
+const observer = new PerformanceObserver((list) => {
+    for (const entry of list.getEntries()) {
+        console.log('长任务:', entry.duration, entry.name);
+    }
+});
+observer.observe({ entryTypes: ['longtask'] });
+
+// ========== 任务分片 (yield) ==========
+function yieldToMain() {
+    return new Promise(resolve => {
+        setTimeout(resolve, 0);
+    });
+}
+
+// ========== requestIdleCallback ==========
+requestIdleCallback((deadline) => {
+    while (deadline.timeRemaining() > 0) {
+        // 执行低优先级任务
+    }
+});
+
+// ========== Scheduler API (实验性) ==========
+await scheduler.postTask(() => heavyWork(), { priority: 'background' });</div>
+    </div>
+    <div class="card">
+        <h2>演示：长任务优化</h2>
+        <button onclick="demoLongTasks()">Long Tasks</button>
+        <button onclick="demoYield()">任务分片</button>
+        <button onclick="demoIdle()">空闲回调</button>
+        <button onclick="demoScheduler()">Scheduler</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoLongTasks() {
+            result.innerHTML = '';
+            log('⏱️ Long Tasks API:');
+            log('');
+
+            log('1️⃣ 什么是长任务?');
+            log('   • 占用主线程超过 50ms 的任务');
+            log('   • 阻塞用户交互、渲染');
+            log('   • 导致 INP (Interaction to Next Paint) 差');
+            log('');
+
+            log('2️⃣ Long Tasks API:');
+            log('   const observer = new PerformanceObserver((list) => {');
+            log('     for (const entry of list.getEntries()) {');
+            log('       console.log("📊 长任务:", {');
+            log('         duration: entry.duration,');
+            log('         startTime: entry.startTime,');
+            log('         name: entry.name,');
+            log('         attribution: entry.attribution');
+            log('       });');
+            log('     }');
+            log('   });');
+            log('   observer.observe({ entryTypes: ["longtask"] });');
+            log('');
+
+            log('3️⃣ 常见的长任务:');
+            log('   • 大数据列表渲染');
+            log('   • 图片/文件处理');
+            log('   • JSON 解析 (大对象)');
+            log('   • DOM 操作 (批量插入)');
+            log('   • 复杂 CSS 计算');
+            log('');
+
+            log('4️⃣ 任务拆分策略:');
+            log('   ┌─────────────────────────────────────────┐');
+            log('   │ 长任务 (300ms)                          │');
+            log('   ├─────────┬─────────┬─────────┬──────────┤');
+            log('   │ chunk 1 │ chunk 2 │ chunk 3 │ chunk 4  │');
+            log('   │ 50ms    │ 50ms    │ 50ms    │ 50ms     │');
+            log('   ├─────────┴─────────┴─────────┴──────────┤');
+            log('   │ 每块后 yield 给主线程                   │');
+            log('   └─────────────────────────────────────────┘');
+            log('');
+
+            log('5️⃣ 帧预算 (Frame Budget):');
+            log('   • 目标: 每帧 16.6ms (60fps)');
+            log('   • JS 执行: ≤ 10ms');
+            log('   • 渲染: ≤ 6ms');
+            log('   • 超过 50ms = 长任务');
+        }
+
+        function demoYield() {
+            result.innerHTML = '';
+            log('✂️ 任务分片 (Yield):');
+            log('');
+
+            log('1️⃣ yield 到主线程:');
+            log('   function yieldToMain() {');
+            log('     return new Promise(resolve => {');
+            log('       setTimeout(resolve, 0);');
+            log('     });');
+            log('   }');
+            log('');
+
+            log('2️⃣ 批量处理分片:');
+            log('   async function processInChunks(items, chunkSize = 50) {');
+            log('     let i = 0;');
+            log('     while (i < items.length) {');
+            log('       const chunk = items.slice(i, i + chunkSize);');
+            log('       processChunk(chunk);');
+            log('       i += chunkSize;');
+            log('       await yieldToMain();  // 让出主线程');
+            log('     }');
+            log('   }');
+            log('');
+
+            log('3️⃣ 使用 requestAnimationFrame:');
+            log('   function processWithRAF(items) {');
+            log('     let i = 0;');
+            log('     function frame() {');
+            log('       const start = performance.now();');
+            log('       while (i < items.length && (performance.now() - start) < 5) {');
+            log('         processItem(items[i]);');
+            log('         i++;');
+            log('       }');
+            log('       if (i < items.length) requestAnimationFrame(frame);');
+            log('     }');
+            log('     requestAnimationFrame(frame);');
+            log('   }');
+            log('');
+
+            log('4️⃣ setTimeout(fn, 0) vs postMessage:');
+            log('   setTimeout(fn, 0): 最小延迟 4ms (浏览器限制)');
+            log('   postMessage: 更快触发 (~0ms, 但复杂)');
+            log('');
+
+            log('5️⃣ 分片大小选择:');
+            log('   • 大分片: 吞吐量高, 但可能阻塞');
+            log('   • 小分片: 交互流畅, 但总时间长');
+            log('   • 建议: 每 5ms 检查一次时间预算');
+        }
+
+        function demoIdle() {
+            result.innerHTML = '';
+            log('😴 requestIdleCallback:');
+            log('');
+
+            log('1️⃣ 基本用法:');
+            log('   requestIdleCallback((deadline) => {');
+            log('     // deadline.timeRemaining() — 剩余空闲时间');
+            log('     // deadline.didTimeout — 是否超时');
+            log('     while (deadline.timeRemaining() > 0) {');
+            log('       // 执行低优先级任务');
+            log('     }');
+            log('   }, { timeout: 2000 });  // 最多等 2s');
+            log('');
+
+            log('2️⃣ 适用场景:');
+            log('   • 发送分析/埋点数据');
+            log('   • 预渲染内容');
+            log('   • 数据清理/缓存');
+            log('   • 非关键计算');
+            log('');
+
+            log('3️⃣ 空闲回调示例:');
+            log('   const tasks = [task1, task2, task3, task4];');
+            log('   function doWork(deadline) {');
+            log('     while (deadline.timeRemaining() > 0 && tasks.length > 0) {');
+            log('       const task = tasks.shift();');
+            log('       task();');
+            log('     }');
+            log('     if (tasks.length > 0) {');
+            log('       requestIdleCallback(doWork);');
+            log('     }');
+            log('   }');
+            log('   requestIdleCallback(doWork);');
+            log('');
+
+            log('4️⃣ 空闲时间:');
+            log('   • 用户无交互时');
+            log('   • 浏览器完成渲染后');
+            log('   • 通常几十 ms (取决于设备)');
+            log('   • 任务应在 timeRemaining() 内完成');
+            log('');
+
+            log('5️⃣ 注意:');
+            log('   • Safari 不支持');
+            log('   • 空闲回调可能永远不会触发');
+            log('   • 不适合 UI 更新 (可能延迟到下一帧)');
+        }
+
+        function demoScheduler() {
+            result.innerHTML = '';
+            log('📋 Scheduler API (实验性):');
+            log('');
+
+            log('1️⃣ scheduler.postTask:');
+            log('   // 优先级的任务调度');
+            log('   const task = await scheduler.postTask(() => {');
+            log('     return heavyComputation();');
+            log('   }, {');
+            log('     priority: "background",');
+            log('     delay: 1000,');
+            log('     signal: abortController.signal');
+            log('   });');
+            log('');
+
+            log('2️⃣ 优先级:');
+            log('   • "user-blocking" — 用户阻塞 (最高)');
+            log('     (点击响应, 输入反馈)');
+            log('   • "user-visible"  — 用户可见');
+            log('     (渲染, 动画)');
+            log('   • "background"   — 后台');
+            log('     (日志, 分析, 预加载)');
+            log('');
+
+            log('3️⃣ 优先级动态调整:');
+            log('   const controller = new TaskController("background");');
+            log('   const task = scheduler.postTask(fn, { signal: controller.signal });');
+            log('   // 动态提升优先级');
+            log('   controller.setPriority("user-visible");');
+            log('');
+
+            log('4️⃣ 可中断任务:');
+            log('   const controller = new AbortController();');
+            log('   scheduler.postTask(fn, { signal: controller.signal });');
+            log('   controller.abort();  // 取消任务');
+            log('');
+
+            log('5️⃣ 浏览器支持 (2025):');
+            log('   • Chrome 87+: postTask');
+            log('   • Firefox: 开发中');
+            log('   • Safari: 不支持');
+            log('   • 可用 polyfill 或 worker 替代');
+            log('');
+
+            log('6️⃣ 优化策略总结:');
+            log('   ① 识别长任务 (Long Tasks API)');
+            log('   ② 分片执行 (yieldToMain)');
+            log('   ③ 使用空闲回调 (requestIdleCallback)');
+            log('   ④ 使用 Worker (heavy computation)');
+            log('   ⑤ 使用 Scheduler API (优先级)');
+        }
+
+        console.log('=== 性能-长任务优化 ===');
+        document.getElementById('output').textContent =
+            `长任务优化: Long Tasks API / 任务分片 / requestIdleCallback / Scheduler API\n` +
+            `✅ 长任务优化演示完成！`;
+    </script>
+</body>
+</html>

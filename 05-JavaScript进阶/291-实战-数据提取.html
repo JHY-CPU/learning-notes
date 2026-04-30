@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实战-数据提取</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #extract-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; margin: 5px 0; width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>实战：数据提取</h2><p>提取 URL 参数、解析日志、HTML 标签、JSON 字符串提取。</p></div>
+    <div class="card">
+        <h2>数据提取场景</h2>
+        <div class="code">// ========== 提取 URL 参数 ==========
+function getQueryParams(url) {
+    const params = {};
+    url.replace(/[?&]+(\w+)=([^&#]*)/g, (_, key, val) => {
+        params[key] = decodeURIComponent(val);
+    });
+    return params;
+}
+
+// ========== 解析日志 ==========
+// 格式: [2024-01-15 10:30:00] [ERROR] 消息内容
+const logPattern = /^\[(.+?)\]\s*\[(\w+)\]\s*(.+)$/gm;
+
+// ========== 提取 HTML 标签 ==========
+// 提取所有链接
+const links = html.match(/<a\s[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi);
+
+// 提取图片
+const imgs = html.match(/<img\s[^>]*src="([^"]*)"[^>]*>/gi);
+
+// ========== 提取 JSON 字符串 ==========
+const jsonStr = str.match(/\{.*\}/s)?.[0];
+
+// ========== 提取邮箱 ==========
+const emails = text.match(/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g);
+
+// ========== 提取数字 ==========
+const numbers = text.match(/-?\d+(\.\d+)?/g);</div>
+    </div>
+    <div class="card">
+        <h2>演示：数据提取</h2>
+        <button onclick="demoURLExtract()">提取 URL 参数</button>
+        <button onclick="demoLogExtract()">解析日志</button>
+        <button onclick="demoHTMLExtract()">提取 HTML</button>
+        <div id="extract-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const extractResult = document.getElementById('extract-result');
+
+        function log(msg) {
+            extractResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoURLExtract() {
+            extractResult.innerHTML = '';
+            log('🔗 提取 URL 参数:');
+            log('');
+
+            const url = 'https://example.com/page?name=Alice&age=25&lang=zh-CN&q=hello+world';
+            log(`URL: ${url}`);
+            log('');
+
+            const params = {};
+            url.replace(/[?&]+(\w+)=([^&#]*)/g, (_, key, val) => {
+                params[key] = decodeURIComponent(val.replace(/\+/g, ' '));
+            });
+
+            log('提取结果:');
+            Object.entries(params).forEach(([k, v]) => log(`   ${k}: ${v}`));
+            log('');
+
+            // 提取 hash
+            const hash = url.match(/#.*/)?.[0] || '无';
+            log(`Hash: ${hash}`);
+
+            // 提取域名
+            const domain = url.match(/https?:\/\/([^\/]+)/)?.[1];
+            log(`域名: ${domain}`);
+            log('');
+            log('📌 正则: /[?&]+(\\w+)=([^&#]*)/g');
+        }
+
+        function demoLogExtract() {
+            extractResult.innerHTML = '';
+            log('📝 解析日志:');
+            log('');
+
+            const logData = `[2024-01-15 10:30:00] [INFO] Server started
+[2024-01-15 10:30:05] [ERROR] Connection timeout: db.example.com
+[2024-01-15 10:30:10] [WARN] Memory usage above 80%
+[2024-01-15 10:30:15] [ERROR] Failed to process request #1234
+[2024-01-15 10:30:20] [INFO] Request completed`;
+
+            log('原始日志:');
+            log(logData);
+            log('');
+
+            const logRe = /^\[(.+?)\]\s*\[(\w+)\]\s*(.+)$/gm;
+            let match;
+            const errors = [];
+
+            log('解析结果:');
+            while ((match = logRe.exec(logData)) !== null) {
+                const [, time, level, msg] = match;
+                const icon = level === 'ERROR' ? '❌' : level === 'WARN' ? '⚠️' : '✅';
+                log(`   ${icon} [${time}] [${level}] ${msg}`);
+                if (level === 'ERROR') errors.push({ time, msg });
+            }
+
+            log('');
+            log(`📊 错误数: ${errors.length}`);
+            errors.forEach(e => log(`   ❌ ${e.time} - ${e.msg}`));
+        }
+
+        function demoHTMLExtract() {
+            extractResult.innerHTML = '';
+            log('🌐 提取 HTML 数据:');
+            log('');
+
+            const html = `<div class="content">
+    <a href="/page1" class="link">页面 1</a>
+    <a href="/page2" class="link">页面 2</a>
+    <img src="image1.jpg" alt="图片1">
+    <img src="image2.png" alt="图片2">
+    <p>Hello World</p>
+</div>`;
+
+            log('HTML 片段:');
+            log(html);
+            log('');
+
+            // 提取所有链接
+            const linkRe = /<a\s[^>]*href="([^"]*)"[^>]*>(.*?)<\/a>/gi;
+            let linkMatch;
+            log('🔗 提取链接:');
+            while ((linkMatch = linkRe.exec(html)) !== null) {
+                log(`   href: ${linkMatch[1]}, text: ${linkMatch[2]}`);
+            }
+
+            // 提取图片
+            const imgRe = /<img\s[^>]*src="([^"]*)"[^>]*>/gi;
+            let imgMatch;
+            log('\n🖼️ 提取图片:');
+            while ((imgMatch = imgRe.exec(html)) !== null) {
+                const alt = imgMatch[0].match(/alt="([^"]*)"/)?.[1] || '';
+                log(`   src: ${imgMatch[1]}, alt: "${alt}"`);
+            }
+
+            // 提取纯文本
+            const text = html.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+            log(`\n📄 纯文本: "${text}"`);
+        }
+
+        console.log('=== 实战: 数据提取 ===');
+
+        document.getElementById('output').textContent =
+            `实战数据提取: URL参数 / 日志解析 / HTML标签 / 邮箱 / 数字\n` +
+            `正则: exec逐次匹配 / 全局 match / 捕获组\n` +
+            `✅ 数据提取实战完成！`;
+    </script>
+</body>
+</html>

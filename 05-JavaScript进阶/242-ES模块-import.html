@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ES模块-import</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #import-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>ES 模块 — import</h2><p>import 语法大全、重命名 as、全部导入 *、import.meta。</p></div>
+    <div class="card">
+        <h2>import 语法大全</h2>
+        <div class="code">// ========== 导入 named export ==========
+import { sum, PI } from './math.js';
+import { sum as add, PI as pi } from './math.js';  // 重命名
+
+// ========== 导入 default export ==========
+import defaultFn from './module.js';               // 名称可自定义
+import { default as myDefault } from './module.js'; // 等价
+
+// ========== 混合导入 ==========
+import React, { useState, useEffect } from 'react';
+
+// ========== 全部导入 (namespace) ==========
+import * as math from './math.js';
+math.sum(1, 2);  // 通过命名空间访问
+math.PI;
+
+// ========== 导入并重导出 ==========
+export { sum } from './math.js';  // 简单转发
+
+// ========== 仅执行模块 (side effect) ==========
+import './polyfill.js';  // 不导入任何绑定，仅执行模块代码
+
+// ========== import.meta (ES2020) ==========
+console.log(import.meta.url);       // 当前模块 URL
+console.log(import.meta.resolve);   // 解析模块路径 (ES2022)
+
+// ========== import 特性 ==========
+// ✅ 静态导入，提升到模块顶部执行
+// ✅ 支持路径解析（相对/绝对/裸模块名需 importmap）
+// ✅ 导入的绑定是只读引用（不能重新赋值）
+// ❌ 不能在块/函数中使用静态 import
+// ❌ 不支持动态路径（变量）</div>
+    </div>
+    <div class="card">
+        <h2>演示：模拟 import 行为</h2>
+        <button onclick="demoImport()">模拟 import 演示</button>
+        <div id="import-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const importResult = document.getElementById('import-result');
+
+        function log(msg) {
+            importResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // 模拟模块系统
+        const moduleSystem = {
+            modules: {},
+            define(name, factory) {
+                this.modules[name] = factory();
+            },
+            import(names, callback) {
+                const deps = names.map(n => this.modules[n]);
+                callback(...deps);
+            },
+            importAll(names, callback) {
+                const ns = {};
+                names.forEach(n => { ns[n] = this.modules[n]; });
+                callback(ns);
+            }
+        };
+
+        // 定义模块
+        moduleSystem.define('math', () => ({
+            sum: (a, b) => a + b,
+            PI: 3.14159,
+            multiply: (a, b) => a * b,
+        }));
+
+        moduleSystem.define('utils', () => ({
+            greet: (name) => `Hello, ${name}!`,
+            VERSION: '1.0.0',
+        }));
+
+        // 默认导出模拟
+        moduleSystem.define('defaultModule', () => {
+            const main = () => 'default function called';
+            main.VERSION = '1.0';
+            return { default: main, VERSION: '1.0' };
+        });
+
+        function demoImport() {
+            importResult.innerHTML = '';
+
+            log('📥 ES Module import 模拟演示：');
+            log('');
+
+            log('1️⃣ 命名导入 (named import):');
+            moduleSystem.import(['math'], (math) => {
+                log(`   sum(2, 3) = ${math.sum(2, 3)}`);
+                log(`   PI = ${math.PI}`);
+            });
+            log('');
+
+            log('2️⃣ 重命名导入 (import as):');
+            moduleSystem.import(['math'], (m) => {
+                const add = m.sum;
+                log(`   add(5, 7) = ${add(5, 7)}`);
+            });
+            log('');
+
+            log('3️⃣ 全部导入 (namespace import):');
+            moduleSystem.importAll(['math', 'utils'], (modules) => {
+                log(`   math.PI = ${modules.math.PI}`);
+                log(`   utils.greet("Alice") = ${modules.utils.greet("Alice")}`);
+            });
+            log('');
+
+            log('4️⃣ 默认导入 (default import):');
+            moduleSystem.import(['defaultModule'], (m) => {
+                log(`   default() = ${m.default()}`);
+                log(`   VERSION = ${m.VERSION}`);
+            });
+            log('');
+
+            log('5️⃣ import 特性总结:');
+            log('   • 静态导入，提升到模块顶部');
+            log('   • 导入的绑定是只读引用');
+            log('   • 支持重命名 as、全部导入 *');
+            log('   • import.meta.url 获取当前模块 URL');
+        }
+
+        console.log('=== ES 模块 import ===');
+
+        document.getElementById('output').textContent =
+            `ES 模块 import: named / default / namespace / import.meta\n` +
+            `import { a, b } / import * as / import x from / import './side-effect'\n` +
+            `✅ ES 模块 import 演示完成！`;
+    </script>
+</body>
+</html>

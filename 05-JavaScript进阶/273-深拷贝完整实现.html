@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>深拷贝完整实现</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        .result-grid { display: flex; gap: 15px; flex-wrap: wrap; margin: 10px 0; }
+        .result-panel { flex: 1; min-width: 200px; background: #f8f9fa; border-radius: 8px; padding: 15px; border: 2px solid #ddd; }
+        .result-panel h4 { margin: 0 0 10px 0; color: #2c3e50; }
+        .result-panel .status { font-size: 14px; padding: 4px 8px; border-radius: 4px; display: inline-block; }
+        .status.ok { background: #d5f5e3; color: #27ae60; }
+        .status.fail { background: #fadbd8; color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>深拷贝完整实现</h2><p>递归复制对象及其所有嵌套对象，与浅拷贝不同，深拷贝创建完全独立的副本。处理循环引用、特殊对象、Symbol 键等边界情况。</p></div>
+    <div class="card"><h2>deepClone vs JSON.parse(JSON.stringify())</h2><p>JSON 方法无法处理：Date (变成字符串)、RegExp (变成空对象)、undefined/Symbol/函数 (被忽略)、循环引用 (抛异常)、Map/Set (变成空对象)。</p></div>
+    <div class="card"><h2>交互演示</h2><p>
+        <button onclick="demoDeepClone()">深拷贝演示</button>
+        <button onclick="demoVsJSON()">对比 JSON 方法</button>
+        <button onclick="demoCircular()">循环引用</button>
+        <button onclick="demoSpecialTypes()">特殊类型</button>
+    </p></div>
+    <pre id="output"></pre>
+    <script>
+        const output = document.getElementById('output');
+
+        function log(msg) {
+            output.textContent += msg + '\n';
+            console.log(msg);
+        }
+
+        function clearLog() {
+            output.textContent = '';
+        }
+
+        // ========== 完整 deepClone 实现 ==========
+        function deepClone(value, seen = new WeakMap()) {
+            // 处理基本类型和 null
+            if (value === null || typeof value !== 'object') {
+                return value;
+            }
+
+            // 循环引用检测
+            if (seen.has(value)) {
+                return seen.get(value);
+            }
+
+            // Date
+            if (value instanceof Date) {
+                return new Date(value.getTime());
+            }
+
+            // RegExp
+            if (value instanceof RegExp) {
+                const flags = value.flags || (value.global ? 'g' : '') + (value.ignoreCase ? 'i' : '') + (value.multiline ? 'm' : '');
+                return new RegExp(value.source, flags);
+            }
+
+            // Map
+            if (value instanceof Map) {
+                const result = new Map();
+                seen.set(value, result);
+                value.forEach((v, k) => result.set(deepClone(k, seen), deepClone(v, seen)));
+                return result;
+            }
+
+            // Set
+            if (value instanceof Set) {
+                const result = new Set();
+                seen.set(value, result);
+                value.forEach(v => result.add(deepClone(v, seen)));
+                return result;
+            }
+
+            // TypedArray
+            if (ArrayBuffer.isView(value) && !(value instanceof DataView)) {
+                return new (value.constructor)(value);
+            }
+
+            // ArrayBuffer
+            if (value instanceof ArrayBuffer) {
+                return value.slice(0);
+            }
+
+            // DataView
+            if (value instanceof DataView) {
+                return new DataView(deepClone(value.buffer));
+            }
+
+            // Promise / WeakMap / WeakSet — 不可复制，返回同一个引用
+            if (value instanceof Promise || value instanceof WeakMap || value instanceof WeakSet) {
+                return value;
+            }
+
+            // Error
+            if (value instanceof Error) {
+                const error = new value.constructor(value.message);
+                error.stack = value.stack;
+                return error;
+            }
+
+            // 普通对象或数组
+            const result = Array.isArray(value) ? [] : Object.create(Object.getPrototypeOf(value));
+            seen.set(value, result);
+
+            // 复制所有可枚举和不可枚举的自身属性（含 Symbol 键）
+            const keys = [
+                ...Object.getOwnPropertyNames(value),
+                ...Object.getOwnPropertySymbols(value)
+            ];
+
+            for (const key of keys) {
+                const descriptor = Object.getOwnPropertyDescriptor(value, key);
+                if (descriptor) {
+                    if ('value' in descriptor) {
+                        result[key] = deepClone(descriptor.value, seen);
+                    } else {
+                        // getter/setter — 复制整个描述符
+                        Object.defineProperty(result, key, descriptor);
+                    }
+                }
+            }
+
+            return result;
+        }
+
+        // ========== 1. 深拷贝演示 ==========
+        function demoDeepClone() {
+            clearLog();
+            log('=== 深拷贝演示 ===\n');
+
+            const original = {
+                name: '张三',
+                age: 25,
+                hobbies: ['coding', 'reading', 'gaming'],
+                address: {
+                    city: '北京',
+                    zip: '100000',
+                    coordinates: { lat: 39.9, lng: 116.4 }
+                },
+                nested: {
+                    deeper: {
+                        value: 42
+                    }
+                }
+            };
+
+            const cloned = deepClone(original);
+
+            // 修改克隆对象
+            cloned.name = '李四';
+            cloned.hobbies[0] = 'design';
+            cloned.address.city = '上海';
+
+            log('修改克隆对象后:');
+            log(`original.name = ${original.name} (不受影响)`);
+            log(`cloned.name = ${cloned.name}`);
+            log(`original.hobbies[0] = ${original.hobbies[0]} (不受影响)`);
+            log(`cloned.hobbies[0] = ${cloned.hobbies[0]}`);
+            log(`original.address.city = ${original.address.city} (不受影响)`);
+            log(`cloned.address.city = ${cloned.address.city}`);
+
+            log('\n深拷贝: 所有嵌套对象完全独立 ✓');
+        }
+
+        // ========== 2. 对比 JSON 方法 ==========
+        function demoVsJSON() {
+            clearLog();
+            log('=== deepClone vs JSON.parse(JSON.stringify()) ===\n');
+
+            const original = {
+                name: '测试',
+                date: new Date(),
+                regex: /hello/gi,
+                undef: undefined,
+                symbol: Symbol('test'),
+                func: function() { return 'hi'; },
+                map: new Map([['key', 'value']]),
+                set: new Set([1, 2, 3]),
+                infinity: Infinity,
+                nan: NaN
+            };
+
+            log('原始值:');
+            log(`  date: ${original.date}`);
+            log(`  regex: ${original.regex}`);
+            log(`  undef: ${original.undef}`);
+            log(`  symbol: ${String(original.symbol)}`);
+            log(`  func: ${original.func}`);
+
+            try {
+                const jsonResult = JSON.parse(JSON.stringify(original));
+                log('\nJSON.parse(JSON.stringify()) 结果:');
+                log(`  date: "${jsonResult.date}" (变成了字符串!)`);
+                log(`  regex: ${JSON.stringify(jsonResult.regex)} (变成了空对象!)`);
+                log(`  undef: ${'undef' in jsonResult} (被忽略了!)`);
+                log(`  symbol: ${'symbol' in jsonResult} (被忽略了!)`);
+                log(`  func: ${'func' in jsonResult} (被忽略了!)`);
+                log(`  map: ${JSON.stringify(jsonResult.map)} (变成了空对象!)`);
+                log(`  infinity: ${jsonResult.infinity} (变成了 null!)`);
+            } catch (e) {
+                log(`\nJSON 方法出错: ${e.message}`);
+            }
+
+            const cloned = deepClone(original);
+            log('\ndeepClone 结果:');
+            log(`  date: ${cloned.date} (保持 Date 类型) ✓`);
+            log(`  regex: ${cloned.regex} (保持 RegExp 类型) ✓`);
+            log(`  undef: ${'undef' in cloned} (保留 undefined) ✓`);
+            log(`  symbol: ${'symbol' in cloned} (保留 Symbol 键) ✓`);
+            log(`  func: ${'func' in cloned} (保留函数) ✓`);
+            log(`  map: ${cloned.map instanceof Map} (保持 Map 类型) ✓`);
+            log(`  set: ${cloned.set instanceof Set} (保持 Set 类型) ✓`);
+        }
+
+        // ========== 3. 循环引用 ==========
+        function demoCircular() {
+            clearLog();
+            log('=== 循环引用处理 ===\n');
+
+            const obj = { name: '循环引用示例' };
+            obj.self = obj; // 自引用
+            obj.nested = { parent: obj }; // 循环引用
+
+            log('原始对象: obj.self === obj');
+            log('原始对象: obj.nested.parent === obj');
+            log('\n使用 JSON.parse(JSON.stringify()):');
+            try {
+                JSON.parse(JSON.stringify(obj));
+            } catch (e) {
+                log(`  错误: ${e.message}`);
+            }
+
+            log('\n使用 deepClone:');
+            const cloned = deepClone(obj);
+            log(`  cloned.self === cloned: ${cloned.self === cloned} (保持循环引用) ✓`);
+            log(`  cloned.nested.parent === cloned: ${cloned.nested.parent === cloned} ✓`);
+            log(`  cloned === obj: ${cloned === obj} (完全独立副本) ✓`);
+        }
+
+        // ========== 4. 特殊类型集合 ==========
+        function demoSpecialTypes() {
+            clearLog();
+            log('=== 特殊类型处理 ===\n');
+
+            const original = {
+                // 基本类型
+                str: 'hello',
+                num: 42,
+                bool: true,
+                nullVal: null,
+                // 特殊对象
+                date: new Date('2024-01-01'),
+                regex: /test\d+/gi,
+                map: new Map([['a', 1], ['b', 2], ['c', 3]]),
+                set: new Set([10, 20, 30]),
+                // 数组
+                arr: [1, 'two', { three: 3 }],
+                // Symbol 键
+                [Symbol('secret')]: 'hidden value',
+                // TypedArray
+                typedArray: new Uint8Array([1, 2, 3, 4, 5]),
+                // Error
+                error: new TypeError('类型错误示例'),
+                // 嵌套
+                nested: { level1: { level2: { value: 'deep' } } }
+            };
+
+            const cloned = deepClone(original);
+
+            log('验证克隆结果:');
+            log(`  date: ${cloned.date instanceof Date} ${cloned.date.toISOString()}`);
+            log(`  regex: ${cloned.regex instanceof RegExp} ${cloned.regex.source}`);
+            log(`  map: ${cloned.map instanceof Map}, size=${cloned.map.size}`);
+            log(`  set: ${cloned.set instanceof Set}, size=${cloned.set.size}`);
+            log(`  typedArray: ${cloned.typedArray instanceof Uint8Array}, [${cloned.typedArray}]`);
+            log(`  error: ${cloned.error instanceof TypeError}, message="${cloned.error.message}"`);
+            log(`  Symbol 键数量: ${Object.getOwnPropertySymbols(cloned).length}`);
+
+            // 验证独立性
+            cloned.nested.level1.level2.value = 'modified';
+            log(`\n修改独立性检查:`);
+            log(`  original.nested.level1.level2.value = "${original.nested.level1.level2.value}"`);
+            log(`  cloned.nested.level1.level2.value = "${cloned.nested.level1.level2.value}"`);
+        }
+
+        log('=== 深拷贝完整实现 演示 ===\n完善的深拷贝需处理 Date、RegExp、Map、Set、循环引用、Symbol 键等边界情况。\n\n点击上方按钮查看不同示例。');
+    </script>
+</body>
+</html>

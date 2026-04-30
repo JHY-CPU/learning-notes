@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python高级数据结构</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📊 Python 高级数据结构</h2><p>collections 模块深入: Counter 计数、defaultdict 默认字典、deque 双端队列、ChainMap 链式映射、OrderedDict 有序字典、heapq 堆队列、bisect 二分查找。</p></div>
+    <div class="card">
+        <h2>Counter 计数器</h2>
+        <div class="code">// ========== Counter 基础 ==========
+// dict 子类,用于计数
+
+from collections import Counter
+
+# 字符串计数:
+word = "mississippi"
+count = Counter(word)
+print(count)                   # Counter({'i': 4, 's': 4, 'p': 2, 'm': 1})
+print(count["i"])              # 4
+print(count["x"])              # 0 (不会 KeyError!)
+
+# 列表计数:
+fruits = ["apple", "banana", "apple", "orange", "banana", "apple"]
+c = Counter(fruits)
+print(c)                       # Counter({'apple': 3, 'banana': 2, 'orange': 1})
+
+// ========== Counter 方法 ==========
+c = Counter(["a", "b", "a", "c", "a", "b"])
+
+# most_common: 最常见的 N 个
+print(c.most_common())         # [('a', 3), ('b', 2), ('c', 1)]
+print(c.most_common(2))        # [('a', 3), ('b', 2)]
+
+# elements: 展开所有元素
+print(list(c.elements()))      # ['a', 'a', 'a', 'b', 'b', 'c']
+
+# subtract: 相减
+c2 = Counter(["a", "b"])
+c.subtract(c2)
+print(c)                       # Counter({'a': 2, 'c': 1, 'b': 1})
+
+# update: 累加
+c.update(["a", "a"])
+print(c)                       # Counter({'a': 4, 'c': 1, 'b': 1})
+
+// ========== 算术运算 ==========
+c1 = Counter(a=3, b=1, c=0)
+c2 = Counter(a=1, b=2, d=1)
+
+print(c1 + c2)                 # Counter({'a': 4, 'b': 3, 'd': 1}) (合并)
+print(c1 - c2)                 # Counter({'a': 2}) (只保留正数)
+print(c1 & c2)                 # Counter({'a': 1, 'b': 1}) (交集:取最小值)
+print(c1 | c2)                 # Counter({'a': 3, 'b': 2, 'd': 1}) (并集:取最大值)</div>
+    </div>
+    <div class="card">
+        <h2>defaultdict 默认字典</h2>
+        <div class="code">// ========== defaultdict 基础 ==========
+// dict 子类,访问不存在的键自动创建默认值
+
+from collections import defaultdict
+
+// ❌ 普通 dict 访问不存在的键:
+d = {}
+# print(d["key"])              # KeyError!
+
+// ✅ defaultdict:
+dd = defaultdict(int)           # 默认值 0
+print(dd["count"])              # 0 (自动创建)
+dd["count"] += 1
+print(dd["count"])              # 1
+
+// ========== 常用默认工厂 ==========
+# int → 0
+dd_int = defaultdict(int)
+print(dd_int["x"])              # 0
+
+# list → []
+dd_list = defaultdict(list)
+dd_list["users"].append("Alice")
+print(dd_list["users"])         # ["Alice"]
+
+# set → set()
+dd_set = defaultdict(set)
+dd_set["tags"].add("python")
+print(dd_set["tags"])           # {"python"}
+
+# str → ""
+dd_str = defaultdict(str)
+print(repr(dd_str["name"]))    # ""
+
+# 自定义工厂:
+dd_custom = defaultdict(lambda: "N/A")
+print(dd_custom["key"])         # "N/A"
+
+// ========== 实际应用 ==========
+# 分组:
+data = [("A", 1), ("B", 2), ("A", 3), ("B", 4), ("A", 5)]
+
+groups = defaultdict(list)
+for key, value in data:
+    groups[key].append(value)
+
+print(groups)                    # {"A": [1, 3, 5], "B": [2, 4]}
+
+# 词频统计 (比 Counter 更灵活):
+text = "the quick brown fox jumps over the lazy dog"
+word_counts = defaultdict(int)
+for word in text.split():
+    word_counts[word] += 1
+
+print(word_counts["the"])       # 2
+
+# 嵌套 defaultdict (树形结构):
+tree = lambda: defaultdict(tree)
+nested = tree()
+nested["user"]["name"] = "Alice"
+nested["user"]["age"] = 25
+print(dict(nested["user"]))     # {"name": "Alice", "age": 25}</div>
+    </div>
+    <div class="card">
+        <h2>deque 双端队列</h2>
+        <div class="code">// ========== deque 基础 ==========
+// 双端队列: 两端都有高效 O(1) 的插入/删除
+
+from collections import deque
+
+d = deque()
+
+# 右端添加:
+d.append("right")
+d.append("right2")
+
+# 左端添加:
+d.appendleft("left")
+d.appendleft("left2")
+
+print(d)                       # deque(['left2', 'left', 'right', 'right2'])
+
+# 弹出:
+print(d.pop())                 # "right2" (右端)
+print(d.popleft())             # "left2" (左端)
+print(d)                       # deque(['left', 'right'])
+
+// ========== 实用方法 ==========
+d = deque([1, 2, 3, 4, 5])
+
+# 旋转:
+d.rotate(1)                    # 右移一位
+print(d)                       # deque([5, 1, 2, 3, 4])
+
+d.rotate(-2)                   # 左移两位
+print(d)                       # deque([2, 3, 4, 5, 1])
+
+# 限制长度 (自动抛弃旧元素):
+d = deque(maxlen=3)
+d.extend([1, 2, 3])
+print(d)                       # deque([1, 2, 3], maxlen=3)
+d.append(4)
+print(d)                       # deque([2, 3, 4], maxlen=3) (1 被丢弃了)
+
+# 扩展:
+d = deque([1, 2])
+d.extend([3, 4])               # 右端扩展
+d.extendleft([0, -1])          # 左端扩展 (逆序插入)
+print(d)                       # deque([-1, 0, 1, 2, 3, 4])
+
+// ========== 实际应用 ==========
+# 1. 队列 (FIFO)
+queue = deque()
+queue.append("任务1")
+queue.append("任务2")
+queue.append("任务3")
+while queue:
+    task = queue.popleft()
+    print(f"处理: {task}")
+
+# 2. 栈 (LIFO)
+stack = deque()
+stack.append("a")
+stack.append("b")
+stack.append("c")
+while stack:
+    item = stack.pop()
+    print(f"弹出: {item}")     # c, b, a
+
+# 3. 最近 N 条记录
+recent = deque(maxlen=5)
+for i in range(20):
+    recent.append(f"记录{i}")
+print(recent)
+# deque(['记录15', '记录16', '记录17', '记录18', '记录19'], maxlen=5)</div>
+    </div>
+    <div class="card">
+        <h2>ChainMap, OrderedDict, heapq, bisect</h2>
+        <div class="code">// ========== ChainMap 链式映射 ==========
+// 将多个字典合并为一个视图
+
+from collections import ChainMap
+
+defaults = {"host": "localhost", "port": 8080, "debug": False}
+user_config = {"port": 3000, "debug": True}
+
+# 用户配置覆盖默认值:
+config = ChainMap(user_config, defaults)
+print(config["host"])          # "localhost" (从 defaults)
+print(config["port"])          # 3000 (从 user_config)
+print(config["debug"])         # True
+
+# 修改只在第一个字典进行
+config["port"] = 5000
+print(user_config["port"])     # 5000
+
+// ========== OrderedDict (Python 3.7+) ==========
+// Python 3.7+ dict 已经有序,但 OrderedDict 有额外方法
+
+from collections import OrderedDict
+
+od = OrderedDict()
+od["a"] = 1
+od["b"] = 2
+od["c"] = 3
+
+# 移动到末尾:
+od.move_to_end("a")
+print(list(od.keys()))         # ['b', 'c', 'a']
+
+# 移动到开头:
+od.move_to_end("a", last=False)
+print(list(od.keys()))         # ['a', 'b', 'c']
+
+# popitem 弹出:
+print(od.popitem(last=True))   # ('c', 3) (从末尾)
+
+// ========== heapq 堆队列 ==========
+import heapq
+
+nums = [3, 1, 4, 1, 5, 9, 2, 6]
+heapq.heapify(nums)            # 转为最小堆
+print(heapq.heappop(nums))     # 1 (最小元素)
+print(heapq.heappop(nums))     # 1
+print(heapq.heappop(nums))     # 2
+
+# 最大 N 个 / 最小 N 个:
+nums = [3, 1, 4, 1, 5, 9, 2, 6]
+print(heapq.nlargest(3, nums)) # [9, 6, 5]
+print(heapq.nsmallest(3, nums)) # [1, 1, 2]
+
+// ========== bisect 二分查找 ==========
+import bisect
+
+sorted_list = [1, 3, 5, 7, 9]
+# 查找插入位置:
+print(bisect.bisect(sorted_list, 4))  # 2 (应该插在索引 2)
+print(bisect.bisect_left(sorted_list, 5))  # 2 (左边插入)
+print(bisect.bisect_right(sorted_list, 5)) # 3 (右边插入)
+
+# 插入并保持有序:
+bisect.insort(sorted_list, 6)
+print(sorted_list)             # [1, 3, 5, 6, 7, 9]</div>
+        <div class="note">💡 高级数据结构要点: (1) Counter 计数 + most_common,支持算术运算; (2) defaultdict 自动处理缺失键,适合分组; (3) deque 双端 O(1) 插入删除,支持 maxlen; (4) ChainMap 多字典视图; (5) heapq 实现优先级队列,bisect 二分查找。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoCounter()">Counter 演示</button>
+        <button onclick="demoDeque()">deque 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoCounter() {
+            result.innerHTML = '';
+            log('# Counter 演示');
+            log('');
+            log("from collections import Counter");
+            log("c = Counter('mississippi')");
+            log("c → Counter({'i': 4, 's': 4, 'p': 2, 'm': 1})");
+            log('');
+            const c = {};
+            "mississippi".split('').forEach(ch => c[ch] = (c[ch]||0)+1);
+            log("c['i'] →", c['i']);
+            log("c.most_common(2) →", Object.entries(c).sort((a,b)=>b[1]-a[1]).slice(0,2));
+            log('');
+            log('支持 + - & | 运算');
+            log('自动处理缺失键 (返回 0)');
+        }
+
+        function demoDeque() {
+            result.innerHTML = '';
+            log('# deque 演示');
+            log('');
+            log("from collections import deque");
+            log("d = deque(maxlen=5)");
+            log("for i in range(10):");
+            log("    d.append(i)");
+            log("d → deque([5,6,7,8,9], maxlen=5)");
+            log('');
+            log('方法:');
+            log('  append/pop     — 右端');
+            log('  appendleft/popleft — 左端');
+            log('  rotate(n)      — 旋转');
+            log('  extend/extendleft — 批量');
+            log('');
+            log('用途: 队列,栈,最近N条记录');
+        }
+    </script>
+</body>
+</html>

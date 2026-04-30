@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GraphQL 入门与实践</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚡ GraphQL 入门与实践</h2><p>GraphQL 核心概念 (Schema/Query/Mutation/Resolver)、Apollo Server、DataLoader N+1、Subscription、安全最佳实践。</p></div>
+    <div class="card">
+        <h2>GraphQL 核心概念</h2>
+        <div class="code">// ========== GraphQL vs REST ==========
+// REST: 多个端点, 固定返回结构
+//   GET /users → {id, name, email, ...}
+//   GET /users/1/orders → [...]
+
+// GraphQL: 单个端点, 客户端指定返回字段
+//   POST /graphql
+//   query { user(id: 1) { name email } }
+//   → { "user": { "name": "John", "email": "john@test.com" } }
+
+// ========== Schema 定义 ==========
+// type Query {        // 查询入口
+//   user(id: ID!): User
+//   users(page: Int, limit: Int): [User!]!
+// }
+//
+// type Mutation {     // 写操作入口
+//   createUser(input: CreateUserInput!): User!
+//   updateUser(id: ID!, input: UpdateUserInput!): User!
+//   deleteUser(id: ID!): Boolean!
+// }
+//
+// type Subscription { // 订阅 (实时)
+//   userCreated: User!
+//   userUpdated: User!
+// }
+//
+// type User {
+//   id: ID!
+//   name: String!
+//   email: String!
+//   posts: [Post!]!    // 关联
+//   createdAt: DateTime!
+// }
+//
+// type Post {
+//   id: ID!
+//   title: String!
+//   content: String!
+//   author: User!
+// }
+//
+// input CreateUserInput {
+//   name: String!
+//   email: String! @constraint(format: "email")
+//   password: String! @constraint(minLength: 8)
+// }
+
+// ========== 查询示例 ==========
+// 查询特定字段:
+// query {
+//   user(id: 1) {
+//     name
+//     email
+//     posts {
+//       title
+//     }
+//   }
+// }
+
+// 查询 + 变量:
+// query GetUser($id: ID!) {
+//   user(id: $id) {
+//     name
+//     email
+//   }
+// }
+// 变量: { "id": 1 }
+
+// 多个查询:
+// query {
+//   users(page: 1, limit: 10) { id name }
+//   user(id: 1) { email }
+// }</div>
+    </div>
+    <div class="card">
+        <h2>Apollo Server (Node.js)</h2>
+        <div class="code">// ========== Apollo Server 搭建 ==========
+// import { ApolloServer } from '@apollo/server';
+// import { startStandaloneServer } from '@apollo/server/standalone';
+
+const typeDefs = `#graphql
+  type Query {
+    users(page: Int, limit: Int): [User!]!
+    user(id: ID!): User
+  }
+
+  type Mutation {
+    createUser(input: CreateUserInput!): User!
+  }
+
+  type User {
+    id: ID!
+    name: String!
+    email: String!
+    posts: [Post!]!
+  }
+
+  type Post {
+    id: ID!
+    title: String!
+  }
+
+  input CreateUserInput {
+    name: String!
+    email: String!
+  }
+`;
+
+const resolvers = {
+  Query: {
+    users: async (_, { page, limit }, { db }) => {
+      return db.users.findAll({ page, limit });
+    },
+    user: async (_, { id }, { db }) => {
+      return db.users.findById(id);
+    },
+  },
+  Mutation: {
+    createUser: async (_, { input }, { db }) => {
+      return db.users.create(input);
+    },
+  },
+  User: {
+    // 关联解析器
+    posts: async (parent, _, { db }) => {
+      return db.posts.findByAuthor(parent.id);
+    },
+  },
+};
+
+const server = new ApolloServer({ typeDefs, resolvers });
+
+const { url } = await startStandaloneServer(server, {
+  context: async ({ req }) => ({
+    db,
+    user: await authenticate(req),
+  }),
+  listen: { port: 4000 },
+});
+
+console.log(`Server ready at ${url}`);
+
+// ========== Context 与认证 ==========
+// context 函数每个请求执行一次
+// 可注入: DB 连接, 当前用户, 数据加载器等
+
+// context: async ({ req }) => {
+//   const token = req.headers.authorization?.split(' ')[1];
+//   const user = token ? await verifyToken(token) : null;
+//   return { db, user, dataLoaders: createLoaders(db) };
+// }</div>
+    </div>
+    <div class="card">
+        <h2>N+1 问题与 DataLoader</h2>
+        <div class="code">// ========== N+1 问题 ==========
+// 查询: { users { posts { title } } }
+// 1 次查用户列表 → N 次查每个用户的文章
+// 共 1+N 次查询!
+
+// ========== DataLoader 解决 N+1 ==========
+// DataLoader: 批处理 + 缓存
+
+import DataLoader from 'dataloader';
+
+function createLoaders(db) {
+  return {
+    userById: new DataLoader(async (ids) => {
+      const users = await db.users.findByIds(ids);
+      return ids.map(id => users.find(u => u.id === id));
+    }),
+    postsByAuthorId: new DataLoader(async (authorIds) => {
+      const posts = await db.posts.findByAuthorIds(authorIds);
+      return authorIds.map(id =>
+        posts.filter(p => p.authorId === id)
+      );
+    }),
+  };
+}
+
+// Resolver 中使用:
+const resolvers = {
+  User: {
+    posts: async (parent, _, { dataLoaders }) => {
+      return dataLoaders.postsByAuthorId.load(parent.id);
+    },
+  },
+  Query: {
+    users: async (_, args, { dataLoaders }) => {
+      const users = await db.users.findAll();
+      // 只 load 不会立即执行
+      users.forEach(u => dataLoaders.postsByAuthorId.load(u.id));
+      return users;
+    },
+  },
+};
+
+// 现在: 1 次用户 + 1 次文章 = 2 次查询
+// DataLoader 自动合并同一 tick 内的 load 请求
+
+// ========== GraphQL 安全 ==========
+// 1. 查询深度限制
+//    import depthLimit from 'graphql-depth-limit';
+//    server.start({ validationRules: [depthLimit(7)] })
+
+// 2. 查询复杂度限制
+//    根据字段权重计算复杂度
+//    query { users { posts { comments { likes } } } } → 复杂度 10
+
+// 3. 超时
+//    requestTimeout: 10000
+
+// 4. 持久化查询 (Persisted Queries)
+//    只允许预定义的查询
+
+// 5. 认证 + 授权
+//    context 中验证用户
+//    resolver 中检查权限</div>
+    </div>
+    <div class="card">
+        <h2>Subscription 与最佳实践</h2>
+        <div class="code">// ========== Subscription ==========
+// 实时推送, 基于 WebSocket
+
+// Schema:
+// type Subscription {
+//   userCreated: User!
+//   notificationReceived(userId: ID!): Notification!
+// }
+
+// Resolver:
+// const resolvers = {
+//   Subscription: {
+//     userCreated: {
+//       subscribe: (_, __, { pubsub }) => {
+//         return pubsub.asyncIterator(['USER_CREATED']);
+//       },
+//     },
+//   },
+// };
+
+// 发布事件:
+// pubsub.publish('USER_CREATED', { userCreated: newUser });
+
+// ========== Go gqlgen ==========
+// Go GraphQL 服务器, 代码生成
+
+// go get github.com/99designs/gqlgen
+
+// schema.graphql:
+// type Query {
+//   users: [User!]!
+// }
+// type User {
+//   id: ID!
+//   name: String!
+// }
+
+// 生成代码:
+// go run github.com/99designs/gqlgen generate
+
+// ========== GraphQL 最佳实践 ==========
+// 1. 使用 DataLoader 解决 N+1
+// 2. 限制查询深度/复杂度
+// 3. 使用持久化查询 (生产)
+// 4. 监控慢查询
+// 5. 分页使用 Connections (Relay 规范)
+// 6. 向后兼容: 只添加不删除字段
+// 7. 使用 Union/Interface 处理多态
+// 8. 批量操作用 Mutation</div>
+        <div class="note">💡 GraphQL 要点: Schema (Query/Mutation/Subscription); 客户端指定字段, 单端点; Apollo Server typeDefs + resolvers; Context 注入认证/DB; N+1 问题: DataLoader 批处理+缓存; 关联字段 parent resolver; Subscription WebSocket 实时; 安全: 深度限制/复杂度/持久化查询; Go gqlgen 代码生成。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoGQL()">GraphQL 基础</button>
+        <button onclick="demoLoader()">DataLoader</button>
+        <button onclick="demoSub()">Subscription</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoGQL() {
+            result.innerHTML = '';
+            log('# GraphQL 基础');
+            log('');
+            log('Schema:');
+            log('  type Query { user(id: ID!): User }');
+            log('  type Mutation { createUser(...): User }');
+            log('  type Subscription { userCreated: User }');
+            log('');
+            log('REST vs GQL:');
+            log('  REST: 多端点, 固定结构');
+            log('  GQL: 单端点, 按需取字段');
+        }
+
+        function demoLoader() {
+            result.innerHTML = '';
+            log('# DataLoader 解决 N+1');
+            log('');
+            log('问题:');
+            log('  { users { posts { title } } }');
+            log('  1次查用户 + N次查文章');
+            log('');
+            log('DataLoader:');
+            log('  load(id) 在同一 tick 合并');
+            log('  1次查用户 + 1次批量查文章');
+            log('');
+            log('关键:');
+            log('  context 中创建, 请求级缓存');
+        }
+
+        function demoSub() {
+            result.innerHTML = '';
+            log('# Subscription');
+            log('');
+            log('实时推送 (WebSocket):');
+            log('  type Subscription {');
+            log('    userCreated: User');
+            log('  }');
+            log('');
+            log('发布:');
+            log('  pubsub.publish("USER_CREATED", data)');
+            log('');
+            log('安全:');
+            log('  深度限制 / 复杂度 / 认证');
+            log('  持久化查询');
+        }
+    </script>
+</body>
+</html>

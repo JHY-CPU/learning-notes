@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MongoDB 数据建模</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🏗️ MongoDB 数据建模</h2><p>文档设计模式 (单表/子集/聚合/多态)、电商/社交/博客等场景建模、属性模式、模式演化、与关系型设计对比。</p></div>
+    <div class="card">
+        <h2>MongoDB 设计原则</h2>
+        <div class="code">// ========== MongoDB 数据建模原则 ==========
+
+// 原则 1: 数据一起读取 → 存在一起 (嵌入)
+// 原则 2: 从查询模式倒推文档结构
+// 原则 3: 避免过深的嵌套 (< 3 层)
+// 原则 4: 避免无限增长的数组 (如评论)
+// 原则 5: 减少跨文档引用, 优先嵌入
+
+// ========== 常见建模模式 ==========
+
+// 1. 单表模式 (Single Table)
+//    存储相似结构的数据
+//    适合: 配置, 简单 CRUD
+
+// 2. 子集模式 (Subset)
+//    主文档存概要, 另一个集合存详情
+//    适合: 商品列表+详情
+
+// 3. 聚合模式 (Polymorphic)
+//    不同类型但字段相似的文档存同一集合
+//    适合: 日志, 事件
+
+// 4. 属性模式 (Attribute)
+//    用键值对替代大量预定义字段
+//    适合: 产品属性不同
+
+// 5. 桶模式 (Bucket)
+//    按时间/数量批量存入一个文档
+//    适合: 时序数据</div>
+    </div>
+    <div class="card">
+        <h2>场景 1: 电商系统</h2>
+        <div class="code">// ========== 电商数据建模 ==========
+
+// ========== 商品 (商品详情 + SKU) ==========
+{
+    _id: ObjectId("..."),
+    name: "iPhone 15",
+    brand: "Apple",
+    category_id: ObjectId("..."),
+    description: "最新款...",
+    attributes: {
+        color: "Black",
+        storage: "256GB"
+    },
+    // 子集模式: 嵌入 SKU 概要
+    skus: [
+        { sku_id: "IP15-BLK-256", price: 6999, stock: 100 },
+        { sku_id: "IP15-WHT-256", price: 6999, stock: 50 }
+    ],
+    tags: ["phone", "apple", "5g"],
+    sales_count: 5000,
+    rating: 4.5,
+    created_at: ISODate("2024-09-15")
+}
+
+// ========== 用户 (引用地址 + 嵌入概要) ==========
+{
+    _id: ObjectId("..."),
+    name: "Alice",
+    email: "alice@test.com",
+    // 嵌入地址 (1对少)
+    addresses: [
+        { tag: "home", city: "Beijing", street: "..." },
+        { tag: "work", city: "Shanghai", street: "..." }
+    ],
+    // 子集: 最近订单概要
+    recent_orders: [
+        { order_id: ObjectId("..."), total: 299, date: ISODate("...") },
+        { order_id: ObjectId("..."), total: 599, date: ISODate("...") }
+    ]
+}
+
+// ========== 订单 (嵌入商品快照) ==========
+{
+    _id: ObjectId("..."),
+    user_id: ObjectId("..."),       // 引用用户
+    shipping_address: {              // 快照 (地址不变)
+        name: "Alice",
+        phone: "138xxxx",
+        address: "Beijing ..."
+    },
+    items: [                         // 嵌入商品快照
+        {
+            product_name: "iPhone 15",  // 快照! 商品改名不影响
+            sku_id: "IP15-BLK-256",
+            price: 6999,
+            qty: 1,
+            image: "iphone15.jpg"
+        }
+    ],
+    total: 6999,
+    status: "paid",
+    paid_at: ISODate("2024-10-01"),
+    created_at: ISODate("2024-10-01")
+}</div>
+    </div>
+    <div class="card">
+        <h2>场景 2: 博客与社交</h2>
+        <div class="code">// ========== 博客系统 ==========
+
+// ========== 文章 (嵌入评论概要) ==========
+{
+    _id: ObjectId("..."),
+    title: "MongoDB 入门",
+    slug: "mongodb-intro",
+    content: "MongoDB is...",
+    author: {
+        id: ObjectId("..."),
+        name: "Alice",
+        avatar: "alice.jpg"
+    },
+    tags: ["mongodb", "database"],
+    stats: {
+        views: 15000,
+        likes: 230,
+        bookmarks: 45
+    },
+    // 子集: 最近评论
+    recent_comments: [
+        {
+            user: { id: ObjectId("..."), name: "Bob" },
+            content: "Great article!",
+            created_at: ISODate("...")
+        }
+    ],
+    created_at: ISODate("2024-09-01"),
+    updated_at: ISODate("2024-09-10")
+}
+
+// ========== 评论 (独立集合, 引用文章) ==========
+{
+    _id: ObjectId("..."),
+    article_id: ObjectId("..."),
+    user_id: ObjectId("..."),
+    content: "Great article!",
+    likes: 5,
+    parent_id: null,              // 回复某条评论
+    created_at: ISODate("2024-09-02")
+}
+
+// 索引: { article_id: 1, created_at: -1 }
+
+// ========== 社交关系 (图结构) ==========
+// 关注关系
+{
+    _id: ObjectId("..."),
+    follower_id: ObjectId("alice"),    // 关注者
+    following_id: ObjectId("bob"),     // 被关注者
+    created_at: ISODate("2024-09-01")
+}
+// 索引: { follower_id: 1, following_id: 1 } (唯一复合索引)
+
+// ========== 时间线 (扇出模式) ==========
+// 博客发布后, 写入所有粉丝的时间线
+// timeline.posts 集合:
+{
+    user_id: ObjectId("bob"),          // 粉丝
+    post_ids: [
+        ObjectId("post1"),
+        ObjectId("post2"),
+        // ... 保持固定大小 (如 100)
+    ]
+}
+
+// 扇出写入 (写放大) vs 拉取模式 (读放大)
+// 大 V → 拉取模式; 普通人 → 扇出写入</div>
+    </div>
+    <div class="card">
+        <h2>场景 3: 时序与日志</h2>
+        <div class="code">// ========== 时序数据 (桶模式) ==========
+
+// ❌ 每条数据一个文档 (读大量文档)
+{
+    _id: ObjectId("..."),
+    sensor_id: "sensor01",
+    timestamp: ISODate("2024-10-01T00:00:01"),
+    temperature: 23.5
+}
+
+// ✅ 桶模式 (每小时一个桶文档)
+{
+    _id: ObjectId("..."),
+    sensor_id: "sensor01",
+    hour: ISODate("2024-10-01T00:00:00"),
+    readings_count: 3600,
+    // 嵌入读数数组
+    readings: [
+        { t: ISODate("00:00:01"), v: 23.5 },
+        { t: ISODate("00:00:02"), v: 23.6 },
+        // ... 3600 条
+    ],
+    stats: {
+        min: 22.1,
+        max: 25.3,
+        avg: 23.7
+    }
+}
+
+// ========== 日志系统 ==========
+// 按日期分集合: logs_20241001, logs_20241002
+// + TTL 索引自动过期
+
+// ========== 属性模式 ==========
+// 产品属性各不相同 (电子产品 vs 服装)
+{
+    _id: ObjectId("..."),
+    name: "iPhone 15",
+    category: "Electronics",
+    // 属性模式: 用数组存储可变属性
+    specs: [
+        { key: "color", value: "Black" },
+        { key: "storage", value: "256GB" },
+        { key: "screen_size", value: "6.1 inch" }
+    ]
+}
+
+// ========== 设计模式选择 ==========
+// 嵌入: "包含" 关系, 数据一起读, 不会无限增长
+// 引用: "属于" 关系, 独立访问, 会无限增长
+// 子集: 主集合存概要, 子集合存详情
+// 桶: 时序数据按时间窗口聚合
+// 属性: 字段差异大的同类数据</div>
+        <div class="note">💡 建模要点: 从查询方式倒推设计; 一起读的数据嵌入在一起; 无限增长的数据用引用; 商品快照防历史订单变化; 桶模式优化时序数据; 属性模式处理可变字段; 扇出写入适合小 V 的时间线。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoEcommerce()">电商建模</button>
+        <button onclick="demoBlog()">博客建模</button>
+        <button onclick="demoPattern()">设计模式</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoEcommerce() {
+            result.innerHTML = '';
+            log('# 电商建模');
+            log('');
+            log('商品: 嵌入 SKU 数组');
+            log('用户: 嵌入地址');
+            log('订单: 嵌入商品快照');
+            log('');
+            log('快照确保历史订单不变');
+            log('商品改名不影响历史订单');
+        }
+
+        function demoBlog() {
+            result.innerHTML = '';
+            log('# 博客建模');
+            log('');
+            log('文章: 嵌入作者+评论概要');
+            log('评论: 独立集合 (无限增长)');
+            log('关注: 独立集合 (图关系)');
+            log('');
+            log('大 V → 拉模式 (扇出开销大)');
+            log('普通人 → 推模式 (扇出写入)');
+        }
+
+        function demoPattern() {
+            result.innerHTML = '';
+            log('# 设计模式');
+            log('');
+            log('嵌入 — 包含关系, 数据一起读');
+            log('引用 — 属于关系, 独立访问');
+            log('子集 — 主集合概要, 子集合详情');
+            log('桶 — 时序数据时间窗口');
+            log('属性 — 可变字段用键值对');
+        }
+    </script>
+</body>
+</html>

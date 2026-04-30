@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas文字图像</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        canvas { border: 1px solid #ddd; margin: 10px 0; background: white; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Canvas 文字图像</h2><p>fillText、measureText、drawImage、getImageData、像素操作。</p></div>
+    <div class="card">
+        <h2>文字与图像 API</h2>
+        <div class="code">// ========== 文字绘制 ==========
+ctx.font = 'bold 24px Arial';
+ctx.fillStyle = '#333';
+ctx.fillText('Hello Canvas', 50, 50);
+ctx.strokeText('Hello Canvas', 50, 100);
+
+// ========== 文字样式 ==========
+ctx.textAlign = 'center';  // left/center/right
+ctx.textBaseline = 'middle'; // top/middle/bottom
+ctx.direction = 'ltr';     // ltr/rtl
+
+// ========== 文字测量 ==========
+const metrics = ctx.measureText('Hello');
+console.log(metrics.width);   // 宽度
+console.log(metrics.actualBoundingBoxAscent);
+console.log(metrics.actualBoundingBoxDescent);
+
+// ========== 图像绘制 ==========
+const img = document.getElementById('myImg');
+ctx.drawImage(img, 10, 10);              // 原始大小
+ctx.drawImage(img, 10, 10, 100, 100);    // 缩放
+ctx.drawImage(img, 0, 0, 200, 200, 10, 10, 100, 100); // 裁剪+缩放
+
+// ========== 像素操作 ==========
+const imageData = ctx.getImageData(0, 0, 100, 100);
+// imageData.data = [R,G,B,A, R,G,B,A, ...]
+ctx.putImageData(imageData, 200, 0);</div>
+    </div>
+    <div class="card">
+        <h2>演示：文字与图像</h2>
+        <button onclick="demoText()">文字绘制</button>
+        <button onclick="demoImage()">图像操作</button>
+        <button onclick="demoPixel()">像素操作</button>
+        <button onclick="demoFilter()">滤镜效果</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <canvas id="canvas" width="400" height="300"></canvas>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#f8f9fa';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function demoText() {
+            clearCanvas();
+            result.innerHTML = '';
+            log('📝 Canvas 文字绘制:');
+            log('');
+
+            // 基础文字
+            ctx.font = '24px Arial';
+            ctx.fillStyle = '#2c3e50';
+            ctx.fillText('基础文字 24px Arial', 20, 40);
+            log('1️⃣ 基础文字: fillText("基础文字", 20, 40)');
+
+            // 粗体斜体
+            ctx.font = 'bold italic 28px Georgia';
+            ctx.fillStyle = '#3498db';
+            ctx.fillText('Bold Italic 28px', 20, 80);
+            log('2️⃣ 粗体斜体: font="bold italic 28px Georgia"');
+
+            // 描边文字
+            ctx.font = '32px Arial';
+            ctx.strokeStyle = '#e74c3c';
+            ctx.lineWidth = 2;
+            ctx.strokeText('描边文字', 20, 130);
+            log('3️⃣ 描边文字: strokeText() + strokeStyle');
+
+            // 对齐方式
+            ctx.font = '14px Arial';
+            ctx.fillStyle = '#95a5a6';
+            ctx.fillText('textAlign:', 20, 170);
+
+            ctx.font = '16px Arial';
+            ctx.fillStyle = '#2c3e50';
+            ctx.textAlign = 'left';
+            ctx.fillText('left', 160, 170);
+            ctx.textAlign = 'center';
+            ctx.fillText('center', 270, 170);
+            ctx.textAlign = 'right';
+            ctx.fillText('right', 380, 170);
+            ctx.textAlign = 'left';
+            log('4️⃣ textAlign: left / center / right');
+
+            // 文字测量
+            const text = '测量文字';
+            const metrics = ctx.measureText(text);
+            log(`5️⃣ measureText("${text}"): width=${metrics.width.toFixed(1)}px`);
+
+            // 多行文字
+            ctx.font = '15px Arial';
+            ctx.fillStyle = '#7f8c8d';
+            const lines = ['这是第一行文字', '这是第二行文字', '这是第三行文字'];
+            lines.forEach((line, i) => {
+                ctx.fillText(line, 20, 210 + i * 22);
+            });
+            log('6️⃣ 多行文字: 手动计算 y 坐标');
+        }
+
+        function demoImage() {
+            clearCanvas();
+            result.innerHTML = '';
+            log('🖼️ 图像操作:');
+            log('');
+
+            // 由于没有实际图片, 在 Canvas 上绘制模拟"图片"
+            log('1️⃣ 绘制模拟图像 (渐变矩形):');
+
+            // 模拟图片区域
+            const imgX = 20, imgY = 20, imgW = 160, imgH = 120;
+            const grad = ctx.createLinearGradient(imgX, imgY, imgX + imgW, imgY + imgH);
+            grad.addColorStop(0, '#ff6b6b');
+            grad.addColorStop(0.3, '#ffd93d');
+            grad.addColorStop(0.6, '#6bcb77');
+            grad.addColorStop(1, '#4d96ff');
+            ctx.fillStyle = grad;
+            ctx.fillRect(imgX, imgY, imgW, imgH);
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(imgX, imgY, imgW, imgH);
+            ctx.fillStyle = 'rgba(255,255,255,0.7)';
+            ctx.font = '16px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('模拟图像', imgX + imgW / 2, imgY + imgH / 2);
+            ctx.textAlign = 'left';
+
+            log('   模拟 drawImage(img, 20, 20, 160, 120)');
+            log('');
+
+            // 缩放绘制
+            ctx.drawImage(canvas, 20, 20, 160, 120, 200, 20, 80, 60);
+            log('2️⃣ 缩放绘制: drawImage(源, sx, sy, sw, sh, dx, dy, dw, dh)');
+            log('   将左上角区域缩放到 80x60');
+
+            // 绘制网格
+            ctx.strokeStyle = '#3498db';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < 200; x += 20) {
+                ctx.beginPath();
+                ctx.moveTo(x, 150);
+                ctx.lineTo(x, 280);
+                ctx.stroke();
+            }
+            for (let y = 150; y < 300; y += 20) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(200, y);
+                ctx.stroke();
+            }
+            log('3️⃣ 绘制网格: 10x10 网格线');
+
+            // 绘制圆形裁剪
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(320, 80, 50, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.fillStyle = '#f39c12';
+            ctx.fillRect(270, 30, 100, 100);
+            ctx.restore();
+            ctx.strokeStyle = '#333';
+            ctx.beginPath();
+            ctx.arc(320, 80, 50, 0, Math.PI * 2);
+            ctx.stroke();
+            log('4️⃣ 圆形裁剪: clip() 限制绘图区域');
+        }
+
+        function demoPixel() {
+            clearCanvas();
+            result.innerHTML = '';
+            log('🔬 像素操作:');
+            log('');
+
+            // 创建一些彩色像素
+            const imageData = ctx.createImageData(100, 100);
+            const data = imageData.data;
+
+            for (let y = 0; y < 100; y++) {
+                for (let x = 0; x < 100; x++) {
+                    const idx = (y * 100 + x) * 4;
+                    data[idx] = x * 2.55;       // R
+                    data[idx + 1] = y * 2.55;   // G
+                    data[idx + 2] = 128;         // B
+                    data[idx + 3] = 255;         // A
+                }
+            }
+
+            ctx.putImageData(imageData, 20, 20);
+            log('1️⃣ 创建像素数据: createImageData(100, 100)');
+            log('   生成 RGB 渐变 (R=x方向, G=y方向)');
+
+            // 读取像素
+            const imageData2 = ctx.getImageData(20, 20, 100, 100);
+            const pixel1 = imageData2.data.slice(0, 4);
+            const pixel2 = imageData2.data.slice(50 * 100 * 4, 50 * 100 * 4 + 4);
+            log(`2️⃣ 像素读取: getImageData(20, 20, 100, 100)`);
+            log(`   左上像素: RGBA(${pixel1[0]}, ${pixel1[1]}, ${pixel1[2]}, ${pixel1[3]})`);
+            log(`   中心像素: RGBA(${pixel2[0]}, ${pixel2[1]}, ${pixel2[2]}, ${pixel2[3]})`);
+
+            // 复制到右侧
+            ctx.putImageData(imageData2, 140, 20);
+            log('3️⃣ 像素复制: putImageData() 复制到新位置');
+
+            log('');
+            log('📌 像素数据结构:');
+            log('   [R, G, B, A, R, G, B, A, ...]');
+            log('   每个像素 4 字节 (RGBA)');
+            log('   100x100 的图像 = 40000 字节');
+        }
+
+        function demoFilter() {
+            clearCanvas();
+            result.innerHTML = '';
+            log('🎨 滤镜效果:');
+            log('');
+
+            // 创建测试图像
+            const imageData = ctx.createImageData(160, 160);
+            const data = imageData.data;
+            for (let y = 0; y < 160; y++) {
+                for (let x = 0; x < 160; x++) {
+                    const idx = (y * 160 + x) * 4;
+                    data[idx] = 128 + 127 * Math.sin(x * 0.05) * Math.cos(y * 0.05);
+                    data[idx + 1] = 128 + 127 * Math.sin(x * 0.05 + 2);
+                    data[idx + 2] = 128 + 127 * Math.sin(y * 0.05 + 4);
+                    data[idx + 3] = 255;
+                }
+            }
+            ctx.putImageData(imageData, 20, 20);
+            log('1️⃣ 原始图像: 渐变图案');
+
+            // 灰度滤镜
+            const grayData = ctx.getImageData(20, 20, 160, 160);
+            const gd = grayData.data;
+            for (let i = 0; i < gd.length; i += 4) {
+                const gray = 0.299 * gd[i] + 0.587 * gd[i + 1] + 0.114 * gd[i + 2];
+                gd[i] = gd[i + 1] = gd[i + 2] = gray;
+            }
+            ctx.putImageData(grayData, 200, 20);
+            log('2️⃣ 灰度滤镜: Gray = 0.299R + 0.587G + 0.114B');
+
+            // 反转滤镜
+            const invertData = ctx.getImageData(20, 20, 160, 160);
+            const id = invertData.data;
+            for (let i = 0; i < id.length; i += 4) {
+                id[i] = 255 - id[i];
+                id[i + 1] = 255 - id[i + 1];
+                id[i + 2] = 255 - id[i + 2];
+            }
+            ctx.putImageData(invertData, 20, 200);
+            log('3️⃣ 反转滤镜: R = 255 - R');
+
+            // 亮度增强
+            const brightData = ctx.getImageData(20, 20, 160, 160);
+            const bd = brightData.data;
+            for (let i = 0; i < bd.length; i += 4) {
+                bd[i] = Math.min(255, bd[i] + 50);
+                bd[i + 1] = Math.min(255, bd[i + 1] + 50);
+                bd[i + 2] = Math.min(255, bd[i + 2] + 50);
+            }
+            ctx.putImageData(brightData, 200, 200);
+            log('4️⃣ 亮度增强: 各通道 +50 (限制最大值 255)');
+        }
+
+        console.log('=== Canvas 文字图像 ===');
+        clearCanvas();
+        ctx.fillStyle = '#7f8c8d';
+        ctx.font = '16px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('点击按钮查看 Canvas 文字与图像操作', 200, 150);
+        ctx.textAlign = 'left';
+        document.getElementById('output').textContent =
+            `Canvas 文字图像: fillText / measureText / drawImage / 像素操作 / 滤镜\n` +
+            `✅ Canvas 文字图像演示完成！`;
+    </script>
+</body>
+</html>

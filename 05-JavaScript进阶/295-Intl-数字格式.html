@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intl-数字格式</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #numFmt-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Intl 数字格式</h2><p>NumberFormat、货币/百分比/单位、小数位数、千分位分组。</p></div>
+    <div class="card">
+        <h2>NumberFormat 用法</h2>
+        <div class="code">// ========== NumberFormat 选项 ==========
+const options = {
+    // 样式
+    style: 'decimal',     // 'decimal' (默认) / 'currency' / 'percent' / 'unit'
+
+    // 货币 (style='currency' 时需要)
+    currency: 'CNY',      // ISO 4217 货币代码
+    currencyDisplay: 'symbol',  // 'symbol' / 'code' / 'name' / 'narrowSymbol'
+
+    // 单位 (style='unit' 时需要, ES2020)
+    unit: 'kilometer',    // 单位名
+    unitDisplay: 'long',  // 'long' / 'short' / 'narrow'
+
+    // 数字格式
+    minimumIntegerDigits: 1,      // 最小整数位数 (1-21)
+    minimumFractionDigits: 0,     // 最小小数位数 (0-20)
+    maximumFractionDigits: 3,     // 最大小数位数 (1-20)
+    minimumSignificantDigits: 1,  // 最小有效数字
+    maximumSignificantDigits: 21, // 最大有效数字
+
+    // 分组
+    useGrouping: true,    // 是否千分位分组
+
+    // 符号显示
+    signDisplay: 'auto',  // 'auto' / 'always' / 'exceptZero' / 'never'
+};
+
+// ========== 常用货币代码 ==========
+// CNY — 人民币
+// USD — 美元
+// EUR — 欧元
+// JPY — 日元
+// GBP — 英镑
+// HKD — 港币
+
+// ========== 常用单位 ==========
+// kilometer / meter / centimeter
+// kilogram / gram
+// liter / milliliter
+// mile / pound / ounce
+// percent (百分比用 style='percent')</div>
+    </div>
+    <div class="card">
+        <h2>演示：数字格式化</h2>
+        <button onclick="demoCurrency()">货币格式</button>
+        <button onclick="demoUnits()">单位和百分比</button>
+        <div id="numFmt-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const numFmtResult = document.getElementById('numFmt-result');
+
+        function log(msg) {
+            numFmtResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoCurrency() {
+            numFmtResult.innerHTML = '';
+            const amount = 1234567.89;
+            log(`💵 货币格式化: ${amount}`);
+            log('');
+
+            const currencies = [
+                { code: 'CNY', name: '人民币' },
+                { code: 'USD', name: '美元' },
+                { code: 'EUR', name: '欧元' },
+                { code: 'JPY', name: '日元' },
+                { code: 'GBP', name: '英镑' },
+                { code: 'HKD', name: '港币' },
+            ];
+
+            currencies.forEach(({ code, name }) => {
+                const nf = new Intl.NumberFormat('zh-CN', {
+                    style: 'currency',
+                    currency: code,
+                });
+                log(`   ${name} (${code}): ${nf.format(amount)}`);
+            });
+            log('');
+
+            log('货币显示模式:');
+            const modes = ['symbol', 'code', 'name'];
+            modes.forEach(display => {
+                const nf = new Intl.NumberFormat('zh-CN', {
+                    style: 'currency',
+                    currency: 'USD',
+                    currencyDisplay: display,
+                });
+                log(`   ${display}: ${nf.format(100)}`);
+            });
+        }
+
+        function demoUnits() {
+            numFmtResult.innerHTML = '';
+            log('📐 单位和百分比:');
+            log('');
+
+            const value = 1234.567;
+
+            log('1️⃣ 百分比:');
+            const pct = new Intl.NumberFormat('zh-CN', {
+                style: 'percent',
+                minimumFractionDigits: 1,
+                maximumFractionDigits: 2,
+            });
+            log(`   0.1256 → ${pct.format(0.1256)}`);
+            log(`   1 → ${pct.format(1)}`);
+            log(`   0.5 → ${pct.format(0.5)}`);
+            log('');
+
+            log('2️⃣ 单位格式:');
+            const units = [
+                { unit: 'kilometer', name: '公里' },
+                { unit: 'kilogram', name: '公斤' },
+                { unit: 'liter', name: '升' },
+                { unit: 'meter', name: '米' },
+                { unit: 'mile', name: '英里' },
+            ];
+
+            units.forEach(({ unit, name }) => {
+                try {
+                    const nf = new Intl.NumberFormat('zh-CN', {
+                        style: 'unit',
+                        unit: unit,
+                        unitDisplay: 'long',
+                    });
+                    log(`   ${name} (${unit}): ${nf.format(value)}`);
+                } catch (e) {
+                    log(`   ${name}: ⚠️ 不支持`);
+                }
+            });
+            log('');
+
+            log('3️⃣ 小数位控制:');
+            const num = 1234.56789;
+            [0, 2, 4].forEach(fraction => {
+                const nf = new Intl.NumberFormat('zh-CN', {
+                    minimumFractionDigits: fraction,
+                    maximumFractionDigits: fraction,
+                });
+                log(`   ${fraction}位小数: ${nf.format(num)}`);
+            });
+            log('');
+
+            log('4️⃣ 有效数字:');
+            [1, 3, 5].forEach(sig => {
+                const nf = new Intl.NumberFormat('zh-CN', {
+                    maximumSignificantDigits: sig,
+                });
+                log(`   ${sig}位有效: ${nf.format(12345)}`);
+            });
+        }
+
+        console.log('=== Intl 数字格式 ===');
+
+        document.getElementById('output').textContent =
+            `Intl NumberFormat: 货币 / 百分比 / 单位 / 小数位 / 有效数字\n` +
+            `style: decimal / currency / percent / unit\n` +
+            `✅ Intl 数字格式演示完成！`;
+    </script>
+</body>
+</html>

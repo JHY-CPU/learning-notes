@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>10-Trie字典树基础 (Trie Concepts)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<h1>10 - Trie 字典树基础 (Trie Concepts)</h1>
+
+<div class="card">
+  <h2>什么是 Trie？</h2>
+  <p>Trie（又称字典树、前缀树）是一种<strong>多叉树结构</strong>，用于高效地存储和检索字符串集合中的键。Trie 的核心思想是利用字符串的<strong>公共前缀</strong>来减少查询时间，最大限度地减少不必要的字符比较。</p>
+  <div class="note">
+    <strong>词源：</strong> "Trie" 来自 "retrieval"（检索），发音为"try"（与 "tree" 区分）。<br>
+    <strong>基本性质：</strong>
+    <ul>
+      <li>根节点不包含字符，根节点外的每个节点包含一个字符</li>
+      <li>从根节点到某个节点的路径上的字符连接起来就是该节点对应的字符串</li>
+      <li>每个节点的子节点对应的字符通常不同</li>
+      <li>通常用<strong>标记位</strong>表示某个节点是否是一个完整单词的结尾</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Trie 的结构示例</h2>
+  <p>插入单词: <strong>"and", "ant", "do", "dad", "ball"</strong></p>
+  <pre>
+        (根)
+       /  |  \
+      a   b   d
+     /    |    |\
+    n     a    o  a
+   / \    |       |
+  d  t    l       d
+  ↑  ↑    ↑       ↑
+ and ant  ball    dad
+  </pre>
+  <p>↑ 标记表示单词结尾。</p>
+</div>
+
+<div class="card">
+  <h2>基本操作</h2>
+  <table border="1" cellpadding="8" cellspacing="0" style="width:100%;border-collapse:collapse;">
+    <tr style="background:#3498db;color:white;"><th>操作</th><th>描述</th><th>时间复杂度</th></tr>
+    <tr><td><strong>插入</strong> (Insert)</td><td>将一个字符串插入 Trie 中</td><td>O(m) — m 为字符串长度</td></tr>
+    <tr><td><strong>查找</strong> (Search)</td><td>在 Trie 中查找一个字符串是否存在</td><td>O(m)</td></tr>
+    <tr><td><strong>前缀查询</strong> (StartsWith)</td><td>判断是否有以给定前缀开头的字符串</td><td>O(m)</td></tr>
+    <tr><td><strong>删除</strong> (Delete)</td><td>从 Trie 中删除一个字符串</td><td>O(m)</td></tr>
+  </table>
+  <div class="note" style="margin-top:10px;">
+    Trie 的插入和查找时间复杂度为 O(m)，与集合中已有多少元素<strong>无关</strong>。相比之下，平衡 BST 需要 O(m·log n)，哈希表需要 O(m) 平均但存在哈希冲突风险。
+  </div>
+</div>
+
+<div class="card">
+  <h2>优缺点</h2>
+  <table border="1" cellpadding="8" cellspacing="0" style="width:100%;border-collapse:collapse;">
+    <tr style="background:#2c3e50;color:white;"><th>优点</th><th>缺点</th></tr>
+    <tr><td>前缀查询极其高效（O(m)）</td><td>空间消耗大（每个节点存多个指针）</td></tr>
+    <tr><td>查找时间与数据集大小无关</td><td>对长字符串且无公共前缀的情况浪费空间</td></tr>
+    <tr><td>支持自动补全、拼写检查</td><td>实现比哈希表复杂</td></tr>
+    <tr><td>字符串有序存储（字典序）</td><td>对大量短字符串效率不如哈希表</td></tr>
+    <tr><td>无哈希冲突</td><td>指针开销可能很大（尤其 JS 对象）</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>两种实现方式</h2>
+  <h3>1. 数组实现（固定字符集）</h3>
+  <div class="code">
+// 每个节点维护一个大小为26的数组（仅限小写字母）
+// 速度快，但可能浪费空间
+class TrieNode {
+  constructor() {
+    this.children = new Array(26);  // 26个小写字母
+    this.isEnd = false;
+  }
+}
+// childIndex = charCode - 'a'.charCodeAt(0)
+  </div>
+
+  <h3>2. 哈希表/对象实现（通用）</h3>
+  <div class="code">
+// 每个节点维护一个哈希表（支持任意字符）
+// 空间高效，但略慢
+class TrieNode {
+  constructor() {
+    this.children = {};   // { char: TrieNode }
+    this.isEnd = false;
+  }
+}
+  </div>
+</div>
+
+<div class="card">
+  <h2>交互演示：Trie 可视化</h2>
+  <p>在下方输入框中添加单词，查看 Trie 的结构变化：</p>
+  <input type="text" id="wordInput" value="and" placeholder="输入一个单词" style="width:60%;padding:8px;margin:5px 0;">
+  <button onclick="addWord()">插入单词</button>
+  <button onclick="searchWord()">查找单词</button>
+  <button onclick="checkPrefix()">检查前缀</button>
+  <button onclick="resetTrie()">重置</button>
+  <br>
+  <textarea id="wordList" rows="3" style="width:100%;padding:8px;margin:5px 0;" placeholder="每行一个单词进行批量插入">and
+ant
+do
+dad
+ball</textarea>
+  <button onclick="batchInsert()">批量插入</button>
+  <div id="result"></div>
+</div>
+
+<script>
+class TrieNode {
+  constructor() {
+    this.children = {};
+    this.isEnd = false;
+  }
+}
+
+class Trie {
+  constructor() { this.root = new TrieNode(); }
+
+  insert(word) {
+    let node = this.root;
+    for (const ch of word) {
+      if (!node.children[ch]) node.children[ch] = new TrieNode();
+      node = node.children[ch];
+    }
+    node.isEnd = true;
+  }
+
+  search(word) {
+    let node = this.root;
+    for (const ch of word) {
+      if (!node.children[ch]) return false;
+      node = node.children[ch];
+    }
+    return node.isEnd;
+  }
+
+  startsWith(prefix) {
+    let node = this.root;
+    for (const ch of prefix) {
+      if (!node.children[ch]) return false;
+      node = node.children[ch];
+    }
+    return true;
+  }
+
+  // 获取Trie中所有单词
+  getAllWords(node = this.root, prefix = '', result = []) {
+    if (node.isEnd) result.push(prefix);
+    for (const [ch, child] of Object.entries(node.children)) {
+      this.getAllWords(child, prefix + ch, result);
+    }
+    return result;
+  }
+
+  // 获取Trie的JSON表示（用于可视化）
+  toJSON(node = this.root) {
+    const obj = {};
+    for (const [ch, child] of Object.entries(node.children)) {
+      obj[ch] = this.toJSON(child);
+      if (child.isEnd) obj[ch] = { ...obj[ch], __end__: true };
+    }
+    return obj;
+  }
+}
+
+const trie = new Trie();
+
+function addWord() {
+  const word = document.getElementById('wordInput').value.trim();
+  if (!word) { document.getElementById('result').innerHTML = '请输入单词'; return; }
+  trie.insert(word);
+  showTrieState(`已插入单词: "${word}"`);
+}
+
+function searchWord() {
+  const word = document.getElementById('wordInput').value.trim();
+  if (!word) { document.getElementById('result').innerHTML = '请输入单词'; return; }
+  const found = trie.search(word);
+  showTrieState(`查找 "${word}": ${found ? '✅ 找到' : '❌ 未找到'}`);
+}
+
+function checkPrefix() {
+  const word = document.getElementById('wordInput').value.trim();
+  if (!word) { document.getElementById('result').innerHTML = '请输入前缀'; return; }
+  const found = trie.startsWith(word);
+  showTrieState(`前缀 "${word}": ${found ? '✅ 存在' : '❌ 不存在'}`);
+}
+
+function batchInsert() {
+  const words = document.getElementById('wordList').value.split('\n').map(w => w.trim()).filter(w => w);
+  for (const w of words) trie.insert(w);
+  showTrieState(`已批量插入 ${words.length} 个单词: [${words.join(', ')}]`);
+}
+
+function resetTrie() {
+  trie.root = new TrieNode();
+  document.getElementById('result').innerHTML = '<p>Trie 已重置</p>';
+}
+
+function showTrieState(msg) {
+  const allWords = trie.getAllWords();
+  const structure = trie.toJSON();
+  let html = `<p>${msg}</p>`;
+  html += `<p><strong>当前 Trie 中的单词:</strong> [${allWords.join(', ')}]</p>`;
+  html += `<p><strong>单词总数:</strong> ${allWords.length}</p>`;
+
+  // 显示树结构（简化版）
+  html += '<div style="font-family:monospace;background:#f8f9fa;padding:15px;border-radius:4px;line-height:1.6;">';
+  html += renderTree(trie.root, '');
+  html += '</div>';
+
+  document.getElementById('result').innerHTML = html;
+}
+
+function renderTree(node, prefix) {
+  let html = '';
+  const entries = Object.entries(node.children);
+  for (let i = 0; i < entries.length; i++) {
+    const [ch, child] = entries[i];
+    const isLast = i === entries.length - 1;
+    const connector = isLast ? '└── ' : '├── ';
+    const endMark = child.isEnd ? ' <span style="color:green;font-weight:bold;">(单词尾)</span>' : '';
+    html += prefix + connector + ch + endMark + '<br>';
+    const childPrefix = prefix + (isLast ? '    ' : '│   ');
+    html += renderTree(child, childPrefix);
+  }
+  return html;
+}
+</script>
+</body></html>

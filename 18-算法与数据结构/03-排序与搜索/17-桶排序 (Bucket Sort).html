@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>17-桶排序 (Bucket Sort)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; white-space: pre-wrap; }
+.bucket { display: inline-block; vertical-align: top; background: #eaf2f8; border: 1px solid #3498db; border-radius: 6px; padding: 8px; margin: 5px; min-width: 60px; min-height: 40px; }
+.bucket h4 { margin: 0 0 5px 0; text-align: center; color: #2c3e50; font-size: 13px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>桶排序 (Bucket Sort)</h2>
+  <p>桶排序将数据分到有限数量的桶里，每个桶内分别排序，最后合并。适用于数据均匀分布的场景。</p>
+  <div class="note">
+    <strong>复杂度分析：</strong>平均 O(n+k)，最坏 O(n^2)。空间 O(n)。稳定排序（取决于桶内排序算法）。
+  </div>
+</div>
+
+<div class="card">
+  <h2>算法步骤</h2>
+  <ol>
+    <li>确定桶的数量和范围</li>
+    <li>将元素分配到对应的桶中</li>
+    <li>对每个桶内的元素进行排序（通常使用插入排序）</li>
+    <li>按顺序合并所有桶中的元素</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h2>代码实现</h2>
+  <pre>function bucketSort(arr, bucketSize = 5) {
+  if (arr.length <= 1) return arr;
+  const min = Math.min(...arr);
+  const max = Math.max(...arr);
+  const bucketCount = Math.floor((max - min) / bucketSize) + 1;
+  const buckets = Array.from({length: bucketCount}, () => []);
+
+  // 分配到桶
+  for (const num of arr) {
+    const idx = Math.floor((num - min) / bucketSize);
+    buckets[idx].push(num);
+  }
+
+  // 每个桶内排序并合并
+  const result = [];
+  for (const bucket of buckets) {
+    insertionSort(bucket);
+    result.push(...bucket);
+  }
+  return result;
+}
+
+function insertionSort(arr) {
+  for (let i = 1; i < arr.length; i++) {
+    let key = arr[i], j = i - 1;
+    while (j >= 0 && arr[j] > key) {
+      arr[j + 1] = arr[j]; j--;
+    }
+    arr[j + 1] = key;
+  }
+}</pre>
+</div>
+
+<div class="card">
+  <h2>交互演示</h2>
+  <button onclick="runBucketSort()">开始桶排序</button>
+  <div id="result"></div>
+</div>
+
+<script>
+function insertionSort(arr) {
+  for (let i = 1; i < arr.length; i++) {
+    let key = arr[i], j = i - 1;
+    while (j >= 0 && arr[j] > key) { arr[j + 1] = arr[j]; j--; }
+    arr[j + 1] = key;
+  }
+}
+
+function runBucketSort() {
+  const arr = Array.from({length: 20}, () => Math.floor(Math.random() * 100) + 1);
+  const bucketSize = 10;
+  const min = Math.min(...arr);
+  const max = Math.max(...arr);
+  const bucketCount = Math.floor((max - min) / bucketSize) + 1;
+  const buckets = Array.from({length: bucketCount}, () => []);
+
+  for (const num of arr) {
+    const idx = Math.floor((num - min) / bucketSize);
+    buckets[idx].push(num);
+  }
+
+  let html = '<strong>原始数组：</strong>[' + arr.join(', ') + ']<br>';
+  html += '<strong>数据范围：</strong>' + min + ' ~ ' + max + '<br>';
+  html += '<strong>桶数量：</strong>' + bucketCount + '（每个桶范围 ' + bucketSize + '）<br><br>';
+  html += '<strong>分配到桶：</strong><br>';
+
+  buckets.forEach((bucket, i) => {
+    const low = min + i * bucketSize;
+    const high = low + bucketSize - 1;
+    html += '<div class="bucket"><h4>' + low + '~' + high + '</h4>';
+    html += bucket.length > 0 ? bucket.join(', ') : '空';
+    html += '</div>';
+  });
+
+  const result = [];
+  for (const bucket of buckets) {
+    insertionSort(bucket);
+    result.push(...bucket);
+  }
+
+  html += '<br><br><strong>桶内排序后：</strong><br>';
+  buckets.forEach((bucket, i) => {
+    const low = min + i * bucketSize;
+    html += '<div class="bucket"><h4>' + low + '~' + (low + bucketSize - 1) + '</h4>';
+    html += bucket.join(', ');
+    html += '</div>';
+  });
+
+  html += '<br><br><strong>最终结果：</strong>[' + result.join(', ') + ']';
+  html += '<br><strong>结果正确：</strong>' + result.every((v, i, a) => !i || a[i-1] <= v);
+  document.getElementById('result').innerHTML = html;
+}
+</script>
+</body></html>

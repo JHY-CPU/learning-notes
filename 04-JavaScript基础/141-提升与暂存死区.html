@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>提升与暂存死区</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        .warn { background: #fdedec; border-left: 4px solid #e74c3c; padding: 10px 15px; font-size: 14px; color: #c0392b; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>变量提升与暂存死区</h2><p>Hoisting（提升）和 TDZ（Temporal Dead Zone，暂存死区）是 JS 变量声明的特殊行为。</p></div>
+    <div class="card">
+        <h2>var 的提升（Hoisting）</h2>
+        <div class="code">// 你写的代码：
+console.log(a);  // undefined（不是报错！）
+var a = 10;
+
+// JS 实际执行的代码：
+var a;           // 声明提升到顶部，初始化为 undefined
+console.log(a);  // undefined
+a = 10;          // 赋值留在原地</div>
+        <div class="warn">var 的提升是 bug 的来源——访问未声明的变量不会报错，只是 undefined。</div>
+    </div>
+    <div class="card">
+        <h2>let/const 的暂存死区（TDZ）</h2>
+        <div class="code">// let 也会被提升，但不会初始化
+console.log(b);  // ❌ ReferenceError: Cannot access 'b' before initialization
+let b = 20;
+
+// 从块开始到声明之间的区域称为"暂存死区"
+{
+    // TDZ 开始（不能访问 c）
+    // console.log(c);  // ❌ 报错
+    let c = 30;
+    // TDZ 结束（可以访问 c）
+    console.log(c);  // ✅ 30
+}
+
+// const 同样有 TDZ
+// console.log(d);  // ❌ 报错
+const d = 40;</div>
+    </div>
+    <div class="card">
+        <h2>var vs let 提升对比</h2>
+        <div class="code">// var：声明提升并初始化为 undefined
+console.log(v1);  // undefined
+var v1 = 1;
+
+// let：声明提升但不初始化（TDZ）
+// console.log(l1);  // ❌ 报错
+let l1 = 1;
+
+// 函数声明：整体提升（定义+赋值）
+foo();  // ✅ 可以正常调用
+function foo() { return 'foo'; }
+
+// 函数表达式：取决于 var/let
+// bar();  // ❌ 报错（let 不提升）
+const bar = function() { return 'bar'; };</div>
+    </div>
+    <div class="card">
+        <h2>typeof 和 TDZ</h2>
+        <div class="code">// typeof 对未声明变量不会报错
+typeof undeclaredVar;   // "undefined"（不报错！）
+
+// 但 typeof 在 TDZ 中会报错！
+// typeof x;  // ❌ 报错
+let x = 10;
+
+// 对 var 提升的变量 typeof 是安全的
+console.log(typeof y);  // "undefined"
+var y = 20;</div>
+    </div>
+    <div class="card">
+        <h2>最佳实践</h2>
+        <div class="code">// 1. 始终在作用域顶部声明变量
+// ❌
+function bad() {
+    // ... 很多代码 ...
+    let x = 1;
+    // ... 更多代码 ...
+}
+
+// ✅
+function good() {
+    let x;
+    // ... 很多代码 ...
+    x = 1;
+    // ... 更多代码 ...
+}
+
+// 2. 始终用 const/let，不用 var
+// 3. 声明顺序：const > let > (不用 var)</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        // 注意：以下演示中，可能报错的代码已经被注释
+        // 取消注释看具体错误
+        console.log('=== var 提升 ===');
+        console.log('hoistedVar:', typeof hoistedVar);  // undefined（不报错）
+        var hoistedVar = '我被提升了';
+        console.log('赋值后:', hoistedVar);
+
+        // let TDZ 演示（取消注释看报错）
+        // console.log(tdzVar);  // ❌ 报错
+        let tdzVar = 'TDZ 演示';
+
+        // 函数声明提升
+        console.log('=== 函数声明提升 ===');
+        console.log('声明前调用:', declaredFunc());
+        function declaredFunc() {
+            return '函数声明可以提升';
+        }
+
+        // 函数表达式不提升
+        const exprFunc = function() {
+            return '函数表达式不提升';
+        };
+        console.log('声明后调用:', exprFunc());
+
+        document.getElementById('output').textContent =
+            `var 提升后值: ${typeof hoistedVar}（提升到undefined）\n` +
+            `函数声明提升: ${declaredFunc()}\n` +
+            `\n✅ 注意：let 的 TDZ 只能在控制台通过取消注释体验\n` +
+            `✅ 提升与暂存死区演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图片懒加载</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        .gallery { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+        .gallery img { width: 120px; height: 90px; object-fit: cover; border-radius: 4px; border: 1px solid #ddd; transition: opacity 0.3s; }
+        .gallery img[loading="lazy"] { background: #f0f0f0; }
+        .placeholder-box { width: 120px; height: 90px; background: linear-gradient(135deg, #f0f0f0, #e0e0e0); border-radius: 4px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; color: #999; border: 1px solid #ddd; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>图片懒加载</h2><p>loading="lazy" 属性、IntersectionObserver 实现、占位图、错误处理。</p></div>
+    <div class="card">
+        <h2>懒加载 API</h2>
+        <div class="code">// ========== 原生懒加载 (HTML) ==========
+&lt;img src="photo.jpg" loading="lazy" alt="描述"&gt;
+// loading: "lazy" | "eager" | "auto"
+
+// ========== IntersectionObserver 实现 ==========
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        if (entry.isIntersecting) {
+            const img = entry.target;
+            img.src = img.dataset.src;  // 替换真正的 src
+            observer.unobserve(img);    // 停止观察
+        }
+    });
+});
+images.forEach(img => observer.observe(img));
+
+// ========== 占位方案 ==========
+// 低质量占位 (LQIP) — 小模糊图
+// 颜色占位 — background-color
+// 骨架占位 — 形状轮廓
+
+// ========== 错误处理 ==========
+img.onerror = () => {
+    img.src = 'fallback.png';
+    img.alt = '加载失败';
+};</div>
+    </div>
+    <div class="card">
+        <h2>演示：图片懒加载</h2>
+        <button onclick="demoNativeLazy()">原生 loading=lazy</button>
+        <button onclick="demoIntersectionObserver()">IntersectionObserver</button>
+        <button onclick="demoPlaceholder()">占位方案</button>
+        <button onclick="demoError()">错误处理</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <div class="gallery" id="gallery"></div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        const gallery = document.getElementById('gallery');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function clearGallery() { gallery.innerHTML = ''; }
+
+        // Mock image generator
+        function createMockImage(index, withLazy = false) {
+            const div = document.createElement('div');
+            div.style.cssText = 'width:120px;height:90px;border-radius:4px;border:1px solid #ddd;display:inline-flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;color:#666;background:#f8f9fa;';
+            div.innerHTML = `<span>🖼️ 图片 ${index}</span><span style="font-size:9px;color:#999;">${withLazy ? 'lazy' : 'eager'}</span>`;
+            return div;
+        }
+
+        function demoNativeLazy() {
+            clearGallery();
+            result.innerHTML = '';
+            log('🖼️ 原生 loading="lazy":');
+            log('');
+
+            log('1️⃣ loading 属性:');
+            log('   <img loading="lazy" src="photo.jpg">');
+            log('');
+
+            log('   • lazy  — 延迟加载 (浏览器决定加载时机)');
+            log('   • eager — 立即加载 (默认)');
+            log('   • auto  — 浏览器自动决定 (同不设置)');
+            log('');
+
+            log('2️⃣ 浏览器行为:');
+            log('   • 只有 <img> 和 <iframe> 支持 loading');
+            log('   • 图片在接近视口时开始加载 (<300px)');
+            log('   • 不适用于 display:none 的图片');
+            log('   • JavaScript 动态创建的图片默认 eager');
+            log('');
+
+            // Show mock images
+            for (let i = 1; i <= 8; i++) {
+                gallery.appendChild(createMockImage(i, true));
+            }
+
+            log('3️⃣ 示例: 下方展示了 8 张懒加载图片');
+            log('   在浏览器中打开 DevTools → Network');
+            log('   滚动页面可见图片按需加载');
+            log('');
+
+            log('4️⃣ 优点:');
+            log('   • 零 JavaScript (纯 HTML 实现)');
+            log('   • 浏览器优化加载优先级');
+            log('   • 减少首屏带宽消耗');
+            log('');
+
+            log('5️⃣ 缺点:');
+            log('   • 不支持旧浏览器 (Safari <15.4)');
+            log('   • 无法自定义加载阈值');
+            log('   • 不支持背景图片懒加载');
+        }
+
+        function demoIntersectionObserver() {
+            clearGallery();
+            result.innerHTML = '';
+            log('👁️ IntersectionObserver 实现:');
+            log('');
+
+            log('1️⃣ 实现原理:');
+            log('   const observer = new IntersectionObserver((entries) => {');
+            log('     entries.forEach(entry => {');
+            log('       if (entry.isIntersecting) {');
+            log('         const img = entry.target;');
+            log('         img.src = img.dataset.src;  // data-src → src');
+            log('         observer.unobserve(img);');
+            log('       }');
+            log('     });');
+            log('   }, { rootMargin: "200px" });  // 提前 200px 加载');
+            log('');
+
+            log('2️⃣ HTML 结构:');
+            log('   <img data-src="real.jpg" src="placeholder.jpg" alt="">');
+            log('   // data-src 存储真实地址');
+            log('   // src 使用占位图或空串');
+            log('');
+
+            log('3️⃣ IntersectionObserver 选项:');
+            log('   • root — 容器元素 (默认 viewport)');
+            log('   • rootMargin — 提前加载距离');
+            log('   • threshold — 可见比例阈值 [0, 0.25, 0.5, 1]');
+            log('');
+
+            // Mock IO demo
+            class MockIntersectionObserver {
+                constructor(callback, options = {}) {
+                    this.callback = callback;
+                    this.rootMargin = options.rootMargin || '0px';
+                    this.threshold = options.threshold || 0;
+                    this._elements = new Set();
+                    log(`   创建 IntersectionObserver`);
+                    log(`   rootMargin: "${this.rootMargin}"`);
+                    log(`   threshold: ${this.threshold}`);
+                }
+                observe(el) {
+                    this._elements.add(el);
+                    log(`   观察元素已添加: ${el.tagName}`);
+                    // Simulate intersection after delay
+                    setTimeout(() => {
+                        this.callback([{ isIntersecting: true, target: el }]);
+                        log(`   元素已进入视口，加载 data-src`);
+                    }, 100);
+                }
+                unobserve(el) {
+                    this._elements.delete(el);
+                }
+                disconnect() { this._elements.clear(); }
+            }
+
+            const spy = new MockIntersectionObserver(
+                (entries) => entries.forEach(e => {
+                    if (e.isIntersecting) {
+                        log(`   ✅ 图片已加载: ${e.target.dataset.src || '(模拟)'}`);
+                    }
+                }),
+                { rootMargin: '200px', threshold: 0.1 }
+            );
+
+            const mockImg = { tagName: 'IMG', dataset: { src: 'https://example.com/photo.jpg' } };
+            spy.observe(mockImg);
+
+            log('');
+            log('4️⃣ 应用场景:');
+            log('   • 图片列表 / 相册');
+            log('   • 商品卡片图片');
+            log('   • 长文章配图');
+            log('   • 无限滚动加载');
+        }
+
+        function demoPlaceholder() {
+            clearGallery();
+            result.innerHTML = '';
+            log('🎨 占位方案:');
+            log('');
+
+            log('1️⃣ 颜色占位 (Solid Color):');
+            log('   <img src="photo.jpg" style="background: #f0f0f0;">');
+            log('   优点: 简单，零额外请求');
+            log('   缺点: 无内容信息');
+            log('');
+
+            // Color placeholder demo
+            const colors = ['#ff6b6b', '#ffd93d', '#6bcb77', '#4d96ff', '#9b59b6', '#e67e22'];
+            colors.forEach((c, i) => {
+                const box = document.createElement('div');
+                box.style.cssText = `width:80px;height:60px;background:${c};border-radius:4px;display:inline-flex;align-items:center;justify-content:center;color:white;font-size:10px;margin:2px;`;
+                box.textContent = `占位${i+1}`;
+                gallery.appendChild(box);
+            });
+
+            log('   颜色占位示例 (6色):');
+            log('');
+
+            log('2️⃣ 低质量占位 (LQIP):');
+            log('   • 加载 tiny 模糊图 (blur-up)');
+            log('   • 使用 data:URL 内联');
+            log('   • 清晰图加载后渐变过渡');
+            log('   <img src="tiny-blur.jpg"');
+            log('        onload="this.style.opacity=1"');
+            log('        style="opacity:0;transition:opacity .3s;">');
+            log('');
+
+            log('3️⃣ SVG 占位 (SQIP):');
+            log('   • 用 SVG 轮廓描绘图片形状');
+            log('   • 文件小 (几百字节)');
+            log('   • 可缩放不变形');
+            log('   <svg viewBox="0 0 400 300">...轮廓...</svg>');
+            log('');
+
+            log('4️⃣ 骨架占位 (Skeleton):');
+            log('   • 模拟图片宽高比的灰色块');
+            log('   • 配合 CSS 动画 (shimmer)');
+            log('   .placeholder {');
+            log('     background: linear-gradient(90deg, #eee 25%, #f5f5f5 50%, #eee 75%);');
+            log('     background-size: 200% 100%;');
+            log('     animation: shimmer 1.5s infinite;');
+            log('   }');
+            log('');
+
+            log('5️⃣ 占位策略对比:');
+            log('   颜色 < SVG < LQIP < 骨架');
+            log('   (简单 → 丰富, 小 → 大)');
+        }
+
+        function demoError() {
+            clearGallery();
+            result.innerHTML = '';
+            log('⚠️ 图片错误处理:');
+            log('');
+
+            log('1️⃣ onerror 事件:');
+            log('   <img src="broken.jpg" onerror="this.src=\'fallback.png\'">');
+            log('');
+
+            log('2️⃣ JS 错误处理:');
+            log('   img.onerror = function() {');
+            log('     // 防止循环 (fallback 也失败)');
+            log('     this.onerror = null;');
+            log('     this.src = "/images/fallback.svg";');
+            log('     this.alt = "图片加载失败";');
+            log('   };');
+            log('');
+
+            // Mock error images
+            ['加载失败', '网络错误', '404'].forEach((text, i) => {
+                const box = document.createElement('div');
+                box.style.cssText = 'width:120px;height:90px;border-radius:4px;border:1px solid #e74c3c;display:inline-flex;align-items:center;justify-content:center;font-size:11px;color:#e74c3c;background:#fdf0ef;margin:2px;';
+                box.textContent = `❌ ${text}`;
+                gallery.appendChild(box);
+            });
+
+            log('');
+
+            log('3️⃣ 错误类型:');
+            log('   • 404 — 图片不存在');
+            log('   • 403 — 无权限');
+            log('   • 网络错误 — 断网/超时');
+            log('   • 格式不支持 — .webp 在旧 Safari');
+            log('   • CORS — 跨域图片无权限');
+            log('');
+
+            log('4️⃣ 降级策略:');
+            log('   img.onerror = function() {');
+            log('     // 第1次: 使用 WebP 降级到 PNG');
+            log('     // 第2次: 使用颜色占位');
+            log('     // 第3次: 隐藏元素');
+            log('   };');
+            log('');
+
+            log('5️⃣ data:URL 占位:');
+            log('   // 1x1 像素透明 GIF');
+            log('   "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7"');
+            log('');
+
+            log('6️⃣ 最佳实践:');
+            log('   • 始终设置 width/height (防止 CLS)');
+            log('   • 使用 srcset 提供多分辨率');
+            log('   • 提供 fallback 图片');
+            log('   • 使用 <picture> 支持多格式');
+        }
+
+        console.log('=== 图片懒加载 ===');
+        document.getElementById('output').textContent =
+            `图片懒加载: loading=lazy / IntersectionObserver / 占位图 / 错误处理\n` +
+            `✅ 图片懒加载演示完成！`;
+    </script>
+</body>
+</html>

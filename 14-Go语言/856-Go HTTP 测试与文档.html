@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go HTTP 测试与文档</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🧪 Go HTTP 测试与文档</h2><p>httptest 服务测试、表格驱动测试、mock 中间件、Golden 文件测试、OpenAPI/Swagger 文档生成。</p></div>
+    <div class="card">
+        <h2>httptest 基础</h2>
+        <div class="code">// ========== httptest 测试 HTTP Handler ==========
+// import "net/http/httptest"
+
+// 基本测试
+func TestHandler(t *testing.T) {
+    // 创建请求
+    req := httptest.NewRequest("GET", "/api/users", nil)
+    // 记录响应
+    w := httptest.NewRecorder()
+
+    // 调用 handler
+    handler(w, req)
+
+    // 断言
+    resp := w.Result()
+    body, _ := io.ReadAll(resp.Body)
+
+    assert.Equal(t, 200, resp.StatusCode)
+    assert.Contains(t, string(body), "users")
+}
+
+// ========== 测试 Gin Handler ==========
+func setupTestRouter() *gin.Engine {
+    gin.SetMode(gin.TestMode)
+    r := gin.New()
+    r.GET("/api/users", listUsers)
+    r.POST("/api/users", createUser)
+    return r
+}
+
+func TestGetUsers(t *testing.T) {
+    r := setupTestRouter()
+
+    // 创建测试请求
+    w := httptest.NewRecorder()
+    req, _ := http.NewRequest("GET", "/api/users?page=1&limit=10", nil)
+    r.ServeHTTP(w, req)
+
+    // 断言
+    assert.Equal(t, 200, w.Code)
+    assert.Contains(t, w.Body.String(), "users")
+}
+
+func TestCreateUser(t *testing.T) {
+    r := setupTestRouter()
+
+    // JSON 请求体
+    body := `{"name":"John","email":"john@test.com"}`
+    w := httptest.NewRecorder()
+    req, _ := http.NewRequest("POST", "/api/users", strings.NewReader(body))
+    req.Header.Set("Content-Type", "application/json")
+    r.ServeHTTP(w, req)
+
+    assert.Equal(t, 201, w.Code)
+
+    var resp map[string]interface{}
+    json.Unmarshal(w.Body.Bytes(), &resp)
+    assert.Equal(t, "John", resp["name"])
+}
+
+// ========== 带认证头的测试 ==========
+func TestAuthRequired(t *testing.T) {
+    r := setupTestRouter()
+
+    // 无 token
+    w := httptest.NewRecorder()
+    req, _ := http.NewRequest("GET", "/api/admin", nil)
+    r.ServeHTTP(w, req)
+    assert.Equal(t, 401, w.Code)
+
+    // 有 token
+    w = httptest.NewRecorder()
+    req, _ = http.NewRequest("GET", "/api/admin", nil)
+    req.Header.Set("Authorization", "Bearer test-token")
+    r.ServeHTTP(w, req)
+    assert.Equal(t, 200, w.Code)
+}</div>
+    </div>
+    <div class="card">
+        <h2>表格驱动测试</h2>
+        <div class="code">// ========== 表格驱动测试 Handler ==========
+func TestListUsersHandler(t *testing.T) {
+    tests := []struct {
+        name       string
+        method     string
+        path       string
+        body       string
+        headers    map[string]string
+        wantStatus int
+        wantBody   string
+    }{
+        {
+            name:       "正常分页查询",
+            method:     "GET",
+            path:       "/api/users?page=1&limit=10",
+            wantStatus: 200,
+            wantBody:   `"users"`,
+        },
+        {
+            name:       "缺少分页参数",
+            method:     "GET",
+            path:       "/api/users",
+            wantStatus: 400,
+            wantBody:   `error`,
+        },
+        {
+            name:       "创建用户成功",
+            method:     "POST",
+            path:       "/api/users",
+            body:       `{"name":"John","email":"john@test.com"}`,
+            headers:    map[string]string{"Content-Type": "application/json"},
+            wantStatus: 201,
+            wantBody:   `"id"`,
+        },
+        {
+            name:       "创建用户无效邮箱",
+            method:     "POST",
+            path:       "/api/users",
+            body:       `{"name":"John","email":"invalid"}`,
+            headers:    map[string]string{"Content-Type": "application/json"},
+            wantStatus: 422,
+            wantBody:   `email`,
+        },
+    }
+
+    r := setupTestRouter()
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            var bodyReader io.Reader
+            if tt.body != "" {
+                bodyReader = strings.NewReader(tt.body)
+            }
+
+            req, _ := http.NewRequest(tt.method, tt.path, bodyReader)
+            for k, v := range tt.headers {
+                req.Header.Set(k, v)
+            }
+
+            w := httptest.NewRecorder()
+            r.ServeHTTP(w, req)
+
+            assert.Equal(t, tt.wantStatus, w.Code)
+            assert.Contains(t, w.Body.String(), tt.wantBody)
+        })
+    }
+}
+
+// ========== 测试中间件 ==========
+func TestAuthMiddleware(t *testing.T) {
+    tests := []struct {
+        name       string
+        token      string
+        wantStatus int
+    }{
+        {"无 token", "", 401},
+        {"空 Bearer", "Bearer ", 401},
+        {"无效 token", "Bearer invalid", 401},
+        {"有效 token", "Bearer valid-token", 200},
+    }
+
+    // 需要认证的 handler
+    handler := func(c *gin.Context) {
+        c.JSON(200, gin.H{"user_id": c.GetInt("user_id")})
+    }
+
+    r := gin.New()
+    r.GET("/protected", AuthMiddleware(), handler)
+
+    for _, tt := range tests {
+        t.Run(tt.name, func(t *testing.T) {
+            w := httptest.NewRecorder()
+            req, _ := http.NewRequest("GET", "/protected", nil)
+            req.Header.Set("Authorization", tt.token)
+            r.ServeHTTP(w, req)
+            assert.Equal(t, tt.wantStatus, w.Code)
+        })
+    }
+}
+
+// ========== 使用 testify suite ==========
+// import "github.com/stretchr/testify/suite"
+
+type UserAPITestSuite struct {
+    suite.Suite
+    router *gin.Engine
+}
+
+func (s *UserAPITestSuite) SetupSuite() {
+    s.router = setupTestRouter()
+}
+
+func (s *UserAPITestSuite) TestListUsers() {
+    w := httptest.NewRecorder()
+    req, _ := http.NewRequest("GET", "/api/users?page=1&limit=10", nil)
+    s.router.ServeHTTP(w, req)
+
+    s.Equal(200, w.Code)
+    s.Contains(w.Body.String(), "users")
+}
+
+func TestUserAPISuite(t *testing.T) {
+    suite.Run(t, new(UserAPITestSuite))
+}</div>
+    </div>
+    <div class="card">
+        <h2>高级测试技术</h2>
+        <div class="code">// ========== Golden 文件测试 ==========
+// 将预期响应保存到 testdata/*.golden 文件
+
+func TestAPIWithGolden(t *testing.T) {
+    r := setupTestRouter()
+    w := httptest.NewRecorder()
+    req, _ := http.NewRequest("GET", "/api/users/1", nil)
+    r.ServeHTTP(w, req)
+
+    // 更新 golden: go test -update
+    goldenFile := filepath.Join("testdata", "get_user_1.golden")
+    if *update {
+        os.WriteFile(goldenFile, w.Body.Bytes(), 0644)
+    }
+
+    expected, _ := os.ReadFile(goldenFile)
+    assert.JSONEq(t, string(expected), w.Body.String())
+}
+
+var update = flag.Bool("update", false, "更新 golden 文件")
+
+// ========== 测试 HTTP 客户端 ==========
+// 使用 httptest.Server 模拟外部 API
+func TestExternalAPI(t *testing.T) {
+    // 模拟外部服务
+    mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+        assert.Equal(t, "/api/data", r.URL.Path)
+        assert.Equal(t, "Bearer token", r.Header.Get("Authorization"))
+        w.WriteHeader(200)
+        json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+    }))
+    defer mockServer.Close()
+
+    // 使用模拟服务器 URL
+    client := NewAPIClient(mockServer.URL, "token")
+    result, err := client.GetData()
+    assert.NoError(t, err)
+    assert.Equal(t, "ok", result.Status)
+}
+
+// ========== Mock 数据库 ==========
+type mockDB struct {
+    users map[int]*User
+}
+
+func (m *mockDB) GetUser(id int) (*User, error) {
+    u, ok := m.users[id]
+    if !ok {
+        return nil, fmt.Errorf("user %d not found", id)
+    }
+    return u, nil
+}
+
+func TestHandlerWithMockDB(t *testing.T) {
+    db := &mockDB{
+        users: map[int]*User{
+            1: {ID: 1, Name: "John", Email: "john@test.com"},
+        },
+    }
+    handler := NewUserHandler(db)  // 注入 mock
+
+    r := gin.New()
+    r.GET("/api/users/:id", handler.GetUser)
+
+    w := httptest.NewRecorder()
+    req, _ := http.NewRequest("GET", "/api/users/1", nil)
+    r.ServeHTTP(w, req)
+
+    assert.Equal(t, 200, w.Code)
+    assert.Contains(t, w.Body.String(), "John")
+}
+
+// ========== 测试并发安全 ==========
+func TestConcurrentHandler(t *testing.T) {
+    r := setupTestRouter()
+    var wg sync.WaitGroup
+
+    for i := 0; i < 10; i++ {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            w := httptest.NewRecorder()
+            req, _ := http.NewRequest("GET", "/api/users?page=1&limit=10", nil)
+            r.ServeHTTP(w, req)
+            assert.Equal(t, 200, w.Code)
+        }()
+    }
+    wg.Wait()
+}</div>
+    </div>
+    <div class="card">
+        <h2>API 文档与 OpenAPI</h2>
+        <div class="code">// ========== Swagger 注解 (swaggo) ==========
+// go install github.com/swaggo/swag/cmd/swag@latest
+// swag init 生成 docs/
+
+// @title 用户管理 API
+// @version 1.0
+// @description 用户管理系统 REST API
+// @host localhost:8080
+// @BasePath /api/v1
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+
+// @Summary 获取用户列表
+// @Description 分页获取用户列表
+// @Tags 用户管理
+// @Accept json
+// @Produce json
+// @Param page query int true "页码" default(1)
+// @Param limit query int true "每页数量" default(20)
+// @Success 200 {object} APIResponse{data=[]UserResponse}
+// @Failure 400 {object} APIResponse
+// @Router /users [get]
+func listUsers(c *gin.Context) {
+    // 处理器实现
+}
+
+// @Summary 创建用户
+// @Description 创建新用户
+// @Tags 用户管理
+// @Accept json
+// @Produce json
+// @Param user body CreateUserRequest true "用户信息"
+// @Success 201 {object} APIResponse{data=UserResponse}
+// @Failure 422 {object} APIResponse
+// @Router /users [post]
+func createUser(c *gin.Context) {
+    // 处理器实现
+}
+
+// ========== 集成 Swagger 到 Gin ==========
+// import swaggerFiles "github.com/swaggo/files"
+// import ginSwagger "github.com/swaggo/gin-swagger"
+// import _ "your-project/docs"  // 生成的 docs 包
+
+func setupSwagger(r *gin.Engine) {
+    r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+    // 访问: http://localhost:8080/swagger/index.html
+}
+
+// ========== OpenAPI 3.0 手动编写 ==========
+// 也可手动写 openapi.yaml
+//
+// openapi: 3.0.0
+// info:
+//   title: 用户 API
+//   version: 1.0.0
+// paths:
+//   /api/v1/users:
+//     get:
+//       summary: 获取用户列表
+//       parameters:
+//         - name: page
+//           in: query
+//           schema: { type: integer, default: 1 }
+//       responses:
+//         '200':
+//           description: 成功
+//           content:
+//             application/json:
+//               schema:
+//                 $ref: '#/components/schemas/UserList'
+// components:
+//   schemas:
+//     User:
+//       type: object
+//       properties:
+//         id: { type: integer }
+//         name: { type: string }
+//         email: { type: string }
+
+// ========== gin-swagger 中间件 ==========
+func swaggerRouter() *gin.Engine {
+    r := gin.Default()
+
+    // API 路由
+    v1 := r.Group("/api/v1")
+    {
+        v1.GET("/users", listUsers)
+        v1.POST("/users", createUser)
+    }
+
+    // Swagger 文档
+    r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+    return r
+}
+
+// ========== 测试覆盖率 ==========
+// go test -cover -coverprofile=coverage.out ./...
+// go tool cover -html=coverage.out  // 浏览器可视化
+//
+// go test -covermode=count -coverprofile=count.out ./...  // 计数模式</div>
+        <div class="note">💡 HTTP 测试要点: httptest.NewRecorder + httptest.NewRequest 测试 handler; Gin TestMode + ServeHTTP; 表格驱动测试 (method/path/body/wantStatus); testify suite 组织测试; Golden 文件 testdata/*.golden 快照测试; httptest.Server 模拟外部 API; mock DB 注入测试; OpenAPI/Swagger 注解 @Summary/@Param/@Success/@Router; swaggo 自动生成文档; go test -cover 覆盖率。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoHttptest()">httptest</button>
+        <button onclick="demoTable()">表格测试</button>
+        <button onclick="demoSwagger()">Swagger</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoHttptest() {
+            result.innerHTML = '';
+            log('# httptest 测试');
+            log('');
+            log('基本结构:');
+            log('  req := httptest.NewRequest("GET", "/path", body)');
+            log('  w := httptest.NewRecorder()');
+            log('  handler.ServeHTTP(w, req)');
+            log('  assert.Equal(t, 200, w.Code)');
+            log('');
+            log('Gin 测试:');
+            log('  gin.SetMode(gin.TestMode)');
+            log('  r.ServeHTTP(w, req)');
+            log('');
+            log('Mock 服务器:');
+            log('  srv := httptest.NewServer(handler)');
+            log('  defer srv.Close()');
+        }
+
+        function demoTable() {
+            result.innerHTML = '';
+            log('# 表格驱动测试');
+            log('');
+            log('结构:');
+            log('  tests := []struct {');
+            log('    name string');
+            log('    method string');
+            log('    path string');
+            log('    wantStatus int');
+            log('  }');
+            log('');
+            log('运行:');
+            log('  for _, tt := range tests {');
+            log('    t.Run(tt.name, func(t *testing.T) {');
+            log('      // 测试逻辑');
+            log('    })');
+            log('  }');
+            log('');
+            log('Golden 文件:');
+            log('  testdata/*.golden + flag -update');
+        }
+
+        function demoSwagger() {
+            result.innerHTML = '';
+            log('# OpenAPI / Swagger');
+            log('');
+            log('注解:');
+            log('  @Summary 接口摘要');
+            log('  @Param 参数');
+            log('  @Success 成功响应');
+            log('  @Router 路由');
+            log('');
+            log('生成:');
+            log('  swag init → docs/');
+            log('  import docs + ginSwagger');
+            log('  r.GET("/swagger/*any", ginSwagger.WrapHandler(...))');
+            log('');
+            log('覆盖率:');
+            log('  go test -cover ./...');
+            log('  go tool cover -html=coverage.out');
+        }
+    </script>
+</body>
+</html>

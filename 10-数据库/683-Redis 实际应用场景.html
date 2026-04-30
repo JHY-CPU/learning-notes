@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redis 实际应用场景</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔧 Redis 实际应用场景</h2><p>缓存 Session 存储、API 限流、排行榜、布隆过滤器、HyperLogLog 去重、Geo 地理位置、位图统计、全局 ID 生成器、延迟队列。</p></div>
+    <div class="card">
+        <h2>Session 存储与缓存</h2>
+        <div class="code">// ========== 场景 1: Session 存储 ==========
+// 分布式应用中共享 Session
+
+// 用户登录时:
+SET session:abc123 user_id 1000
+EXPIRE session:abc123 86400  // 24 小时过期
+
+// 每次请求检查 Session:
+GET session:abc123 → user_id 1000
+
+// Spring Session + Redis:
+// @EnableRedisHttpSession
+// 自动将 Session 存入 Redis
+
+// ========== 场景 2: 热点数据缓存 ==========
+// 数据库前放一层 Redis, 减轻数据库压力
+
+// 商城首页:
+SET home:index '{"banners":[...],"hot_products":[...]}'
+EXPIRE home:index 300  // 5 分钟刷新
+
+// 商品详情页:
+SET product:42:detail '{"name":"iPhone","price":6999}'
+EXPIRE product:42:detail 3600
+
+// 缓存更新策略:
+// 写: 更新 DB → 删缓存
+// 读: 查缓存 → 命中返回 → 未命中查 DB 回填
+
+// ========== 场景 3: 页面防抖 (幂等) ==========
+// 防止用户重复提交订单
+SET order:prevent:user_1000 "submitted" NX EX 3
+// 成功 → 处理 (3 秒内不允许重复)
+// 失败 → "请勿重复提交"</div>
+    </div>
+    <div class="card">
+        <h2>限流与排行榜</h2>
+        <div class="code">// ========== 场景 4: API 限流 ==========
+
+// 方法 1: 固定窗口 (简单)
+INCR rate:ip:192.168.1.1
+EXPIRE rate:ip:192.168.1.1 1
+// 如果值 > 100 → 拒绝
+
+// 方法 2: 滑动窗口 (精确)
+// 用 ZSet 记录每个请求的时间戳
+ZADD rate:ip:192.168.1.1 now request_id
+ZREMRANGEBYSCORE rate:ip:192.168.1.1 0 now-1000
+ZCARD rate:ip:192.168.1.1
+// 如果 > 100 → 拒绝
+
+// 方法 3: 令牌桶 (Lua)
+// 每秒增加令牌, 每次请求消耗
+
+// ========== 场景 5: 排行榜 ==========
+// ZSet 天然支持排行榜
+
+// 实时积分榜:
+ZADD leaderboard:realtime 1500 "user:100"
+ZADD leaderboard:realtime 1200 "user:200"
+ZADD leaderboard:realtime 1800 "user:300"
+
+// 查看 Top 10:
+ZREVRANGE leaderboard:realtime 0 9 WITHSCORES
+
+// 查看排名:
+ZREVRANK leaderboard:realtime "user:100"
+
+// 每日排行 (按日期分 key):
+ZADD leaderboard:20241001 1500 "user:100"
+
+// 周榜: 合并 7 天的日榜
+ZUNIONSTORE leaderboard:week 7
+    leaderboard:20241001 ... leaderboard:20241007
+    WEIGHTS 1 1 1 1 1 1 1
+    AGGREGATE SUM</div>
+    </div>
+    <div class="card">
+        <h2>统计与去重</h2>
+        <div class="code">// ========== 场景 6: UV 统计 HyperLogLog ==========
+// HyperLogLog: 基数统计, 误差 ~0.81%, 固定 12KB 内存
+
+PFADD uv:page:42 "user:100" "user:200" "user:100"
+PFCOUNT uv:page:42           // 2 (自动去重)
+PFMERGE uv:total uv:page:42 uv:page:43  // 合并
+
+// 对比:
+// SET: 精确但内存 O(N)
+// HyperLogLog: 12KB 固定, 可统计 2^64 个元素
+
+// ========== 场景 7: 布隆过滤器 ==========
+// 判断元素"可能存在"或"肯定不存在"
+// 需要安装 RedisBloom 模块
+
+BF.ADD bloom:users "alice@test.com"       // 添加
+BF.EXISTS bloom:users "alice@test.com"     // 1 (可能存在)
+BF.EXISTS bloom:users "nonexist@test.com"  // 0 (肯定不存在)
+
+// 应用: 防止缓存穿透
+// 查 Bloom Filter → 不存在 → 直接返回
+// 存在 → 查 Redis → 查 DB
+
+// ========== 场景 8: 位图统计 ==========
+// 节省内存的统计方式
+
+// 日活跃用户:
+// 以 user_id 为偏移量, 1 表示今日登录
+SETBIT active:20241001 100 1    // user 100 登录
+SETBIT active:20241001 200 1    // user 200 登录
+
+BITCOUNT active:20241001          // 今日活跃用户数
+
+// 连续登录:
+BITOP AND active:20240930 active:20241001 result  // 两天都登录
+
+// 内存: 1 亿用户只需 ~12MB</div>
+    </div>
+    <div class="card">
+        <h2>地理位置与消息</h2>
+        <div class="code">// ========== 场景 9: Geo 地理位置 ==========
+// Redis 3.2+ 支持地理位置
+
+// 添加位置:
+GEOADD shops 116.397 39.908 "shop:beijing_hd"     // 北京海淀
+GEOADD shops 121.473 31.230 "shop:shanghai_pd"    // 上海浦东
+
+// 计算距离 (km):
+GEODIST shops "shop:beijing_hd" "shop:shanghai_pd" km
+// "1067.56" (公里)
+
+// 查找附近:
+GEOSEARCH shops
+    FROMLONLAT 116.4 39.9
+    BYRADIUS 5 km
+    WITHDIST
+// 返回 5 公里内的店铺
+
+// ========== 场景 10: 延迟队列 ==========
+// 用 ZSet 实现, 以执行时间为分数
+
+// 添加延迟任务:
+ZADD delayed:queue 1696118400 "task:send_email"
+ZADD delayed:queue 1696204800 "task:timeout_order"
+
+// 轮询到期任务:
+while true:
+    tasks = ZRANGEBYSCORE delayed:queue 0 now LIMIT 0 10
+    for task in tasks:
+        // 处理任务
+        ZREM delayed:queue task
+    sleep(1)
+
+// ========== 场景 11: 全局 ID 生成器 ==========
+INCR id:users     // 1
+INCR id:orders    // 1000
+// 每秒 10 万+ 吞吐
+
+// 前缀 + 日期 + 自增:
+KEY = "order:" + date + ":" + INCR id:date
+// order:20241001:1, order:20241001:2
+
+// ========== 场景 12: 最新动态/Feed ==========
+// 用户时间线 (保留 100 条)
+LPUSH feed:user:100 "post:42"
+LTRIM feed:user:100 0 99
+
+// 获取:
+LRANGE feed:user:100 0 -1</div>
+        <div class="note">💡 Redis 应用广泛: Session 共享解分布式; 缓存减轻 DB 压力; ZSet 做排行榜; HyperLogLog 节省 UV 统计内存; 布隆过滤器防缓存穿透; 位图统计日活; Geo 查附近; ZSet 做延迟队列; INCR 做全局 ID。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSession()">Session/缓存</button>
+        <button onclick="demoStats()">统计/去重</button>
+        <button onclick="demoGeo()">地理位置</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSession() {
+            result.innerHTML = '';
+            log('# Session 与缓存');
+            log('');
+            log('Session: SET session:id user_id NX EX 86400');
+            log('缓存: SET product:detail ... EX 3600');
+            log('防重: SETNX order:prevent:user NX EX 3');
+        }
+
+        function demoStats() {
+            result.innerHTML = '';
+            log('# 统计与去重');
+            log('');
+            log('UV: PFADD/PFCOUNT HyperLogLog');
+            log('  12KB 统计 2^64 个元素');
+            log('DAU: SETBIT/BITCOUNT 位图');
+            log('  1 亿用户 ~12MB');
+            log('去重: BF.ADD/BF.EXISTS 布隆过滤器');
+        }
+
+        function demoGeo() {
+            result.innerHTML = '';
+            log('# 地理位置');
+            log('');
+            log('GEOADD shops lng lat name');
+            log('GEODIST shops a b km');
+            log('GEOSEARCH shops FROMLONLAT lng lat');
+            log('  BYRADIUS 5 km');
+            log('');
+            log('适合: 附近商家, 定位服务');
+        }
+    </script>
+</body>
+</html>

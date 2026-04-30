@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express dotenv 多环境配置</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚙️ Express dotenv 多环境配置</h2><p>dotenv 环境变量管理、多环境文件 (.env.development/.env.production)、配置验证、配置对象封装、环境切换、敏感信息保护、12-Factor App 配置原则。</p></div>
+    <div class="card">
+        <h2>dotenv 基础</h2>
+        <div class="code">// ========== dotenv 环境变量 ==========
+// 通过 .env 文件管理配置
+// 不上传到 git!
+
+// 安装:
+// npm install dotenv
+
+// ========== .env 文件 ==========
+// .env (基础配置, 所有环境共享)
+// PORT=3000
+// NODE_ENV=development
+// API_PREFIX=/api/v1
+//
+// .env.development (开发环境)
+// DB_URI=mongodb://localhost:27017/myapp
+// REDIS_URL=redis://localhost:6379
+// LOG_LEVEL=debug
+//
+// .env.production (生产环境)
+// DB_URI=mongodb+srv://user:pass@cluster.mongodb.net/myapp
+// REDIS_URL=redis://redis-prod:6379
+// LOG_LEVEL=warn
+// S3_BUCKET=myapp-prod
+// CDN_URL=https://d123.cloudfront.net
+//
+// .env.test (测试环境)
+// DB_URI=mongodb://localhost:27017/myapp-test
+// LOG_LEVEL=silent
+
+// ========== 加载配置 ==========
+// app.js:
+
+const path = require('path');
+const envFile = path.resolve(process.cwd(), `.env.${process.env.NODE_ENV || 'development'}`);
+
+require('dotenv').config({ path: '.env' });          // 加载 .env (基础)
+require('dotenv').config({ path: envFile });          // 加载环境特定配置
+// 后加载的会覆盖前一个的相同变量
+
+// 也可以直接用:
+// npm install dotenv-cli
+// "start:dev": "dotenv -e .env -e .env.development -- node app.js"
+
+// ========== 配置验证 ==========
+const requiredVars = [
+    'DB_URI',
+    'JWT_SECRET',
+    'NODE_ENV',
+];
+
+const missing = requiredVars.filter(v => !process.env[v]);
+if (missing.length > 0) {
+    console.error(`Missing required env vars: ${missing.join(', ')}`);
+    process.exit(1);
+}
+
+// ========== .gitignore ==========
+// .env
+// .env.development
+// .env.production
+// .env.local
+// !.env.example  (示例文件要保留)
+
+// ========== .env.example ==========
+// 提交到 git 的配置模板:
+// PORT=3000
+// DB_URI=mongodb://localhost:27017/myapp
+// JWT_SECRET=change-me
+// REDIS_URL=redis://localhost:6379</div>
+    </div>
+    <div class="card">
+        <h2>配置对象封装</h2>
+        <div class="code">// ========== 配置对象 ==========
+// config/index.js:
+// 集中管理所有配置, 提供类型转换和默认值
+
+const config = {
+    // 服务
+    env: process.env.NODE_ENV || 'development',
+    port: parseInt(process.env.PORT, 10) || 3000,
+    apiPrefix: process.env.API_PREFIX || '/api/v1',
+    isDev: () => config.env === 'development',
+    isProd: () => config.env === 'production',
+    isTest: () => config.env === 'test',
+
+    // 数据库
+    db: {
+        uri: process.env.DB_URI || 'mongodb://localhost:27017/myapp',
+        options: {
+            maxPoolSize: parseInt(process.env.DB_POOL_SIZE, 10) || 10,
+            minPoolSize: 2,
+            serverSelectionTimeoutMS: 5000,
+        },
+    },
+
+    // Redis
+    redis: {
+        url: process.env.REDIS_URL || 'redis://localhost:6379',
+        prefix: process.env.REDIS_PREFIX || 'myapp:',
+    },
+
+    // JWT
+    jwt: {
+        secret: process.env.JWT_SECRET,
+        accessExpiry: process.env.JWT_ACCESS_EXPIRY || '15m',
+        refreshExpiry: process.env.JWT_REFRESH_EXPIRY || '7d',
+        issuer: process.env.JWT_ISSUER || 'myapp',
+    },
+
+    // 文件上传
+    upload: {
+        maxFileSize: parseInt(process.env.UPLOAD_MAX_SIZE, 10) || 10 * 1024 * 1024,
+        storage: process.env.UPLOAD_STORAGE || 'local',
+        s3: {
+            bucket: process.env.S3_BUCKET,
+            region: process.env.AWS_REGION || 'ap-northeast-1',
+        },
+    },
+
+    // 日志
+    log: {
+        level: process.env.LOG_LEVEL || (config?.env === 'production' ? 'warn' : 'debug'),
+        format: config?.env === 'production' ? 'json' : 'pretty',
+    },
+
+    // CORS
+    cors: {
+        origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:5173'],
+    },
+};
+
+// 启动时验证关键配置
+function validateConfig() {
+    const critical = [
+        ['jwt.secret', config.jwt.secret],
+        ['db.uri', config.db.uri],
+    ];
+
+    const missing = critical.filter(([, val]) => !val);
+    if (missing.length > 0) {
+        const names = missing.map(([name]) => name).join(', ');
+        throw new Error(`Missing critical configuration: ${names}`);
+    }
+}
+
+// 冻结配置 (防止运行时修改)
+module.exports = Object.freeze(config);
+
+// ========== 使用 ==========
+// const config = require('./config');
+// mongoose.connect(config.db.uri, config.db.options);
+// app.listen(config.port);</div>
+    </div>
+    <div class="card">
+        <h2>环境切换与脚本</h2>
+        <div class="code">// ========== package.json 脚本 ==========
+// {
+//   "scripts": {
+//     "start": "node app.js",
+//     "start:dev": "NODE_ENV=development node app.js",
+//     "start:prod": "NODE_ENV=production node app.js",
+//     "start:staging": "NODE_ENV=staging node app.js",
+//     "test": "NODE_ENV=test jest",
+//     "lint": "NODE_ENV=test eslint ."
+//   }
+// }
+
+// Windows 需要 cross-env:
+// npm install cross-env --save-dev
+// "start:prod": "cross-env NODE_ENV=production node app.js"
+
+// ========== 环境检测 ==========
+// 应用中根据环境调整行为:
+if (config.isDev()) {
+    // 开发: 详细日志, 不压缩, CORS 宽松
+    app.use(morgan('dev'));
+    app.use(cors({ origin: true, credentials: true }));
+} else {
+    // 生产: JSON 日志, 压缩, CORS 严格
+    app.use(morgan('combined'));
+    app.use(compression());
+    app.use(helmet());
+    app.use(cors({
+        origin: config.cors.origin,
+        credentials: true,
+        maxAge: 86400,
+    }));
+}
+
+// ========== 敏感信息 ==========
+// 1. .env 文件永远不提交到 git
+// 2. 生产环境用环境变量 (CI/CD 注入)
+// 3. 密钥轮换 (定期更换 JWT_SECRET)
+// 4. 不要打印环境变量
+// 5. 配置对象不序列化到响应
+
+// ========== 12-Factor App 配置 ==========
+// 1. 配置与代码严格分离
+// 2. 不把配置写死在代码里
+// 3. 通过环境变量注入
+// 4. 支持不修改代码切换环境
+// 5. 环境特定文件: .env.development / .env.production
+// 6. CI/CD 中通过 secrets 注入
+
+// ========== Docker 环境变量 ==========
+// docker-compose.yml:
+// services:
+//   app:
+//     image: myapp
+//     environment:
+//       - NODE_ENV=production
+//       - DB_URI=mongodb://db:27017/myapp
+//       - JWT_SECRET=${JWT_SECRET}
+//     env_file:
+//       - .env.production
+//
+// 或 Dockerfile 中:
+// ENV NODE_ENV=production</div>
+        <div class="note">💡 dotenv 要点: .env 不上传 git; 多环境文件 (.development/.production/.test); dotenv.config({ path }) 加载; 配置对象封装 类型转换+默认值; 启动时验证关键配置; cross-env 跨平台设置 NODE_ENV; 12-Factor App 配置分离; Docker env_file; .env.example 提交模板; 敏感信息不打印不序列化。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoEnv()">多环境配置</button>
+        <button onclick="demoConfig()">配置对象</button>
+        <button onclick="demo12Factor()">12-Factor</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoEnv() {
+            result.innerHTML = '';
+            log('# 多环境配置策略');
+            log('');
+            log('.env                - 共用基础配置');
+            log('.env.development    - 开发环境 (本地)');
+            log('.env.staging        - 预发布环境');
+            log('.env.production     - 生产环境');
+            log('.env.test           - 测试环境');
+            log('.env.example        - 模板 (提交 git)');
+            log('');
+            log('加载顺序:');
+            log('dotenv .env');
+            log('dotenv .env.{NODE_ENV}  (覆盖)');
+        }
+
+        function demoConfig() {
+            result.innerHTML = '';
+            log('# 配置对象封装');
+            log('');
+            log('const config = {');
+            log('  env: process.env.NODE_ENV,');
+            log('  port: parseInt(PORT) || 3000,');
+            log('  db: { uri, options },');
+            log('  jwt: { secret, expiry },');
+            log('  log: { level, format },');
+            log('  isDev: () => env === "development",');
+            log('  isProd: () => env === "production",');
+            log('};');
+            log('');
+            log('validateConfig(): 启动检查关键配置');
+            log('Object.freeze(): 防止运行时修改');
+        }
+
+        function demo12Factor() {
+            result.innerHTML = '';
+            log('# 12-Factor App 配置原则');
+            log('');
+            log('1. 代码库: 单代码库多部署');
+            log('2. 依赖: 显式声明');
+            log('3. 配置: 环境变量存储');
+            log('4. 后端服务: 可替换资源');
+            log('5. 构建/发布/运行: 严格分离');
+            log('');
+            log('配置核心:');
+            log('- 不硬编码在代码');
+            log('- 通过环境变量注入');
+            log('- 不修改代码切换环境');
+        }
+    </script>
+</body>
+</html>

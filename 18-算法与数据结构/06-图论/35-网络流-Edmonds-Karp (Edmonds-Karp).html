@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>35-网络流-Edmonds-Karp (Edmonds-Karp)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Edmonds-Karp</h2>
+  <div class="code">Edmonds-Karp 用 BFS 找最短增广路，时间复杂度 O(VE²)。</div>
+  <pre>// Edmonds-Karp 与 Ford-Fulkerson 类似，但总是用 BFS 找最短增广路
+// 确保了 O(VE²) 的时间复杂度上界
+function edmondsKarp(capacity, source, sink) {
+  const n = capacity.length;
+  const res = capacity.map(r => [...r]);
+  let flow = 0;
+  while (true) {
+    const parent = new Array(n).fill(-1);
+    const q = [source]; parent[source] = source;
+    while (q.length && parent[sink] === -1) {
+      const u = q.shift();
+      for (let v = 0; v < n; v++)
+        if (parent[v] === -1 && res[u][v] > 0) { parent[v] = u; q.push(v); }
+    }
+    if (parent[sink] === -1) break;
+    let add = Infinity;
+    for (let v = sink; v !== source; v = parent[v]) add = Math.min(add, res[parent[v]][v]);
+    for (let v = sink; v !== source; v = parent[v]) { res[parent[v]][v] -= add; res[v][parent[v]] += add; }
+    flow += add;
+  }
+  return flow;
+}
+console.log('Edmonds-Karp O(VE²)');</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  document.getElementById('result').textContent =
+    `Edmonds-Karp 算法:\n用 BFS 找最短增广路\n时间复杂度 O(VE²)\n适合中小规模网络流\n\nDinic 算法 O(V²E) 更适合大规模`;
+}
+</script>
+</body>
+</html>

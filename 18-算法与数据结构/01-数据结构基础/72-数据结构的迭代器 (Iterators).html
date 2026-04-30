@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>72-数据结构的迭代器 (Iterators)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Iterators</h2>
+  <div class="code">迭代器是一种设计模式，提供统一的方式遍历不同的数据结构。</div>
+  <pre>class ArrayIterator {
+  constructor(arr) { this.arr = arr; this.idx = 0; }
+  hasNext() { return this.idx < this.arr.length; }
+  next() { return this.hasNext() ? this.arr[this.idx++] : null; }
+}
+class TreeNode {
+  constructor(val) { this.val = val; this.left = null; this.right = null; }
+}
+// 二叉树中序遍历迭代器
+class InorderIterator {
+  constructor(root) { this.stack = []; this._pushLeft(root); }
+  _pushLeft(node) { while (node) { this.stack.push(node); node = node.left; } }
+  hasNext() { return this.stack.length > 0; }
+  next() { const node = this.stack.pop(); this._pushLeft(node.right); return node.val; }
+}</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  class InorderIterator {
+    constructor(root){this.stack=[];this._pushLeft(root);}
+    _pushLeft(n){while(n){this.stack.push(n);n=n.left;}}
+    hasNext(){return this.stack.length>0;}
+    next(){const n=this.stack.pop();this._pushLeft(n.right);return n.val;}
+  }
+  const root={val:4,left:{val:2,left:{val:1,left:null,right:null},right:{val:3,left:null,right:null}},right:{val:6,left:{val:5,left:null,right:null},right:{val:7,left:null,right:null}}};
+  const it=new InorderIterator(root);
+  const res=[];while(it.hasNext())res.push(it.next());
+  document.getElementById('result').textContent = `中序遍历: ${res.join(' → ')}`;
+}
+</script>
+</body>
+</html>

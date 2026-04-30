@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bash条件判断与测试</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔀 Bash 条件判断与测试</h2><p>if/elif/else、test 命令、[[ ]] 扩展测试、case 多分支、运算符。</p></div>
+    <div class="card">
+        <h2>if 语句</h2>
+        <div class="code">// ========== if 基本语法 ==========
+// if <命令>; then ... fi
+// 注意: if 后面跟的是命令,根据退出码判断
+// 命令返回 0 → true, 非 0 → false
+
+if true; then
+    echo "永远执行"
+fi
+
+if false; then
+    echo "永远不会执行"
+fi
+
+// ========== if/elif/else ==========
+if [ "$1" = "start" ]; then
+    echo "启动服务"
+elif [ "$1" = "stop" ]; then
+    echo "停止服务"
+else
+    echo "用法: $0 {start|stop}"
+fi
+
+// ========== 测试命令结构 ==========
+// 三种写法:
+// 1. test 条件       (test 命令)
+// 2. [ 条件 ]        (test 的别名,注意空格!)
+// 3. [[ 条件 ]]      (Bash 扩展,推荐)
+
+// [ 是命令,]] 是关键字:
+// [ 要求后面的参数以 ] 结束
+// [[ 是 Bash 关键字,支持更多特性
+
+// ========== 命令组合 ==========
+// && 和 || 也可以做条件判断
+[ -f "$file" ] && echo "file exists"
+[ -z "$name" ] && { echo "name is empty"; exit 1; }
+
+// command1 || command2  # command1 失败时运行 command2
+ping -c1 google.com || echo "网络不通"</div>
+    </div>
+    <div class="card">
+        <h2>test / [ ] 条件测试</h2>
+        <div class="code">// ========== 文件测试 ==========
+[ -f "$file" ]    # 是否为普通文件
+[ -d "$dir" ]     # 是否为目录
+[ -e "$path" ]    # 是否存在 (任何类型)
+[ -s "$file" ]    # 文件非空 (size > 0)
+[ -r "$file" ]    # 是否可读
+[ -w "$file" ]    # 是否可写
+[ -x "$file" ]    # 是否可执行
+[ -L "$file" ]    # 是否为符号链接
+[ -p "$pipe" ]    # 是否为命名管道
+[ -S "$socket" ]  # 是否为 socket
+[ -t "$fd" ]      # 文件描述符是否关联终端
+[ file1 -nt file2 ]  # file1 比 file2 新 (newer than)
+[ file1 -ot file2 ]  # file1 比 file2 旧 (older than)
+[ file1 -ef file2 ]  # file1 和 file2 是同一文件 (硬链接)
+
+// ========== 字符串比较 ==========
+[ "$str1" = "$str2" ]   # 相等 (POSIX)
+[ "$str1" == "$str2" ]  # 相等 (Bash)
+[ "$str1" != "$str2" ]  # 不等
+[ -z "$str" ]           # 空字符串 (zero)
+[ -n "$str" ]           # 非空字符串 (non-zero)
+
+// 重要: 字符串变量一定要加引号!
+// [ $str = "a" ]  → str 为空时变成 [ = "a" ] → 语法错误
+// [ "$str" = "a" ] → str 为空时变成 [ "" = "a" ] → 正确
+
+// ========== 数字比较 ==========
+[ "$a" -eq "$b" ]  # 等于 (equal)
+[ "$a" -ne "$b" ]  # 不等于 (not equal)
+[ "$a" -gt "$b" ]  # 大于 (greater than)
+[ "$a" -ge "$b" ]  # 大于等于 (greater or equal)
+[ "$a" -lt "$b" ]  # 小于 (less than)
+[ "$a" -le "$b" ]  # 小于等于 (less or equal)
+
+// ========== 逻辑运算 ==========
+[ ! expr ]          # 取反
+[ expr1 -a expr2 ]  # 与 (and)
+[ expr1 -o expr2 ]  # 或 (or)
+
+// ========== 组合示例 ==========
+if [ -f "$file" -a -r "$file" ]; then
+    echo "文件存在且可读"
+fi
+
+// ========== 注意事项 ==========
+// [ 内部每个 token 要空格分隔!
+// [ "$var" = "val" ]  正确
+// ["$var"="val"]      错误 (缺空格)
+// [ "$var"="val" ]    错误 (= 旁边缺空格)</div>
+    </div>
+    <div class="card">
+        <h2>[[ ]] — Bash 扩展测试</h2>
+        <div class="code">// ========== [[ ]] 优势 ==========
+// 1. 不会对变量做 word splitting,可以省略引号
+// 2. 支持正则匹配 =~
+// 3. 支持模式匹配 ==
+// 4. 支持 && || (比 -a -o 更直观)
+// 5. 支持分组 ()
+
+// ========== 字符串比较 ==========
+[[ "$str" == "hello" ]]    # 相等
+[[ "$str" != "hello" ]]    # 不等
+[[ -z "$str" ]]            # 空
+[[ -n "$str" ]]            # 非空
+
+// ========== 模式匹配 ==========
+[[ "$file" == *.jpg ]]     # 通配符匹配 (不用加引号!)
+[[ "$str" == [Aa]lice* ]]  # 以 Alice 或 alice 开头
+[[ "$str" == "Alice*" ]]   # 注意: 引号关掉通配,变成字面匹配
+
+// ========== 正则匹配 =~ ==========
+[[ "$email" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]
+
+// BASH_REMATCH 数组保存匹配结果
+if [[ "$url" =~ ^https?://([^/]+)/(.*) ]]; then
+    echo "域名: ${BASH_REMATCH[1]}"
+    echo "路径: ${BASH_REMATCH[2]}"
+fi
+
+// 注意: 正则不要加引号,否则变成字面量
+// [[ "$str" =~ "^regex$" ]]  # 不对!
+
+// ========== 逻辑运算 ==========
+[[ -f "$file" && -r "$file" ]]  # 与
+[[ -d "$dir" || -L "$dir" ]]    # 或
+[[ ! -z "$var" ]]               # 非
+
+// 分组
+if [[ (-f "$file" || -d "$file") && -r "$file" ]]; then
+    echo "文件或目录,且可读"
+fi
+
+// ========== 数字比较 ==========
+// [[ ]] 也支持 (()) 风格的算术比较
+[[ $a -gt $b ]]         # 传统风格,推荐
+(( a > b ))             # 算术风格,也可用于 if
+(( a > b && b > 0 ))    # 多个条件
+
+// ========== 推荐使用 [[ ]] ==========
+// 总是使用 [[ ]] 而不是 [ ],除非需要 POSIX 兼容性
+// [[ ]] 更安全、更强大、更易读</div>
+        <div class="note">💡 [[ ]] 是 Bash 关键字而非外部命令,因此不会做 word splitting 或 pathname expansion。这意味着 [[ $str == hello ]] 即使 $str 含空格也安全,无需加引号。但稳妥起见,变量还是加引号为好。</div>
+    </div>
+    <div class="card">
+        <h2>case 多分支</h2>
+        <div class="code">// ========== case 语法 ==========
+// case 比多层 if-elif-else 更清晰
+
+case "$1" in
+    start)
+        echo "启动..."
+        systemctl start myservice
+        ;;
+    stop)
+        echo "停止..."
+        systemctl stop myservice
+        ;;
+    restart|reload)
+        echo "重启..."
+        systemctl restart myservice
+        ;;
+    *)
+        echo "用法: $0 {start|stop|restart}"
+        exit 1
+        ;;
+esac
+
+// ========== case 模式匹配 ==========
+// case 支持通配符模式
+
+case "$file" in
+    *.jpg|*.jpeg|*.png)
+        echo "图片文件"
+        ;;
+    *.mp4|*.avi|*.mkv)
+        echo "视频文件"
+        ;;
+    *.zip|*.tar.gz|*.rar)
+        echo "压缩文件"
+        ;;
+    *)
+        echo "其他类型"
+        ;;
+esac
+
+// ========== case 高级用法 ==========
+// 用 | 分隔多个模式
+// 用 *) 作为默认匹配
+//模式可按顺序匹配,匹配到第一个就退出
+
+// 匹配数字范围
+case "$code" in
+    [0-9])
+        echo "$code 是单位数"
+        ;;
+    [1-9][0-9])
+        echo "$code 是两位数"
+        ;;
+    *)
+        echo "其他"
+        ;;
+esac
+
+// 简单的 ini/conf 解析
+while IFS='=' read -r key value; do
+    case "$key" in
+        server.port)    PORT="$value" ;;
+        server.host)    HOST="$value" ;;
+        db.url)         DB_URL="$value" ;;
+        \#*)            ;;  # 跳过注释
+        "")             ;;  # 跳过空行
+    esac
+done < config.properties</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoIf()">条件判断演示</button>
+        <button onclick="demoCase()">case 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoIf() {
+            result.innerHTML = '';
+            log('# Bash 条件判断演示');
+            log('');
+            log('#!/bin/bash');
+            log('score=$1');
+            log('');
+            log('if [[ $score -ge 90 ]]; then');
+            log('    echo "等级: A"');
+            log('elif [[ $score -ge 80 ]]; then');
+            log('    echo "等级: B"');
+            log('elif [[ $score -ge 70 ]]; then');
+            log('    echo "等级: C"');
+            log('else');
+            log('    echo "等级: D (不及格)"');
+            log('fi');
+            log('');
+            log('$ ./grade.sh 85  → B');
+            log('');
+            log('---');
+            log('[[ 优势:');
+            log('  [[ -f "file.txt" && -r "file.txt" ]]  # 一行完成');
+            log('  [[ "$email" =~ ^[a-z]+@[a-z]+\\.[a-z]+$ ]]  # 正则');
+            log('  [[ "$img" == *.@(jpg|png|gif) ]]  # 扩展通配');
+        }
+
+        function demoCase() {
+            result.innerHTML = '';
+            log('# Bash case 演示 — 服务管理');
+            log('');
+            log('case "$action" in');
+            log('  start)  echo "启动服务..." ;;');
+            log('  stop)   echo "停止服务..." ;;');
+            log('  status) echo "查看状态..." ;;');
+            log('  restart|reload)');
+            log('    echo "重启服务..." ;;');
+            log('  *)');
+            log('    echo "用法: $0 {start|stop|restart|status}"');
+            log('    exit 1 ;;');
+            log('esac');
+            log('');
+            log('--- file 类型判断 ---');
+            log('case "$file" in');
+            log('  *.html|*.css|*.js)  echo "前端资源" ;;');
+            log('  *.py|*.rb|*.go)     echo "后端代码" ;;');
+            log('  *.json|*.xml|*.yml) echo "配置文件" ;;');
+            log('  *) echo "未知类型" ;;');
+            log('esac');
+        }
+    </script>
+</body>
+</html>

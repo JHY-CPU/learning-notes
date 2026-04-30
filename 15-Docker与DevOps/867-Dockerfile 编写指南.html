@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dockerfile 编写指南</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📝 Dockerfile 编写指南</h2><p>Dockerfile 指令详解 (FROM/RUN/COPY/CMD/ENTRYPOINT 等)、层缓存机制、.dockerignore、构建优化、最佳实践。</p></div>
+    <div class="card">
+        <h2>Dockerfile 指令大全</h2>
+        <div class="code">// ========== Dockerfile 完整示例 ==========
+// Dockerfile
+
+// 基础镜像
+FROM node:20-alpine
+
+// 作者信息
+LABEL maintainer="developer@example.com"
+LABEL version="1.0.0"
+
+// 设置工作目录
+WORKDIR /app
+
+// 复制 package 文件 (利用缓存)
+COPY package.json package-lock.json ./
+RUN npm ci --only=production
+
+// 复制源代码
+COPY . .
+
+// 环境变量
+ENV NODE_ENV=production
+ENV PORT=3000
+
+// 暴露端口
+EXPOSE 3000
+
+// 创建非 root 用户
+RUN addgroup -g 1001 -S appgroup && \
+    adduser -S appuser -u 1001 -G appgroup
+USER appuser
+
+// 健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
+
+// 默认命令
+CMD ["node", "server.js"]
+
+// ========== 指令详解 ==========
+// FROM        — 基础镜像 (必须第一个非注释指令)
+//   FROM node:20-alpine
+//   FROM ubuntu:22.04 AS builder  // 多阶段命名
+//   FROM scratch                    // 空基础镜像
+
+// RUN         — 构建时执行命令
+//   RUN apt-get update && apt-get install -y curl
+//   RUN npm install
+//   每个 RUN 创建一个层
+
+// COPY        — 复制文件到镜像
+//   COPY package.json ./
+//   COPY --from=builder /app/dist ./dist  // 多阶段复制
+
+// ADD         — 增强版 COPY (支持 URL/解压)
+//   ADD https://example.com/file.tar.gz /tmp/
+//   ADD archive.tar.gz /tmp/        // 自动解压
+//   推荐: 纯复制用 COPY, 需要解压用 ADD
+
+// CMD         — 容器启动默认命令
+//   CMD ["node", "app.js"]          // 推荐 exec 格式
+//   CMD node app.js                 // shell 格式
+//   可以被 docker run 命令覆盖
+
+// ENTRYPOINT  — 容器入口命令
+//   ENTRYPOINT ["docker-entrypoint.sh"]
+//   可以和 CMD 配合 (CMD 作为默认参数)
+//   ENTRYPOINT ["nginx", "-g", "daemon off;"]
+
+// WORKDIR     — 设置工作目录
+//   WORKDIR /app
+//   自动创建目录
+
+// ENV         — 环境变量
+//   ENV NODE_ENV=production
+//   ENV DB_HOST=localhost DB_PORT=5432
+
+// EXPOSE      — 声明端口 (文档用途)
+//   EXPOSE 8080
+//   实际映射需要 -p 或 --publish
+
+// USER        — 指定运行用户
+//   USER appuser
+//   安全最佳实践: 不要用 root
+
+// LABEL       — 元数据
+//   LABEL version="1.0" description="My app"
+
+// ARG         — 构建参数 (构建时可用)
+//   ARG VERSION=latest
+//   ARG DEBIAN_FRONTEND=noninteractive
+
+// VOLUME      — 声明挂载点
+//   VOLUME /data
+
+// HEALTHCHECK — 健康检查
+//   HEALTHCHECK CMD curl -f http://localhost || exit 1</div>
+    </div>
+    <div class="card">
+        <h2>层缓存机制</h2>
+        <div class="code">// ========== Docker 层 (Layer) ==========
+// 每个指令创建一个只读层
+// 层是 Docker 缓存和共享的基础
+
+// Dockerfile 指令 → 层 (Layer)
+// FROM      → 第 1 层 (基础镜像)
+// RUN       → 第 2 层
+// COPY      → 第 3 层
+// RUN       → 第 4 层
+// CMD       → 元数据 (不创建层)
+
+// ========== 层缓存优化 ==========
+// 缓存命中条件: 指令 + 上下文未变
+// 如果某一层缓存未命中, 后续层都重新构建
+
+// ❌ 不好的顺序 (源码变更导致 npm install 每次都重做)
+// COPY . .
+// RUN npm install
+
+// ✅ 好的顺序 (先复制依赖文件, 再安装)
+// COPY package.json package-lock.json ./
+// RUN npm ci
+// COPY . .
+
+// 原理: package.json 不常变, 源码常变
+// 不变的部分命中缓存, 只重新构建变的部分
+
+// ========== 减少层数 ==========
+// 合并 RUN 指令:
+// RUN apt-get update && \
+//     apt-get install -y --no-install-recommends \
+//         curl \
+//         ca-certificates \
+//         git && \
+//     rm -rf /var/lib/apt/lists/*
+
+// 不是必须减少层数 (层数不是性能瓶颈)
+// 更关注缓存命中率
+
+// ========== .dockerignore ==========
+// 类似 .gitignore, 排除不必要的文件
+
+// .dockerignore:
+// node_modules
+// npm-debug.log
+// .git
+// .gitignore
+// .env
+// .env.*
+// Dockerfile
+// docker-compose*.yml
+// README.md
+// .vscode
+// .idea
+// *.md
+
+// 减少构建上下文 → 加快构建速度</div>
+    </div>
+    <div class="card">
+        <h2>构建优化与最佳实践</h2>
+        <div class="code">// ========== 基础镜像选择 ==========
+// 小的基础镜像 = 小最终镜像 + 少攻击面
+
+// 镜像大小对比:
+// node:20          ~1GB  (完整系统)
+// node:20-slim     ~200MB (精简系统)
+// node:20-alpine   ~120MB (Alpine Linux)
+// alpine:3.19      ~7MB   (最小 Linux)
+
+// 选择准则:
+// - 开发环境: 用完整镜像 (有构建工具)
+// - 生产环境: 用 alpine 或 distroless
+
+// ========== 构建缓存技巧 ==========
+// 1. 依赖先于源码复制
+// COPY package*.json ./
+// RUN npm ci
+// COPY . .
+
+// 2. apt-get 合并并清理
+// RUN apt-get update && \
+//     apt-get install -y --no-install-recommends pkg && \
+//     rm -rf /var/lib/apt/lists/*
+
+// 3. npm ci 替代 npm install
+// npm ci: 更快, 严格基于 lock 文件
+
+// 4. --no-cache 使用 apk (Alpine)
+// RUN apk add --no-cache curl
+
+// ========== 安全最佳实践 ==========
+// 1. 不使用 root 运行
+// RUN adduser -D appuser
+// USER appuser
+
+// 2. 不存储 secrets 在镜像中
+// 构建时 ARG 不要用于密码
+// 运行时通过 -e 或 secrets 注入
+
+// 3. 最小基础镜像
+// 减少攻击面
+
+// 4. 定期更新基础镜像
+// 修复 CVE 漏洞
+
+// 5. 使用多阶段构建
+// 构建工具不留在最终镜像
+
+// ========== docker build 命令 ==========
+// docker build -t myapp:latest .
+// docker build -t myapp:v1.0 -t myapp:latest .
+// docker build --no-cache -t myapp .
+// docker build --build-arg VERSION=1.0 -t myapp .
+// docker build --platform linux/amd64 -t myapp .
+
+// 构建上下文: . (最后一个参数)
+// .dockerignore 排除的文件不会发送到 daemon</div>
+    </div>
+    <div class="card">
+        <h2>常见语言 Dockerfile</h2>
+        <div class="code">// ========== Node.js ==========
+// FROM node:20-alpine AS builder
+// WORKDIR /app
+// COPY package*.json ./
+// RUN npm ci
+// COPY . .
+// RUN npm run build
+//
+// FROM node:20-alpine
+// WORKDIR /app
+// COPY --from=builder /app/dist ./dist
+// COPY --from=builder /app/node_modules ./node_modules
+// COPY package*.json ./
+// EXPOSE 3000
+// USER node
+// CMD ["node", "dist/index.js"]
+
+// ========== Python ==========
+// FROM python:3.12-slim
+// WORKDIR /app
+// COPY requirements.txt .
+// RUN pip install --no-cache-dir -r requirements.txt
+// COPY . .
+// EXPOSE 8000
+// CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+// ========== Java (Spring Boot) ==========
+// FROM maven:3.9-eclipse-temurin-21 AS builder
+// WORKDIR /build
+// COPY pom.xml .
+// RUN mvn dependency:go-offline
+// COPY src ./src
+// RUN mvn package -DskipTests
+//
+// FROM eclipse-temurin:21-jre-alpine
+// COPY --from=builder /build/target/*.jar app.jar
+// EXPOSE 8080
+// ENTRYPOINT ["java", "-jar", "/app.jar"]
+
+// ========== Go ==========
+// FROM golang:1.22-alpine AS builder
+// WORKDIR /app
+// COPY go.mod go.sum ./
+// RUN go mod download
+// COPY . .
+// RUN CGO_ENABLED=0 go build -ldflags="-w -s" -o server .
+//
+// FROM alpine:3.19
+// RUN adduser -D appuser
+// COPY --from=builder /app/server /server
+// USER appuser
+// EXPOSE 8080
+// CMD ["/server"]</div>
+        <div class="note">💡 Dockerfile 要点: FROM 基础镜像; RUN 构建命令; COPY/ADD 文件; CMD/ENTRYPOINT 启动命令; WORKDIR/ENV/USER/EXPOSE; 层缓存: 不变指令放前面 (COPY package.json 先于 COPY .); 多阶段构建分离构建和运行环境; alpine 小镜像 (~7MB); .dockerignore 减少上下文; 安全: 非 root 用户, 不存 secrets, 最小基础镜像。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoInstructions()">指令</button>
+        <button onclick="demoCache()">缓存优化</button>
+        <button onclick="demoLang()">语言模板</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoInstructions() {
+            result.innerHTML = '';
+            log('# Dockerfile 指令');
+            log('');
+            log('FROM    基础镜像');
+            log('RUN     构建时命令');
+            log('COPY    复制文件');
+            log('ADD     复制+解压');
+            log('CMD     默认命令');
+            log('ENTRYPOINT  入口');
+            log('WORKDIR 工作目录');
+            log('ENV     环境变量');
+            log('USER    运行用户');
+            log('EXPOSE  声明端口');
+            log('HEALTHCHECK 健康检查');
+            log('ARG     构建参数');
+        }
+
+        function demoCache() {
+            result.innerHTML = '';
+            log('# 层缓存优化');
+            log('');
+            log('✅ 好的顺序:');
+            log('  COPY package*.json ./');
+            log('  RUN npm ci');
+            log('  COPY . .');
+            log('');
+            log('❌ 坏的顺序:');
+            log('  COPY . .');
+            log('  RUN npm install');
+            log('');
+            log('原理:');
+            log('  依赖文件不常变, 缓存命中');
+            log('  源码常变, 只重建最后层');
+        }
+
+        function demoLang() {
+            result.innerHTML = '';
+            log('# 语言 Dockerfile 模板');
+            log('');
+            log('Node.js:');
+            log('  node:20-alpine → npm ci → dist');
+            log('');
+            log('Python:');
+            log('  python:3.12-slim → pip install → uvicorn');
+            log('');
+            log('Java:');
+            log('  maven:3.9 build → jre:21-alpine run');
+            log('');
+            log('Go:');
+            log('  golang:alpine build → alpine run (10MB)');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>18-字符串算法面试题 (String Interview Problems)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>String Interview Problems</h2>
+  <div class="code">字符串算法在面试中的高频题型。</div>
+  <pre>// 1. 无重复字符的最长字串
+function lengthOfLongestSubstring(s) {
+  const map = new Map(); let max = 0, start = 0;
+  for (let i = 0; i < s.length; i++) {
+    if (map.has(s[i])) start = Math.max(start, map.get(s[i])+1);
+    map.set(s[i], i); max = Math.max(max, i-start+1);
+  }
+  return max;
+}
+// 2. 字符串的排列
+function checkInclusion(s1, s2) {
+  const need = new Map(); for (const c of s1) need.set(c,(need.get(c)||0)+1);
+  const win = new Map(); let l=0, r=0, valid=0;
+  while (r < s2.length) {
+    const c = s2[r++];
+    if (need.has(c)) { win.set(c,(win.get(c)||0)+1); if (win.get(c)===need.get(c)) valid++; }
+    while (r - l >= s1.length) {
+      if (valid === need.size) return true;
+      const d = s2[l++];
+      if (need.has(d)) { if (win.get(d)===need.get(d)) valid--; win.set(d,win.get(d)-1); }
+    }
+  }
+  return false;
+}
+console.log(lengthOfLongestSubstring("abcabcbb")); // 3
+console.log(checkInclusion("ab", "eidbaooo")); // true</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  function lols(s){const map=new Map();let max=0,st=0;for(let i=0;i<s.length;i++){if(map.has(s[i]))st=Math.max(st,map.get(s[i])+1);map.set(s[i],i);max=Math.max(max,i-st+1);}return max;}
+  document.getElementById('result').textContent =
+    `无重复最长字串 "abcabcbb": ${lols("abcabcbb")}\n无重复最长字串 "bbbbb": ${lols("bbbbb")}`;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IntersectionObserver</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        .box { width: 100%; height: 150px; background: #3498db; color: white; display: flex; align-items: center; justify-content: center; border-radius: 8px; margin: 500px 0; font-size: 18px; transition: all 0.5s; }
+        .box.visible { background: #2ecc71; transform: scale(1.05); }
+        #counter { font-size: 14px; color: #7f8c8d; margin: 5px 0; }
+        #stats { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; }
+        #stats .row { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid #eee; }
+        #stats .val { font-weight: bold; color: #2c3e50; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>IntersectionObserver</h2><p>异步观察元素与视口（或父元素）的交叉状态，用于懒加载、无限滚动、曝光统计等。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 创建观察器
+const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+        entry.isIntersecting;      // 是否交叉（进入视口）
+        entry.intersectionRatio;   // 可见比例 (0~1)
+        entry.boundingClientRect;  // 元素的视口坐标
+        entry.intersectionRect;    // 交叉区域坐标
+        entry.rootBounds;          // 根元素的视口坐标
+        entry.target;              // 被观察的元素
+    });
+}, {
+    root: null,                   // 父容器（null = 视口）
+    rootMargin: '0px',            // 扩大的边界（如 '-50px' 延迟触发）
+    threshold: [0, 0.5, 1],       // 触发阈值 (0~1 数组)
+});
+
+// 开始/停止观察
+observer.observe(element);
+observer.unobserve(element);
+observer.disconnect();
+
+// 获取所有被观察的元素
+const observed = observer.takeRecords();</div>
+        <div class="note">💡 rootMargin 可以提前触发："100px" = 元素距离视口 100px 时触发，适合预加载。<br>
+        💡 threshold: [0, 0.5, 1] = 进入/一半/完全可见时各触发一次。</div>
+    </div>
+    <div class="card">
+        <h2>演示：滚动观察方块</h2>
+        <p>下方彩色方块分布在页面各处，滚动页面观察它们进入视口的状态。</p>
+        <div id="stats">
+            <div class="row"><span>已触发的元素</span><span class="val" id="triggered-count">0</span></div>
+            <div class="row"><span>可见的元素</span><span class="val" id="visible-count">0</span></div>
+        </div>
+        <div id="boxes"></div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const boxes = document.getElementById('boxes');
+        const triggeredCount = document.getElementById('triggered-count');
+        const visibleCount = document.getElementById('visible-count');
+
+        // 生成方块
+        const colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#e67e22', '#34495e'];
+        const totalBoxes = 8;
+        let triggered = new Set();
+
+        for (let i = 0; i < totalBoxes; i++) {
+            const box = document.createElement('div');
+            box.className = 'box';
+            box.style.background = colors[i % colors.length];
+            box.textContent = `方块 #${i + 1}`;
+            box.dataset.index = i;
+            boxes.appendChild(box);
+        }
+
+        // IntersectionObserver
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                const box = entry.target;
+                if (entry.isIntersecting) {
+                    box.classList.add('visible');
+                    box.textContent = `方块 #${parseInt(box.dataset.index) + 1} ✅ 可见 (${(entry.intersectionRatio * 100).toFixed(0)}%)`;
+                    triggered.add(box.dataset.index);
+                } else {
+                    box.classList.remove('visible');
+                    box.textContent = `方块 #${parseInt(box.dataset.index) + 1} ⬜️ 不可见`;
+                }
+            });
+            triggeredCount.textContent = triggered.size;
+            visibleCount.textContent = document.querySelectorAll('.box.visible').length;
+        }, {
+            threshold: [0, 0.3, 0.6, 1],
+        });
+
+        document.querySelectorAll('.box').forEach(box => observer.observe(box));
+
+        console.log('=== IntersectionObserver 演示 ===');
+        console.log('观察 8 个方块，threshold: [0, 0.3, 0.6, 1]');
+
+        document.getElementById('output').textContent =
+            `IntersectionObserver: 元素可见性检测\n` +
+            `isIntersecting/intersectionRatio/boundingClientRect\n` +
+            `应用：懒加载、无限滚动、曝光埋点、视差动画\n` +
+            `✅ IntersectionObserver 演示完成！`;
+    </script>
+</body>
+</html>

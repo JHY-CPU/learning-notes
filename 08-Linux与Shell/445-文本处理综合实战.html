@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文本处理综合实战</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🎯 文本处理综合实战</h2><p>grep/sed/awk/sort/uniq 综合应用、Nginx 日志分析、系统监控脚本。</p></div>
+    <div class="card">
+        <h2>Nginx 访问日志分析</h2>
+        <div class="code">// ========== 日志格式 (Nginx Combined) ==========
+// log_format combined '$remote_addr - $remote_user [$time_local] '
+//                     '"$request" $status $body_bytes_sent '
+//                     '"$http_referer" "$http_user_agent"';
+//
+// 示例:
+// 192.168.1.1 - - [15/Jan/2024:10:00:00 +0800] "GET /api/users HTTP/1.1" 200 1234 "-" "curl/8.0"
+
+// ========== 实战 1: 统计 IP 访问 ==========
+// Top 10 访问 IP:
+// $ awk '{ print $1 }' access.log | sort | uniq -c | sort -nr | head -10
+//
+// 某 IP 的访问详情:
+// $ grep "192.168.1.1" access.log | awk '{ print $4, $6, $7 }'
+
+// ========== 实战 2: 响应状态码 ==========
+// 状态码分布:
+// $ awk '{ print $9 }' access.log | sort | uniq -c | sort -nr
+//
+// 4xx/5xx 错误请求:
+// $ awk '$9 ~ /^[45]/ { print $1, $6, $7, $9 }' access.log | head -20
+//
+// 404 最多的路径:
+// $ awk '$9 == 404 { print $7 }' access.log | sort | uniq -c | sort -nr | head -10
+
+// ========== 实战 3: 流量分析 ==========
+// 总流量 (MB):
+// $ awk '{ total += $10 } END { print total/1024/1024, "MB" }' access.log
+//
+// 最耗流量的 URL:
+// $ awk '{ traffic[$7] += $10 } END { for(u in traffic) print traffic[u], u }' access.log | sort -rn | head -10
+
+// ========== 实战 4: 响应时间分析 ==========
+// 假设日志含响应时间 (自定义格式):
+// $ awk '{ if($NF > 5) print $0 }' app.log          # 慢请求 (>5s)
+// $ awk '{ total+=$NF; count++ } END { print "avg:", total/count, "ms" }' response_times.log</div>
+    </div>
+    <div class="card">
+        <h2>系统监控脚本</h2>
+        <div class="code">// ========== 磁盘使用告警 ==========
+// $ df -h | awk 'NR>1 { print $5, $6 }' | sed 's/%//' | awk '$1 > 80 { print "⚠️ 磁盘:", $2, "使用率:", $1"%"}'
+//
+// 输出:
+//   ⚠️ 磁盘: /data 使用率: 85%
+//   ⚠️ 磁盘: /var/log 使用率: 91%
+
+// ========== 内存监控 ==========
+// $ free -m | awk 'NR==2 { printf "内存: %.1f/%.1f GB (%.0f%%)\n", $3/1024, $2/1024, $3/$2*100 }'
+//
+// 输出:
+//   内存: 3.2/15.6 GB (21%)
+
+// ========== 进程监控 ==========
+// CPU 最高的进程:
+//   $ ps aux --sort=-%cpu | awk 'NR>1 && NR<6 { printf "%-5s %-5s %s\n", $3, $4, $11 }'
+//
+// 内存最高的进程:
+//   $ ps aux --sort=-%mem | awk 'NR>1 && NR<6 { printf "%-5s %-5s %s\n", $3, $4, $11 }'
+
+// ========== 系统信息汇总 ==========
+// $ cat << EOF
+// ===== 系统概览 =====
+// 运行时间: $(uptime | sed 's/.*up //' | sed 's/,.*//')
+// 登录用户: $(who | wc -l)
+// CPU 负载: $(uptime | awk -F'load average:' '{ print $2 }')
+// 磁盘使用: $(df -h / | awk 'NR>1 { print $5 }')
+// 内存使用: $(free -m | awk 'NR==2 { printf "%d/%d MB", $3, $2 }')
+// EOF</div>
+    </div>
+    <div class="card">
+        <h2>代码搜索与重构</h2>
+        <div class="code">// ========== 查找 TODO/FIXME ==========
+// $ grep -rn "TODO\|FIXME\|HACK\|XXX" src/ --exclude-dir=node_modules 2>/dev/null
+//
+// 按类型统计 TODO:
+// $ grep -rn "TODO" src/ --include="*.py" | wc -l
+
+// ========== 批量替换 ==========
+// 在 .js 文件中将 console.log 替换为 // console.log:
+// $ sed -i 's/console\.log/\/\/ console.log/g' src/**/*.js
+//
+// 重命名函数名:
+// $ sed -i 's/oldFunction/newFunction/g' $(grep -rl "oldFunction" src/)
+
+// ========== 代码统计 ==========
+// 统计每种语言的代码行数:
+// $ find . -name "*.py" -o -name "*.js" -o -name "*.go" | xargs wc -l | sort -nr
+//
+// 统计注释比例:
+// $ awk '{ if($0 ~ /^[[:space:]]*\/\//) comments++; total++ } END { printf "注释: %.1f%%\n", comments/total*100 }' app.py
+
+// ========== 转换日志格式 ==========
+// Apache/Nginx 日志 → CSV:
+// $ awk '{ print $1","$4","$6","$7","$9","$10 }' access.log > access.csv
+//
+// 提取 JSON 日志中的字段:
+// $ grep -oP '"level":"\K[^"]*' app.json.log | sort | uniq -c</div>
+    </div>
+    <div class="card">
+        <h2>综合练习</h2>
+        <button onclick="comprehensiveDemo()">综合分析演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function comprehensiveDemo() {
+            result.innerHTML = '';
+            log('📊 综合演示: Nginx 日志分析');
+            log('');
+            log('$ awk \'$9 == 404 { path[$7]++ } END { for(p in path) print path[p], p }\' access.log | sort -rn | head -5');
+            log('');
+            log(' 45 /old-api/v1/users');
+            log(' 32 /images/not-found.jpg');
+            log(' 28 /broken-link');
+            log(' 15 /api/deprecated');
+            log(' 12 /assets/missing.js');
+            log('');
+            log('---');
+            log('');
+            log('$ awk \'{ ip[$1]++; bytes[$1]+=$10 } END { for(i in ip) printf "%-15s %3d reqs %8d bytes\\n", i, ip[i], bytes[i] }\' access.log | sort -k2 -rn | head -5');
+            log('');
+            log(' 192.168.1.1    245 reqs  1234567 bytes');
+            log(' 10.0.0.2      189 reqs   987654 bytes');
+            log(' 203.0.113.5   156 reqs   654321 bytes');
+            log(' 198.51.100.2   89 reqs   345678 bytes');
+            log(' 172.16.0.1     45 reqs   123456 bytes');
+        }
+
+        log('点击按钮查看综合分析示例');
+    </script>
+</body>
+</html>

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>事件基础</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        #click-area { background: #3498db; color: white; padding: 30px; text-align: center; border-radius: 8px; cursor: pointer; margin: 10px 0; user-select: none; }
+        #click-area:active { opacity: 0.8; }
+        .log-entry { padding: 2px 0; font-size: 13px; border-bottom: 1px solid #eee; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>事件基础</h2><p>addEventListener / removeEventListener / 事件对象。</p></div>
+    <div class="card">
+        <h2>addEventListener — 绑定事件</h2>
+        <div class="code">// 语法：element.addEventListener(事件类型, 处理函数, 配置)
+
+const btn = document.getElementById('btn');
+
+// 基本用法
+btn.addEventListener('click', function() {
+    console.log('按钮被点击');
+});
+
+// 箭头函数
+btn.addEventListener('click', () => {
+    console.log('箭头函数处理');
+});
+
+// 命名函数（便于移除）
+function handleClick() {
+    console.log('点击');
+}
+btn.addEventListener('click', handleClick);
+
+// 第三个参数（配置对象）
+btn.addEventListener('click', handler, {
+    capture: false,    // 是否在捕获阶段触发（默认 false）
+    once: false,       // 是否只执行一次后自动移除
+    passive: false     // 如果为 true，表示不调用 preventDefault
+});
+
+// once — 只执行一次
+btn.addEventListener('click', () => {
+    console.log('只执行一次');
+}, { once: true });
+
+// ⚠️ 同一元素同一事件可以绑定多个处理函数（按顺序执行）
+// ⚠️ 匿名函数不能通过 removeEventListener 移除</div>
+    </div>
+    <div class="card">
+        <h2>removeEventListener — 移除事件</h2>
+        <div class="code">// 必须传入相同的函数引用
+function handler() { console.log('click'); }
+
+element.addEventListener('click', handler);
+element.removeEventListener('click', handler);  // ✅ 移除
+
+// ❌ 匿名函数无法移除
+element.addEventListener('click', function() {});
+// element.removeEventListener('click', function() {});  // ❌ 不同引用
+
+// ❌ 箭头函数也无法移除（除非保存引用）
+const arrowHandler = () => {};
+element.addEventListener('click', arrowHandler);
+element.removeEventListener('click', arrowHandler);  // ✅ 保存了引用
+
+// 实际应用：条件性移除
+// 只在特定条件下触发一次后移除
+function onScroll() {
+    if (window.scrollY > 500) {
+        console.log('已滚动超过500px');
+        window.removeEventListener('scroll', onScroll);
+    }
+}
+window.addEventListener('scroll', onScroll);</div>
+    </div>
+    <div class="card">
+        <h2>事件对象（event）</h2>
+        <div class="code">// 事件处理函数接收一个事件对象
+
+element.addEventListener('click', function(event) {
+    console.log(event);  // MouseEvent 对象
+});
+
+// 常用属性和方法：
+event.type          // 事件类型：'click', 'mouseover' 等
+event.target        // 触发事件的元素（真实来源）
+event.currentTarget // 绑定事件的元素（this 指向它）
+event.eventPhase    // 事件阶段：1=捕获 2=目标 3=冒泡
+
+// 鼠标事件属性
+event.clientX / event.clientY   // 鼠标在视口的坐标
+event.pageX / event.pageY       // 鼠标在页面的坐标
+event.screenX / event.screenY   // 鼠标在屏幕的坐标
+event.button                     // 按下的鼠标键（0=左,1=中,2=右）
+
+// 键盘事件属性
+event.key    // 按下的键字符
+event.code   // 物理键代码
+event.ctrlKey / event.shiftKey / event.altKey / event.metaKey
+
+// 方法
+event.preventDefault()  // 阻止默认行为
+event.stopPropagation() // 停止传播（阻止冒泡/捕获）
+event.stopImmediatePropagation() // 立即停止所有传播</div>
+    </div>
+    <div class="card">
+        <h2>this 指向</h2>
+        <div class="code">// 在事件处理函数中：
+// 1. 普通函数 → this 指向绑定事件的元素（currentTarget）
+element.addEventListener('click', function() {
+    console.log(this === element);       // true
+    console.log(this === event.currentTarget); // true
+});
+
+// 2. 箭头函数 → this 继承自外层作用域（不绑定）
+element.addEventListener('click', () => {
+    console.log(this);  // 外层 this（可能是 window）
+});
+
+// 建议：需要 this 指向元素就用普通函数
+// 不需要或者需要外层 this 就用箭头函数</div>
+    </div>
+    <div id="click-area" class="click-demo">
+        点击这个区域测试事件<br>
+        <span style="font-size:13px;opacity:0.8;">坐标会显示在下面</span>
+    </div>
+    <div class="card">
+        <h2>事件日志</h2>
+        <div id="event-log" style="max-height:150px;overflow-y:auto;background:#f8f9fa;padding:10px;border-radius:4px;font-size:13px;"></div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const area = document.getElementById('click-area');
+        const log = document.getElementById('event-log');
+
+        function addLog(msg) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = new Date().toLocaleTimeString() + ' - ' + msg;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        console.log('=== addEventListener ===');
+        // 普通函数
+        area.addEventListener('click', function(event) {
+            console.log('点击位置:', event.clientX, event.clientY);
+            console.log('target:', event.target.tagName);
+            console.log('currentTarget:', event.currentTarget.id);
+            console.log('this === currentTarget:', this === event.currentTarget);
+            addLog(`点击 (${event.clientX}, ${event.clientY})`);
+        });
+
+        // once — 只执行一次
+        area.addEventListener('mouseenter', function() {
+            console.log('鼠标进入（只触发一次）');
+        }, { once: true });
+
+        // 键盘事件示例
+        document.addEventListener('keydown', function(event) {
+            console.log('键盘事件:', event.key, event.code, event.ctrlKey);
+            addLog(`按键: ${event.key} (${event.code})`);
+        });
+
+        console.log('=== removeEventListener ===');
+        function tempHandler() {
+            console.log('临时处理函数');
+        }
+        area.addEventListener('dblclick', tempHandler);
+        // 双击后移除
+        area.addEventListener('dblclick', function() {
+            area.removeEventListener('dblclick', tempHandler);
+            console.log('已移除 tempHandler');
+            addLog('双击，已移除双击处理');
+        });
+
+        console.log('=== 事件对象 ===');
+        area.addEventListener('mousemove', function(event) {
+            // 只在每第20次mousemove输出（避免刷屏）
+            if (event.timeStamp % 20 < 1) {
+                console.log('mousemove:', event.clientX, event.clientY);
+            }
+        });
+
+        console.log('=== preventDefault ===');
+        // 阻止右键菜单
+        area.addEventListener('contextmenu', function(event) {
+            event.preventDefault();
+            addLog('右键菜单被阻止');
+            console.log('preventDefault: 右键菜单');
+        });
+
+        document.getElementById('output').textContent =
+            `事件已绑定: click, dblclick, mousemove\n` +
+            `键盘事件已监听\n` +
+            `✅ 事件基础演示完成！`;
+    </script>
+</body>
+</html>

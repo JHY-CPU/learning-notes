@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实战-文本替换</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #replace2-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; margin: 5px 0; width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>实战：文本替换</h2><p>数字千分位、驼峰命名转换、敏感信息脱敏、模板替换。</p></div>
+    <div class="card">
+        <h2>常用替换场景</h2>
+        <div class="code">// ========== 数字千分位 ==========
+function toThousands(num) {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+// 1234567 → '1,234,567'
+// 1234.56 → '1,234.56'
+
+// ========== 驼峰命名转换 ==========
+// kebab-case → camelCase
+'hello-world-js'.replace(/-(\w)/g, (_, c) => c.toUpperCase());
+// 'helloWorldJs'
+
+// camelCase → kebab-case
+'helloWorldJs'.replace(/([A-Z])/g, '-$1').toLowerCase();
+// 'hello-world-js'
+
+// ========== 敏感信息脱敏 ==========
+// 手机号: 138****1234
+'13812345678'.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+
+// 邮箱: a***@example.com
+'alice@example.com'.replace(/^(.)(.*)(@.*)$/, (_, f, m, e) =>
+    f + '*'.repeat(Math.min(m.length, 3)) + e
+);
+
+// ========== 模板替换 ==========
+function template(str, data) {
+    return str.replace(/\{\{(\w+)\}\}/g, (_, key) => data[key] ?? '');
+}
+template('Hello, {{name}}! You are {{age}}.', { name: 'Alice', age: 25 });
+// 'Hello, Alice! You are 25.'</div>
+    </div>
+    <div class="card">
+        <h2>演示：文本替换</h2>
+        <button onclick="demoNumber()">数字格式化</button>
+        <button onclick="demoCase()">命名转换</button>
+        <button onclick="demoMask()">脱敏处理</button>
+        <button onclick="demoTemplate()">模板替换</button>
+        <div id="replace2-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const replace2Result = document.getElementById('replace2-result');
+
+        function log(msg) {
+            replace2Result.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoNumber() {
+            replace2Result.innerHTML = '';
+            log('🔢 数字千分位格式化:');
+            log('');
+
+            const nums = [1234, 1234567, 1234.56, 1000000000, 9876543.21];
+
+            nums.forEach(n => {
+                const formatted = n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+                log(`   ${n} → ${formatted}`);
+            });
+            log('');
+            log('📌 正则: /\\B(?=(\\d{3})+(?!\\d))/g');
+            log('📌 原理: 非单词边界后跟3位数字组');
+        }
+
+        function demoCase() {
+            replace2Result.innerHTML = '';
+            log('🐫 驼峰命名转换:');
+            log('');
+
+            // kebab → camel
+            const kebabCases = ['hello-world', 'user-name', 'background-color', 'my-long-variable-name'];
+            log('kebab-case → camelCase:');
+            kebabCases.forEach(s => {
+                const camel = s.replace(/-(\w)/g, (_, c) => c.toUpperCase());
+                log(`   ${s} → ${camel}`);
+            });
+            log('');
+
+            // camel → kebab
+            const camelCases = ['helloWorld', 'userName', 'backgroundColor', 'DOMElement'];
+            log('camelCase → kebab-case:');
+            camelCases.forEach(s => {
+                const kebab = s.replace(/([A-Z])/g, '-$1').toLowerCase();
+                log(`   ${s} → ${kebab}`);
+            });
+            log('');
+
+            // snake_case → camelCase
+            const snakeCases = ['hello_world', 'user_name'];
+            log('snake_case → camelCase:');
+            snakeCases.forEach(s => {
+                const camel = s.replace(/_(\w)/g, (_, c) => c.toUpperCase());
+                log(`   ${s} → ${camel}`);
+            });
+        }
+
+        function demoMask() {
+            replace2Result.innerHTML = '';
+            log('🔒 敏感信息脱敏:');
+            log('');
+
+            // 手机号
+            const phone = '13812345678';
+            const maskedPhone = phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+            log(`📱 手机号: ${phone} → ${maskedPhone}`);
+
+            // 身份证 (显示前后各2位)
+            const idCard = '110101199001011234';
+            const maskedId = idCard.replace(/^(.{4}).+(.{4})$/, '$1********$2');
+            log(`🆔 身份证: ${idCard} → ${maskedId}`);
+
+            // 邮箱
+            const emails = ['alice@example.com', 'bob@test.com', 'charlie.long@company.org'];
+            log('📧 邮箱脱敏:');
+            emails.forEach(email => {
+                const masked = email.replace(/^(.)(.*?)(@.*)$/, (_, f, m, e) => {
+                    return f + '*'.repeat(Math.min(m.length, 3)) + e;
+                });
+                log(`   ${email} → ${masked}`);
+            });
+
+            // 银行卡
+            const card = '6222021234567890';
+            const maskedCard = card.replace(/(\d{4})\d{8}(\d{4})/, '$1********$2');
+            log(`💳 银行卡: ${card} → ${maskedCard}`);
+        }
+
+        function demoTemplate() {
+            replace2Result.innerHTML = '';
+            log('📄 模板引擎替换:');
+            log('');
+
+            const tmpl = 'Hello, {{name}}! 您的验证码是 {{code}}，有效期 {{expire}} 分钟。';
+            const data = { name: 'Alice', code: '123456', expire: 5 };
+
+            const result = tmpl.replace(/\{\{(\w+)\}\}/g, (_, key) => data[key] ?? '{{' + key + '}}');
+            log(`模板: "${tmpl}"`);
+            log(`数据: ${JSON.stringify(data)}`);
+            log(`结果: "${result}"`);
+            log('');
+
+            log('高级模板: 条件替换');
+            const tmpl2 = '{{title}}: {{name}} ({{role}})';
+            const data2 = { title: '用户信息', name: 'Bob', role: '管理员' };
+            const result2 = tmpl2.replace(/\{\{(\w+)\}\}/g, (_, k) => data2[k] ?? '');
+            log(`   "${tmpl2}" → "${result2}"`);
+        }
+
+        console.log('=== 实战: 文本替换 ===');
+
+        document.getElementById('output').textContent =
+            `实战文本替换: 千分位 / 驼峰转换 / 脱敏 / 模板引擎\n` +
+            `正则: replace + 函数replacer / $引用 / 前向后顾\n` +
+            `✅ 文本替换实战完成！`;
+    </script>
+</body>
+</html>

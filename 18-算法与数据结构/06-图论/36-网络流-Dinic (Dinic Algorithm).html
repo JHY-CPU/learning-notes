@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>36-网络流-Dinic (Dinic Algorithm)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Dinic Algorithm</h2>
+  <div class="code">Dinic 算法用分层图+阻塞流，O(V²E) 时间求最大流，实际性能远优于理论界。</div>
+  <pre>function dinic(capacity, source, sink) {
+  const n = capacity.length;
+  const graph = Array.from({length:n}, () => []);
+  for (let i = 0; i < n; i++)
+    for (let j = 0; j < n; j++)
+      if (capacity[i][j] > 0) graph[i].push(j);
+  const edges = capacity.map(r => [...r]);
+  function bfs() {
+    const level = new Array(n).fill(-1);
+    const q = [source]; level[source] = 0;
+    while (q.length) { const u = q.shift(); for (const v of graph[u]) if (level[v] === -1 && edges[u][v] > 0) { level[v] = level[u] + 1; q.push(v); } }
+    return level[sink] !== -1;
+  }
+  const it = new Array(n).fill(0);
+  function dfs(u, f, level) {
+    if (u === sink) return f;
+    for (let i = it[u]; i < graph[u].length; i++) {
+      const v = graph[u][i];
+      if (level[v] === level[u]+1 && edges[u][v] > 0) {
+        const minF = dfs(v, Math.min(f, edges[u][v]), level);
+        if (minF > 0) { edges[u][v] -= minF; edges[v][u] += minF; return minF; }
+      }
+      it[u]++;
+    }
+    return 0;
+  }
+  let flow = 0;
+  while (bfs()) { it.fill(0); while (true) { const f = dfs(source, Infinity, [...Array(n).fill(-1)]); if (!f) break; flow += f; } }
+  return flow;
+}
+console.log('Dinic O(V²E)');</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  document.getElementById('result').textContent =
+    `Dinic 算法核心:\n1. BFS 构建分层图\n2. DFS 找阻塞流\n3. 重复直到无法增广\n\n时间复杂度 O(V²E)\n实际对大多数图非常快\n是竞赛中最常用的最大流算法`;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实战-倒计时与秒表</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; max-width: 500px; margin: 0 auto; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        /* 计时器通用 */
+        .timer-display { font-family: 'Courier New', monospace; font-size: 48px; font-weight: bold; color: #2c3e50; text-align: center; padding: 20px; background: #f8f9fa; border-radius: 8px; letter-spacing: 2px; }
+        .timer-label { font-size: 12px; color: #95a5a6; text-align: center; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px; }
+        .controls { display: flex; gap: 8px; justify-content: center; margin: 12px 0; flex-wrap: wrap; }
+        .controls button { padding: 8px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; font-weight: bold; transition: opacity 0.15s; }
+        .controls button:hover { opacity: 0.85; }
+        .controls button.start { background: #2ecc71; color: white; }
+        .controls button.stop { background: #e74c3c; color: white; }
+        .controls button.pause { background: #f39c12; color: white; }
+        .controls button.reset { background: #95a5a6; color: white; }
+        .controls button.secondary { background: #3498db; color: white; }
+        .controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+        /* 倒计时设置 */
+        .countdown-setup { display: flex; gap: 8px; justify-content: center; align-items: center; margin: 12px 0; flex-wrap: wrap; }
+        .countdown-setup input { width: 60px; padding: 6px 8px; border: 1px solid #ddd; border-radius: 4px; font-size: 16px; text-align: center; }
+        .countdown-setup label { font-size: 13px; color: #666; }
+        .countdown-setup button { padding: 6px 14px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-size: 12px; }
+        /* 进度环 */
+        .ring-container { display: flex; justify-content: center; margin: 10px 0; }
+        .progress-ring { transform: rotate(-90deg); }
+        .progress-ring circle { fill: none; stroke-width: 6; }
+        .progress-ring .bg { stroke: #e0e0e0; }
+        .progress-ring .fg { stroke: #3498db; stroke-linecap: round; transition: stroke-dashoffset 0.3s; }
+        .progress-text { font-size: 12px; color: #95a5a6; text-align: center; margin-top: 4px; }
+        .section { margin-bottom: 24px; }
+        .section-title { font-size: 14px; color: #2c3e50; font-weight: bold; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>⏱️ 倒计时与秒表</h2>
+        <p style="color:#7f8c8d;font-size:13px;">Countdown、Stopwatch、精度控制、环形进度、Lap 记录。</p>
+
+        <!-- 秒表 -->
+        <div class="section">
+            <div class="section-title">⏱️ 秒表</div>
+            <div class="timer-label">计时 (时:分:秒.毫秒)</div>
+            <div class="timer-display" id="stopwatchDisplay">00:00:00.00</div>
+            <div class="controls">
+                <button class="start" id="swStart" onclick="swStart()">▶ 开始</button>
+                <button class="pause" id="swPause" onclick="swPause()" disabled>⏸ 暂停</button>
+                <button class="stop" id="swStop" onclick="swStop()" disabled>⏹ 停止</button>
+                <button class="reset" onclick="swReset()">↺ 重置</button>
+                <button class="secondary" id="swLap" onclick="swLap()" disabled>🏁 计次</button>
+            </div>
+            <div id="laps" style="font-size:12px;color:#95a5a6;max-height:100px;overflow-y:auto;margin-top:8px;"></div>
+        </div>
+
+        <!-- 倒计时 -->
+        <div class="section">
+            <div class="section-title">⏳ 倒计时</div>
+            <div class="timer-label">剩余时间 (天:时:分:秒)</div>
+            <div class="timer-display" id="countdownDisplay" style="font-size:36px;">00:00:00:00</div>
+            <div class="countdown-setup">
+                <label>天</label><input type="number" id="cdDays" value="0" min="0" max="99">
+                <label>时</label><input type="number" id="cdHours" value="0" min="0" max="23">
+                <label>分</label><input type="number" id="cdMinutes" value="2" min="0" max="59">
+                <label>秒</label><input type="number" id="cdSeconds" value="0" min="0" max="59">
+                <button class="start" onclick="cdStart()">▶ 开始</button>
+                <button class="reset" onclick="cdReset()">↺ 重置</button>
+            </div>
+            <div class="ring-container">
+                <svg class="progress-ring" width="100" height="100" viewBox="0 0 100 100">
+                    <circle class="bg" cx="50" cy="50" r="42"/>
+                    <circle class="fg" id="progressRing" cx="50" cy="50" r="42" stroke-dasharray="263.89" stroke-dashoffset="0"/>
+                </svg>
+            </div>
+            <div class="progress-text" id="progressText">进度: 0%</div>
+        </div>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('⏱️ 倒计时与秒表演示:');
+        log('');
+
+        // ========== 秒表 ==========
+        let swInterval = null;
+        let swRunning = false;
+        let swStartTime = 0;
+        let swElapsed = 0;
+        let lapCount = 0;
+
+        function formatTime(ms) {
+            const totalCs = Math.floor(ms / 10);
+            const cs = totalCs % 100;
+            const totalSec = Math.floor(totalCs / 100);
+            const sec = totalSec % 60;
+            const totalMin = Math.floor(totalSec / 60);
+            const min = totalMin % 60;
+            const hr = Math.floor(totalMin / 60);
+            return `${String(hr).padStart(2,'0')}:${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}.${String(cs).padStart(2,'0')}`;
+        }
+
+        function swUpdate() {
+            const now = Date.now();
+            swElapsed = now - swStartTime;
+            document.getElementById('stopwatchDisplay').textContent = formatTime(swElapsed);
+        }
+
+        function swStart() {
+            if (swRunning) return;
+            swRunning = true;
+            swStartTime = Date.now() - swElapsed;
+            swInterval = setInterval(swUpdate, 10);
+            document.getElementById('swStart').disabled = true;
+            document.getElementById('swPause').disabled = false;
+            document.getElementById('swStop').disabled = false;
+            document.getElementById('swLap').disabled = false;
+            log('▶️ 秒表开始');
+        }
+
+        function swPause() {
+            if (!swRunning) return;
+            swRunning = false;
+            clearInterval(swInterval);
+            document.getElementById('swStart').disabled = false;
+            document.getElementById('swPause').disabled = true;
+            document.getElementById('swStart').textContent = '▶ 继续';
+            log(`⏸️ 秒表暂停 (${formatTime(swElapsed)})`);
+        }
+
+        function swStop() {
+            swRunning = false;
+            clearInterval(swInterval);
+            swElapsed = 0;
+            document.getElementById('stopwatchDisplay').textContent = '00:00:00.00';
+            document.getElementById('swStart').disabled = false;
+            document.getElementById('swPause').disabled = true;
+            document.getElementById('swStop').disabled = true;
+            document.getElementById('swLap').disabled = true;
+            document.getElementById('swStart').textContent = '▶ 开始';
+            document.getElementById('laps').innerHTML = '';
+            lapCount = 0;
+            log('⏹️ 秒表停止');
+        }
+
+        function swReset() {
+            const wasRunning = swRunning;
+            if (wasRunning) {
+                swRunning = false;
+                clearInterval(swInterval);
+            }
+            swElapsed = 0;
+            document.getElementById('stopwatchDisplay').textContent = '00:00:00.00';
+            document.getElementById('swStart').disabled = false;
+            document.getElementById('swPause').disabled = true;
+            document.getElementById('swStop').disabled = true;
+            document.getElementById('swLap').disabled = true;
+            document.getElementById('swStart').textContent = '▶ 开始';
+            document.getElementById('laps').innerHTML = '';
+            lapCount = 0;
+            log('↺ 秒表重置');
+        }
+
+        function swLap() {
+            if (!swRunning) return;
+            lapCount++;
+            const time = formatTime(swElapsed);
+            const lapEl = document.createElement('div');
+            lapEl.textContent = `计次 #${lapCount}: ${time}`;
+            document.getElementById('laps').prepend(lapEl);
+            log(`🏁 计次 #${lapCount}: ${time}`);
+        }
+
+        // ========== 倒计时 ==========
+        let cdInterval = null;
+        let cdRunning = false;
+        let cdTotalMs = 0;
+        let cdRemainingMs = 0;
+        let cdEndTime = 0;
+        const circumference = 2 * Math.PI * 42; // ~263.89
+
+        function cdFormatTime(ms) {
+            if (ms < 0) ms = 0;
+            const totalSec = Math.floor(ms / 1000);
+            const sec = totalSec % 60;
+            const totalMin = Math.floor(totalSec / 60);
+            const min = totalMin % 60;
+            const totalHr = Math.floor(totalMin / 60);
+            const hr = totalHr % 24;
+            const days = Math.floor(totalHr / 24);
+            return `${String(days).padStart(2,'0')}:${String(hr).padStart(2,'0')}:${String(min).padStart(2,'0')}:${String(sec).padStart(2,'0')}`;
+        }
+
+        function cdUpdate() {
+            const now = Date.now();
+            cdRemainingMs = cdEndTime - now;
+            if (cdRemainingMs <= 0) {
+                cdRemainingMs = 0;
+                document.getElementById('countdownDisplay').textContent = '00:00:00:00';
+                document.getElementById('progressRing').style.strokeDashoffset = '0';
+                document.getElementById('progressText').textContent = '⏰ 倒计时结束!';
+                clearInterval(cdInterval);
+                cdRunning = false;
+                log('⏰ 倒计时结束!');
+                return;
+            }
+            document.getElementById('countdownDisplay').textContent = cdFormatTime(cdRemainingMs);
+            const progress = cdRemainingMs / cdTotalMs;
+            const offset = circumference * (1 - progress);
+            document.getElementById('progressRing').style.strokeDashoffset = offset;
+            document.getElementById('progressText').textContent = `进度: ${Math.round((1 - progress) * 100)}%`;
+        }
+
+        function cdStart() {
+            if (cdRunning) return;
+            const days = parseInt(document.getElementById('cdDays').value) || 0;
+            const hrs = parseInt(document.getElementById('cdHours').value) || 0;
+            const mins = parseInt(document.getElementById('cdMinutes').value) || 0;
+            const secs = parseInt(document.getElementById('cdSeconds').value) || 0;
+            cdTotalMs = (days * 86400 + hrs * 3600 + mins * 60 + secs) * 1000;
+            if (cdTotalMs <= 0) {
+                log('⚠️ 请设置有效时间');
+                return;
+            }
+            cdRemainingMs = cdTotalMs;
+            cdEndTime = Date.now() + cdTotalMs;
+            cdRunning = true;
+            cdInterval = setInterval(cdUpdate, 100);
+            document.getElementById('progressRing').style.strokeDasharray = circumference;
+            log(`⏳ 倒计时开始: ${days}天${hrs}时${mins}分${secs}秒`);
+        }
+
+        function cdReset() {
+            if (cdRunning) {
+                clearInterval(cdInterval);
+                cdRunning = false;
+            }
+            document.getElementById('countdownDisplay').textContent = '00:00:00:00';
+            document.getElementById('progressRing').style.strokeDashoffset = circumference;
+            document.getElementById('progressText').textContent = '进度: 0%';
+            log('↺ 倒计时重置');
+        }
+
+        log('✅ 倒计时与秒表就绪');
+    </script>
+</body>
+</html>

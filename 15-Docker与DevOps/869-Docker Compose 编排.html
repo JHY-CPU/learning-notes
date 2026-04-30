@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docker Compose 编排</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🐙 Docker Compose 编排</h2><p>docker-compose.yml 详解、services/volumes/networks 配置、多容器应用 (app+db+redis)、开发/生产环境分离、常用命令。</p></div>
+    <div class="card">
+        <h2>Compose 文件结构</h2>
+        <div class="code">// ========== docker-compose.yml 完整示例 ==========
+
+services:
+  # ===== API 服务 =====
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+      args:
+        VERSION: 1.0.0
+    image: myapp/api:latest
+    container_name: myapp-api
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - GIN_MODE=release
+    env_file:
+      - ./api/.env
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - backend
+      - frontend
+
+  # ===== PostgreSQL 数据库 =====
+  db:
+    image: postgres:16-alpine
+    container_name: myapp-db
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-secret}
+      POSTGRES_DB: myapp
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d  # 初始化脚本
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "5432:5432"  # 开发时暴露
+    networks:
+      - backend
+
+  # ===== Redis 缓存 =====
+  redis:
+    image: redis:7-alpine
+    container_name: myapp-redis
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    ports:
+      - "6379:6379"
+    networks:
+      - backend
+
+  # ===== Nginx 反向代理 =====
+  nginx:
+    image: nginx:alpine
+    container_name: myapp-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - static-files:/usr/share/nginx/html:ro
+    depends_on:
+      - api
+    networks:
+      - frontend
+
+volumes:
+  postgres-data:
+  redis-data:
+  uploads:
+  static-files:
+
+networks:
+  frontend:
+    driver: bridge
+  backend:
+    driver: bridge</div>
+    </div>
+    <div class="card">
+        <h2>Compose 指令详解</h2>
+        <div class="code">// ========== 核心指令 ==========
+// services:    服务定义
+//   build:     构建配置 (context, dockerfile, args)
+//   image:     使用的镜像
+//   ports:     端口映射
+//   volumes:   卷挂载
+//   environment: 环境变量
+//   env_file:   环境变量文件
+//   depends_on: 依赖关系
+//   command:   覆盖默认命令
+//   restart:   重启策略
+//   healthcheck: 健康检查
+//   networks:  网络连接
+//   container_name: 容器名
+
+// volumes:     卷定义
+// networks:    网络定义
+// configs:     配置 (Swarm)
+// secrets:     密钥 (Swarm)
+
+// ========== restart 策略 ==========
+// no:           不自动重启 (默认)
+// always:       总是重启
+// on-failure:   失败时重启
+// unless-stopped: 除非手动停止
+
+// ========== depends_on ==========
+// 简单依赖:
+//   depends_on:
+//     - db
+//     - redis
+
+// 条件依赖:
+//   depends_on:
+//     db:
+//       condition: service_healthy
+//     redis:
+//       condition: service_started
+
+// ========== 环境变量 ==========
+// 方式 1: 直接指定
+//   environment:
+//     - DB_HOST=db
+//     - DB_PORT=5432
+
+// 方式 2: 字典格式
+//   environment:
+//     DB_HOST: db
+//     DB_PORT: "5432"
+
+// 方式 3: 从宿主机传递
+//   environment:
+//     - DB_PASSWORD=${DB_PASSWORD}
+
+// 方式 4: 从 .env 文件
+//   env_file: .env
+
+// ========== 变量替换 ==========
+// .env 文件:
+// DB_PASSWORD=secret
+// IMAGE_TAG=latest
+
+// compose 中使用:
+//   image: myapp:${IMAGE_TAG:-latest}
+//   environment:
+//     DB_PASSWORD: ${DB_PASSWORD}
+
+// 默认值: ${VAR:-default}</div>
+    </div>
+    <div class="card">
+        <h2>多环境配置</h2>
+        <div class="code">// ========== 环境覆盖 ==========
+// 默认: docker-compose.yml
+// 覆盖: docker-compose.override.yml (自动加载)
+
+// 开发环境 docker-compose.override.yml:
+// services:
+//   api:
+//     build:
+//       context: .
+//       dockerfile: Dockerfile.dev
+//     volumes:
+//       - .:/app          # 热重载
+//     ports:
+//       - "2345:2345"     # dlv 调试
+//     environment:
+//       - GIN_MODE=debug
+
+// 生产环境 docker-compose.prod.yml:
+// services:
+//   api:
+//     image: registry.example.com/myapp:${TAG:-latest}
+//     deploy:
+//       replicas: 3
+//       resources:
+//         limits:
+//           memory: 512M
+//     restart: always
+
+// 使用:
+// docker compose up -d                              # 开发 (自动加载 override)
+// docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d  # 生产
+
+// ========== 扩展服务 ==========
+// 使用 & 和 * 复用配置
+
+// x-logging: &logging
+//   logging:
+//     driver: "json-file"
+//     options:
+//       max-size: "10m"
+//       max-file: "3"
+//
+// services:
+//   api:
+//     <<: *logging
+//   worker:
+//     <<: *logging
+
+// ========== Compose 命令 ==========
+// docker compose up -d               # 后台启动
+// docker compose up -d --build       # 重新构建
+// docker compose down                # 停止并删除
+// docker compose down -v             # 停止并删除卷
+// docker compose ps                  # 查看状态
+// docker compose logs -f             # 日志
+// docker compose logs -f api         # 特定服务
+// docker compose exec api bash       # 进入容器
+// docker compose restart api         # 重启服务
+// docker compose pull                # 拉取镜像
+// docker compose build               # 构建镜像
+// docker compose config              # 验证配置
+// docker compose top                 # 进程</div>
+    </div>
+    <div class="card">
+        <h2>实战示例</h2>
+        <div class="code">// ========== Go API + PostgreSQL + Redis ==========
+services:
+  app:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_DSN: host=db user=postgres password=postgres dbname=todo sslmode=disable
+      REDIS_ADDR: redis:6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: pg_isready -U postgres
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: redis-cli ping
+
+volumes:
+  pgdata:
+
+// ========== Python FastAPI + PostgreSQL ==========
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://app:secret@db:5432/app
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: secret
+      POSTGRES_DB: app
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:
+
+// ========== Node.js + MongoDB + Redis ==========
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/app
+      REDIS_URL: redis://redis:6379
+    depends_on:
+      - mongo
+      - redis
+
+  mongo:
+    image: mongo:7
+    volumes:
+      - mongodata:/data/db
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redisdata:/data
+
+volumes:
+  mongodata:
+  redisdata:
+
+// ========== .env 文件建议 ==========
+// 生产环境使用 .env 文件:
+// DB_PASSWORD=<strong-password>
+// JWT_SECRET=<random-64-chars>
+// TAG=v1.0.0
+
+// .env 不上传 git
+// .env.example 上传 git (不含敏感信息)</div>
+        <div class="note">💡 Compose 要点: docker-compose.yml 定义多服务; build/image/ports/volumes/environment/depends_on; depends_on condition: service_healthy; 环境变量 4 种方式; .env 文件管理敏感信息; 多环境覆盖 (override/prod); x-logging 复用配置; docker compose up/down/logs/exec; 端口映射注意生产不暴露 DB; Volumes 持久化数据。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoComposeFile()">Compose 文件</button>
+        <button onclick="demoMultiEnv()">多环境</button>
+        <button onclick="demoCommand2()>命令</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoComposeFile() {
+            result.innerHTML = '';
+            log('# docker-compose.yml');
+            log('');
+            log('services:');
+            log('  app:      Go/Python/Node API');
+            log('  db:       PostgreSQL');
+            log('  redis:    Redis');
+            log('  nginx:    反向代理');
+            log('');
+            log('关键配置:');
+            log('  build: context + dockerfile');
+            log('  ports: "8080:8080"');
+            log('  environment / env_file');
+            log('  volumes / depends_on');
+            log('  healthcheck');
+        }
+
+        function demoMultiEnv() {
+            result.innerHTML = '';
+            log('# 多环境配置');
+            log('');
+            log('开发:');
+            log('  docker-compose.yml');
+            log('  + docker-compose.override.yml');
+            log('  热重载 + 调试');
+            log('');
+            log('生产:');
+            log('  docker-compose.yml');
+            log('  + docker-compose.prod.yml');
+            log('  镜像 tag + 资源限制');
+            log('');
+            log('命令:');
+            log('  docker compose -f prod.yml up -d');
+        }
+
+        function demoCommand2() {
+            result.innerHTML = '';
+            log('# Compose 命令');
+            log('');
+            log('up -d        启动');
+            log('down         停止+删除');
+            log('down -v      停止+删除+卷');
+            log('logs -f      日志');
+            log('ps           状态');
+            log('exec         执行命令');
+            log('build        构建');
+            log('pull         拉取');
+            log('config       验证');
+        }
+    </script>
+</body>
+</html>

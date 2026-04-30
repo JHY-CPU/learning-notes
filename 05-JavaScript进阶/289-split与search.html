@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>split与search</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #split-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; margin: 5px 0; width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>split 与 search</h2><p>String.split 正则分割、String.search 位置查找。</p></div>
+    <div class="card">
+        <h2>split 与 search 语法</h2>
+        <div class="code">// ========== String.split() ==========
+// 用正则或字符串分割
+'a,b,c'.split(',');              // ['a', 'b', 'c']
+'a,b,c'.split(/,/);              // ['a', 'b', 'c']
+
+// 正则分割，更灵活
+'a1b2c3'.split(/\d/);            // ['a', 'b', 'c']
+'hello   world'.split(/\s+/);    // ['hello', 'world']
+'a--b---c'.split(/-+/);          // ['a', 'b', 'c']
+
+// 限制分割数量
+'a,b,c,d'.split(',', 2);         // ['a', 'b']
+
+// 保留捕获组中的内容
+'a1b2c'.split(/(\d)/);           // ['a', '1', 'b', '2', 'c']
+
+// ========== String.search() ==========
+// 返回第一个匹配的索引，未找到返回 -1
+'Hello World'.search(/World/);  // 6
+'Hello World'.search(/w/);      // -1 (区分大小写)
+'Hello World'.search(/w/i);     // 6 (不区分大小写)
+
+// search 不支持全局 g, 永远返回第一个匹配
+
+// ========== split 应用场景 ==========
+// 解析 CSV
+const csv = 'a,b,c'.split(',');
+
+// 解析 URL 参数
+const params = 'a=1&b=2'.split(/[&=]/);
+
+// 提取单词
+const words = 'Hello, world! JS.'.split(/\W+/).filter(Boolean);
+
+// 按行分割 (保留空行)
+const lines = 'a\n\nb\nc'.split(/\r?\n/);</div>
+    </div>
+    <div class="card">
+        <h2>演示：split 与 search</h2>
+        <input id="splitInput" value="apple, banana, cherry, date" placeholder="输入文本">
+        <button onclick="demoSplit()">split 演示</button>
+        <button onclick="demoSearch()">search 演示</button>
+        <div id="split-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const splitResult = document.getElementById('split-result');
+
+        function log(msg) {
+            splitResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoSplit() {
+            splitResult.innerHTML = '';
+            const text = document.getElementById('splitInput').value;
+            log(`📋 原始文本: "${text}"`);
+            log('');
+
+            log('1️⃣ 基本分割:');
+            log(`   split(/,/): [${text.split(/,/).join(' | ')}]`);
+            log(`   split(/, /): [${text.split(/, /).join(' | ')}]`);
+            log('');
+
+            log('2️⃣ 正则分割:');
+            log(`   split(/\\W+/): [${text.split(/\W+/).join(' | ')}]`);
+
+            const multiWS = 'a   b  c   d';
+            log(`   "${multiWS}" split(/\\s+/): [${multiWS.split(/\s+/).join(' | ')}]`);
+
+            const dashed = 'word1---word2--word3';
+            log(`   "${dashed}" split(/-+/): [${dashed.split(/-+/).join(' | ')}]`);
+            log('');
+
+            log('3️⃣ 限制分割数量:');
+            log(`   split(/, /, 2): [${text.split(/, /, 2).join(' | ')}]`);
+            log(`   split(/, /, 3): [${text.split(/, /, 3).join(' | ')}]`);
+            log('');
+
+            log('4️⃣ 捕获组保留:');
+            const withGroups = 'a1b2c3d';
+            log(`   "${withGroups}" split(/(\\d)/): [${withGroups.split(/(\d)/).join(' | ')}]`);
+            log('');
+
+            log('5️⃣ 实际应用:');
+            const csv = 'name,age,email\nAlice,25,alice@test.com';
+            log(`   CSV 首行: [${csv.split('\n')[0].split(',').join(' | ')}]`);
+
+            const url = 'https://example.com/search?q=hello&lang=zh';
+            const params = url.split(/[?&]/).slice(1);
+            log(`   URL 参数: ${params.join(', ')}`);
+        }
+
+        function demoSearch() {
+            splitResult.innerHTML = '';
+            const text = document.getElementById('splitInput').value;
+            log(`📋 文本: "${text}"`);
+            log('');
+
+            log('1️⃣ search 查找位置:');
+            log(`   search(/apple/): ${text.search(/apple/)}`);
+            log(`   search(/banana/): ${text.search(/banana/)}`);
+            log(`   search(/BANANA/): ${text.search(/BANANA/)} (未找到)`);
+            log(`   search(/BANANA/i): ${text.search(/BANANA/i)} (不区分大小写)`);
+            log('');
+
+            log('2️⃣ 正则 search:');
+            log(`   第一个数字位置: "${'abc123def456'}".search(/\\d/) = ${'abc123def456'.search(/\d/)}`);
+            log(`   单词边界: "${text}".search(/\\b\\w{5}\\b/) = ${text.search(/\b\w{5}\b/)}`);
+            log('');
+
+            log('3️⃣ search vs indexOf:');
+            log(`   indexOf("banana"): ${text.indexOf('banana')}`);
+            log(`   search(/banana/): ${text.search(/banana/)}`);
+            log('   ✅ 相同: 两者返回相同结果');
+            log('   ❌ indexOf 不支持正则');
+            log('   ❌ search 不支持全局、不支持指定起始位置');
+        }
+
+        console.log('=== split 与 search ===');
+
+        document.getElementById('output').textContent =
+            `split: 正则分割 / 限制数量 / 捕获组保留\n` +
+            `search: 正则查找位置 / 返回索引或 -1\n` +
+            `✅ split 与 search 演示完成！`;
+    </script>
+</body>
+</html>

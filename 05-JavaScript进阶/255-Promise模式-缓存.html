@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Promise模式-缓存</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #cache-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Promise 模式 — 缓存</h2><p>Promise 结果缓存、缓存失效、TTL、避免重复请求。</p></div>
+    <div class="card">
+        <h2>Promise 缓存实现</h2>
+        <div class="code">// ========== 基础 Promise 缓存 ==========
+const cache = new Map();
+
+function cachedFetch(url) {
+    if (cache.has(url)) {
+        return Promise.resolve(cache.get(url));
+    }
+    return fetch(url)
+        .then(r => r.json())
+        .then(data => {
+            cache.set(url, data);
+            return data;
+        });
+}
+
+// ========== 避免重复请求（请求合并） ==========
+const pendingCache = new Map();
+
+function deduplicatedFetch(url) {
+    // 如果已有正在进行的请求，复用同一个 Promise
+    if (pendingCache.has(url)) {
+        return pendingCache.get(url);
+    }
+    const promise = fetch(url)
+        .then(r => r.json())
+        .finally(() => pendingCache.delete(url));
+    pendingCache.set(url, promise);
+    return promise;
+}
+
+// ========== 带 TTL 的缓存 ==========
+function createCache(ttlMs = 60000) {
+    const store = new Map();
+
+    return (key, fetcher) => {
+        const cached = store.get(key);
+        if (cached && Date.now() - cached.time < ttlMs) {
+            return Promise.resolve(cached.value);
+        }
+        return Promise.resolve(fetcher()).then(value => {
+            store.set(key, { value, time: Date.now() });
+            return value;
+        });
+    };
+}
+
+// ========== SWR 缓存 ==========
+function swrCache(fetchFn) {
+    let cached = null;
+    let pending = null;
+
+    return () => {
+        // 有缓存立即返回旧值，后台刷新
+        if (cached) {
+            if (!pending) {
+                pending = fetchFn().then(data => {
+                    cached = data;
+                    pending = null;
+                }).catch(() => { pending = null; });
+            }
+            return Promise.resolve(cached);
+        }
+        // 无缓存就等待
+        if (!pending) {
+            pending = fetchFn().then(data => {
+                cached = data;
+                pending = null;
+            });
+        }
+        return pending.then(() => cached);
+    };
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：Promise 缓存</h2>
+        <button onclick="demoSimpleCache()">基础缓存</button>
+        <button onclick="demoDedup()">请求合并(去重)</button>
+        <div id="cache-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const cacheResult = document.getElementById('cache-result');
+
+        function log(msg) {
+            cacheResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        let fetchCounter = 0;
+
+        async function mockFetch(id) {
+            fetchCounter++;
+            await new Promise(r => setTimeout(r, 400));
+            return { id, data: `数据 ${id}`, fetchedAt: fetchCounter };
+        }
+
+        function demoSimpleCache() {
+            cacheResult.innerHTML = '';
+            fetchCounter = 0;
+            log('📦 Promise 基础缓存:');
+            log('');
+
+            const ttlCache = (() => {
+                const store = new Map();
+                return async (key, fetcher) => {
+                    const cached = store.get(key);
+                    if (cached) {
+                        log(`   🎯 缓存命中: ${key}`);
+                        return cached;
+                    }
+                    log(`   🚀 首次请求: ${key}`);
+                    const value = await fetcher();
+                    store.set(key, value);
+                    return value;
+                };
+            })();
+
+            (async () => {
+                log('第1次请求 (应调用 fetch):');
+                const r1 = await ttlCache('user', () => mockFetch(1));
+                log(`   结果: ${JSON.stringify(r1)}, fetch 调用: ${fetchCounter}次`);
+
+                log('第2次请求 (应走缓存):');
+                const r2 = await ttlCache('user', () => mockFetch(1));
+                log(`   结果: ${JSON.stringify(r2)}, fetch 调用: ${fetchCounter}次`);
+
+                log('第3次请求 (不同 key, 应调用 fetch):');
+                const r3 = await ttlCache('other', () => mockFetch(2));
+                log(`   结果: ${JSON.stringify(r3)}, fetch 调用: ${fetchCounter}次`);
+
+                log('');
+                log('📌 基础缓存要点:');
+                log('   • 缓存 Promise 结果而非 Promise');
+                log('   • 返回 Promise.resolve(cached) 保证一致性');
+                log('   • 可组合 TTL / LRU 等策略');
+            })();
+        }
+
+        function demoDedup() {
+            cacheResult.innerHTML = '';
+            fetchCounter = 0;
+            log('🔄 请求合并 (去重) 演示:');
+            log('');
+
+            const pending = new Map();
+
+            async function dedupFetch(key, fetcher) {
+                if (pending.has(key)) {
+                    log(`   🔗 复用已有请求: ${key}`);
+                    return pending.get(key);
+                }
+                log(`   🆕 发起新请求: ${key}`);
+                const promise = fetcher().finally(() => pending.delete(key));
+                pending.set(key, promise);
+                return promise;
+            }
+
+            (async () => {
+                // 同时发起 5 次相同请求
+                log('同时发起 5 次相同请求:');
+                const start = performance.now();
+                const results = await Promise.all(
+                    Array.from({ length: 5 }, () => dedupFetch('data', () => mockFetch(1)))
+                );
+                const elapsed = ((performance.now() - start) / 1000).toFixed(1);
+
+                log(`\n✅ 全部完成, fetchCounter = ${fetchCounter} (实际只请求了1次)`);
+                log(`⏱️ 总耗时 ${elapsed}s (如果串行需要 ~2s)`);
+                log(`📊 返回结果数: ${results.length}`);
+                log('');
+                log('📌 请求合并优势:');
+                log('   • 避免重复请求');
+                log('   • 复用正在进行的 Promise');
+                log('   • 大幅减少并发量');
+            })();
+        }
+
+        console.log('=== Promise 模式: 缓存 ===');
+
+        document.getElementById('output').textContent =
+            `Promise 缓存模式: 结果缓存 / 请求合并 / TTL / SWR\n` +
+            `避免重复请求 / 缓存复用 / 提高响应速度\n` +
+            `✅ Promise 缓存模式演示完成！`;
+    </script>
+</body>
+</html>

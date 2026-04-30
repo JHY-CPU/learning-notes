@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>删除与替换节点</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #c0392b; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        #list-container { background: white; border: 2px solid #bdc3c7; padding: 15px; border-radius: 8px; min-height: 60px; margin: 10px 0; }
+        #list-container .item { background: #3498db; color: white; padding: 8px 12px; margin: 5px; border-radius: 4px; display: inline-block; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>删除与替换节点</h2><p>从 DOM 中移除或替换元素。</p></div>
+    <div class="card">
+        <h2>removeChild</h2>
+        <div class="code">// removeChild — 从父元素中删除子节点
+// 返回被删除的节点
+
+const parent = document.getElementById('list');
+const child = parent.children[0];
+
+const removed = parent.removeChild(child);
+console.log(removed === child);  // true
+
+// ⚠️ 如果 child 不是 parent 的子节点，会报错
+// parent.removeChild(wrongElement);  // ❌ NotFoundError
+
+// 删除所有子节点
+while (parent.firstChild) {
+    parent.removeChild(parent.firstChild);
+}
+
+// 删除所有元素子节点
+while (parent.firstElementChild) {
+    parent.removeChild(parent.firstElementChild);
+}
+
+// removeChild 返回的节点可以重新插入到其他地方
+parent2.appendChild(removed);  // 移动到另一个父元素</div>
+    </div>
+    <div class="card">
+        <h2>remove — 直接删除</h2>
+        <div class="code">// remove — 直接删除自身（不需要通过父元素）
+// ES2015+ 引入，更简洁
+
+element.remove();  // 直接删除，不需要找父元素
+
+// remove vs removeChild：
+// remove: 元素自行删除，不需要父元素引用
+// removeChild: 父元素删除子元素，需要父元素引用
+
+// ❌ 传统方式
+// child.parentNode.removeChild(child);
+
+// ✅ 现代方式
+// child.remove();
+
+// ⚠️ remove 返回 undefined（不返回被删除的节点）
+// 如果需要继续使用，先保存引用或使用 removeChild</div>
+    </div>
+    <div class="card">
+        <h2>replaceChild</h2>
+        <div class="code">// replaceChild — 替换子节点
+parent.replaceChild(newChild, oldChild);
+// newChild — 新节点
+// oldChild — 被替换的旧节点（必须是 parent 的子节点）
+// 返回 oldChild
+
+const parent = document.getElementById('list');
+const oldItem = parent.children[0];
+const newItem = document.createElement('div');
+newItem.textContent = '替换后的内容';
+
+const replaced = parent.replaceChild(newItem, oldItem);
+console.log(replaced === oldItem);  // true
+
+// ⚠️ oldChild 必须是 parent 的直接子节点
+// ⚠️ 如果 oldChild 有事件监听，事件不会自动迁移到 newChild</div>
+    </div>
+    <div class="card">
+        <h2>replaceWith — 直接替换</h2>
+        <div class="code">// replaceWith — 用新节点替换当前节点
+// 不需要父元素引用
+
+element.replaceWith(newElement);
+element.replaceWith('文本', document.createElement('span'), '更多');
+// 可以传多个参数（节点或字符串）
+
+// replaceChild vs replaceWith：
+// replaceChild: parent.replaceChild(new, old)
+// replaceWith: old.replaceWith(new)
+// replaceWith 更简洁</div>
+    </div>
+    <div class="card">
+        <h2>cloneNode — 克隆节点</h2>
+        <div class="code">// cloneNode — 复制元素
+// cloneNode(true)   — 深克隆（包括所有子节点）
+// cloneNode(false)  — 浅克隆（只克隆自身，不包括子节点）
+
+const original = document.getElementById('original');
+const deepClone = original.cloneNode(true);    // 包括子元素
+const shallowClone = original.cloneNode(false); // 只有自身
+
+// ⚠️ 克隆的节点不在 DOM 中，需要手动插入
+parent.appendChild(deepClone);
+
+// ⚠️ 克隆不会复制事件监听
+// ⚠️ 不会复制 data 属性（自定义属性会被保留）
+// ⚠️ id 也被复制了（需要手动修改避免重复）
+
+// 常用：模板复制
+const template = document.querySelector('.template-item');
+const newItem = template.cloneNode(true);
+newItem.id = 'item-' + Date.now();
+newItem.textContent = '新项目';
+parent.appendChild(newItem);</div>
+    </div>
+    <div id="list-container">
+        <span class="item">项目 A</span>
+        <span class="item">项目 B</span>
+        <span class="item">项目 C</span>
+    </div>
+    <div style="display:flex;gap:10px;margin:10px 0;flex-wrap:wrap;">
+        <button onclick="removeFirst()">removeChild 删除第一个</button>
+        <button onclick="removeLast()">remove 删除最后一个</button>
+        <button onclick="replaceSecond()">replaceChild 替换第2个</button>
+        <button onclick="cloneItem()">cloneNode 克隆第一个</button>
+        <button onclick="clearAll()">清空</button>
+        <button onclick="resetList()">重置</button>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const list = document.getElementById('list-container');
+        const out = document.getElementById('output');
+
+        function createItem(text) {
+            const el = document.createElement('span');
+            el.className = 'item';
+            el.textContent = text;
+            return el;
+        }
+
+        function removeFirst() {
+            const first = list.firstElementChild;
+            if (!first) { out.textContent = '没有元素'; return; }
+            const removed = list.removeChild(first);
+            out.textContent = 'removeChild 删除了: ' + removed.textContent;
+        }
+        function removeLast() {
+            const last = list.lastElementChild;
+            if (!last) { out.textContent = '没有元素'; return; }
+            last.remove();
+            out.textContent = 'remove 删除了: ' + last.textContent;
+        }
+        function replaceSecond() {
+            const second = list.children[1];
+            if (!second) { out.textContent = '没有第2个元素'; return; }
+            const newItem = createItem('替换项目 X');
+            const old = list.replaceChild(newItem, second);
+            out.textContent = '替换了: ' + old.textContent + ' → ' + newItem.textContent;
+        }
+        function cloneItem() {
+            const first = list.firstElementChild;
+            if (!first) { out.textContent = '没有可克隆的'; return; }
+            const clone = first.cloneNode(true);
+            clone.textContent = first.textContent + ' (克隆)';
+            clone.style.background = '#2ecc71';
+            list.appendChild(clone);
+            out.textContent = '已克隆: ' + clone.textContent;
+        }
+        function clearAll() {
+            while (list.firstChild) {
+                list.removeChild(list.firstChild);
+            }
+            out.textContent = '已清空所有子节点';
+        }
+        function resetList() {
+            list.innerHTML = `
+                <span class="item">项目 A</span>
+                <span class="item">项目 B</span>
+                <span class="item">项目 C</span>
+            `;
+            out.textContent = '已重置';
+        }
+
+        console.log('=== removeChild ===');
+        const first = list.firstElementChild;
+        if (first) {
+            const removed = list.removeChild(first);
+            console.log('removeChild 返回被删除节点:', removed.textContent);
+            list.prepend(removed);  // 插回去
+        }
+
+        console.log('=== remove ===');
+        const last = list.lastElementChild;
+        if (last) {
+            last.remove();
+            console.log('remove 删除后元素不在 DOM');
+            list.append(last);
+        }
+
+        console.log('=== replaceChild ===');
+        const second = list.children[1];
+        if (second) {
+            const newSpan = createItem('新项目');
+            const old = list.replaceChild(newSpan, second);
+            console.log('替换:', old.textContent, '→', newSpan.textContent);
+        }
+
+        console.log('=== cloneNode ===');
+        const template = list.firstElementChild;
+        if (template) {
+            const deep = template.cloneNode(true);
+            const shallow = template.cloneNode(false);
+            console.log('深克隆有子节点:', deep.childNodes.length > 0);
+            console.log('浅克隆无子节点:', shallow.childNodes.length === 0);
+        }
+
+        document.getElementById('output').textContent =
+            `当前元素数: ${list.children.length}\n` +
+            `✅ 删除与替换节点演示完成！`;
+    </script>
+</body>
+</html>

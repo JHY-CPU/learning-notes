@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Service Worker</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Service Worker</h2><p>注册/安装/激活、fetch 事件拦截、离线策略(NetworkFirst/CacheFirst)。</p></div>
+    <div class="card">
+        <h2>Service Worker API</h2>
+        <div class="code">// ========== 注册 ==========
+navigator.serviceWorker.register('/sw.js')
+    .then(reg => console.log('注册成功:', reg.scope))
+    .catch(err => console.error('注册失败:', err));
+
+// ========== 生命周期 ==========
+// 安装 → 激活 → 空闲 → 拦截请求
+self.addEventListener('install', event => {
+    event.waitUntil(self.skipWaiting());
+});
+self.addEventListener('activate', event => {
+    event.waitUntil(self.clients.claim());
+});
+
+// ========== 拦截请求 ==========
+self.addEventListener('fetch', event => {
+    event.respondWith(
+        caches.match(event.request).then(cached => {
+            return cached || fetch(event.request);
+        })
+    );
+});
+
+// ========== 离线策略 ==========
+// NetworkFirst: 优先网络, 失败用缓存
+// CacheFirst: 优先缓存, 无缓存查网络
+// StaleWhileRevalidate: 缓存返回 + 后台更新
+// NetworkOnly: 仅网络
+// CacheOnly: 仅缓存</div>
+    </div>
+    <div class="card">
+        <h2>演示：Service Worker</h2>
+        <button onclick="demoLifecycle()">生命周期</button>
+        <button onclick="demoStrategies()">离线策略</button>
+        <button onclick="demoCache()">缓存管理</button>
+        <button onclick="demoNotification()">推送通知</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoLifecycle() {
+            result.innerHTML = '';
+            log('🔄 Service Worker 生命周期:');
+            log('');
+
+            log('注册流程:');
+            const steps = [
+                { phase: 'navigator.serviceWorker.register("/sw.js")', desc: '浏览器注册 SW' },
+                { phase: '下载', desc: '浏览器下载 sw.js 文件' },
+                { phase: '安装 (install)', desc: '触发 install 事件, 预缓存资源' },
+                { phase: '等待 (waiting)', desc: '存在旧 SW 时等待, 直到所有页面关闭' },
+                { phase: '激活 (activate)', desc: '触发 activate 事件, 清理旧缓存' },
+                { phase: '运行', desc: '拦截 fetch 请求, 处理消息, 推送通知' },
+                { phase: '更新', desc: '浏览器检测到 sw.js 变化, 重新走流程' },
+            ];
+            steps.forEach(({ phase, desc }) => log(`   ${phase.padEnd(20)} ${desc}`));
+
+            log('');
+            log('关键 API:');
+            log('   self.skipWaiting() — 跳过等待, 立即激活');
+            log('   self.clients.claim() — 立即控制所有页面');
+            log('   event.waitUntil() — 延长事件生命周期');
+
+            log('');
+            log('状态变化:');
+            log('   注册 → 已安装 (installed)');
+            log('   → 已激活 (activated)');
+            log('   → 运行中 (running)');
+            log('   → 冗余 (redundant: 被新 SW 取代)');
+        }
+
+        function demoStrategies() {
+            result.innerHTML = '';
+            log('📋 离线缓存策略:');
+            log('');
+
+            const strategies = [
+                {
+                    name: 'NetworkFirst',
+                    desc: '优先网络, 失败回退缓存',
+                    useCase: 'API 请求, 经常更新的内容',
+                    pros: '数据最新, 有离线回退',
+                    cons: '网络慢时等待, 需要网络',
+                },
+                {
+                    name: 'CacheFirst',
+                    desc: '优先缓存, 无缓存再请求网络',
+                    useCase: '静态资源 (图片/CSS/JS)',
+                    pros: '最快响应, 完全离线可用',
+                    cons: '内容可能过时',
+                },
+                {
+                    name: 'StaleWhileRevalidate',
+                    desc: '缓存即时返回 + 后台更新缓存',
+                    useCase: '用户头像, 不太重要的数据',
+                    pros: '即时响应, 自动更新',
+                    cons: '可能展示旧数据',
+                },
+                {
+                    name: 'NetworkOnly',
+                    desc: '始终请求网络',
+                    useCase: '支付, 实时数据',
+                    pros: '数据绝对最新',
+                    cons: '完全依赖网络',
+                },
+                {
+                    name: 'CacheOnly',
+                    desc: '仅使用缓存',
+                    useCase: '离线页面, 固定资源',
+                    pros: '最快, 完全离线',
+                    cons: '缓存没有则失败',
+                },
+            ];
+
+            log('策略对比:');
+            log('');
+            strategies.forEach(({ name, desc, useCase, pros, cons }) => {
+                log(`   ${name}:`);
+                log(`      描述: ${desc}`);
+                log(`      场景: ${useCase}`);
+                log(`      优点: ${pros}`);
+                log(`      缺点: ${cons}`);
+                log('');
+            });
+
+            log('NetworkFirst 实现模拟:');
+            async function networkFirst(request) {
+                log(`   1. 请求网络: ${request}`);
+                try {
+                    const response = await fetch(request);
+                    log(`   2. 网络成功, 更新缓存`);
+                    return response;
+                } catch (err) {
+                    log(`   3. 网络失败, 查缓存`);
+                    const cached = await caches.match(request);
+                    if (cached) {
+                        log(`   4. 缓存命中, 返回缓存`);
+                        return cached;
+                    }
+                    log(`   5. 缓存未命中, 返回离线页面`);
+                    return new Response('离线中...', { status: 200 });
+                }
+            }
+
+            log('');
+            log('策略选择指南:');
+            log('   需要最新数据 → NetworkFirst');
+            log('   静态资源 → CacheFirst');
+            log('   平衡方案 → StaleWhileRevalidate');
+            log('   敏感数据 → NetworkOnly');
+            log('   固定内容 → CacheOnly');
+        }
+
+        function demoCache() {
+            result.innerHTML = '';
+            log('💾 Cache API 缓存管理:');
+            log('');
+
+            // 模拟 CacheStorage
+            const mockCache = {
+                _store: new Map(),
+                async add(request) {
+                    log(`   缓存: ${request}`);
+                    this._store.set(request, `模拟响应: ${request}`);
+                },
+                async put(request, response) {
+                    this._store.set(request, response);
+                },
+                async match(request) {
+                    return this._store.get(request) || null;
+                },
+                async delete(request) {
+                    return this._store.delete(request);
+                },
+                async keys() {
+                    return Array.from(this._store.keys());
+                },
+            };
+
+            log('1️⃣ 打开缓存:');
+            log('   caches.open("v1") → 打开名为 "v1" 的缓存');
+            log('');
+
+            log('2️⃣ 添加资源:');
+            const resources = ['/index.html', '/style.css', '/app.js', '/logo.png'];
+            resources.forEach(r => mockCache.add(r));
+            log('');
+
+            log('3️⃣ 查看缓存:');
+            mockCache.keys().then(keys => {
+                keys.forEach(k => log(`   缓存: ${k}`));
+            });
+
+            log('');
+            log('4️⃣ 缓存版本管理:');
+            const CACHE_VERSION = 'v2';
+            log(`   当前版本: ${CACHE_VERSION}`);
+
+            function cleanOldCaches() {
+                const validCaches = [CACHE_VERSION, 'static-v2', 'api-v1'];
+                log('   清理旧缓存:');
+                log(`   保留: [${validCaches.join(', ')}]`);
+                log(`   删除其他版本缓存`);
+            }
+            cleanOldCaches();
+
+            log('');
+            log('5️⃣ install 事件预缓存:');
+            log('   self.addEventListener("install", e => {');
+            log('     e.waitUntil(');
+            log('       caches.open("v1").then(cache =>');
+            log('         cache.addAll(["/", "/index.html", "/app.js"])');
+            log('       )');
+            log('     );');
+            log('   });');
+        }
+
+        function demoNotification() {
+            result.innerHTML = '';
+            log('🔔 推送通知:');
+            log('');
+
+            log('1️⃣ 请求权限:');
+            log('   Notification.requestPermission()');
+            log('   状态: granted / denied / default');
+            log('');
+
+            log('2️⃣ 订阅推送:');
+            log('   registration.pushManager.subscribe({');
+            log('     userVisibleOnly: true,');
+            log('     applicationServerKey: "..."');
+            log('   })');
+            log('');
+
+            log('3️⃣ Service Worker 接收推送:');
+            log('   self.addEventListener("push", event => {');
+            log('     const data = event.data.json();');
+            log('     self.registration.showNotification(data.title, {');
+            log('       body: data.body,');
+            log('       icon: "/icon.png",');
+            log('       badge: "/badge.png",');
+            log('       data: { url: data.url }');
+            log('     });');
+            log('   });');
+            log('');
+
+            log('4️⃣ 通知点击:');
+            log('   self.addEventListener("notificationclick", event => {');
+            log('     event.notification.close();');
+            log('     clients.openWindow(event.notification.data.url);');
+            log('   });');
+            log('');
+
+            log('📌 Service Worker 能力:');
+            log('   • 离线缓存 (PWA 核心)');
+            log('   • 推送通知');
+            log('   • 后台同步');
+            log('   • 网络代理 (拦截/修改请求)');
+            log('   ⚠️ 只能在 HTTPS 或 localhost 下使用');
+        }
+
+        console.log('=== Service Worker ===');
+        document.getElementById('output').textContent =
+            `Service Worker: 注册 / 安装/激活 / fetch拦截 / 离线策略 / 推送\n` +
+            `✅ Service Worker 演示完成！`;
+    </script>
+</body>
+</html>

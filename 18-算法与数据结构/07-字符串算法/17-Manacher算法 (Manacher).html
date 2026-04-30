@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>17-Manacher算法 (Manacher)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Manacher</h2>
+  <div class="code">Manacher 算法 O(n) 时间找出最长回文子串。</div>
+  <pre>function manacher(s) {
+  const t = '#' + s.split('').join('#') + '#';
+  const p = new Array(t.length).fill(0);
+  let center = 0, right = 0;
+  for (let i = 0; i < t.length; i++) {
+    if (i < right) p[i] = Math.min(right - i, p[2*center - i]);
+    while (i-p[i]-1 >= 0 && i+p[i]+1 < t.length && t[i-p[i]-1] === t[i+p[i]+1]) p[i]++;
+    if (i + p[i] > right) { center = i; right = i + p[i]; }
+  }
+  let maxLen = 0, centerIdx = 0;
+  for (let i = 0; i < t.length; i++) {
+    if (p[i] > maxLen) { maxLen = p[i]; centerIdx = i; }
+  }
+  const start = (centerIdx - maxLen) / 2;
+  return s.slice(start, start + maxLen);
+}
+console.log(manacher("babad")); // "bab" 或 "aba"
+console.log(manacher("cbbd")); // "bb" </pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  function man(s){const t='#'+s.split('').join('#')+'#';const p=new Array(t.length).fill(0);let c=0,r=0;for(let i=0;i<t.length;i++){if(i<r)p[i]=Math.min(r-i,p[2*c-i]);while(i-p[i]-1>=0&&i+p[i]+1<t.length&&t[i-p[i]-1]===t[i+p[i]+1])p[i]++;if(i+p[i]>r){c=i;r=i+p[i];}}let ml=0,ci=0;for(let i=0;i<t.length;i++)if(p[i]>ml){ml=p[i];ci=i;}return s.slice((ci-ml)/2,(ci-ml)/2+ml);}
+  document.getElementById('result').textContent =
+    `"babad" → ${man("babad")}\n"cbbd" → ${man("cbbd")}\n"banana" → ${man("banana")}`;
+}
+</script>
+</body>
+</html>

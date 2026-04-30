@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoSQL 面试题</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>❓ NoSQL 面试题</h2><p>MongoDB 面试高频题 (聚合/索引/副本集)、Redis 面试高频题 (数据结构/缓存/持久化)、NoSQL 面试高频题 (CAP/BASE/选型)。</p></div>
+    <div class="card">
+        <h2>MongoDB 面试题</h2>
+        <div class="code">// ========== MongoDB 面试高频题 ==========
+
+// Q1: MongoDB 和 MySQL 的区别?
+// A: MongoDB 是文档数据库, 无 Schema, 适合灵活数据结构
+//    MySQL 是关系型数据库, 固定 Schema, 支持 JOIN/事务
+//    选型: 复杂查询/事务用 MySQL, 快速迭代用 MongoDB
+
+// Q2: 什么是聚合管道?
+// A: 多阶段数据处理管道
+//    各阶段: $match(过滤) → $group(分组) → $sort(排序)
+//    类似 Unix 管道, 前一阶段输出是下阶段输入
+
+// Q3: MongoDB 如何做 JOIN?
+// A: $lookup 实现左外连接
+//    db.orders.aggregate([{
+//        $lookup: {
+//            from: "users",
+//            localField: "user_id",
+//            foreignField: "_id",
+//            as: "user_info"
+//        }
+//    }])
+
+// Q4: 为什么 MongoDB 用 BSON 不用 JSON?
+// A: BSON 支持更多类型 (Date/ObjectId/BinData)
+//    二进制编码, 解析更快, 空间利用率更高
+
+// Q5: MongoDB 如何保证高可用?
+// A: 副本集 (Replica Set)
+//    1 个 Primary + N 个 Secondary
+//    Primary 故障自动选举新主
+
+// Q6: 什么是分片键? 如何选择?
+// A: 分片键决定数据分布
+//    选择: 高基数, 查询频繁的字段
+//    哈希分片: 均匀但无范围查询
+//    范围分片: 有范围查询但可能热点
+
+// Q7: Mongoose 的 populate 和 $lookup 区别?
+// A: populate 在应用层查询 (多次查询)
+//    $lookup 在数据库层聚合 (单次查询)
+//    populate 简单但效率低 (N+1)
+//    $lookup 复杂但效率高
+
+// Q8: 索引 ESR 原则?
+// A: E = Equality (等值查询放前)
+//    S = Sort (排序字段中间)
+//    R = Range (范围查询最后)</div>
+    </div>
+    <div class="card">
+        <h2>Redis 面试题</h2>
+        <div class="code">// ========== Redis 面试高频题 ==========
+
+// Q1: Redis 的数据结构有哪些?
+// A: String, List, Set, Hash, ZSet
+//    扩展: Stream (5.0+), Bitmap, HyperLogLog, Geo
+
+// Q2: Redis 为什么快?
+// A: 1. 内存操作 (主要)
+//    2. 单线程 (无上下文切换/竞态)
+//    3. 高效 IO 多路复用 (epoll)
+//    4. 数据结构优化 (压缩表/跳跃表)
+//    注意: 6.0+ 网络 IO 多线程, 命令执行单线程
+
+// Q3: Redis 持久化方式及区别?
+// A: RDB: 快照 (文件小/恢复快/可能丢数据)
+//    AOF: 追加日志 (数据安全/文件大/恢复慢)
+//    推荐: AOF + RDB 混合持久化
+
+// Q4: 缓存穿透/击穿/雪崩?
+// A: 穿透: 不存在的数据一直打 DB
+//       解决: 缓存空值 / 布隆过滤器
+//    击穿: 热点 key 过期, 大量请求打 DB
+//       解决: 互斥锁 / 永不过期 + 异步刷新
+//    雪崩: 大量 key 同时过期
+//       解决: 随机过期时间 / 多级缓存 / 限流降级
+
+// Q5: Redis 分布式锁如何实现?
+// A: SET key uuid NX EX 10 (加锁)
+//    Lua 脚本 GET + DEL (解锁)
+//    多节点: Redlock 算法
+
+// Q6: Redis 淘汰策略?
+// A: noeviction / allkeys-lru / volatile-lru
+//    allkeys-lfu / volatile-ttl ...
+//    推荐: allkeys-lru
+
+// Q7: Redis 主从/哨兵/集群区别?
+// A: 主从: 读写分离, 手动切换
+//    哨兵: 自动故障转移, 1主N从
+//    集群: 自动分片 + 故障转移
+
+// Q8: 如何发现和处理 bigkey?
+// A: redis-cli --bigkeys
+//    bigkey 危害: 阻塞/网络延迟/数据倾斜
+//    处理: 拆分/压缩/UNLINK 异步删除</div>
+    </div>
+    <div class="card">
+        <h2>NoSQL 概念面试题</h2>
+        <div class="code">// ========== NoSQL 面试高频题 ==========
+
+// Q1: NoSQL 和 SQL 的核心区别?
+// A: SQL: 固定 Schema, ACID 事务, JOIN, 垂直扩展
+//    NoSQL: 灵活 Schema, BASE, 水平扩展, 高性能
+//    不是替代, 而是互补
+
+// Q2: CAP 定理是什么?
+// A: 分布式系统只能同时满足 3 个中的 2 个:
+//    C = 一致性 (所有节点数据相同)
+//    A = 可用性 (每个请求都有响应)
+//    P = 分区容忍 (网络中断仍工作)
+//    实际: P 必选, 在 C/A 间权衡
+
+// Q3: CP vs AP 数据库举例?
+// A: CP: HBase, MongoDB (默认), Etcd
+//    AP: Cassandra, DynamoDB, CouchDB
+
+// Q4: BASE 理论?
+// A: BA = Basically Available (基本可用)
+//    S = Soft State (软状态)
+//    E = Eventually Consistent (最终一致)
+//    NoSQL 的核心哲学
+
+// Q5: 什么是最终一致性?
+// A: 没有新更新后, 所有节点最终达到相同状态
+//    通常几毫秒到几秒
+//    例子: DNS 更新需要时间传播
+
+// Q6: 什么是多语言持久化?
+// A: 不同数据用不同数据库
+//    例: 业务数据用 PostgreSQL
+//        缓存用 Redis
+//        日志用 MongoDB
+//        搜索用 Elasticsearch
+
+// Q7: 什么时候选择 NoSQL?
+// A: 1. 数据量大 (需要水平扩展)
+//    2. Schema 频繁变更
+//    3. 高并发低延迟
+//    4. 非结构化/半结构化数据
+
+// Q8: 什么时候选 SQL?
+// A: 1. 数据关系复杂 (多表 JOIN)
+//    2. 强一致事务
+//    3. 数据完整性要求高
+//    4. 报表/分析查询</div>
+        <div class="note">💡 面试要点: MongoDB 重点问聚合/副本集/分片/ESR; Redis 重点问数据结构/缓存问题/持久化/分布式锁; NoSQL 重点问 CAP/BASE/选型。准备好场景题 (缓存设计/秒杀/排行榜)。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoMongo()">MongoDB 面试</button>
+        <button onclick="demoRedis()">Redis 面试</button>
+        <button onclick="demoNoSQL()">NoSQL 概念</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoMongo() {
+            result.innerHTML = '';
+            log('# MongoDB 面试');
+            log('');
+            log('聚合管道: $match → $group → $sort');
+            log('副本集: Primary + Secondary 自动切换');
+            log('分片键: 高基数, 查询频繁');
+            log('ESR: Equality → Sort → Range');
+            log('$lookup: MongoDB 的 JOIN');
+        }
+
+        function demoRedis() {
+            result.innerHTML = '';
+            log('# Redis 面试');
+            log('');
+            log('5 种结构: String/List/Set/Hash/ZSet');
+            log('持久化: RDB(快照) vs AOF(日志)');
+            log('穿透→空值, 击穿→互斥锁, 雪崩→随机过期');
+            log('分布式锁: SET NX EX + Lua');
+        }
+
+        function demoNoSQL() {
+            result.innerHTML = '';
+            log('# NoSQL 面试');
+            log('');
+            log('CAP: C+A+P 只能选 2 个');
+            log('BASE: 基本可用 + 最终一致');
+            log('最终一致: 无更新后所有节点一致');
+            log('多语言持久化: 不同数据用不同 DB');
+        }
+    </script>
+</body>
+</html>

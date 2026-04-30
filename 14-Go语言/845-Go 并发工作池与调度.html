@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 并发工作池与调度</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚙️ Go 并发工作池与调度</h2><p>工作池实现与优化、动态 worker 管理、任务优先级、调度策略、并发控制模式、Graceful Shutdown 工作池。</p></div>
+    <div class="card">
+        <h2>基础工作池</h2>
+        <div class="code">// ========== 通用工作池 ==========
+// 固定数量 worker, 处理 channel 中的任务
+
+type Job struct {
+    ID      int
+    Payload interface{}
+}
+
+type WorkerPool struct {
+    jobs    chan Job
+    results chan JobResult
+    done    chan struct{}
+    wg      sync.WaitGroup
+}
+
+type JobResult struct {
+    JobID int
+    Err   error
+}
+
+func NewWorkerPool(numWorkers, bufferSize int) *WorkerPool {
+    wp := &WorkerPool{
+        jobs:    make(chan Job, bufferSize),
+        results: make(chan JobResult, bufferSize),
+        done:    make(chan struct{}),
+    }
+
+    // 启动 workers
+    for i := 0; i < numWorkers; i++ {
+        wp.wg.Add(1)
+        go wp.worker(i)
+    }
+
+    return wp
+}
+
+func (wp *WorkerPool) worker(id int) {
+    defer wp.wg.Done()
+    for {
+        select {
+        case job, ok := <-wp.jobs:
+            if !ok {
+                return  // jobs 关闭, 退出
+            }
+            // 处理任务
+            err := processJob(job)
+            wp.results <- JobResult{JobID: job.ID, Err: err}
+        case <-wp.done:
+            return  // 收到停止信号
+        }
+    }
+}
+
+func (wp *WorkerPool) Submit(job Job) {
+    wp.jobs <- job
+}
+
+func (wp *WorkerPool) Results() <-chan JobResult {
+    return wp.results
+}
+
+func (wp *WorkerPool) Stop() {
+    close(wp.done)
+    wp.wg.Wait()
+    close(wp.results)
+}
+
+// ========== 动态工作池 ==========
+// 根据负载自动调整 worker 数量
+
+type DynamicPool struct {
+    minWorkers int
+    maxWorkers int
+    jobs       chan Job
+    active     atomic.Int32
+    wg         sync.WaitGroup
+    ctx        context.Context
+    cancel     context.CancelFunc
+}
+
+func NewDynamicPool(min, max int) *DynamicPool {
+    ctx, cancel := context.WithCancel(context.Background())
+    dp := &DynamicPool{
+        minWorkers: min,
+        maxWorkers: max,
+        jobs:       make(chan Job, 100),
+        ctx:        ctx,
+        cancel:     cancel,
+    }
+
+    // 启动最小 workers
+    for i := 0; i < min; i++ {
+        dp.startWorker()
+    }
+
+    // 监控 goroutine (动态扩缩)
+    go dp.autoScale()
+
+    return dp
+}
+
+func (dp *DynamicPool) startWorker() {
+    dp.active.Add(1)
+    dp.wg.Add(1)
+    go func() {
+        defer dp.wg.Done()
+        defer dp.active.Add(-1)
+
+        for {
+            select {
+            case job, ok := <-dp.jobs:
+                if !ok {
+                    return
+                }
+                processJob(job)
+            case <-dp.ctx.Done():
+                return
+            }
+        }
+    }()
+}
+
+func (dp *DynamicPool) autoScale() {
+    ticker := time.NewTicker(time.Second)
+    defer ticker.Stop()
+
+    for {
+        select {
+        case <-ticker.C:
+            queueLen := len(dp.jobs)
+            active := int(dp.active.Load())
+
+            // 队列积压: 增加 worker
+            if queueLen > 10 && active < dp.maxWorkers {
+                dp.startWorker()
+            }
+
+            // 队列空闲: 减少 worker (保留 min 个)
+            if queueLen == 0 && active > dp.minWorkers {
+                // 向 jobs 发送 nil 信号让 worker 退出
+                // 简化: 用 cancel 控制
+            }
+
+        case <-dp.ctx.Done():
+            return
+        }
+    }
+}
+
+func (dp *DynamicPool) Stop() {
+    dp.cancel()
+    dp.wg.Wait()
+}</div>
+    </div>
+    <div class="card">
+        <h2>任务优先级</h2>
+        <div class="code">// ========== 优先级工作池 ==========
+// 使用多个队列实现优先级
+
+type Priority int
+
+const (
+    LowPriority      Priority = 0
+    MediumPriority   Priority = 1
+    HighPriority     Priority = 2
+    CriticalPriority Priority = 3
+)
+
+type PriorityJob struct {
+    Job
+    Priority Priority
+}
+
+type PriorityPool struct {
+    queues  []chan Job  // 按优先级
+    results chan JobResult
+    wg      sync.WaitGroup
+}
+
+func NewPriorityPool(numWorkers int) *PriorityPool {
+    pp := &PriorityPool{
+        queues:  make([]chan Job, 4),  // 4 个优先级
+        results: make(chan JobResult, 100),
+    }
+
+    for i := range pp.queues {
+        pp.queues[i] = make(chan Job, 100)
+    }
+
+    // 启动 workers (每个 worker 从高优先级取任务)
+    for i := 0; i < numWorkers; i++ {
+        pp.wg.Add(1)
+        go pp.worker()
+    }
+
+    return pp
+}
+
+func (pp *PriorityPool) worker() {
+    defer pp.wg.Done()
+    for {
+        // 从高到低检查队列
+        var job Job
+        found := false
+
+        for priority := len(pp.queues) - 1; priority >= 0; priority-- {
+            select {
+            case job = <-pp.queues[priority]:
+                found = true
+            default:
+                continue
+            }
+            if found {
+                break
+            }
+        }
+
+        if !found {
+            // 所有队列空, 等待 (使用 critical 队列阻塞)
+            job = <-pp.queues[CriticalPriority]
+        }
+
+        err := processJob(job)
+        pp.results <- JobResult{JobID: job.ID, Err: err}
+    }
+}
+
+func (pp *PriorityPool) Submit(job Job, priority Priority) {
+    pp.queues[priority] <- job
+}
+
+// ========== 任务调度策略 ==========
+// 1. 公平调度 (Round Robin)
+type RoundRobinScheduler struct {
+    workers []chan Job
+    next    atomic.Int64
+}
+
+func (s *RoundRobinScheduler) Submit(job Job) {
+    idx := s.next.Add(1) % int64(len(s.workers))
+    s.workers[idx] <- job
+}
+
+// 2. 最少负载 (Least Loaded)
+type LeastLoadedScheduler struct {
+    workers []chan Job
+}
+
+func (s *LeastLoadedScheduler) Submit(job Job) {
+    minIdx := 0
+    minLen := len(s.workers[0])
+    for i, w := range s.workers[1:] {
+        if len(w) < minLen {
+            minLen = len(w)
+            minIdx = i + 1
+        }
+    }
+    s.workers[minIdx] <- job
+}
+
+// 3. 随机调度
+type RandomScheduler struct {
+    workers []chan Job
+}
+
+func (s *RandomScheduler) Submit(job Job) {
+    idx := rand.Intn(len(s.workers))
+    s.workers[idx] <- job
+}</div>
+    </div>
+    <div class="card">
+        <h2>Graceful Shutdown</h2>
+        <div class="code">// ========== 优雅关闭工作池 ==========
+// 步骤: 停止接受 → 完成进行中 → 清理资源
+
+type GracefulPool struct {
+    jobs      chan Job
+    results   chan JobResult
+    quit      chan os.Signal
+    wg        sync.WaitGroup
+    inFlight  atomic.Int64  // 进行中任务数
+    shutdown  atomic.Bool   // 关闭标志
+}
+
+func NewGracefulPool(workers int) *GracefulPool {
+    gp := &GracefulPool{
+        jobs:    make(chan Job, 100),
+        results: make(chan JobResult, 100),
+        quit:    make(chan os.Signal, 1),
+    }
+
+    signal.Notify(gp.quit, syscall.SIGINT, syscall.SIGTERM)
+
+    for i := 0; i < workers; i++ {
+        gp.wg.Add(1)
+        go gp.worker(i)
+    }
+
+    // 监听退出信号
+    go gp.handleShutdown()
+
+    return gp
+}
+
+func (gp *GracefulPool) worker(id int) {
+    defer gp.wg.Done()
+    for job := range gp.jobs {
+        gp.inFlight.Add(1)
+        err := processJob(job)
+        gp.results <- JobResult{JobID: job.ID, Err: err}
+        gp.inFlight.Add(-1)
+    }
+}
+
+func (gp *GracefulPool) Submit(job Job) error {
+    if gp.shutdown.Load() {
+        return fmt.Errorf("pool is shutting down")
+    }
+    gp.jobs <- job
+    return nil
+}
+
+func (gp *GracefulPool) handleShutdown() {
+    <-gp.quit  // 等待信号
+    gp.shutdown.Store(true)
+    close(gp.jobs)  // 停止接受新任务
+    gp.wg.Wait()    // 等待完成
+    close(gp.results)
+
+    // 等待所有进行中任务完成
+    for gp.inFlight.Load() > 0 {
+        time.Sleep(100 * time.Millisecond)
+    }
+
+    log.Println("all workers stopped gracefully")
+}
+
+func (gp *GracefulPool) WaitForCompletion() {
+    gp.wg.Wait()
+    close(gp.results)
+}
+
+// ========== 使用示例 ==========
+func poolExample() {
+    pool := NewGracefulPool(5)
+
+    // 提交任务
+    for i := 0; i < 100; i++ {
+        pool.Submit(Job{ID: i, Payload: i * 2})
+    }
+
+    // 非阻塞收集结果
+    go func() {
+        for result := range pool.results {
+            fmt.Printf("job %d done, err=%v\n", result.JobID, result.Err)
+        }
+    }()
+
+    // 等待或 Ctrl+C 优雅关闭
+    pool.WaitForCompletion()
+    fmt.Println("all jobs completed")
+}
+
+// ========== 并发控制: 信号量实现 ==========
+type Semaphore struct {
+    tokens chan struct{}
+}
+
+func NewSemaphore(max int) *Semaphore {
+    return &Semaphore{tokens: make(chan struct{}, max)}
+}
+
+func (s *Semaphore) Acquire() {
+    s.tokens <- struct{}{}
+}
+
+func (s *Semaphore) Release() {
+    <-s.tokens
+}
+
+// 使用: sem.Acquire(); defer sem.Release(); doWork()
+
+// ========== goroutine 泄漏检测 ==========
+func leakDetection() {
+    // 测试中检测泄漏
+    before := runtime.NumGoroutine()
+
+    // 被测代码...
+    time.Sleep(time.Millisecond)
+
+    after := runtime.NumGoroutine()
+    if after > before {
+        fmt.Printf("⚠ 泄漏: %d goroutines\n", after-before)
+    }
+}</div>
+        <div class="note">💡 工作池要点: 固定 worker 池 (基础); 动态扩缩 (autoScale 监控队列深度); 优先级用多队列; 调度策略 (Round Robin/Least Loaded/Random); Graceful Shutdown (signal → close jobs → Wait → close results); 信号量 (chan struct{} 限流); 原子计数 tracking in-flight 任务; goroutine 泄漏检测 (runtime.NumGoroutine ±差值)。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoBasic()">基础工作池</button>
+        <button onclick="demoPriority()">优先级</button>
+        <button onclick="demoShutdown()">优雅关闭</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoBasic() {
+            result.innerHTML = '';
+            log('# 基础工作池');
+            log('');
+            log('workers := 固定数量 goroutine');
+            log('循环: select { case job := <-jobs }');
+            log('');
+            log('核心结构:');
+            log('  jobs    chan Job     // 任务');
+            log('  results chan Result  // 结果');
+            log('  done    chan struct{}// 停止');
+            log('');
+            log('Submit → jobs, Stop → close(done)');
+        }
+
+        function demoPriority() {
+            result.innerHTML = '';
+            log('# 优先级工作池');
+            log('');
+            log('多个队列: queues[4]chan Job');
+            log('worker 从高优先级向低取:');
+            log('  for p := 3; p >= 0; p-- {');
+            log('    select { case job := <-q[p] }');
+            log('  }');
+            log('');
+            log('调度策略:');
+            log('  Round Robin: 轮询');
+            log('  Least Loaded: 最少任务');
+            log('  Random: 随机');
+        }
+
+        function demoShutdown() {
+            result.innerHTML = '';
+            log('# Graceful Shutdown');
+            log('');
+            log('步骤:');
+            log('  1. 收到 SIGINT/SIGTERM');
+            log('  2. shutdown flag = true');
+            log('  3. close(jobs) 拒绝新任务');
+            log('  4. wg.Wait() 等待进行中');
+            log('  5. close(results)');
+            log('');
+            log('atomic.Int64 追踪 in-flight');
+            log('Submit 时检查 shutdown flag');
+        }
+    </script>
+</body>
+</html>

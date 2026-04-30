@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>05-希尔排序 (Shell Sort)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; white-space: pre-wrap; }
+.bar-container { display: flex; align-items: flex-end; height: 200px; gap: 4px; margin: 10px 0; }
+.bar { background: #3498db; width: 28px; text-align: center; color: white; font-size: 11px; transition: height 0.3s; border-radius: 3px 3px 0 0; }
+.bar-active { background: #e74c3c; }
+.bar-sorted { background: #27ae60; }
+</style></head>
+<body>
+<div class="card">
+  <h2>希尔排序 (Shell Sort)</h2>
+  <p>希尔排序是插入排序的改进版。通过将待排序数组按下标的一定增量分组，对每组使用插入排序，随着增量逐渐减少，每组元素越来越多，当增量减至1时，整个数组基本有序，最后进行一次插入排序。</p>
+  <div class="note">
+    <strong>复杂度分析：</strong>时间复杂度取决于增量序列，平均 O(n^1.3)~O(n^2)。空间 O(1)。不稳定排序。
+  </div>
+</div>
+
+<div class="card">
+  <h2>增量序列</h2>
+  <ul>
+    <li><strong>Shell 原始序列：</strong>n/2, n/4, ..., 1</li>
+    <li><strong>Knuth 序列：</strong>(3^k-1)/2 → ..., 121, 40, 13, 4, 1</li>
+    <li><strong>Sedgewick 序列：</strong>..., 109, 41, 19, 5, 1</li>
+  </ul>
+</div>
+
+<div class="card">
+  <h2>代码实现</h2>
+  <pre>function shellSort(arr) {
+  const n = arr.length;
+  for (let gap = Math.floor(n / 2); gap > 0; gap = Math.floor(gap / 2)) {
+    for (let i = gap; i < n; i++) {
+      let temp = arr[i];
+      let j = i;
+      while (j >= gap && arr[j - gap] > temp) {
+        arr[j] = arr[j - gap];
+        j -= gap;
+      }
+      arr[j] = temp;
+    }
+  }
+  return arr;
+}</pre>
+</div>
+
+<div class="card">
+  <h2>交互演示</h2>
+  <button onclick="runShellSort()">开始希尔排序</button>
+  <button onclick="resetData()">重置数据</button>
+  <div id="bars" class="bar-container"></div>
+  <div id="result">点击按钮开始演示</div>
+</div>
+
+<script>
+let data = [];
+let isSorting = false;
+
+function initData() {
+  data = Array.from({length: 10}, () => Math.floor(Math.random() * 150) + 20);
+  renderBars(data, []);
+}
+
+function renderBars(arr, activeIndices) {
+  const container = document.getElementById('bars');
+  const maxVal = Math.max(...arr);
+  container.innerHTML = arr.map((val, i) => {
+    let cls = 'bar';
+    if (activeIndices.includes(i)) cls += ' bar-active';
+    const height = (val / maxVal) * 180;
+    return `<div class="${cls}" style="height:${height}px">${val}</div>`;
+  }).join('');
+}
+
+async function runShellSort() {
+  if (isSorting) return;
+  isSorting = true;
+  const arr = [...data];
+  const n = arr.length;
+  const resultEl = document.getElementById('result');
+
+  for (let gap = Math.floor(n / 2); gap > 0; gap = Math.floor(gap / 2)) {
+    resultEl.textContent = `当前增量 gap = ${gap}`;
+    for (let i = gap; i < n; i++) {
+      let temp = arr[i];
+      let j = i;
+      while (j >= gap && arr[j - gap] > temp) {
+        arr[j] = arr[j - gap];
+        j -= gap;
+        renderBars(arr, [j, j + gap]);
+        await sleep(200);
+      }
+      arr[j] = temp;
+      renderBars(arr, [j]);
+      await sleep(100);
+    }
+    resultEl.textContent = `增量 ${gap} 处理完成: [${arr.join(', ')}]`;
+    await sleep(500);
+  }
+  renderBars(arr, []);
+  resultEl.textContent = '排序完成: [' + arr.join(', ') + ']';
+  data = arr;
+  isSorting = false;
+}
+
+function resetData() {
+  if (isSorting) return;
+  initData();
+  document.getElementById('result').textContent = '数据已重置';
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+initData();
+</script>
+</body></html>

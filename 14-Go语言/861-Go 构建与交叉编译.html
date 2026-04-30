@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 构建与交叉编译</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔨 Go 构建与交叉编译</h2><p>go build 标志与优化、交叉编译 GOOS/GOARCH、构建标签、CGO、减小编译体积、Makefile 与 CI 构建。</p></div>
+    <div class="card">
+        <h2>go build 详解</h2>
+        <div class="code">// ========== go build 基础 ==========
+// go build [-o output] [packages]
+
+// 常用:
+// go build -o app main.go
+// go build -o app .               // 当前包
+// go build ./...                  // 检查编译 (不产生文件)
+
+// ========== 编译标志 ==========
+// -ldflags: 链接器标志
+// -tags:    构建标签
+// -race:    竞态检测 (仅 amd64)
+// -v:       详细输出
+// -x:       打印执行的命令
+// -a:       强制重编译所有包
+// -n:       打印但不执行
+
+// ========== ldflags 注入变量 ==========
+// 编译时注入版本/提交/时间信息
+
+var (
+    Version   = "dev"
+    Commit    = "none"
+    BuildTime = "unknown"
+)
+
+// 编译:
+// go build -ldflags="-X main.Version=1.0.0 -X main.Commit=abc123 -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o app
+
+// 或者使用 -ldflags 多行
+// LDFLAGS="-X main.Version=1.0.0"
+// LDFLAGS="$LDFLAGS -X main.Commit=$(git rev-parse HEAD)"
+// LDFLAGS="$LDFLAGS -X main.BuildTime=$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+// go build -ldflags="$LDFLAGS" -o app
+
+// ========== 减小编译体积 ==========
+// 1. 去掉 DWARF 调试信息
+// go build -ldflags="-w -s" -o app
+//   -w: 去掉 DWARF
+//   -s: 去掉符号表
+
+// 2. 使用 upx 压缩
+// upx --best app
+// upx --ultra-brute app  // 最狠压缩
+
+// 3. 禁用 CGO
+// CGO_ENABLED=0 go build -o app
+
+// 体积对比:
+// go build:           ~15MB
+// -ldflags="-w -s":   ~11MB
+// upx:                ~4MB
+// upx --ultra-brute:  ~3MB
+
+// ========== 编译优化 ==========
+// -gcflags: 编译器标志
+// go build -gcflags="-m" ./...    // 内联/逃逸分析
+// go build -gcflags="-l" ./...    // 禁用内联 (调试)
+// go build -gcflags="-N" ./...    // 禁用优化 (调试)
+
+// 逃逸分析:
+// go build -gcflags="-m -m" ./...  // 详细逃逸分析</div>
+    </div>
+    <div class="card">
+        <h2>交叉编译</h2>
+        <div class="code">// ========== GOOS / GOARCH ==========
+// GOOS=目标操作系统 GOARCH=目标架构 go build
+
+// 常用组合:
+// GOOS=linux   GOARCH=amd64 go build -o app-linux
+// GOOS=darwin  GOARCH=amd64 go build -o app-mac
+// GOOS=windows GOARCH=amd64 go build -o app.exe
+// GOOS=linux   GOARCH=arm64 go build -o app-arm64  // 树莓派/ARM
+// GOOS=linux   GOARCH=arm   GOARM=7 go build -o app-armv7
+
+// 完整列表:
+// GOOS:     linux, darwin, windows, freebsd, openbsd, netbsd, plan9, android, ios, ...
+// GOARCH:   amd64, arm64, arm, 386, mips, mips64, riscv64, s390x, wasm, ...
+
+// ========== 交叉编译脚本 ==========
+// build.sh
+
+// #!/bin/bash
+// PLATFORMS=(
+//   "linux/amd64"
+//   "linux/arm64"
+//   "darwin/amd64"
+//   "darwin/arm64"
+//   "windows/amd64"
+// )
+//
+// for PLATFORM in "${PLATFORMS[@]}"; do
+//   OS=${PLATFORM%/*}
+//   ARCH=${PLATFORM#*/}
+//   OUTPUT="app-${OS}-${ARCH}"
+//
+//   if [ "$OS" = "windows" ]; then
+//     OUTPUT="${OUTPUT}.exe"
+//   fi
+//
+//   echo "构建 $OUTPUT..."
+//   GOOS=$OS GOARCH=$ARCH CGO_ENABLED=0 go build -ldflags="-w -s" -o "$OUTPUT" .
+// done
+
+// ========== CGO 与交叉编译 ==========
+// CGO 交叉编译需要目标平台的 C 编译器
+// 通常禁用 CGO 简化交叉编译
+
+// 禁用 CGO:
+// CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build
+
+// 启用 CGO (需要工具链):
+// GOOS=linux GOARCH=arm64 CC=aarch64-linux-gnu-gcc CGO_ENABLED=1 go build
+
+// CGO 检测:
+// import "net"   // 默认纯 Go
+// import "os/user" // 需要 CGO (cgo 版本)
+// import "plugin"  // 需要 CGO
+
+// ========== WASM 编译 ==========
+// GOOS=js GOARCH=wasm go build -o main.wasm
+
+// HTML 调用:
+// <script src="wasm_exec.js"></script>
+// <script>
+//   const go = new Go();
+//   WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject)
+//     .then(result => go.run(result.instance));
+// </script>
+// cp "$(go env GOROOT)/misc/wasm/wasm_exec.js" .
+
+// ========== Android NDK 编译 ==========
+// CGO_ENABLED=1 \
+// GOOS=android \
+// GOARCH=arm64 \
+// CC=$ANDROID_NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android21-clang \
+// go build -o app</div>
+    </div>
+    <div class="card">
+        <h2>构建标签</h2>
+        <div class="code">// ========== 构建标签 (Build Tags) ==========
+// 条件编译: 根据平台或特性选择文件
+
+// 文件最顶部加注释:
+// //go:build linux
+// // +build linux       // 旧式
+
+package main
+
+// 可用标签:
+// //go:build linux              // Linux 平台
+// //go:build darwin             // macOS
+// //go:build windows            // Windows
+// //go:build amd64              // amd64 架构
+// //go:build arm64              // arm64 架构
+// //go:build cgo                // CGO 启用
+// //go:build go1.18             // Go 版本 >= 1.18
+// //go:build !linux             // 非 Linux
+// //go:build linux && amd64     // AND
+// //go:build linux || darwin    // OR
+// //go:build !(linux || windows) // NOT
+
+// ========== 文件名约定 ==========
+// 自动平台匹配:
+// *_linux.go        // Linux 专用
+// *_windows.go      // Windows 专用
+// *_darwin.go       // macOS 专用
+// *_amd64.go        // amd64 专用
+// *_arm64.go        // arm64 专用
+// *_linux_amd64.go  // 组合
+// *_test.go         // 测试文件
+
+// 示例:
+// config.go         — 通用
+// config_linux.go   — Linux 覆盖
+// config_windows.go — Windows 覆盖
+
+// 运行时检测:
+// runtime.GOOS      // 当前操作系统
+// runtime.GOARCH    // 当前架构
+
+// ========== 自定义标签 ==========
+// //go:build production
+
+// 编译时:
+// go build -tags="production" -o app
+
+// 代码中:
+// //go:build production
+// package main
+// func init() {
+//     log.SetFlags(log.LstdFlags | log.Lshortfile)
+// }
+
+// 开发环境:
+// //go:build !production
+
+// ========== 构建标签实际应用 ==========
+// 文件: db_mock.go (测试用)
+// //go:build !production
+
+// func NewDB() *DB {
+//     return &DB{memory: true}
+// }
+
+// 文件: db_real.go (生产用)
+// //go:build production
+
+// func NewDB() *DB {
+//     db, _ := sql.Open("postgres", os.Getenv("DATABASE_URL"))
+//     return &DB{sqlDB: db}
+// }</div>
+    </div>
+    <div class="card">
+        <h2>构建工具与 CI</h2>
+        <div class="code">// ========== Makefile ==========
+// Go 项目常用 Makefile
+
+// .PHONY: build test clean lint run
+
+// VERSION := $(shell git describe --tags --always 2>/dev/null || echo "dev")
+// COMMIT  := $(shell git rev-parse HEAD 2>/dev/null || echo "none")
+// DATE    := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
+// LDFLAGS := "-w -s -X main.Version=$(VERSION) -X main.Commit=$(COMMIT) -X main.BuildTime=$(DATE)"
+
+// build:
+// 	CGO_ENABLED=0 go build -ldflags=$(LDFLAGS) -o bin/app .
+//
+// build-all: build-linux build-darwin build-windows
+//
+// build-linux:
+// 	GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -ldflags=$(LDFLAGS) -o bin/app-linux .
+//
+// build-darwin:
+// 	GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go build -ldflags=$(LDFLAGS) -o bin/app-darwin .
+//
+// build-windows:
+// 	GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -ldflags=$(LDFLAGS) -o bin/app.exe .
+//
+// test:
+// 	go test -race -coverprofile=coverage.out ./...
+// 	go tool cover -html=coverage.out -o coverage.html
+//
+// lint:
+// 	golangci-lint run ./...
+//
+// clean:
+// 	rm -rf bin/ coverage.out coverage.html
+//
+// run:
+// 	go run main.go
+//
+// docker:
+// 	docker build -t myapp:$(VERSION) .
+
+// ========== 多架构 Docker 构建 ==========
+// docker buildx build \
+//   --platform linux/amd64,linux/arm64 \
+//   --tag myapp:latest \
+//   --push .
+
+// ========== CI 构建流程 ==========
+// GitHub Actions:
+// steps:
+//   - uses: actions/setup-go@v5
+//     with:
+//       go-version: '1.22'
+//   - run: make test
+//   - run: make build-all
+//   - uses: actions/upload-artifact@v4
+//     with:
+//       name: binaries
+//       path: bin/
+
+// ========== go vet 静态分析 ==========
+// go vet ./...  // 检查常见问题
+
+// 检查项:
+// - 错误的锁使用
+// - 错误的 printf 格式
+// - 不可达代码
+// - 错误的 range 变量捕获
+// - 结构体标签格式
+
+// golangci-lint: 集成多个 linter
+// go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
+// golangci-lint run ./...</div>
+        <div class="note">💡 构建要点: go build -ldflags="-w -s" 减体积; GOOS/GOARCH 交叉编译 (linux/amd64/windows/arm64); CGO_ENABLED=0 简化交叉编译; ldflags -X 注入版本/提交/时间; 构建标签 //go:build linux/amd64/production; 文件名 _linux.go/_windows.go 自动匹配; Makefile 管理构建/测试/lint; Docker buildx 多架构; go vet 静态分析; upx 压缩二进制。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoBuild()">构建</button>
+        <button onclick="demoCross()">交叉编译</button>
+        <button onclick="demoTag()">构建标签</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoBuild() {
+            result.innerHTML = '';
+            log('# go build');
+            log('');
+            log('常用:');
+            log('  go build -o app .');
+            log('  go build -ldflags="-w -s" -o app');
+            log('  go build -gcflags="-m" .');
+            log('');
+            log('ldflags:');
+            log('  -X main.Version=1.0.0');
+            log('  -X main.Commit=$(git rev-parse HEAD)');
+            log('');
+            log('体积:');
+            log('  默认 ~15MB → -w -s ~11MB → upx ~3MB');
+        }
+
+        function demoCross() {
+            result.innerHTML = '';
+            log('# 交叉编译');
+            log('');
+            log('GOOS=linux GOARCH=amd64 go build');
+            log('GOOS=linux GOARCH=arm64 go build');
+            log('GOOS=darwin GOARCH=arm64 go build');
+            log('GOOS=windows GOARCH=amd64 go build -o app.exe');
+            log('GOOS=js GOARCH=wasm go build -o main.wasm');
+            log('');
+            log('注意:');
+            log('  CGO_ENABLED=0 简化交叉编译');
+            log('  CGO 需要目标平台工具链');
+        }
+
+        function demoTag() {
+            result.innerHTML = '';
+            log('# 构建标签');
+            log('');
+            log('//go:build linux');
+            log('//go:build amd64');
+            log('//go:build !production');
+            log('//go:build linux && arm64');
+            log('');
+            log('文件名:');
+            log('  config_linux.go');
+            log('  config_windows.go');
+            log('  config_darwin_amd64.go');
+            log('');
+            log('自定义标签:');
+            log('  go build -tags="production"');
+        }
+    </script>
+</body>
+</html>

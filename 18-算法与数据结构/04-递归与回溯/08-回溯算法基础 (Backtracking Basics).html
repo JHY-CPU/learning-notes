@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>08-回溯算法基础 (Backtracking Basics)</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f0f2f5; padding: 20px; color: #333; }
+h1 { text-align: center; color: #2c3e50; margin-bottom: 24px; font-size: 28px; }
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; font-size: 18px; }
+.card p { line-height: 1.7; color: #555; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; font-size: 14px; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; border-radius: 4px; margin: 10px 0; font-size: 14px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 14px; line-height: 1.5; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; font-size: 14px; transition: background 0.2s; }
+button:hover { opacity: 0.9; background: #2980b9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; white-space: pre-wrap; font-size: 14px; }
+.section-nav { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 24px; }
+.section-nav a { text-decoration: none; color: white; background: #7f8c8d; padding: 6px 14px; border-radius: 16px; font-size: 13px; transition: background 0.2s; }
+.section-nav a:hover { background: #3498db; }
+.input-group { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 10px 0; }
+.input-group label { font-weight: 600; font-size: 14px; }
+.input-group input[type="text"], .input-group input[type="number"] { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; font-size: 14px; width: 120px; }
+</style></head>
+<body>
+<div class="section-nav">
+<a href="01-%E9%80%92%E5%BD%92%E5%9F%BA%E7%A1%80%20(Recursion%20Basics).html">01-递归基础</a>
+<a href="02-%E9%80%92%E5%BD%92%E4%B8%89%E8%A6%81%E7%B4%A0%20(Three%20Elements).html">02-三要素</a>
+<a href="03-%E9%80%92%E5%BD%92%E8%B0%83%E7%94%A8%E6%A0%88%20(Recursion%20Call%20Stack).html">03-调用栈</a>
+<a href="04-%E5%B0%BE%E9%80%92%E5%BD%92%E4%BC%98%E5%8C%96%20(Tail%20Recursion).html">04-尾递归</a>
+<a href="05-%E9%80%92%E5%BD%92%E8%BD%AC%E8%BF%AD%E4%BB%A3%20(Recursion%20to%20Iteration).html">05-转迭代</a>
+<a href="06-%E9%80%92%E6%8E%A8%E5%85%B3%E7%B3%BB%E5%BB%BA%E6%A8%A1%20(Recurrence%20Modeling).html">06-递推关系</a>
+<a href="07-%E9%80%92%E5%BD%92%E6%A0%91%E5%88%86%E6%9E%90%20(Recursion%20Tree).html">07-递归树</a>
+<a href="08-%E5%9B%9E%E6%BA%AF%E7%AE%97%E6%B3%95%E5%9F%BA%E7%A1%80%20(Backtracking%20Basics).html">08-回溯基础</a>
+<a href="09-%E5%9B%9E%E6%BA%AF%E4%B8%89%E8%A6%81%E7%B4%A0%20(Backtracking%20Framework).html">09-回溯框架</a>
+<a href="10-%E5%89%AA%E6%9E%9D%E4%BC%98%E5%8C%96%20(Pruning).html">10-剪枝</a>
+<a href="11-%E5%AD%90%E9%9B%86%E9%97%AE%E9%A2%98%20(Subsets).html">11-子集</a>
+<a href="12-%E7%BB%84%E5%90%88%E9%97%AE%E9%A2%98%20(Combinations).html">12-组合</a>
+<a href="13-%E6%8E%92%E5%88%97%E9%97%AE%E9%A2%98%20(Permutations).html">13-排列</a>
+<a href="14-%E7%BB%84%E5%90%88%E6%80%BB%E5%92%8C%20(Combination%20Sum).html">14-组合总和</a>
+<a href="15-N%E7%9A%87%E5%90%8E%E9%97%AE%E9%A2%98%20(N-Queens).html">15-N皇后</a>
+<a href="16-%E6%95%B0%E7%8B%AC%E6%B1%82%E8%A7%A3%20(Sudoku%20Solver).html">16-数独</a>
+<a href="17-%E6%8B%AC%E5%8F%B7%E7%94%9F%E6%88%90%20(Generate%20Parentheses).html">17-括号</a>
+<a href="18-%E5%8D%95%E8%AF%8D%E6%90%9C%E7%B4%A2%20(Word%20Search).html">18-单词搜索</a>
+<a href="19-%E5%88%86%E5%89%B2%E5%9B%9E%E6%96%87%E4%B8%B2%20(Palindrome%20Partitioning).html">19-回文串</a>
+<a href="20-%E5%A4%8D%E5%8E%9FIP%E5%9C%B0%E5%9D%80%20(Restore%20IP%20Addresses).html">20-IP地址</a>
+<a href="21-%E5%AD%90%E9%9B%86%E6%A0%91%E4%B8%8E%E6%8E%92%E5%88%97%E6%A0%91%20(Subset%20%26%20Permutation%20Tree).html">21-子集树</a>
+<a href="22-%E5%88%86%E6%94%AF%E9%99%90%E7%95%8C%E6%B3%95%20(Branch%20and%20Bound).html">22-分支限界</a>
+<a href="23-%E8%BF%AD%E4%BB%A3%E5%8A%A0%E6%B7%B1%E6%90%9C%E7%B4%A2%20(Iterative%20Deepening%20DFS).html">23-迭代加深</a>
+<a href="24-%E5%8F%8C%E5%90%91%E6%90%9C%E7%B4%A2%20(Bidirectional%20Search).html">24-双向搜索</a>
+<a href="25-%E9%80%92%E5%BD%92%E4%B8%8E%E5%9B%9E%E6%BA%AF%E7%BB%BC%E5%90%88%E7%BB%83%E4%B9%A0%20(Recursion%20%26%20Backtracking%20Practice).html">25-综合练习</a>
+</div>
+<h1>回溯算法基础</h1>
+
+<div class="card">
+<h2>什么是回溯算法</h2>
+<p>回溯算法（Backtracking）是一种通过穷举所有可能的候选解来求解问题的算法。它采用"尝试-回溯"的策略：每步做出一个选择，如果发现当前选择导致无法得到有效解，就撤销该选择（回溯），尝试其他选择。</p>
+<div class="note">回溯可以看作是一种<b>深度优先搜索（DFS）</b>，在解空间树中搜索所有可能的解。当搜索到叶节点或无解的分支时，返回上一层继续搜索。</div>
+</div>
+
+<div class="card">
+<h2>回溯的通用框架</h2>
+<div class="code">function backtrack(路径, 选择列表) {
+    if (满足结束条件) {
+        记录结果;
+        return;
+    }
+
+    for (选择 in 选择列表) {
+        做选择（加入路径）;
+        backtrack(路径, 新的选择列表);
+        撤销选择（从路径移除）;
+    }
+}</div>
+</div>
+
+<div class="card">
+<h2>经典示例：全排列</h2>
+<p>给定一个不含重复数字的数组，返回其所有可能的全排列。</p>
+<div class="code">function permute(nums) {
+    const result = [];
+    function backtrack(path, used) {
+        if (path.length === nums.length) {
+            result.push([...path]);
+            return;
+        }
+        for (let i = 0; i < nums.length; i++) {
+            if (used[i]) continue;
+            path.push(nums[i]);
+            used[i] = true;
+            backtrack(path, used);
+            path.pop();
+            used[i] = false;
+        }
+    }
+    backtrack([], []);
+    return result;
+}</div>
+<div class="input-group">
+<label>输入数组（逗号分隔）：</label>
+<input type="text" id="arrInput" value="1,2,3">
+<button onclick="runPermute()">计算全排列</button>
+</div>
+<div id="result"></div>
+</div>
+
+<script>
+function permute(nums) {
+    const result = [];
+    function backtrack(path, used) {
+        if (path.length === nums.length) {
+            result.push([...path]);
+            return;
+        }
+        for (let i = 0; i < nums.length; i++) {
+            if (used[i]) continue;
+            path.push(nums[i]);
+            used[i] = true;
+            backtrack(path, used);
+            path.pop();
+            used[i] = false;
+        }
+    }
+    backtrack([], []);
+    return result;
+}
+
+function runPermute() {
+    const input = document.getElementById("arrInput").value;
+    const nums = input.split(",").map(s => parseInt(s.trim()));
+    if (nums.some(isNaN)) {
+        document.getElementById("result").textContent = "请输入有效的数字数组，用逗号分隔";
+        return;
+    }
+    if (nums.length > 6) {
+        document.getElementById("result").textContent = "元素太多（超过6个），防止结果过多";
+        return;
+    }
+    const result = permute(nums);
+    let out = "输入: [" + nums.join(", ") + "]\n";
+    out += "全排列个数: " + result.length + "\n\n";
+    result.forEach((p, i) => {
+        out += (i + 1) + ": [" + p.join(", ") + "]\n";
+    });
+    document.getElementById("result").textContent = out;
+}
+</script>
+</body></html>

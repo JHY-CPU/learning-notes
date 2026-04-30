@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>requestAnimationFrame</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+        canvas { display: block; margin: 10px auto; background: #1e1e1e; border-radius: 8px; width: 500px; height: 150px; }
+        #fps-display { font-size: 14px; color: #7f8c8d; text-align: center; margin: 5px 0; }
+        #ball-status { font-size: 14px; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>requestAnimationFrame</h2><p>浏览器优化的动画帧调度，与屏幕刷新率同步（通常 60fps）。</p></div>
+    <div class="card">
+        <h2>requestAnimationFrame 基本用法</h2>
+        <div class="code">// requestAnimationFrame(callback)
+// 在下一次浏览器重绘之前调用 callback
+// 返回请求 ID（用于取消）
+
+const animId = requestAnimationFrame(function(timestamp) {
+    // timestamp — 页面加载以来的毫秒数（高精度时间）
+    console.log('动画帧触发, 时间:', timestamp);
+});
+
+// 取消动画帧
+cancelAnimationFrame(animId);
+
+// 常见模式：递归调用实现连续动画
+function animate(timestamp) {
+    // 更新动画状态
+    updatePosition();
+
+    // 请求下一帧
+    requestAnimationFrame(animate);
+}
+// 启动动画
+requestAnimationFrame(animate);</div>
+    </div>
+    <div class="card">
+        <h2>rAF vs setTimeout / setInterval</h2>
+        <div class="code">// requestAnimationFrame 的优点：
+
+// 1. 与屏幕刷新率同步
+//    60Hz 屏幕 → 约 16.67ms 执行一次
+//    120Hz 屏幕 → 约 8.33ms 执行一次
+//    setTimeout 无法精确同步
+
+// 2. 浏览器优化
+//    页面不可见时（切换到后台标签），rAF 暂停
+//    省电、省 CPU
+
+// 3. 更平滑的动画
+//    rAF 在重绘之前执行，不会丢帧
+//    setTimeout 可能错过帧同步
+
+// 4. 自带时间戳
+//    callback 接收高精度时间戳
+//    无需自己计算时间差
+
+// 什么时候用 rAF：
+// ✅ 视觉动画（移动、缩放、旋转）
+// ✅ Canvas/SVG 渲染
+// ✅ 滚动同步
+// ❌ 网络请求（用 setTimeout 或 setInterval）
+// ❌ 精确计时（rAF 不适合）
+
+// rAF vs setInterval：
+// rAF: 浏览器控制执行时机，平滑高效
+// setInterval: 固定间隔，可能丢帧或过度绘制</div>
+    </div>
+    <div class="card">
+        <h2>实用的帧率控制</h2>
+        <div class="code">// 限制 rAF 执行频率（比如每秒 30 帧）
+let lastTime = 0;
+const fps = 30;
+const interval = 1000 / fps;
+
+function animate(timestamp) {
+    const delta = timestamp - lastTime;
+
+    if (delta >= interval) {
+        // 更新逻辑
+        update();
+        lastTime = timestamp - (delta % interval);
+    }
+
+    requestAnimationFrame(animate);
+}
+
+// 计算 FPS
+let frameCount = 0;
+let lastFpsTime = 0;
+
+function showFps(timestamp) {
+    frameCount++;
+    if (timestamp - lastFpsTime >= 1000) {
+        console.log('FPS:', frameCount);
+        frameCount = 0;
+        lastFpsTime = timestamp;
+    }
+    requestAnimationFrame(showFps);
+}
+
+// 停止动画
+// cancelAnimationFrame(rafId);</div>
+    </div>
+    <div>
+        <canvas id="canvas" width="500" height="150"></canvas>
+        <div id="fps-display">FPS: 0</div>
+        <div id="ball-status"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin:10px 0;flex-wrap:wrap;">
+        <button id="start-anim">开始动画</button>
+        <button id="stop-anim" disabled>停止</button>
+        <button id="switch-mode">切换模式: 匀速</button>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const fpsDisplay = document.getElementById('fps-display');
+        const ballStatus = document.getElementById('ball-status');
+        const startBtn = document.getElementById('start-anim');
+        const stopBtn = document.getElementById('stop-anim');
+        const modeBtn = document.getElementById('switch-mode');
+
+        let rafId = null;
+        let x = 50;
+        let speed = 3;
+        let direction = 1;
+        let mode = '匀速';
+        let frameCount = 0;
+        let lastFpsTime = 0;
+        let fps = 0;
+
+        function drawBall(posX) {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // 绘制轨道
+            ctx.strokeStyle = '#444';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, 75);
+            ctx.lineTo(canvas.width, 75);
+            ctx.stroke();
+
+            // 绘制小球
+            const gradient = ctx.createRadialGradient(posX - 8, 67, 2, posX, 75, 20);
+            gradient.addColorStop(0, '#fff');
+            gradient.addColorStop(0.3, '#3498db');
+            gradient.addColorStop(1, '#2c3e50');
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.arc(posX, 75, 20, 0, Math.PI * 2);
+            ctx.fill();
+
+            // 绘制光晕
+            ctx.fillStyle = 'rgba(52,152,219,0.15)';
+            ctx.beginPath();
+            ctx.arc(posX, 75, 30, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function animate(timestamp) {
+            // FPS 计算
+            frameCount++;
+            if (timestamp - lastFpsTime >= 1000) {
+                fps = frameCount;
+                frameCount = 0;
+                lastFpsTime = timestamp;
+                fpsDisplay.textContent = `FPS: ${fps} (△ ${lastFpsTime.toFixed(0)}ms)`;
+            }
+
+            // 更新位置
+            if (mode === '匀速') {
+                x += speed * direction;
+            } else if (mode === '正弦') {
+                const progress = (x - 50) / 400;  // 0~1
+                const amplitude = 30;
+                const bounceY = Math.sin(progress * Math.PI * 4) * amplitude;
+                // 用弹跳效果（简化为垂直偏移显示）
+                x += speed * direction * 0.5;
+            }
+
+            // 反弹
+            if (x > canvas.width - 30) {
+                direction = -1;
+                ballStatus.textContent = '→ 向左';
+            } else if (x < 30) {
+                direction = 1;
+                ballStatus.textContent = '→ 向右';
+            }
+
+            // 限制范围
+            x = Math.max(30, Math.min(canvas.width - 30, x));
+
+            drawBall(x);
+            ballStatus.textContent = `x=${x.toFixed(0)}px ${direction > 0 ? '→' : '←'} ${mode}`;
+
+            rafId = requestAnimationFrame(animate);
+        }
+
+        function startAnimation() {
+            if (rafId) return;
+            if (x < 30 || x > canvas.width - 30) x = 50;
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            rafId = requestAnimationFrame(animate);
+            console.log('rAF 已启动');
+        }
+
+        function stopAnimation() {
+            if (rafId) {
+                cancelAnimationFrame(rafId);
+                rafId = null;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                console.log('rAF 已停止');
+            }
+        }
+
+        modeBtn.addEventListener('click', () => {
+            if (mode === '匀速') {
+                mode = '正弦';
+                modeBtn.textContent = '切换模式: 正弦';
+            } else {
+                mode = '匀速';
+                modeBtn.textContent = '切换模式: 匀速';
+            }
+            console.log('切换到:', mode);
+        });
+
+        startBtn.addEventListener('click', startAnimation);
+        stopBtn.addEventListener('click', stopAnimation);
+
+        // 初始绘制
+        drawBall(x);
+
+        console.log('=== requestAnimationFrame ===');
+        console.log('rAF 与屏幕刷新率同步（通常 60fps）');
+        console.log('页面不可见时自动暂停');
+
+        console.log('=== rAF vs setTimeout ===');
+        const comparisons = [
+            'rAF: 浏览器优化，不可见时暂停',
+            'rAF: 与刷新率同步，不丢帧',
+            'setTimeout: 固定间隔，不管是否可见',
+            'setTimeout: 可能丢帧或过度绘制',
+            'rAF: 适合视觉动画',
+            'setTimeout: 适合定时任务/网络轮询'
+        ];
+        comparisons.forEach(c => console.log('  -', c));
+
+        document.getElementById('output').textContent =
+            `rAF 动画运行中: ${mode}\n` +
+            `rAF 自动与屏幕刷新率同步\n` +
+            `✅ requestAnimationFrame 演示完成！`;
+    </script>
+</body>
+</html>

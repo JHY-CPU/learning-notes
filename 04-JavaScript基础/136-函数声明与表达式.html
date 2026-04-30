@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>函数声明与表达式</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>函数声明与函数表达式</h2><p>定义函数的两种主要方式。</p></div>
+    <div class="card">
+        <h2>函数声明（Function Declaration）</h2>
+        <div class="code">function greet(name) {
+    return `你好, ${name}!`;
+}
+
+// 特点：会提升（hoisting），可以在定义前调用
+sayHi();  // ✅ 可以
+function sayHi() {
+    console.log('Hi!');
+}</div>
+    </div>
+    <div class="card">
+        <h2>函数表达式（Function Expression）</h2>
+        <div class="code">// 匿名函数表达式
+const greet = function(name) {
+    return `你好, ${name}!`;
+};
+
+// 命名函数表达式
+const factorial = function calc(n) {
+    return n <= 1 ? 1 : n * calc(n - 1);
+};
+
+// 特点：不会提升，必须先赋值后调用
+// hello();  // ❌ 报错！
+const hello = function() { console.log('Hello'); };</div>
+    </div>
+    <div class="card">
+        <h2>函数声明 vs 表达式对比</h2>
+        <div class="code">// 函数声明：提升（hoisted）
+foo();  // ✅ 可以
+function foo() { return 'foo'; }
+
+// 函数表达式：不提升
+// bar();  // ❌ 报错！bar is not a function
+const bar = function() { return 'bar'; };
+
+// var 函数表达式：变量提升，但值为 undefined
+// baz();  // ❌ 报错！baz is not a function（不是函数）
+var baz = function() { return 'baz'; };
+// 相当于：
+// var baz;
+// baz();  // undefined() → TypeError</div>
+    </div>
+    <div class="card">
+        <h2>函数是对象</h2>
+        <div class="code">function add(a, b) { return a + b; }
+
+add.name;       // "add"（函数名）
+add.length;     // 2（形参个数）
+
+// 函数可以赋值给变量
+const fn = add;
+
+// 函数可以作为参数
+function exec(fn, a, b) {
+    return fn(a, b);
+}
+exec(add, 1, 2);  // 3
+
+// 函数可以作为返回值
+function makeAdder(x) {
+    return function(y) {
+        return x + y;
+    };
+}</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== 函数声明（提升） ===');
+        console.log('声明前调用:', multiply(3, 4));
+        function multiply(a, b) { return a * b; }
+        console.log('声明后调用:', multiply(3, 4));
+
+        console.log('=== 函数表达式 ===');
+        const divide = function(a, b) { return a / b; };
+        console.log('表达式调用:', divide(10, 3));
+        // console.log(divide2(5, 2));  // ❌ 会报错
+
+        console.log('=== 函数属性 ===');
+        function example(a, b, c) {}
+        console.log('函数名:', example.name);
+        console.log('参数个数:', example.length);
+
+        console.log('=== 高阶函数 ===');
+        function operate(a, b, fn) {
+            return fn(a, b);
+        }
+        console.log('操作(加):', operate(5, 3, (a,b) => a + b));
+        console.log('操作(乘):', operate(5, 3, (a,b) => a * b));
+
+        document.getElementById('output').textContent =
+            `函数提升: multiply(3,4)=${multiply(3,4)}\n` +
+            `函数属性: ${example.name}(${example.length}个参数)\n` +
+            `高阶函数: operate(5,3,加)=${operate(5,3,(a,b)=>a+b)}\n` +
+            `✅ 函数声明与表达式演示完成！`;
+    </script>
+</body>
+</html>

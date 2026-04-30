@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>装饰器模式</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        .decorator-chain { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; padding: 15px; background: #f8f9fa; border-radius: 8px; margin: 10px 0; }
+        .decorator-chain .fn { background: #27ae60; color: white; padding: 6px 12px; border-radius: 4px; font-size: 13px; }
+        .decorator-chain .dec { background: #e67e22; color: white; padding: 6px 12px; border-radius: 4px; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>装饰器模式 Decorator</h2><p>动态地给函数或类添加额外职责，而不修改原始代码。在 JavaScript 中，函数装饰器通过高阶函数实现；类装饰器使用 @decorator 语法（提案阶段）。</p></div>
+    <div class="card"><h2>函数装饰器</h2><p>接收函数作为参数，返回增强后的新函数。常见的函数装饰器：withLogging（日志）、withAuth（权限）、withTimer（计时）、memoize（缓存）。</p></div>
+    <div class="card"><h2>类装饰器语法 (legacy)</h2><p>ES 提案的 @decorator 语法，可以装饰类、方法、属性、访问器。通过修改 property descriptor 实现。</p></div>
+    <div class="card"><h2>交互演示</h2><p>
+        <button onclick="demoWithLogging()">日志装饰器</button>
+        <button onclick="demoWithTimer()">计时装饰器</button>
+        <button onclick="demoWithAuth()">权限装饰器</button>
+        <button onclick="demoWithValidation()">参数验证</button>
+        <button onclick="demoClassDecorator()">类装饰器模拟</button>
+        <button onclick="demoDecoratorChain()">装饰器链</button>
+    </p></div>
+    <pre id="output"></pre>
+    <script>
+        const output = document.getElementById('output');
+
+        function log(msg) {
+            output.textContent += msg + '\n';
+            console.log(msg);
+        }
+
+        function clearLog() {
+            output.textContent = '';
+        }
+
+        // ========== 1. 日志装饰器 ==========
+        function withLogging(fn) {
+            return function(...args) {
+                log(`[日志] 调用 ${fn.name || '匿名函数'}(${args.map(JSON.stringify).join(', ')})`);
+                const result = fn.apply(this, args);
+                log(`[日志] 返回: ${JSON.stringify(result)}`);
+                return result;
+            };
+        }
+
+        function demoWithLogging() {
+            clearLog();
+            log('=== withLogging 装饰器 ===\n');
+
+            function add(a, b) {
+                return a + b;
+            }
+
+            const loggedAdd = withLogging(add);
+            loggedAdd(3, 4);
+            loggedAdd(10, 20);
+
+            log('\n装饰器: 不修改原函数，只在外层增加功能');
+            log(`原函数仍可用: add(1, 2) = ${add(1, 2)}`);
+        }
+
+        // ========== 2. 计时装饰器 ==========
+        function withTimer(fn) {
+            return function(...args) {
+                const start = performance.now();
+                const result = fn.apply(this, args);
+                const elapsed = (performance.now() - start).toFixed(3);
+                log(`[计时] ${fn.name || '匿名函数'} 耗时 ${elapsed}ms`);
+                return result;
+            };
+        }
+
+        function demoWithTimer() {
+            clearLog();
+            log('=== withTimer 计时装饰器 ===\n');
+
+            const heavyComputation = (n) => {
+                let sum = 0;
+                for (let i = 0; i < n * 1000000; i++) sum += i;
+                return sum;
+            };
+
+            const timedHeavy = withTimer(heavyComputation);
+            log('执行 heavyComputation(50):');
+            timedHeavy(50);
+
+            log('\n执行 heavyComputation(100):');
+            timedHeavy(100);
+
+            log('\n组合装饰器:');
+            const loggedAndTimed = withLogging(withTimer(heavyComputation));
+            loggedAndTimed(30);
+        }
+
+        // ========== 3. 权限装饰器 ==========
+        function withAuth(requiredRole) {
+            return function(fn) {
+                return function(...args) {
+                    // 从全局获取当前用户
+                    const user = window.currentUser || { role: 'guest' };
+                    const roles = { admin: 3, editor: 2, viewer: 1, guest: 0 };
+
+                    if ((roles[user.role] || 0) < (roles[requiredRole] || 0)) {
+                        log(`[权限不足] 需要 ${requiredRole} 角色，当前为 ${user.role}`);
+                        return null;
+                    }
+
+                    log(`[授权通过] ${user.role} 可以执行 ${fn.name}`);
+                    return fn.apply(this, args);
+                };
+            };
+        }
+
+        function demoWithAuth() {
+            clearLog();
+            log('=== withAuth 权限装饰器 ===\n');
+
+            function deleteUser(id) {
+                log(`  删除用户 ${id}`);
+                return true;
+            }
+
+            function viewDashboard() {
+                log(`  查看仪表盘`);
+                return 'dashboard data';
+            }
+
+            const securedDelete = withAuth('admin')(deleteUser);
+            const securedView = withAuth('editor')(viewDashboard);
+
+            log('当前用户: guest');
+            window.currentUser = { role: 'guest' };
+            securedDelete(1);
+            securedView();
+
+            log('\n切换为 admin:');
+            window.currentUser = { role: 'admin' };
+            securedDelete(1);
+            securedView();
+        }
+
+        // ========== 4. 参数验证装饰器 ==========
+        function withValidation(schema) {
+            return function(fn) {
+                return function(...args) {
+                    const validations = Object.entries(schema);
+                    for (const [index, validator] of validations) {
+                        const idx = parseInt(index);
+                        if (!validator(args[idx])) {
+                            log(`[验证失败] 参数 ${idx} = ${JSON.stringify(args[idx])} 不符合要求`);
+                            throw new Error(`参数 ${idx} 验证失败`);
+                        }
+                    }
+                    log(`[验证通过] ${args.map(JSON.stringify).join(', ')}`);
+                    return fn.apply(this, args);
+                };
+            };
+        }
+
+        function demoWithValidation() {
+            clearLog();
+            log('=== withValidation 参数验证装饰器 ===\n');
+
+            function createUser(name, age, email) {
+                log(`  创建用户: ${name}, ${age}岁, ${email}`);
+                return { name, age, email };
+            }
+
+            const validatedCreateUser = withValidation({
+                0: v => typeof v === 'string' && v.length > 0,
+                1: v => Number.isInteger(v) && v > 0 && v < 150,
+                2: v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)
+            })(createUser);
+
+            log('有效数据:');
+            validatedCreateUser('张三', 25, 'zhang@example.com');
+
+            log('\n无效数据:');
+            try {
+                validatedCreateUser('', -5, 'invalid');
+            } catch (e) {
+                log(`  捕获错误: ${e.message}`);
+            }
+        }
+
+        // ========== 5. 类装饰器模拟（legacy 语法） ==========
+        // 模拟 @decorator 语法（ES 提案）
+        function classDecorator(decoration) {
+            return function(target) {
+                decoration(target);
+                return target;
+            };
+        }
+
+        function methodDecorator(decoration) {
+            return function(target, key, descriptor) {
+                const original = descriptor.value;
+                decoration(target, key, descriptor);
+                return descriptor;
+            };
+        }
+
+        function demoClassDecorator() {
+            clearLog();
+            log('=== 类/方法装饰器模拟 ===\n');
+
+            // 类装饰器：添加静态属性
+            function withVersion(target) {
+                target.version = '1.0.0';
+                target.author = '张三';
+                log(`[类装饰器] 添加静态属性: version=${target.version}`);
+            }
+
+            // 方法装饰器：只读
+            function readonly(target, key, descriptor) {
+                descriptor.writable = false;
+                log(`[方法装饰器] ${key} 设置为只读`);
+                return descriptor;
+            }
+
+            // 方法装饰器：延迟执行
+            function delay(ms) {
+                return function(target, key, descriptor) {
+                    const original = descriptor.value;
+                    descriptor.value = function(...args) {
+                        log(`[延迟] ${key} 延迟 ${ms}ms 执行`);
+                        return new Promise(resolve => {
+                            setTimeout(() => resolve(original.apply(this, args)), ms);
+                        });
+                    };
+                    return descriptor;
+                };
+            }
+
+            // 应用装饰器（通过 Object.defineProperties 模拟）
+            class API {
+                @readonly
+                getVersion() { return '1.0.0'; }
+
+                @delay(200)
+                fetchData() {
+                    return '数据加载完成';
+                }
+            }
+
+            // 这里我们手动实现装饰器效果，因为 @ 语法需要 transpiler
+            // 手动应用类装饰器
+            withVersion(API);
+
+            // 手动应用方法装饰器
+            const proto = API.prototype;
+            const descriptors = Object.getOwnPropertyDescriptors(proto);
+
+            if (descriptors.getVersion) {
+                readonly(API.prototype, 'getVersion', Object.getOwnPropertyDescriptor(proto, 'getVersion'));
+            }
+            if (descriptors.fetchData) {
+                const delayDesc = delay(200)(API.prototype, 'fetchData', Object.getOwnPropertyDescriptor(proto, 'fetchData'));
+                Object.defineProperty(API.prototype, 'fetchData', delayDesc);
+            }
+
+            log(`\nAPI.version = ${API.version}`);
+            log(`API.author = ${API.author}`);
+
+            const api = new API();
+            log(`API 版本: ${api.getVersion()}`);
+
+            api.fetchData().then(result => {
+                log(`fetchData 结果: ${result}`);
+            });
+        }
+
+        // ========== 6. 装饰器链 ==========
+        function demoDecoratorChain() {
+            clearLog();
+            log('=== 装饰器链 ===\n');
+            log('多个装饰器组合:');
+
+            function compose(...decorators) {
+                return function(fn) {
+                    return decorators.reduceRight((acc, dec) => dec(acc), fn);
+                };
+            }
+
+            // 装饰器定义
+            const logging = withLogging;
+            const timing = withTimer;
+
+            function memoizing(fn) {
+                const cache = new Map();
+                return function(...args) {
+                    const key = JSON.stringify(args);
+                    if (cache.has(key)) {
+                        log(`[缓存] 命中 ${key}`);
+                        return cache.get(key);
+                    }
+                    const result = fn.apply(this, args);
+                    cache.set(key, result);
+                    log(`[缓存] 未命中 ${key} = ${result}`);
+                    return result;
+                };
+            }
+
+            // 组合装饰器
+            function fibonacci(n) {
+                if (n <= 1) return n;
+                return fibonacci(n - 1) + fibonacci(n - 2);
+            }
+
+            // 从内到外: memoizing → timing → logging
+            const enhancedFib = compose(logging, timing, memoizing)(fibonacci);
+
+            log('执行 fibonacci(10) 三次:');
+            enhancedFib(10);
+            log('\n第二次:');
+            enhancedFib(10);
+            log('\n第三次:');
+            enhancedFib(10);
+
+            log('\n装饰器链执行顺序: 先应用的装饰器在最内层');
+            log('compose(logging, timing, memoizing) → logging(timing(memoizing(fn)))');
+            log('调用时: logging → timing → memoizing → fn → memoizing → timing → logging');
+        }
+
+        log('=== 装饰器模式 演示 ===\n装饰器模式动态添加职责，不修改原始代码。函数装饰器、类装饰器、装饰器链。\n\n点击上方按钮查看不同示例。');
+    </script>
+</body>
+</html>

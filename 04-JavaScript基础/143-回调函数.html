@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>回调函数</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>回调函数</h2><p>作为参数传递给另一个函数，在特定时机被调用的函数。</p></div>
+    <div class="card">
+        <h2>什么是回调</h2>
+        <div class="code">// 函数作为参数
+function greet(name, callback) {
+    const message = `你好, ${name}!`;
+    callback(message);  // 在函数内部调用回调
+}
+
+// 使用
+greet('Alice', function(msg) {
+    console.log(msg);
+});
+
+// 用箭头函数
+greet('Bob', msg => console.log(msg));</div>
+    </div>
+    <div class="card">
+        <h2>同步回调</h2>
+        <div class="code">// 回调立即执行（同步）
+function process(arr, callback) {
+    for (let i = 0; i < arr.length; i++) {
+        callback(arr[i], i);
+    }
+}
+
+process([1, 2, 3], (item, index) => {
+    console.log(`索引${index}: ${item}`);
+});
+// 索引0: 1, 索引1: 2, 索引2: 3
+// forEach、map、filter 等都是同步回调</div>
+    </div>
+    <div class="card">
+        <h2>异步回调</h2>
+        <div class="code">// 回调不立即执行，在将来某个时间点执行
+console.log('开始');
+
+setTimeout(function() {
+    console.log('2秒后执行（异步回调）');
+}, 2000);
+
+console.log('结束');
+
+// 输出顺序：
+// 开始
+// 结束
+// 2秒后执行（异步回调）
+
+// 其他异步回调例子：
+// - 按钮点击事件
+// - AJAX 请求完成
+// - 文件读取完成</div>
+    </div>
+    <div class="card">
+        <h2>回调地狱</h2>
+        <div class="code">// 多层嵌套的回调导致可读性差
+// 称为"回调地狱"（Callback Hell）
+getUser(id, function(user) {
+    getPosts(user.id, function(posts) {
+        getComments(posts[0].id, function(comments) {
+            getReplies(comments[0].id, function(replies) {
+                console.log(replies);  // 嵌套太深了！
+            });
+        });
+    });
+});
+
+// 解决方式：
+// 1. 命名函数代替匿名函数
+// 2. Promise
+// 3. async/await</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== 同步回调 ===');
+        function each(arr, callback) {
+            for (let i = 0; i < arr.length; i++) {
+                callback(arr[i], i);
+            }
+        }
+
+        each(['苹果', '香蕉', '橘子'], (item, i) => {
+            console.log(`[${i}] ${item}`);
+        });
+
+        console.log('=== 异步回调 ===');
+        console.log('开始计时...');
+        setTimeout(() => {
+            console.log('⏰ 1秒后执行的回调');
+        }, 1000);
+        console.log('计时器已设置（不会阻塞）');
+
+        console.log('=== 回调用于错误处理 ===');
+        function divide(a, b, onSuccess, onError) {
+            if (b === 0) {
+                onError('除数不能为0');
+            } else {
+                onSuccess(a / b);
+            }
+        }
+
+        divide(10, 2, result => {
+            console.log('成功:', result);
+        }, error => {
+            console.log('失败:', error);
+        });
+
+        divide(10, 0, result => {
+            console.log('成功:', result);
+        }, error => {
+            console.log('失败:', error);
+        });
+
+        document.getElementById('output').textContent =
+            `同步回调: each遍历数组\n` +
+            `异步回调: setTimeout\n` +
+            `错误优先回调: divide(10,2)成功, divide(10,0)失败\n` +
+            `✅ 回调函数演示完成！`;
+    </script>
+</body>
+</html>

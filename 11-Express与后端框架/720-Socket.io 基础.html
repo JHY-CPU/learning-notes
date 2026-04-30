@@ -1,0 +1,331 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.io 基础</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔌 Socket.io 基础</h2><p>WebSocket 协议 vs HTTP、Socket.io 安装与建立连接、emit/on 事件收发、命名空间 (namespace)、房间 (room)、广播、连接生命周期、断开重连。</p></div>
+    <div class="card">
+        <h2>WebSocket 与 Socket.io</h2>
+        <div class="code">// ========== WebSocket ==========
+// 全双工通信协议 (HTTP 升级)
+// 服务器可主动推送消息到客户端
+
+// HTTP: 请求-响应 (客户端发起)
+// WebSocket: 双向实时 (任一方发起)
+
+// ========== Socket.io ==========
+// WebSocket 的封装库
+// 提供: 自动重连、房间、命名空间、事件、回退
+
+// ========== 安装 ==========
+npm install socket.io socket.io-client
+
+// ========== 建立连接 (服务端) ==========
+const http = require('http');
+const express = require('express');
+const { Server } = require('socket.io');
+
+const app = express();
+const server = http.createServer(app);
+const io = new Server(server, {
+    cors: {
+        origin: 'http://localhost:5173',
+        methods: ['GET', 'POST'],
+        credentials: true,
+    },
+});
+
+// ========== 连接事件 ==========
+io.on('connection', (socket) => {
+    console.log('Client connected:', socket.id);
+
+    // 监听客户端消息
+    socket.on('chat message', (msg) => {
+        console.log('Received:', msg);
+
+        // 广播给所有客户端
+        io.emit('chat message', msg);
+    });
+
+    // 断开连接
+    socket.on('disconnect', (reason) => {
+        console.log('Client disconnected:', socket.id, reason);
+    });
+});
+
+// 启动:
+server.listen(3000, () => {
+    console.log('Server + Socket.io running on port 3000');
+});</div>
+    </div>
+    <div class="card">
+        <h2>客户端连接</h2>
+        <div class="code">// ========== 客户端 (浏览器) ==========
+// 使用 socket.io-client 或 CDN
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+    // ========== 建立连接 ==========
+    const socket = io('http://localhost:3000', {
+        // 配置选项
+        transports: ['websocket'],   // 只使用 WebSocket
+        auth: {
+            token: 'jwt-token-here'  // 认证
+        },
+        query: {
+            userId: '123'
+        },
+        reconnection: true,          // 自动重连
+        reconnectionAttempts: 10,    // 重连次数
+        reconnectionDelay: 1000,     // 初始延迟
+        reconnectionDelayMax: 5000,  // 最大延迟
+        timeout: 20000,              // 连接超时
+    });
+
+    // ========== 连接事件 ==========
+    socket.on('connect', () => {
+        console.log('Connected:', socket.id);
+    });
+
+    socket.on('disconnect', (reason) => {
+        console.log('Disconnected:', reason);
+        if (reason === 'io server disconnect') {
+            // 服务器断开, 需要手动重连
+            socket.connect();
+        }
+    });
+
+    socket.on('connect_error', (err) => {
+        console.error('Connection error:', err.message);
+    });
+
+    // ========== 发送消息 ==========
+    socket.emit('chat message', 'Hello!');
+
+    // 发送带回调 (确认收到)
+    socket.emit('create-room', { name: 'general' }, (response) => {
+        console.log('Server ack:', response);
+    });
+
+    // ========== 接收消息 ==========
+    socket.on('chat message', (msg) => {
+        console.log('New message:', msg);
+    });
+
+    // ========== 主动断开 ==========
+    // socket.disconnect();
+</script>
+
+// ========== Node.js 客户端 ==========
+const { io } = require('socket.io-client');
+const socket = io('http://localhost:3000');
+socket.on('connect', () => console.log('Connected'));</div>
+    </div>
+    <div class="card">
+        <h2>事件与消息</h2>
+        <div class="code">// ========== 事件系统 ==========
+// Socket.io 基于事件通信
+
+// ========== 服务端 ==========
+io.on('connection', (socket) => {
+    // 发送消息到客户端
+    socket.emit('hello', { msg: 'Welcome!' });
+
+    // 发送带确认
+    socket.emit('question', 'what is your name?', (answer) => {
+        console.log('Client answered:', answer);
+    });
+
+    // 监听消息
+    socket.on('message', (data) => {
+        console.log('Message:', data);
+    });
+
+    // 监听带确认
+    socket.on('join', (room, callback) => {
+        socket.join(room);
+        callback({ status: 'ok' });
+    });
+
+    // 一次性监听
+    socket.once('init', (data) => {
+        console.log('Init data:', data);
+    });
+
+    // 移除监听
+    // socket.off('message');
+});
+
+// ========== 广播 ==========
+// 向所有客户端发送 (包括发送者)
+io.emit('global notification', 'Server maintenance soon');
+
+// 向所有客户端发送 (不包括发送者)
+socket.broadcast.emit('user joined', { userId: socket.id });
+
+// 向房间内所有人 (包括发送者)
+io.to('room1').emit('room message', 'Hello room!');
+
+// 向房间内所有人 (不包括发送者)
+socket.to('room1').emit('room message', 'Hello room!');
+
+// 向多个房间
+io.to('room1').to('room2').emit('multi room', 'data');
+
+// ========== 命名空间 ==========
+// 默认命名空间: /
+// 自定义命名空间: /chat, /admin
+
+const chatNamespace = io.of('/chat');
+chatNamespace.on('connection', (socket) => {
+    socket.on('message', (msg) => {
+        chatNamespace.emit('message', msg);
+    });
+});
+
+const adminNamespace = io.of('/admin');
+adminNamespace.use((socket, next) => {
+    // 认证中间件
+    const token = socket.handshake.auth.token;
+    if (token !== 'admin-token') {
+        return next(new Error('Not authorized'));
+    }
+    next();
+});</div>
+    </div>
+    <div class="card">
+        <h2>房间管理</h2>
+        <div class="code">// ========== 房间 (Room) ==========
+// 逻辑分组, 同一房间内可广播
+
+io.on('connection', (socket) => {
+    console.log(`User ${socket.id} connected`);
+
+    // ========== 加入房间 ==========
+    socket.on('join-room', (roomId, callback) => {
+        socket.join(roomId);
+        console.log(`${socket.id} joined room ${roomId}`);
+
+        // 通知房间其他人
+        socket.to(roomId).emit('user-joined', {
+            userId: socket.id,
+            roomId,
+        });
+
+        // 给客户端确认
+        if (callback) callback({ success: true });
+    });
+
+    // ========== 离开房间 ==========
+    socket.on('leave-room', (roomId) => {
+        socket.leave(roomId);
+        socket.to(roomId).emit('user-left', {
+            userId: socket.id,
+        });
+    });
+
+    // ========== 房间内消息 ==========
+    socket.on('room-message', ({ roomId, message }) => {
+        io.to(roomId).emit('new-message', {
+            userId: socket.id,
+            message,
+            timestamp: Date.now(),
+        });
+    });
+
+    // ========== 断开时自动离开 ==========
+    socket.on('disconnect', () => {
+        // 可以获取 socket.rooms 知道他在哪些房间
+        socket.rooms.forEach(room => {
+            if (room !== socket.id) {
+                socket.to(room).emit('user-disconnected', {
+                    userId: socket.id,
+                });
+            }
+        });
+    });
+});
+
+// ========== 房间管理 API ==========
+// 获取房间内成员数:
+io.sockets.adapter.rooms.get('room1')?.size
+// 获取 socket 在哪些房间:
+socket.rooms  // Set { socket.id, 'room1', 'room2' }
+// 获取所有房间:
+io.sockets.adapter.rooms  // Map { roomId => Set { socketId } }</div>
+        <div class="note">💡 Socket.io 要点: 基于 WebSocket 全双工通信; emit/on 事件驱动; 房间 (room) 逻辑分组; 命名空间 (namespace) 隔离不同功能; broadcast 排除发送者; 自动重连; 回调确认; cors 配置跨域; 断开时清理房间。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoWS()">WebSocket 概念</button>
+        <button onclick="demoEvent()">事件收发</button>
+        <button onclick="demoRoom()">房间管理</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoWS() {
+            result.innerHTML = '';
+            log('# WebSocket vs HTTP');
+            log('');
+            log('HTTP: 请求-响应 (客户端发起)');
+            log('WebSocket: 双向实时 (任一方)');
+            log('');
+            log('Socket.io 封装:');
+            log('- 自动重连');
+            log('- 房间/命名空间');
+            log('- 事件驱动');
+            log('- 回调确认');
+            log('- 降级轮询');
+        }
+
+        function demoEvent() {
+            result.innerHTML = '';
+            log('# 事件收发');
+            log('');
+            log('// 服务端:');
+            log('socket.on("message", (data) => {});');
+            log('socket.emit("response", { ok: true });');
+            log('');
+            log('// 客户端:');
+            log('socket.emit("message", "Hello");');
+            log('socket.on("response", (data) => {});');
+            log('');
+            log('// 广播:');
+            log('io.emit("all");         // 所有人');
+            log('socket.broadcast.emit(); // 除自己');
+            log('io.to("room").emit();   // 房间');
+        }
+
+        function demoRoom() {
+            result.innerHTML = '';
+            log('# 房间管理');
+            log('');
+            log('socket.join("room1");     // 加入');
+            log('socket.leave("room1");    // 离开');
+            log('');
+            log('io.to("room1").emit();     // 房间内');
+            log('socket.to("room1").emit(); // 房间内(除自己)');
+            log('');
+            log('io.sockets.adapter.rooms  // 所有房间');
+            log('socket.rooms             // 所在房间');
+        }
+    </script>
+</body>
+</html>

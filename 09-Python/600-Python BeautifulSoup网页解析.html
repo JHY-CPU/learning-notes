@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python BeautifulSoup网页解析</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔍 BeautifulSoup 网页解析</h2><p>BeautifulSoup 解析器、find/find_all 选择器、CSS 选择器 select、导航 DOM 树、数据提取实战。</p></div>
+    <div class="card">
+        <h2>BeautifulSoup 基础</h2>
+        <div class="code">// ========== 安装与基本使用 ==========
+# pip install beautifulsoup4 lxml
+
+from bs4 import BeautifulSoup
+
+# HTML 示例
+html = """
+<html>
+<head><title>测试页面</title></head>
+<body>
+    <h1 id="main-title">Hello World</h1>
+    <p class="content">第一段文字</p>
+    <p class="content">第二段文字</p>
+    <a href="https://example.com/1">链接1</a>
+    <a href="https://example.com/2">链接2</a>
+    <div id="footer">
+        <p>版权信息</p>
+    </div>
+</body>
+</html>
+"""
+
+# 解析 HTML
+soup = BeautifulSoup(html, "html.parser")
+# 或使用 lxml (更快):
+# soup = BeautifulSoup(html, "lxml")
+
+# 获取标签
+print(soup.title)             # <title>测试页面</title>
+print(soup.title.string)      # "测试页面"
+print(soup.title.text)        # "测试页面"
+
+print(soup.h1)                # 第一个 h1
+print(soup.h1["id"])          # "main-title"
+print(soup.h1.text)           # "Hello World"
+
+print(soup.a)                 # 第一个 a 标签
+print(soup.a["href"])         # "https://example.com/1"
+
+# prettify: 格式化输出
+print(soup.prettify())</div>
+    </div>
+    <div class="card">
+        <h2>find / find_all 选择器</h2>
+        <div class="code">// ========== 搜索方法 ==========
+from bs4 import BeautifulSoup
+
+soup = BeautifulSoup(html, "html.parser")
+
+# find_all: 查找所有匹配标签
+all_p = soup.find_all("p")
+print(len(all_p))             # 2
+for p in all_p:
+    print(p.text)
+
+# 带 class 过滤
+content_p = soup.find_all("p", class_="content")
+print([p.text for p in content_p])
+
+# 带 id 过滤
+title = soup.find("h1", id="main-title")
+print(title.text)
+
+# 多个条件
+links = soup.find_all("a", href=True)  # 有 href 属性的 a
+for a in links:
+    print(a["href"], a.text)
+
+# 文本内容匹配
+import re
+p_with_文 = soup.find_all("p", string=re.compile("文"))
+print([p.text for p in p_with_文])
+
+# limit 限制数量
+first_two = soup.find_all("a", limit=2)
+
+# ========== find (单个) ==========
+first_p = soup.find("p")
+print(first_p.text)
+
+# 不存在的返回 None
+not_found = soup.find("nonexistent")
+print(not_found)  # None
+
+# ========== find_parent / find_next_sibling ==========
+first_a = soup.find("a")
+parent = first_a.find_parent("div")
+print(parent)  # 父 div
+
+next_p = first_a.find_next_sibling("p")
+print(next_p)  # 下一个 p 兄弟</div>
+    </div>
+    <div class="card">
+        <h2>CSS 选择器 (select)</h2>
+        <div class="code">// ========== CSS 选择器 ==========
+from bs4 import BeautifulSoup
+
+soup = BeautifulSoup(html, "html.parser")
+
+# select: 使用 CSS 选择器语法 (返回列表)
+# select_one: 返回单个元素
+
+# 标签选择器
+soup.select("p")              # 所有 p
+soup.select("a")              # 所有 a
+
+# 类选择器
+soup.select(".content")       # class="content"
+
+# ID 选择器
+soup.select("#main-title")    # id="main-title"
+soup.select("#footer")
+
+# 属性选择器
+soup.select("a[href]")        # 有 href 的 a
+soup.select('a[href*="example"]')  # href 包含 "example"
+soup.select('a[href^="https"]')    # href 以 https 开头
+soup.select('a[href$=".pdf"]')     # href 以 .pdf 结尾
+
+# 层级选择器
+soup.select("div p")          # div 内的 p
+soup.select("div > p")        # div 的直接子元素 p
+soup.select("h1 + p")         # h1 紧邻的下一个 p
+
+# 组合选择器
+soup.select("p.content")      # p 且 class="content"
+soup.select("h1, p")          # 所有 h1 和 p
+
+# select_one: 单个元素
+first_link = soup.select_one("a")
+print(first_link["href"])</div>
+    </div>
+    <div class="card">
+        <h2>导航 DOM 树</h2>
+        <div class="code">// ========== DOM 导航 ==========
+from bs4 import BeautifulSoup
+
+html_nested = """
+<div id="main">
+    <ul class="list">
+        <li>项目1</li>
+        <li>项目2</li>
+        <li>项目3</li>
+    </ul>
+    <div class="extra">
+        <p>额外内容</p>
+    </div>
+</div>
+"""
+soup = BeautifulSoup(html_nested, "html.parser")
+ul = soup.find("ul")
+
+# 子元素
+print(ul.contents)      # 子节点列表 (包括文本)
+print(list(ul.children))  # 迭代器版本
+
+# 子孙元素
+print(list(ul.descendants))  # 所有后代
+
+# 父元素
+print(ul.parent)           # 直接父元素
+print(ul.parents)          # 所有祖先 (生成器)
+
+# 兄弟元素
+li = ul.find("li")
+print(li.next_sibling)      # 下一个兄弟 (包含文本节点)
+print(li.previous_sibling)  # 上一个兄弟
+print(li.next_element)      # 下一个元素 (深度优先)
+print(li.previous_element)  # 上一个元素
+
+# find_next / find_previous
+print(li.find_next("li"))        # 下一个 li
+print(li.find_next("div"))       # 下一个 div
+print(li.find_previous("ul"))    # 上一个 ul
+
+# find_all_next / find_all_previous
+print(li.find_all_next("li"))    # 之后所有的 li</div>
+    </div>
+    <div class="card">
+        <h2>数据提取实战</h2>
+        <div class="code">// ========== 提取链接和图片 ==========
+from bs4 import BeautifulSoup
+import requests
+
+def extract_links(url):
+    """提取页面中所有链接"""
+    resp = requests.get(url, timeout=10)
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    links = []
+    for a in soup.find_all("a", href=True):
+        links.append({
+            "text": a.text.strip(),
+            "href": a["href"],
+        })
+    return links
+
+def extract_images(url):
+    """提取页面中所有图片"""
+    resp = requests.get(url, timeout=10)
+    soup = BeautifulSoup(resp.text, "html.parser")
+
+    images = []
+    for img in soup.find_all("img"):
+        images.append({
+            "src": img.get("src"),
+            "alt": img.get("alt", ""),
+            "width": img.get("width"),
+            "height": img.get("height"),
+        })
+    return images
+
+# ========== 提取表格数据 ==========
+html_table = """
+<table>
+    <thead>
+        <tr><th>姓名</th><th>年龄</th><th>城市</th></tr>
+    </thead>
+    <tbody>
+        <tr><td>Alice</td><td>25</td><td>北京</td></tr>
+        <tr><td>Bob</td><td>30</td><td>上海</td></tr>
+        <tr><td>Charlie</td><td>35</td><td>广州</td></tr>
+    </tbody>
+</table>
+"""
+
+soup = BeautifulSoup(html_table, "html.parser")
+
+# 提取表头
+headers = [th.text for th in soup.find_all("th")]
+print("表头:", headers)
+
+# 提取数据行
+rows = []
+for tr in soup.find_all("tr")[1:]:  # 跳过表头
+    cells = [td.text for td in tr.find_all("td")]
+    rows.append(dict(zip(headers, cells)))
+
+for row in rows:
+    print(row)
+
+# ========== 提取 JSON-LD ==========
+def extract_jsonld(soup):
+    """提取页面中的结构化数据"""
+    scripts = soup.find_all("script", type="application/ld+json")
+    import json
+    for script in scripts:
+        try:
+            data = json.loads(script.string)
+            print(data)
+        except (json.JSONDecodeError, TypeError):
+            pass</div>
+    </div>
+    <div class="card">
+        <h2>完整示例: 爬取新闻标题</h2>
+        <div class="code">// ========== 新闻爬虫 ==========
+import requests
+from bs4 import BeautifulSoup
+from dataclasses import dataclass
+from typing import List
+import re
+
+@dataclass
+class Article:
+    title: str
+    url: str
+    summary: str = ""
+
+class NewsScraper:
+    """简单新闻爬虫"""
+
+    def __init__(self, base_url):
+        self.base_url = base_url
+        self.session = requests.Session()
+        self.session.headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+        })
+
+    def fetch_articles(self, url: str = None) -> List[Article]:
+        if url is None:
+            url = self.base_url
+
+        resp = self.session.get(url, timeout=10)
+        resp.raise_for_status()
+
+        soup = BeautifulSoup(resp.text, "html.parser")
+        articles = []
+
+        # 常见的文章链接模式
+        for a_tag in soup.find_all("a", href=True):
+            href = a_tag["href"]
+            text = a_tag.text.strip()
+
+            # 过滤: 至少有 10 个字符,看起来像文章标题
+            if len(text) < 10:
+                continue
+
+            # 补全相对 URL
+            if href.startswith("/"):
+                href = self.base_url.rstrip("/") + href
+
+            # 跳过非 HTTP 链接
+            if not href.startswith("http"):
+                continue
+
+            articles.append(Article(title=text, url=href))
+
+        return articles
+
+    def close(self):
+        self.session.close()
+
+# 使用示例
+scraper = NewsScraper("https://httpbin.org")
+try:
+    articles = scraper.fetch_articles()
+    print(f"找到 {len(articles)} 个链接")
+    for a in articles[:5]:
+        print(f"  {a.title[:50]:50} {a.url}")
+finally:
+    scraper.close()</div>
+        <div class="note">💡 BeautifulSoup: find_all/find 按标签名/属性搜索; select 使用 CSS 选择器; .contents/.children/.parent 导航; 结合 requests/httpx 实现爬虫。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoFind()">find_all 演示</button>
+        <button onclick="demoSelect()">CSS 选择器演示</button>
+        <button onclick="demoTable()">表格提取演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoFind() {
+            result.innerHTML = '';
+            log('# find_all / find');
+            log('');
+            log('from bs4 import BeautifulSoup');
+            log('soup = BeautifulSoup(html, "html.parser")');
+            log('');
+            log('soup.find_all("p")');
+            log('soup.find_all("p", class_="content")');
+            log('soup.find(id="main-title")');
+            log('soup.find_all("a", href=True)');
+            log('soup.find("div", string=re.compile("版权"))');
+        }
+
+        function demoSelect() {
+            result.innerHTML = '';
+            log('# CSS 选择器 select');
+            log('');
+            log('soup.select("p")         # 标签');
+            log('soup.select(".content")  # 类');
+            log('soup.select("#footer")   # ID');
+            log('soup.select("div p")     # 后代');
+            log('soup.select("div > p")   # 子元素');
+            log('soup.select("a[href]")   # 属性');
+            log('soup.select_one("h1")    # 单个');
+        }
+
+        function demoTable() {
+            result.innerHTML = '';
+            log('# 表格数据提取');
+            log('');
+            log('headers = [th.text for th in soup.find_all("th")]');
+            log('rows = []');
+            log('for tr in soup.find_all("tr")[1:]:');
+            log('    cells = [td.text for td in tr.find_all("td")]');
+            log('    rows.append(dict(zip(headers, cells)))');
+            log('');
+            log('适合: 股票/天气/统计表格');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实战-进度条</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; max-width: 500px; margin: 0 auto; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        /* 通用进度条样式 */
+        .progress-section { margin-bottom: 20px; }
+        .progress-label { display: flex; justify-content: space-between; font-size: 13px; color: #666; margin-bottom: 4px; }
+        .progress-bar { width: 100%; height: 20px; background: #e0e0e0; border-radius: 10px; overflow: hidden; position: relative; }
+        .progress-bar .fill { height: 100%; border-radius: 10px; transition: width 0.3s ease; position: relative; }
+        .progress-bar .fill.blue { background: linear-gradient(90deg, #3498db, #2980b9); }
+        .progress-bar .fill.green { background: linear-gradient(90deg, #2ecc71, #27ae60); }
+        .progress-bar .fill.orange { background: linear-gradient(90deg, #f39c12, #e67e22); }
+        .progress-bar .fill.red { background: linear-gradient(90deg, #e74c3c, #c0392b); }
+        .progress-bar .fill.purple { background: linear-gradient(90deg, #9b59b6, #8e44ad); }
+        .progress-bar .fill.striped { background-image: linear-gradient(45deg, rgba(255,255,255,0.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,0.15) 50%, rgba(255,255,255,0.15) 75%, transparent 75%, transparent); background-size: 20px 20px; }
+        .progress-bar .fill.animated { animation: progressStripe 1s linear infinite; }
+        @keyframes progressStripe { from { background-position: 0 0; } to { background-position: 40px 0; } }
+        .progress-bar .fill-text { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 11px; color: white; font-weight: bold; text-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+        /* 环形进度条 */
+        .ring-progress { display: inline-flex; flex-direction: column; align-items: center; margin: 0 12px; }
+        .ring-progress svg { transform: rotate(-90deg); }
+        .ring-progress .bg { fill: none; stroke: #e0e0e0; stroke-width: 6; }
+        .ring-progress .fg { fill: none; stroke-width: 6; stroke-linecap: round; transition: stroke-dashoffset 0.5s ease; }
+        .ring-progress .ring-value { font-size: 14px; font-weight: bold; color: #2c3e50; margin-top: 4px; }
+        .ring-progress .ring-label { font-size: 11px; color: #95a5a6; }
+        .rings-container { display: flex; justify-content: center; gap: 16px; padding: 10px 0; }
+        /* 滚动进度条 (fixed 在顶部) */
+        .scroll-progress-wrap { position: fixed; top: 0; left: 0; width: 100%; height: 3px; z-index: 9999; }
+        .scroll-progress-wrap .fill { height: 100%; background: linear-gradient(90deg, #3498db, #2ecc71); transition: width 0.1s linear; }
+        /* 控制按钮 */
+        .controls { display: flex; gap: 8px; margin: 8px 0; flex-wrap: wrap; }
+        .controls button { padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
+        .controls button.primary { background: #3498db; color: white; }
+        .controls button.primary:hover { opacity: 0.9; }
+        .controls button.danger { background: #e74c3c; color: white; }
+        .controls button.secondary { background: #95a5a6; color: white; }
+        .controls button:disabled { opacity: 0.4; cursor: not-allowed; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <!-- 滚动进度条 -->
+    <div class="scroll-progress-wrap"><div class="fill" id="scrollFill" style="width:0%"></div></div>
+
+    <div class="card">
+        <h2>📊 进度条</h2>
+        <p style="color:#7f8c8d;font-size:13px;">上传/滚动/定时/环形进度条、动画过渡、条纹效果。</p>
+
+        <!-- 上传进度 -->
+        <div class="progress-section">
+            <div class="progress-label">
+                <span>⬆️ 上传进度</span>
+                <span id="uploadPercent">0%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="fill blue" id="uploadFill" style="width:0%"></div>
+            </div>
+            <div class="controls">
+                <button class="primary" onclick="startUpload()" id="uploadBtn">▶ 模拟上传</button>
+                <button class="danger" onclick="resetUpload()">↺ 重置</button>
+            </div>
+        </div>
+
+        <!-- 定时进度 -->
+        <div class="progress-section">
+            <div class="progress-label">
+                <span>⏱️ 定时进度 (5 秒)</span>
+                <span id="timerPercent">0%</span>
+            </div>
+            <div class="progress-bar">
+                <div class="fill orange striped animated" id="timerFill" style="width:0%"></div>
+            </div>
+            <div class="controls">
+                <button class="primary" onclick="startTimer()" id="timerBtn">▶ 开始</button>
+                <button class="secondary" onclick="resetTimer()">↺ 重置</button>
+            </div>
+        </div>
+
+        <!-- 环形进度条 -->
+        <div class="progress-section">
+            <div class="progress-label"><span>🔵 环形进度</span></div>
+            <div class="rings-container">
+                <div class="ring-progress">
+                    <svg width="70" height="70" viewBox="0 0 70 70">
+                        <circle class="bg" cx="35" cy="35" r="28"/>
+                        <circle class="fg" id="ring1" cx="35" cy="35" r="28" stroke="#3498db" stroke-dasharray="175.93" stroke-dashoffset="175.93"/>
+                    </svg>
+                    <span class="ring-value" id="ring1Val">0%</span>
+                    <span class="ring-label">内存</span>
+                </div>
+                <div class="ring-progress">
+                    <svg width="70" height="70" viewBox="0 0 70 70">
+                        <circle class="bg" cx="35" cy="35" r="28"/>
+                        <circle class="fg" id="ring2" cx="35" cy="35" r="28" stroke="#2ecc71" stroke-dasharray="175.93" stroke-dashoffset="175.93"/>
+                    </svg>
+                    <span class="ring-value" id="ring2Val">0%</span>
+                    <span class="ring-label">CPU</span>
+                </div>
+                <div class="ring-progress">
+                    <svg width="70" height="70" viewBox="0 0 70 70">
+                        <circle class="bg" cx="35" cy="35" r="28"/>
+                        <circle class="fg" id="ring3" cx="35" cy="35" r="28" stroke="#f39c12" stroke-dasharray="175.93" stroke-dashoffset="175.93"/>
+                    </svg>
+                    <span class="ring-value" id="ring3Val">0%</span>
+                    <span class="ring-label">磁盘</span>
+                </div>
+            </div>
+            <div class="controls" style="justify-content:center;">
+                <button class="primary" onclick="startRings()">▶ 模拟系统负载</button>
+                <button class="danger" onclick="resetRings()">↺ 重置</button>
+            </div>
+        </div>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('📊 进度条演示:');
+        log('');
+
+        // ========== 上传进度 ==========
+        let uploadTimer = null;
+        let uploadProgress = 0;
+
+        function startUpload() {
+            if (uploadTimer) return;
+            document.getElementById('uploadBtn').disabled = true;
+            uploadProgress = 0;
+            uploadTimer = setInterval(() => {
+                const increment = Math.random() * 8 + 2;
+                uploadProgress = Math.min(100, uploadProgress + increment);
+                updateUploadBar(uploadProgress);
+                if (uploadProgress >= 100) {
+                    clearInterval(uploadTimer);
+                    uploadTimer = null;
+                    document.getElementById('uploadBtn').disabled = false;
+                    log('✅ 上传完成');
+                }
+            }, 200);
+            log('⬆️ 开始上传');
+        }
+
+        function updateUploadBar(val) {
+            document.getElementById('uploadFill').style.width = val + '%';
+            document.getElementById('uploadPercent').textContent = Math.round(val) + '%';
+            if (val < 30) document.getElementById('uploadFill').className = 'fill blue';
+            else if (val < 70) document.getElementById('uploadFill').className = 'fill orange';
+            else document.getElementById('uploadFill').className = 'fill green';
+        }
+
+        function resetUpload() {
+            clearInterval(uploadTimer);
+            uploadTimer = null;
+            uploadProgress = 0;
+            updateUploadBar(0);
+            document.getElementById('uploadBtn').disabled = false;
+            log('↺ 上传重置');
+        }
+
+        // ========== 定时进度 ==========
+        let timerInterval = null;
+        let timerProgress = 0;
+
+        function startTimer() {
+            if (timerInterval) return;
+            document.getElementById('timerBtn').disabled = true;
+            timerProgress = 0;
+            const startTime = Date.now();
+            const duration = 5000;
+            timerInterval = setInterval(() => {
+                const elapsed = Date.now() - startTime;
+                timerProgress = Math.min(100, (elapsed / duration) * 100);
+                document.getElementById('timerFill').style.width = timerProgress + '%';
+                document.getElementById('timerPercent').textContent = Math.round(timerProgress) + '%';
+                if (timerProgress >= 100) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                    document.getElementById('timerBtn').disabled = false;
+                    log('⏱️ 定时完成');
+                }
+            }, 50);
+            log('⏱️ 定时开始 (5 秒)');
+        }
+
+        function resetTimer() {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            timerProgress = 0;
+            document.getElementById('timerFill').style.width = '0%';
+            document.getElementById('timerPercent').textContent = '0%';
+            document.getElementById('timerBtn').disabled = false;
+        }
+
+        // ========== 环形进度 ==========
+        const circumference = 2 * Math.PI * 28; // ~175.93
+        let ringInterval = null;
+
+        function setRing(id, valId, percent) {
+            const offset = circumference * (1 - percent / 100);
+            document.getElementById(id).style.strokeDashoffset = offset;
+            document.getElementById(valId).textContent = Math.round(percent) + '%';
+        }
+
+        function startRings() {
+            if (ringInterval) return;
+            ringInterval = setInterval(() => {
+                setRing('ring1', 'ring1Val', Math.random() * 100);
+                setRing('ring2', 'ring2Val', Math.random() * 100);
+                setRing('ring3', 'ring3Val', Math.random() * 100);
+            }, 1500);
+            log('🔄 模拟系统负载开始');
+        }
+
+        function resetRings() {
+            clearInterval(ringInterval);
+            ringInterval = null;
+            setRing('ring1', 'ring1Val', 0);
+            setRing('ring2', 'ring2Val', 0);
+            setRing('ring3', 'ring3Val', 0);
+            log('↺ 环形进度重置');
+        }
+
+        // ========== 滚动进度 ==========
+        window.addEventListener('scroll', () => {
+            const scrollTop = window.scrollY;
+            const docHeight = document.documentElement.scrollHeight - window.innerHeight;
+            const progress = docHeight > 0 ? (scrollTop / docHeight) * 100 : 0;
+            document.getElementById('scrollFill').style.width = progress + '%';
+        }, { passive: true });
+
+        log('✅ 进度条就绪 (支持滚动进度)');
+    </script>
+</body>
+</html>

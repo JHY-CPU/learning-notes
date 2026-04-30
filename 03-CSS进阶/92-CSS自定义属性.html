@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CSS自定义属性</title>
+    <style>
+        /* === CSS自定义属性（CSS变量）=== */
+        /* 定义方式：--变量名: 值; */
+        /* 读取方式：var(--变量名) */
+        /* var()第二个参数是回退值 */
+
+        /* 在根元素定义全局变量 */
+        :root {
+            --primary-color: #3498db;
+            --secondary-color: #2ecc71;
+            --text-color: #333;
+            --border-radius: 8px;
+            --font-size: 16px;
+            /* --spacing: 20px;  /* 这个变量下面会用到 */
+        }
+
+        body {
+            font-family: sans-serif;
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .card {
+            background: white;
+            /* var(--primary-color) 读取CSS变量 */
+            border-left: 4px solid var(--primary-color);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .card h2 {
+            /* 也可以在任意选择器中定义局部变量 */
+            --heading-color: #2c3e50;
+            color: var(--heading-color);
+            margin: 0 0 10px 0;
+        }
+
+        /* 变量可以参与calc计算 */
+        .card p {
+            font-size: var(--font-size);
+            line-height: calc(var(--font-size) * 1.5);
+            margin: 0;
+            color: var(--text-color);
+        }
+
+        /* 主题切换演示 - 通过修改变量值改变主题 */
+        .theme-dark {
+            --primary-color: #e74c3c;
+            --text-color: #ecf0f1;
+            background: #2c3e50;
+            color: var(--text-color);
+        }
+
+        .theme-dark .card {
+            background: #34495e;
+            color: var(--text-color);
+        }
+
+        .theme-dark .card h2 {
+            --heading-color: #ecf0f1;
+            color: var(--heading-color);
+        }
+
+        /* var() 带回退值 */
+        .fallback-example {
+            /* --spacing 变量在上面已经注释掉了，所以使用回退值 10px */
+            padding: var(--spacing, 10px);
+            background: #ecf0f1;
+            border-radius: 4px;
+        }
+
+        /* 变量的继承性：子元素继承父元素的变量值 */
+        .parent {
+            --highlight: #f1c40f;
+            padding: 10px;
+        }
+        .child {
+            background: var(--highlight);
+            padding: 10px;
+            margin: 5px 0;
+        }
+
+        /* @media 中修改变量实现响应式 */
+        @media (max-width: 600px) {
+            :root {
+                --font-size: 14px;
+                --border-radius: 4px;
+            }
+            body {
+                padding: 10px;
+            }
+        }
+        /* === 注意事项 === */
+        /* 1. 变量名大小写敏感：--color 和 --Color 是两个变量 */
+        /* 2. 变量可以存储任何CSS值：颜色、尺寸、数字、字符串 */
+        /* 3. var()不能用于选择器或属性名，只能用于属性值 */
+        /* 4. 可以在JavaScript中通过 element.style.setProperty('--name', value) 修改变量 */
+
+        .demo-box {
+            display: flex;
+            gap: var(--spacing, 10px);
+            margin-top: 10px;
+        }
+        .demo-box div {
+            width: 60px;
+            height: 60px;
+            background: var(--primary-color);
+            border-radius: var(--border-radius);
+        }
+
+        /* JS交互指示 */
+        .js-hint {
+            color: #7f8c8d;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>CSS自定义属性（CSS变量）</h2>
+        <p>使用 <code>--变量名</code> 定义，<code>var(--变量名)</code> 读取。</p>
+        <div class="demo-box">
+            <div></div>
+            <div></div>
+            <div></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>var() 回退值</h2>
+        <div class="fallback-example">
+            <code>padding: var(--spacing, 10px);</code><br>
+            当 --spacing 未定义时，使用回退值 10px
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>变量继承</h2>
+        <div class="parent">
+            <div class="child">子元素继承父元素的 --highlight 变量</div>
+        </div>
+    </div>
+
+    <div class="card theme-dark">
+        <h2>暗色主题</h2>
+        <p>通过修改变量值实现主题切换（--primary-color / --text-color）</p>
+    </div>
+
+    <div class="card">
+        <h2>JS 动态修改变量</h2>
+        <button onclick="changePrimary()">切换主色</button>
+        <p class="js-hint">点击按钮通过JavaScript修改 --primary-color 变量</p>
+    </div>
+
+    <script>
+        function changePrimary() {
+            const root = document.documentElement;
+            const current = getComputedStyle(root).getPropertyValue('--primary-color').trim();
+            const newColor = current === '#3498db' ? '#e74c3c' : '#3498db';
+            root.style.setProperty('--primary-color', newColor);
+        }
+    </script>
+</body>
+</html>

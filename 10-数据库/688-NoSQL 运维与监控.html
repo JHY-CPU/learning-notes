@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NoSQL 运维与监控</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔧 NoSQL 运维与监控</h2><p>MongoDB 运维 (备份/监控/慢查询)、Redis 运维 (监控/内存/bigkey)、NoSQL 数据库通用运维最佳实践、云托管方案比较。</p></div>
+    <div class="card">
+        <h2>MongoDB 运维要点</h2>
+        <div class="code">// ========== MongoDB 运维 ==========
+
+// ========== 备份策略 ==========
+// 1. 从 Secondary 备份 (不影响 Primary)
+// 2. mongodump 逻辑备份 (灵活)
+// 3. 文件系统快照 (快速)
+// 4. Atlas 自动备份 (云)
+
+// 备份命令:
+mongodump --host=secondary:27017 \
+    --db=mydb --out=/backup/$(date +%Y%m%d) --gzip
+
+// 恢复:
+mongorestore --drop --gzip /backup/20241001/mydb
+
+// ========== 监控指标 ==========
+// MongoDB 关键监控指标:
+// 1. 操作延迟 (读写耗时)
+// 2. 连接数 (current/available)
+// 3. 内存使用 (WiredTiger 缓存)
+// 4. 复制延迟 (repl lag)
+// 5. 慢查询 (system.profile)
+// 6. 索引命中率
+
+// 监控命令:
+mongostat --host=localhost:27017 5  // 每 5 秒
+mongotop --host=localhost:27017 5   // 读写时间
+
+// ========== 安全配置 ==========
+// 1. 启用认证 (authorization: enabled)
+// 2. 创建应用用户 (最小权限)
+// 3. 启用 TLS/SSL
+// 4. bindIp 限制
+// 5. 审计日志 (Enterprise)
+
+// ========== 常见问题 ==========
+// WiredTiger 缓存不足 → 增大 cacheSizeGB
+// 复制延迟 → 检查 Secondary 性能/网络
+// 慢查询 → 建索引 / 优化查询
+// 磁盘空间 → 清理 / 压缩</div>
+    </div>
+    <div class="card">
+        <h2>Redis 运维要点</h2>
+        <div class="code">// ========== Redis 运维 ==========
+
+// ========== 监控指标 ==========
+// Redis 关键监控指标 (INFO):
+// 1. used_memory / maxmemory (内存使用)
+// 2. connected_clients (连接数)
+// 3. instantaneous_ops_per_sec (QPS)
+// 4. hit_rate (缓存命中率 = keyspace_hits / (keyspace_hits + keyspace_misses))
+// 5. evicted_keys (被淘汰的 key 数)
+// 6. latest_fork_usec (fork 耗时)
+// 7. repl_delay (复制延迟)
+
+// 缓存命中率计算:
+INFO stats
+keyspace_hits: 95000
+keyspace_misses: 5000
+命中率 = 95000 / (95000 + 5000) = 95%
+
+// ========== bigkey 监控 ==========
+// 定期检查 bigkey:
+redis-cli --bigkeys
+
+// 内存占用分析:
+redis-cli --stat
+// ------- output ------
+// keys  mem  clients blocked requests connections
+// 10000 2.5G 50      0     2000000  50
+
+// ========== 慢查询 ==========
+SLOWLOG GET 10
+
+// ========== 自动运维脚本 ==========
+// 1. 定期备份 RDB/AOF 到 S3
+// 2. 内存告警 (used_memory > 80%)
+// 3. 连接数告警 (> 80% maxclients)
+// 4. 慢查询日志分析
+// 5. bigkey 定期扫描
+
+// ========== Prometheus + Grafana ==========
+// redis_exporter: 导出 Redis 指标
+// Grafana dashboard: 可视化监控
+// 告警规则:
+// - 内存 > 80% → 告警
+// - 命中率 < 90% → 告警
+// - 复制延迟 > 10s → 告警
+// - QPS 突降 → 告警</div>
+    </div>
+    <div class="card">
+        <h2>通用 NoSQL 运维最佳实践</h2>
+        <div class="code">// ========== 通用运维最佳实践 ==========
+
+// ========== 1. 备份与恢复 ==========
+// ✅ 定期备份 (每日/每周)
+// ✅ 异地备份 (不同区域)
+// ✅ 定期演练恢复 (验证备份有效)
+// ✅ 多版本保留 (至少 7 天)
+
+// ========== 2. 监控与告警 ==========
+// ✅ 系统指标: CPU/内存/磁盘/网络
+// ✅ 数据库指标: QPS/延迟/连接数/命中率
+// ✅ 业务指标: 错误率/成功率
+// ✅ 告警分级: P0(紧急) / P1(重要) / P2(一般)
+
+// ========== 3. 安全 ==========
+// ✅ 网络隔离 (VPC/防火墙)
+// ✅ 认证授权 (密码/ACL)
+// ✅ 传输加密 (TLS)
+// ✅ 最小权限 (应用用户只给 CRUD)
+// ✅ 审计日志 (谁在什么时候做了什么)
+
+// ========== 4. 容量规划 ==========
+// ✅ 监控增长趋势 (数据量/连接数/QPS)
+// ✅ 设置容量告警阈值 (80%)
+// ✅ 提前规划扩容
+// ✅ 评估是否需要分片
+
+// ========== 5. 变更管理 ==========
+// ✅ 先测试环境验证
+// ✅ 灰度发布
+// ✅ 回滚方案
+// ✅ 变更窗口 (低峰期)
+
+// ========== 6. 文档 ==========
+// ✅ 架构图
+// ✅ 维护手册
+// ✅ 故障恢复 SOP
+// ✅ 联系人员</div>
+    </div>
+    <div class="card">
+        <h2>云托管方案对比</h2>
+        <div class="code">// ========== 云托管 NoSQL ==========
+
+// ========== MongoDB 云 ==========
+// MongoDB Atlas: 官方云
+//   免费层: 512MB
+//   特性: 自动备份/监控/扩缩
+//   AWS/Azure/GCP 多区域
+
+// ========== Redis 云 ==========
+// AWS ElastiCache:
+//   - Redis OSS 版
+//   - 支持集群/哨兵
+//   - 自动故障转移
+//   - 与 AWS 生态集成
+
+// Redis Cloud (Redis 官方):
+//   - 免费: 30MB
+//   - 全托管
+//   - 自动扩缩
+//   - 多区域
+
+// ========== 自建 vs 托管 ==========
+// ┌──────────┬───────────────┬────────────────┐
+// │          │ 自建           │ 云托管          │
+// ├──────────┼───────────────┼────────────────┤
+// │ 成本      │ 硬件 + 运维   │ 按需付费 (贵)   │
+// │ 运维      │ 自己管        │ 自动            │
+// │ 定制      │ 完全控制      │ 有限制          │
+// │ 可用性    │ 自己保证      │ SLA 99.9%+     │
+// │ 伸缩      │ 手动          │ 自动            │
+// ├──────────┼───────────────┼────────────────┤
+// │ 适合      │ 大规模/定制   │ 大多数项目      │
+// └──────────┴───────────────┴────────────────┘
+
+// ========== 监控工具栈推荐 ==========
+// MongoDB: mongostat + mongotop + mongodb_exporter
+// Redis: redis-cli + redis_exporter
+// 通用: Prometheus + Grafana + Alertmanager
+// 日志: ELK / Loki
+// APM: Datadog / New Relic</div>
+        <div class="note">💡 运维要点: 从 Secondary 备份不影响主; 监控缓存命中率/内存/连接数; bigkey 定期扫描; 备份要还原验证; 云托管省运维; Prometheus+Grafana 免费监控方案; 容量规划防突发。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoMongoOps()">MongoDB 运维</button>
+        <button onclick="demoRedisOps()">Redis 运维</button>
+        <button onclick="demoCloud()">云托管</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoMongoOps() {
+            result.innerHTML = '';
+            log('# MongoDB 运维');
+            log('');
+            log('备份: mongodump --gzip 从 Secondary');
+            log('监控: mongostat, mongotop');
+            log('慢查询: system.profile');
+            log('缓存: WiredTiger cacheSizeGB');
+            log('安全: 认证 + TLS + 最小权限');
+        }
+
+        function demoRedisOps() {
+            result.innerHTML = '';
+            log('# Redis 运维');
+            log('');
+            log('INFO memory/stats/replication');
+            log('--bigkeys 查找大键');
+            log('SLOWLOG GET 查慢查询');
+            log('命中率 = hits/(hits+misses)');
+            log('告警: 内存>80%, 命中率<90%');
+        }
+
+        function demoCloud() {
+            result.innerHTML = '';
+            log('# 云托管');
+            log('');
+            log('MongoDB Atlas: 免费 512MB');
+            log('AWS ElastiCache: Redis 托管');
+            log('自建: 成本低但运维多');
+            log('托管: 省心但贵');
+            log('监控: Prometheus + Grafana');
+        }
+    </script>
+</body>
+</html>

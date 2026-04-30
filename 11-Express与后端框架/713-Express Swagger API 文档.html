@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express Swagger API 文档</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📖 Express Swagger API 文档</h2><p>OpenAPI 3.0 规范、swagger-jsdoc + swagger-ui-express 集成、API 注解 (paths/components/schemas)、JSDoc 注释生成文档、请求/响应模型定义、Bearer Token 认证、API 分组与标签。</p></div>
+    <div class="card">
+        <h2>OpenAPI 与 Swagger</h2>
+        <div class="code">// ========== OpenAPI ==========
+//  REST API 的规范标准 (原名 Swagger)
+//  3.0 是目前主要版本
+
+// ========== 核心概念 ==========
+// OpenAPI 文档描述:
+// 1. API 信息 (title/version/description)
+// 2. 服务器地址 (servers)
+// 3. 路径与操作 (paths + methods)
+// 4. 请求/响应模型 (components/schemas)
+// 5. 安全方案 (securitySchemes)
+// 6. 标签分组 (tags)
+
+// ========== 安装 ==========
+npm install swagger-jsdoc swagger-ui-express
+
+// ========== 基础配置 ==========
+// swagger.js:
+const swaggerJsdoc = require('swagger-jsdoc');
+const swaggerUi = require('swagger-ui-express');
+
+const options = {
+    definition: {
+        openapi: '3.0.0',
+        info: {
+            title: 'My Express API',
+            version: '1.0.0',
+            description: 'REST API documentation',
+            contact: {
+                name: 'Developer',
+                email: 'dev@example.com',
+            },
+        },
+        servers: [
+            { url: 'http://localhost:3000', description: 'Development' },
+            { url: 'https://api.example.com', description: 'Production' },
+        ],
+        components: {
+            securitySchemes: {
+                bearerAuth: {
+                    type: 'http',
+                    scheme: 'bearer',
+                    bearerFormat: 'JWT',
+                },
+            },
+        },
+        security: [{ bearerAuth: [] }],
+    },
+    apis: ['./src/routes/*.js', './src/models/*.js'], // 扫描路径
+};
+
+const specs = swaggerJsdoc(options);
+
+module.exports = { specs, swaggerUi };</div>
+    </div>
+    <div class="card">
+        <h2>路由注解</h2>
+        <div class="code">// ========== JSDoc 注解 ==========
+// 在路由文件里用 JSDoc 注释描述 API
+
+// routes/userRoutes.js:
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     User:
+ *       type: object
+ *       required:
+ *         - name
+ *         - email
+ *       properties:
+ *         _id:
+ *           type: string
+ *           description: Auto-generated ID
+ *         name:
+ *           type: string
+ *           description: User name
+ *         email:
+ *           type: string
+ *           format: email
+ *         role:
+ *           type: string
+ *           enum: [user, admin]
+ *         createdAt:
+ *           type: string
+ *           format: date-time
+ *     Error:
+ *       type: object
+ *       properties:
+ *         success:
+ *           type: boolean
+ *         code:
+ *           type: string
+ *         message:
+ *           type: string
+ *         requestId:
+ *           type: string
+ */
+
+/**
+ * @swagger
+ * /api/users:
+ *   get:
+ *     summary: Get user list
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *         description: Sort field (prefix - for desc)
+ *       - in: query
+ *         name: role
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User list
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/User'
+ *                 pagination:
+ *                   $ref: '#/components/schemas/Pagination'
+ */
+router.get('/', authenticate, userController.list);</div>
+    </div>
+    <div class="card">
+        <h2>CRUD 完整注解</h2>
+        <div class="code">// ========== CRUD 注解 ==========
+
+/**
+ * @swagger
+ * /api/users/{id}:
+ *   get:
+ *     summary: Get user by ID
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: User details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 data:
+ *                   $ref: '#/components/schemas/User'
+ *       404:
+ *         description: User not found
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Error'
+ */
+router.get('/:id', authenticate, userController.getById);
+
+/**
+ * @swagger
+ * /api/users:
+ *   post:
+ *     summary: Create a new user
+ *     tags: [Users]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - email
+ *               - password
+ *             properties:
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *                 format: email
+ *               password:
+ *                 type: string
+ *                 minLength: 8
+ *               role:
+ *                 type: string
+ *                 enum: [user, admin]
+ *     responses:
+ *       201:
+ *         description: User created
+ *       422:
+ *         description: Validation error
+ */
+router.post('/', authenticate, authorize('admin'), validate(createUserSchema), userController.create);
+
+/**
+ * @swagger
+ * /api/users/{id}:
+ *   put:
+ *     summary: Update user
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: User updated
+ */
+router.put('/:id', authenticate, authorize('admin'), userController.update);
+
+/**
+ * @swagger
+ * /api/users/{id}:
+ *   delete:
+ *     summary: Delete user
+ *     tags: [Users]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *     responses:
+ *       200:
+ *         description: User deleted
+ */
+router.delete('/:id', authenticate, authorize('admin'), userController.delete);</div>
+    </div>
+    <div class="card">
+        <h2>集成与最佳实践</h2>
+        <div class="code">// ========== 挂载 Swagger UI ==========
+// app.js:
+const { specs, swaggerUi } = require('./swagger');
+
+// Swagger 文档页面:
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs, {
+    explorer: true,
+    customCss: '.swagger-ui .topbar { display: none }',
+    customSiteTitle: 'My API Docs',
+}));
+
+// JSON 格式文档:
+app.get('/api-docs.json', (req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    res.send(specs);
+});
+
+// ========== 环境控制 ==========
+// 只在非生产环境暴露:
+if (process.env.NODE_ENV !== 'production') {
+    app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
+}
+
+// ========== 分页 Schema ==========
+// 可以在任何路由文件中定义一次:
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     Pagination:
+ *       type: object
+ *       properties:
+ *         page:
+ *           type: integer
+ *         limit:
+ *           type: integer
+ *         total:
+ *           type: integer
+ *         totalPages:
+ *           type: integer
+ *         hasNext:
+ *           type: boolean
+ *         hasPrev:
+ *           type: boolean
+ */
+
+// ========== 最佳实践 ==========
+// 1. 用 @swagger 注释路由, 代码与文档在一起
+// 2. components/schemas 定义可复用的模型
+// 3. tags 分组路由 (Users/Orders/Products)
+// 4. 所有 API 都需要描述 responses
+// 5. securitySchemes 定义 JWT Bearer
+// 6. 生产环境隐藏 API 文档
+// 7. JSON 格式可被其他工具消费 (Postman)
+// 8. 用 swagger-autogen 自动生成</div>
+        <div class="note">💡 Swagger 要点: OpenAPI 3.0 是 REST API 标准; swagger-jsdoc 从 JSDoc 注释生成文档; swagger-ui-express 渲染交互式页面; components/schemas 定义可复用模型; securitySchemes 配置 JWT; tags 分组路由; 生产环境隐藏文档; JSON 格式可互导 Postman; 代码与文档同处, 保持同步。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSetup()">Swagger 设置</button>
+        <button onclick="demoAnnotate()">路由注解</button>
+        <button onclick="demoBest()">最佳实践</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSetup() {
+            result.innerHTML = '';
+            log('# Swagger 设置');
+            log('');
+            log('npm install swagger-jsdoc');
+            log('npm install swagger-ui-express');
+            log('');
+            log('const swaggerJsdoc = require("swagger-jsdoc");');
+            log('const swaggerUi = require("swagger-ui-express");');
+            log('');
+            log('const specs = swaggerJsdoc({');
+            log('  definition: { openapi: "3.0.0", info: {...} },');
+            log('  apis: ["./routes/*.js"]');
+            log('});');
+            log('');
+            log('app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(specs));');
+        }
+
+        function demoAnnotate() {
+            result.innerHTML = '';
+            log('# 路由 JSDoc 注解');
+            log('');
+            log('/**');
+            log(' * @swagger');
+            log(' * /api/users:');
+            log(' *   get:');
+            log(' *     summary: Get users');
+            log(' *     tags: [Users]');
+            log(' *     parameters:');
+            log(' *       - in: query');
+            log(' *         name: page');
+            log(' *         schema: { type: integer }');
+            log(' *     responses:');
+            log(' *       200:');
+            log(' *         description: OK');
+            log(' */');
+        }
+
+        function demoBest() {
+            result.innerHTML = '';
+            log('# Swagger 最佳实践');
+            log('');
+            log('1. 注释写在路由文件旁边');
+            log('2. components/schemas 复用模型');
+            log('3. tags 分组路由');
+            log('4. 每个 API 描述所有 responses');
+            log('5. 配置 JWT Bearer 认证');
+            log('6. 生产环境隐藏 API 文档');
+            log('7. JSON 格式可导 Postman');
+            log('8. 保持代码和文档同步');
+        }
+    </script>
+</body>
+</html>

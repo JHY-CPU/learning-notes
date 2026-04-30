@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebSocket</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+
+        .card {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+
+        .card h2 {
+            margin: 0 0 10px 0;
+            color: #2c3e50;
+        }
+
+        .code {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+            border-left: 3px solid #3498db;
+            margin: 10px 0;
+            white-space: pre-wrap;
+        }
+
+        .note {
+            background: #fef9e7;
+            border-left: 4px solid #f39c12;
+            padding: 10px 15px;
+            font-size: 14px;
+            color: #7f8c8d;
+            margin-top: 10px;
+        }
+
+        pre {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        button {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            background: #3498db;
+            color: white;
+            cursor: pointer;
+            margin: 5px;
+        }
+
+        button:hover {
+            opacity: 0.9;
+        }
+
+        #ws-status {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 13px;
+            min-height: 20px;
+        }
+
+        #ws-log {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+            font-family: monospace;
+            margin-top: 5px;
+        }
+
+        .connected {
+            color: #2ecc71;
+        }
+
+        .disconnected {
+            color: #e74c3c;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h2>WebSocket</h2>
+        <p>全双工通信协议，客户端与服务器实时双向传输。</p>
+    </div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 创建 WebSocket 连接
+            const ws = new WebSocket('ws://localhost:8080');
+            // ws:// — 普通连接
+            // wss:// — 加密连接（推荐，类似 HTTPS）
+
+            // readyState
+            // 0: CONNECTING — 连接中
+            // 1: OPEN — 已连接
+            // 2: CLOSING — 关闭中
+            // 3: CLOSED — 已关闭
+
+            // 事件
+            ws.onopen = () => { // 连接建立
+            ws.send('Hello Server!');
+            };
+            ws.onmessage = (e) => { // 收到消息
+            console.log(e.data); // 字符串（默认）或 Blob/ArrayBuffer
+            };
+            ws.onerror = (e) => { // 错误
+            console.error('WS Error:', e);
+            };
+            ws.onclose = (e) => { // 连接关闭
+            e.code; // 关闭码（1000=正常, 1006=异常断开...）
+            e.reason; // 关闭原因（字符串）
+            e.wasClean; // 是否正常关闭
+            };
+
+            // 发送消息
+            ws.send('Hello'); // 发送文本
+            ws.send(JSON.stringify({type: 'chat', msg: 'Hello'})); // JSON
+            ws.send(blob); // 发送二进制
+            ws.send(arrayBuffer); // 发送 ArrayBuffer
+
+            // 关闭连接
+            ws.close(); // 正常关闭（code=1000）
+            ws.close(1000, '再见'); // 指定关闭码和原因
+
+            // 心跳机制（防止连接被断开）
+            setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'ping' }));
+            }
+            }, 30000);
+
+            // ========== 自动重连机制 ==========
+            function createWebSocket(url, options = {}) {
+            const { maxRetries = 5, retryDelay = 1000 } = options;
+            let retries = 0;
+
+            function connect() {
+            const ws = new WebSocket(url);
+
+            ws.onopen = () => {
+            console.log('✅ 连接成功');
+            retries = 0; // 重置重试计数
+            };
+
+            ws.onclose = (e) => {
+            console.log(`🔌 连接关闭: code=${e.code}`);
+
+            if (retries < maxRetries) { retries++; const delay=Math.min(retryDelay * Math.pow(2, retries - 1), 30000);
+                console.log(`🔄 ${delay}ms 后尝试重连 (${retries}/${maxRetries})`); setTimeout(connect, delay); // 指数退避 }
+                else { console.error('❌ 达到最大重试次数'); } }; ws.onerror=(e)=> {
+                console.error('❌ WebSocket 错误');
+                };
+
+                return ws;
+                }
+
+                return connect();
+                }
+
+                // 使用:
+                // const ws = createWebSocket('wss://your-server.com', {
+                // maxRetries: 10,
+                // retryDelay: 2000
+                // });
+
+                // ========== 二进制数据类型 ==========
+                // 默认接收文本,可以设置为接收 ArrayBuffer 或 Blob
+                ws.binaryType = 'arraybuffer'; // 或 'blob'
+
+                ws.onmessage = (e) => {
+                if (e.data instanceof ArrayBuffer) {
+                // 处理二进制数据
+                const uint8Array = new Uint8Array(e.data);
+                } else {
+                // 处理文本数据
+                console.log(e.data);
+                }
+                };</div>
+        <div class="note">💡 WebSocket 支持发送文本和二进制数据。<br>
+            ⚠️ 需要在服务器端配合（Node.js ws 库 / 其他后端框架）。<br>
+            💡 建立连接前需要 HTTP 升级握手（由浏览器自动完成）。<br>
+            ⚠️ 断线后不会自动重连，需要手动实现重连逻辑。</div>
+    </div>
+    <div class="card">
+        <h2>演示：WebSocket 客户端</h2>
+        <button onclick="connectWS()">🔗 连接测试</button>
+        <button onclick="disconnectWS()">🔌 断开</button>
+        <div id="ws-status">就绪</div>
+        <div id="ws-log">等待操作...</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        let ws = null;
+
+        const wsStatus = document.getElementById('ws-status');
+        const wsLog = document.getElementById('ws-log');
+
+        function log(msg, isError = false) {
+            const div = document.createElement('div');
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            if (isError) div.style.color = '#e74c3c';
+            wsLog.appendChild(div);
+            wsLog.scrollTop = wsLog.scrollHeight;
+            if (wsLog.children.length > 30) wsLog.removeChild(wsLog.firstChild);
+            console.log(msg);
+        }
+
+        function updateStatus(text, connected) {
+            wsStatus.innerHTML = connected
+                ? `<span class="connected">🟢 ${text}</span>`
+                : `<span class="disconnected">🔴 ${text}</span>`;
+        }
+
+        function connectWS() {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                log('⏸ 已连接，先断开再重连');
+                ws.close();
+            }
+
+            // 使用公共 WebSocket 测试服务（仅用于演示连接概念）
+            // ⚠️ echo.websocket.org 已停止服务,请使用自己的服务器
+            // 推荐测试服务: wss://ws.postman-echo.com/raw
+            const testUrl = 'wss://ws.postman-echo.com/raw';
+            log(`🔄 正在连接: ${testUrl}...`);
+
+            try {
+                ws = new WebSocket(testUrl);
+
+                ws.onopen = () => {
+                    updateStatus('已连接', true);
+                    log('✅ 连接建立');
+                    ws.send(JSON.stringify({ type: 'greeting', msg: 'Hello WebSocket!' }));
+                };
+
+                ws.onmessage = (e) => {
+                    log(`📩 收到: ${e.data.substring(0, 100)}`);
+                };
+
+                ws.onerror = (e) => {
+                    log(`❌ 连接错误（可能服务不可用）`, true);
+                    updateStatus('连接错误', false);
+
+                    // 演示：模拟本地 WebSocket 行为
+                    log('💡 演示：这是客户端 WebSocket API 的完整用法');
+                    log('💡 要实际使用，需要运行 WebSocket 服务器');
+                    log('📋 完整 API 已在代码文档中展示');
+                };
+
+                ws.onclose = (e) => {
+                    updateStatus(`已关闭 (code=${e.code})`, false);
+                    log(`🔌 连接关闭: code=${e.code}, reason="${e.reason}", wasClean=${e.wasClean}`);
+                    ws = null;
+                };
+
+            } catch (err) {
+                log(`❌ 创建 WebSocket 失败: ${err.message}`, true);
+            }
+        }
+
+        function disconnectWS() {
+            if (ws) {
+                ws.close(1000, '用户主动断开');
+                log('🔌 主动断开连接');
+            } else {
+                log('⏸ 未连接');
+            }
+        }
+
+        console.log('=== WebSocket ===');
+        console.log('WebSocket 支持:', typeof WebSocket === 'function');
+        console.log('就绪状态: 0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED');
+
+        document.getElementById('output').textContent =
+            `WebSocket: 全双工通信\n` +
+            `new WebSocket(url) → onopen/onmessage/onclose/onerror\n` +
+            `send(data) / close(code, reason)\n` +
+            `readyState: CONNECTING/OPEN/CLOSING/CLOSED\n` +
+            `✅ WebSocket 演示完成！`;
+    </script>
+</body>
+
+</html>

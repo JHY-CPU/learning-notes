@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python os模块</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📁 Python os 模块</h2><p>os 模块概览、文件与目录操作 (listdir/mkdir/remove/rename/walk)、os.path 路径处理 (join/split/exists/abspath)、环境变量 environ、进程管理 (system/popen/getpid)、os 与 pathlib 对比。</p></div>
+    <div class="card">
+        <h2>os 模块基础</h2>
+        <div class="code">// ========== os 模块 ==========
+// os 模块提供与操作系统交互的功能
+// 文件操作、路径处理、进程管理、环境变量
+
+import os
+
+// ========== 当前工作目录 ==========
+cwd = os.getcwd()              # 获取当前工作目录
+print(cwd)                     # /home/user/project
+
+os.chdir("/tmp")               # 切换工作目录
+print(os.getcwd())             # /tmp
+
+// ========== 目录操作 ==========
+os.listdir(".")                # 列出目录内容
+os.mkdir("newdir")             # 创建目录
+os.makedirs("a/b/c")           # 递归创建目录
+os.rmdir("empty_dir")          # 删除空目录
+os.removedirs("a/b/c")         # 递归删除空目录
+
+// ========== 文件操作 ==========
+os.rename("old.txt", "new.txt")  # 重命名/移动
+os.remove("file.txt")           # 删除文件 (注意: 永久删除!)
+os.replace("src.txt", "dst.txt") # 原子替换 (跨平台)
+
+// ========== 文件信息 ==========
+stat = os.stat("file.txt")
+print(stat.st_size)            # 文件大小 (字节)
+print(stat.st_mtime)           # 最后修改时间 (时间戳)
+print(stat.st_mode)            # 文件权限 (八进制)
+print(os.path.getsize("file.txt"))  # 更方便
+print(os.path.getmtime("file.txt"))
+
+// ========== 链接操作 ==========
+os.symlink("target", "link")   # 创建符号链接
+os.readlink("link")            # 读取链接目标
+os.link("target", "hardlink")  # 创建硬链接</div>
+    </div>
+    <div class="card">
+        <h2>os.path 路径处理</h2>
+        <div class="code">// ========== os.path 核心函数 ==========
+import os.path
+
+# 路径拼接:
+path = os.path.join("dir", "sub", "file.txt")
+print(path)                    # dir/sub/file.txt (自动处理 / 或 \)
+
+# 路径分解:
+print(os.path.split(path))     # ("dir/sub", "file.txt")
+print(os.path.dirname(path))   # "dir/sub"
+print(os.path.basename(path))  # "file.txt"
+print(os.path.splitext(path))  # ("dir/sub/file", ".txt")
+
+# 路径信息:
+print(os.path.abspath("file.txt"))  # /当前/目录/file.txt
+print(os.path.realpath("link"))     # 解析符号链接为真实路径
+
+# 路径检查:
+print(os.path.exists(path))    # True/False
+print(os.path.isfile(path))    # 是否是文件
+print(os.path.isdir(path))     # 是否是目录
+print(os.path.islink(path))    # 是否是符号链接
+print(os.path.isabs(path))     # 是否是绝对路径
+
+# 文件大小和时间:
+print(os.path.getsize("f.txt"))
+print(os.path.getmtime("f.txt"))  # 修改时间
+print(os.path.getctime("f.txt"))  # 创建时间 (Unix) / 元数据修改 (Win)
+print(os.path.getatime("f.txt"))  # 访问时间
+
+// ========== 路径遍历 ==========
+# os.walk: 递归遍历目录树
+for root, dirs, files in os.walk("/path/to/start"):
+    # root: 当前目录路径
+    # dirs: 子目录列表 (可修改以控制遍历)
+    # files: 文件列表
+    for f in files:
+        if f.endswith(".py"):
+            full_path = os.path.join(root, f)
+            print(full_path)
+
+# 查找所有 .txt 文件:
+txt_files = []
+for root, dirs, files in os.walk("."):
+    for f in files:
+        if f.endswith(".txt"):
+            txt_files.append(os.path.join(root, f))</div>
+    </div>
+    <div class="card">
+        <h2>环境变量与进程</h2>
+        <div class="code">// ========== 环境变量 environ ==========
+import os
+
+# 获取环境变量:
+home = os.environ.get("HOME")        # 不存在返回 None
+path = os.environ.get("PATH", "")    # 带默认值
+debug = os.environ.get("DEBUG", "false").lower() == "true"
+
+# 直接访问 (不存在会 KeyError):
+home = os.environ["HOME"]
+
+# 设置环境变量:
+os.environ["MY_VAR"] = "value"       # 设置 (当前进程 + 子进程)
+# os.environ["PATH"] += ":/my/path"  # 追加
+
+# 删除:
+del os.environ["MY_VAR"]
+
+# 遍历:
+for key, value in os.environ.items():
+    print(f"{key}={value}")
+
+// ========== 进程管理 ==========
+# 进程信息:
+pid = os.getpid()                    # 当前进程 ID
+ppid = os.getppid()                  # 父进程 ID
+print(f"当前进程: {pid}, 父进程: {ppid}")
+
+# 运行系统命令:
+os.system("ls -la")                  # 简单执行 (阻塞,返回退出码)
+
+# 启动新进程:
+os.execl("/bin/ls", "ls", "-la")     # 替换当前进程 (不会返回!)
+
+# 获取登录用户:
+print(os.getlogin())                 # 当前登录用户名
+print(os.getuid())                   # 用户 ID (Unix)
+
+// ========== 临时文件和目录 ==========
+import tempfile
+
+# 临时文件:
+with tempfile.NamedTemporaryFile(suffix=".txt", delete_on_close=False) as f:
+    f.write(b"Hello")
+    print(f.name)                    # /tmp/tmpXXXXX.txt
+    # 文件在 with 块结束后自动删除
+
+# 临时目录:
+with tempfile.TemporaryDirectory() as tmpdir:
+    print(tmpdir)                    # /tmp/tmpXXXXX/
+    # 目录在 with 块结束后自动删除</div>
+    </div>
+    <div class="card">
+        <h2>os 与 pathlib 对比</h2>
+        <div class="code">// ========== pathlib (Python 3.4+) ==========
+// 面向对象的路径处理,比 os.path 更现代
+
+from pathlib import Path
+
+# 创建路径:
+p = Path("dir/sub/file.txt")
+
+# 路径属性:
+print(p.name)                    # file.txt
+print(p.stem)                    # file (无后缀)
+print(p.suffix)                  # .txt
+print(p.parent)                  # dir/sub
+print(p.parents)                 # [dir/sub, dir, .]
+
+# 路径拼接:
+p2 = Path("dir") / "sub" / "file.txt"
+print(p2)                        # dir/sub/file.txt
+
+# 路径操作:
+Path("newdir").mkdir(exist_ok=True)
+Path("a/b/c").mkdir(parents=True, exist_ok=True)
+Path("old.txt").rename("new.txt")
+Path("file.txt").unlink()        # 删除文件
+
+# 读写文件:
+data = Path("file.txt").read_text(encoding="utf-8")
+Path("out.txt").write_text("Hello", encoding="utf-8")
+data = Path("file.bin").read_bytes()
+Path("out.bin").write_bytes(b"data")
+
+# 遍历目录:
+for f in Path(".").iterdir():    # 直接子项
+    print(f)
+
+for f in Path(".").glob("**/*.py"):  # 递归匹配
+    print(f)
+
+for f in Path(".").rglob("*.py"):   # 递归匹配 (同上)
+    print(f)
+
+// ========== 推荐: 用 pathlib 替代 os.path ==========
+// os.path               → pathlib
+// os.path.join          → /
+// os.path.exists        → Path.exists()
+// os.path.isfile        → Path.is_file()
+// os.path.isdir         → Path.is_dir()
+// os.path.abspath       → Path.resolve()
+// os.path.splitext      → Path.suffix
+// os.walk               → Path.rglob()
+// os.remove             → Path.unlink()
+// os.rename             → Path.rename()
+// os.mkdir              → Path.mkdir()
+// os.makedirs           → Path.mkdir(parents=True)
+
+// ========== 综合示例 ==========
+def cleanup_temp_files(directory, days=7):
+    """删除指定目录中7天前的临时文件"""
+    import time
+    from pathlib import Path
+
+    cutoff = time.time() - days * 86400
+    count = 0
+
+    for f in Path(directory).rglob("*"):
+        if f.is_file() and f.stat().st_mtime < cutoff:
+            f.unlink()
+            count += 1
+
+    return count</div>
+        <div class="note">💡 os 模块要点: (1) os.getcwd/chdir/listdir/mkdir/remove 基本文件操作; (2) os.path.join/split/exists/isfile 路径处理; (3) os.walk 递归遍历目录; (4) os.environ 环境变量; (5) 新代码推荐 pathlib 替代 os.path。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoOS()">os 模块演示</button>
+        <button onclick="demoPathlib()">pathlib 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoOS() {
+            result.innerHTML = '';
+            log('# os 模块演示');
+            log('');
+            log('目录操作:');
+            log('  os.getcwd() — 当前目录');
+            log('  os.listdir(".") — 列出');
+            log('  os.mkdir("dir") — 创建');
+            log('  os.makedirs("a/b/c") — 递归');
+            log('');
+            log('os.path:');
+            log('  os.path.join("a", "b") — 拼接');
+            log('  os.path.exists("f") — 存在?');
+            log('  os.path.isfile("f") — 是文件?');
+            log('');
+            log('os.walk: 遍历目录树');
+            log('os.environ: 环境变量');
+        }
+
+        function demoPathlib() {
+            result.innerHTML = '';
+            log('# pathlib 演示');
+            log('');
+            log('from pathlib import Path');
+            log('');
+            log('p = Path("dir/sub/file.txt")');
+            log('p.name → file.txt');
+            log('p.stem → file');
+            log('p.suffix → .txt');
+            log('p.parent → dir/sub');
+            log('p.parents → 所有父目录');
+            log('');
+            log('读写:');
+            log('  p.read_text()');
+            log('  p.write_text("Hello")');
+            log('  p.read_bytes()');
+            log('');
+            log('遍历: p.glob("**/*.py")');
+            log('推荐 pathlib > os.path!');
+        }
+    </script>
+</body>
+</html>

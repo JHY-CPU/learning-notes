@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>rebase与merge</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔀 rebase 与 merge</h2><p>rebase vs merge 对比、交互式 rebase、squash、cherry-pick、rebase 黄金法则。</p></div>
+    <div class="card">
+        <h2>merge vs rebase</h2>
+        <div class="code">// ========== merge ==========
+// 创建 merge commit,保留完整分支历史
+// 优点:保留真实的时间线和分支结构
+// 缺点:历史有分叉,不够线性
+
+// 命令:
+git checkout main
+git merge feature
+
+// 结果:
+//    *---*---*---M  (main)
+//        \       /
+//         *---*    (feature)
+
+// ========== rebase ==========
+// 将当前分支的提交"移到"目标分支的顶部
+// 重写 commit 历史 (产生新 hash)
+// 优点:线性历史,清晰
+// 缺点:丢失分支信息
+
+// 命令:
+git checkout feature
+git rebase main
+
+// 结果:
+//    *---*---*  (main)
+//                \
+//                 *'---*'  (feature, 新 commit)
+
+// ========== 对比 ==========
+//                 merge          rebase
+// 历史          保留分支分叉     线性历史
+// 安全性       安全             需要小心
+// 冲突解决     一次解决         每个 commit 都可能冲突
+// 适用场景     公共分支         个人分支
+// commit hash  不变             改变</div>
+    </div>
+    <div class="card">
+        <h2>rebase 操作详解</h2>
+        <div class="code">// ========== 基本 rebase ==========
+// 将 feature 分支 rebase 到 main
+git checkout feature
+git rebase main
+
+// 如果遇到冲突:
+// 1. 解决冲突
+// 2. git add <file>
+// 3. git rebase --continue
+
+// 跳过当前 commit:
+git rebase --skip
+
+// 中止 rebase:
+git rebase --abort
+
+// ========== git pull --rebase ==========
+// 拉取远程更新时用 rebase 代替 merge
+git pull --rebase origin main
+
+// 设置默认:
+git config --global pull.rebase true
+// 或: git config --global pull.ff only
+
+// ========== 交互式 rebase (最强大) ==========
+// 修改最近 n 个 commit
+git rebase -i HEAD~3           # 最近 3 个
+git rebase -i main             # main 以来的所有 commit
+git rebase -i abc123           # 从指定 commit 开始
+
+// 交互式 rebase 选项:
+// pick     = 使用该 commit (默认)
+// reword   = 修改提交信息
+// edit     = 修改提交内容
+// squash   = 合并到前一个 commit
+// fixup    = 合并但丢弃提交信息
+// drop     = 删除该 commit
+
+// 示例: 将 3 个 commit 合并为 1 个
+// git rebase -i HEAD~3
+//
+// pick abc123 feat: add login form
+// squash def456 fix: typo in login form
+// squash 789012 chore: format login form
+//
+// 保存后编辑提交信息
+// 结果: 3 个 commit 合并为 1 个
+
+// ========== rebase 黄金法则 ==========
+// ❌ 不要 rebase 已推送的公共分支!
+// ✅ 只在本地个人分支上 rebase
+// ✅ 已推送的个人分支,rebase 后需要 --force-with-lease
+
+// 为什么?
+// rebase 改变 commit hash
+// 如果别人基于这些 commit 工作 → 灾难</div>
+    </div>
+    <div class="card">
+        <h2>cherry-pick — 精选提交</h2>
+        <div class="code">// ========== cherry-pick ==========
+// 将某些 commit 从一个分支复制到另一个分支
+// 只挑需要的 commit,不合并整个分支
+
+// ========== 基本用法 ==========
+git cherry-pick abc123                    # 挑选一个 commit
+git cherry-pick abc123..def456            # 多个连续 commit
+git cherry-pick abc123 def456 789012      # 多个不连续 commit
+git cherry-pick -n abc123                 # 只暂存不提交
+
+// ========== 解决冲突 ==========
+git cherry-pick abc123
+# 如果冲突:
+# 1. 解决冲突, git add .
+# 2. git cherry-pick --continue
+
+git cherry-pick --abort                   # 中止
+git cherry-pick --skip                    # 跳过
+
+// ========== 场景 ==========
+// 场景: 修复在 feature 分支上,但需要应用于 main
+git checkout main
+git cherry-pick abc123   # 复制修复 commit 到 main
+
+// 场景: 只想带回某个 commit,不要其他
+git checkout release
+git cherry-pick def456   # 只挑需要的那一个</div>
+    </div>
+    <div class="card">
+        <h2>rebase 工作流实战</h2>
+        <div class="code">// ========== 场景: 保持 feature 分支同步 ==========
+// 开发功能时,定期 rebase main 以保持同步
+// 避免最后的 PR 有大量冲突
+
+git checkout feature/login
+git rebase main
+# 解决可能的冲突
+git rebase --continue
+
+// ========== 场景: 清理提交历史 ==========
+// 合并 WIP (Work In Progress) commit
+git rebase -i HEAD~5
+// squash 所有 WIP commit 为一个干净的提交
+
+// 修改前:
+// abc123 WIP: start login
+// def456 WIP: continue login
+// 789012 WIP: finish login
+// 345678 feat: add validation
+
+// 修改后:
+// 345678 feat: add login
+// 新 hash feat: add validation
+
+// ========== 场景: PR 前的清理 ==========
+// 在创建 PR 前,使用 rebase -i 整理提交
+// 将多个小提交合并为有意义的提交
+// 确保每个 commit 能独立通过测试
+
+// ========== 团队策略推荐 ==========
+// 1. 个人分支: rebase 保持同步
+// 2. 公共分支: merge 保护历史
+// 3. 合并 PR: squash merge (压缩合并)
+
+// GitHub PR 合并选项:
+// Create a merge commit    → 保留所有历史 (默认)
+// Squash and merge         → 全部 squash 为一个 commit
+// Rebase and merge         → rebase + merge (线性)</div>
+        <div class="note">💡 rebase 黄金法则:不要 rebase 已经推送的公共分支。在个人分支上尽情 rebase,保持历史干净。交互式 rebase (git rebase -i) 是最强大的 Git 工具之一,可以改写历史、合并提交、修改信息。PR 前做一次 rebase -i 清理是良好习惯。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoRebase()">rebase 演示</button>
+        <button onclick="demoCherry()">cherry-pick 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoRebase() {
+            result.innerHTML = '';
+            log('# rebase 演示');
+            log('');
+            log('初始: feature 基于 main 的旧版本');
+            log('  main:   C1---C2---C3');
+            log('  feature: C1---F1---F2');
+            log('');
+            log('$ git checkout feature');
+            log('$ git rebase main');
+            log('');
+            log('结果: feature "移到" main 顶部');
+            log('  main:   C1---C2---C3');
+            log('  feature:           F1\'---F2\'');
+            log('');
+            log('--- 交互式 rebase ---');
+            log('$ git rebase -i HEAD~3');
+            log('  pick abc123 feat: add form');
+            log('  squash def456 fix: typo     ← 合并');
+            log('  squash 789012 chore: format  ← 合并');
+            log('  # 3 commits → 1 commit');
+        }
+
+        function demoCherry() {
+            result.innerHTML = '';
+            log('# cherry-pick 演示');
+            log('');
+            log('分支 main: C1---C2---C3');
+            log('分支 feature:    F1---F2---F3');
+            log('                    ↑ 想要 F2');
+            log('');
+            log('$ git checkout main');
+            log('$ git cherry-pick F2-hash');
+            log('');
+            log('结果: F2 复制到 main');
+            log('  main: C1---C2---C3---F2\'');
+            log('  feature:    F1---F2---F3');
+            log('');
+            log('适用场景:');
+            log('  1. bug fix 在 feature 分支,main 也需要');
+            log('  2. 不想合并整个分支,只要某个特定 commit');
+            log('  3. 把 commit 从一个发布版本移植到另一个');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 错误处理进阶</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚠️ Go 错误处理进阶</h2><p>Sentinel errors、自定义错误类型、error wrapping (fmt.Errorf %w)、errors.Is/As 链式检查、错误处理策略与最佳实践。</p></div>
+    <div class="card">
+        <h2>错误类型体系</h2>
+        <div class="code">// ========== Go 错误类型 ==========
+// error 是内置接口:
+// type error interface {
+//     Error() string
+// }
+
+// 1. 预定义错误 (Sentinel Errors)
+var (
+    ErrNotFound   = errors.New("not found")
+    ErrPermission = errors.New("permission denied")
+    ErrTimeout    = errors.New("request timeout")
+    ErrInvalidInput = errors.New("invalid input")
+)
+
+// 2. 自定义错误类型
+type ValidationError struct {
+    Field   string
+    Value   interface{}
+    Message string
+}
+
+func (e *ValidationError) Error() string {
+    return fmt.Sprintf("验证失败: %s = %v (%s)",
+        e.Field, e.Value, e.Message)
+}
+
+// 3. 带状态码的错误
+type HTTPError struct {
+    StatusCode int
+    Message    string
+    Err        error  // 内部错误
+}
+
+func (e *HTTPError) Error() string {
+    if e.Err != nil {
+        return fmt.Sprintf("HTTP %d: %s (%v)", e.StatusCode, e.Message, e.Err)
+    }
+    return fmt.Sprintf("HTTP %d: %s", e.StatusCode, e.Message)
+}
+
+func (e *HTTPError) Unwrap() error {
+    return e.Err
+}
+
+// ========== 使用自定义错误 ==========
+func findUser(id int) (*User, error) {
+    if id <= 0 {
+        return nil, &ValidationError{
+            Field:   "id",
+            Value:   id,
+            Message: "ID 必须为正数",
+        }
+    }
+    // ... 数据库查询
+    return nil, ErrNotFound  // sentinel error
+}
+
+func findUserAPI(id int) (*User, error) {
+    user, err := findUser(id)
+    if err != nil {
+        return nil, &HTTPError{
+            StatusCode: 400,
+            Message:    "查询用户失败",
+            Err:        err,
+        }
+    }
+    return user, nil
+}</div>
+    </div>
+    <div class="card">
+        <h2>Error Wrapping</h2>
+        <div class="code">// ========== fmt.Errorf %w ==========
+// Go 1.13+ error wrapping: 保留错误链
+
+func openConfig(path string) error {
+    return fmt.Errorf("打开配置 %s: %w", path, ErrNotFound)
+    // %w 创建包装错误, 可通过 errors.Is/As 解包
+}
+
+// 多层包装:
+func loadConfig() error {
+    err := openConfig("/etc/app.conf")
+    if err != nil {
+        return fmt.Errorf("加载配置失败: %w", err)
+    }
+    return nil
+}
+
+// 使用 errors.Is 检查:
+func handleConfig() {
+    err := loadConfig()
+    if err != nil {
+        fmt.Println(err)
+        // "加载配置失败: 打开配置 /etc/app.conf: not found"
+
+        if errors.Is(err, ErrNotFound) {
+            fmt.Println("→ 配置不存在, 使用默认值")
+        }
+    }
+}
+
+// ========== errors.Is — 链式检查 ==========
+// errors.Is 沿错误链查找匹配的 sentinel error
+
+func isDemo() {
+    err := loadConfig()
+
+    // 等价于:
+    // err == ErrNotFound 或 err 链中任意层 == ErrNotFound
+    if errors.Is(err, ErrNotFound) {
+        fmt.Println("not found")
+    }
+
+    // 自定义 Is 方法 (控制匹配规则)
+}
+
+// 自定义 Is 方法
+type QueryError struct {
+    Query string
+    Err   error
+}
+
+func (e *QueryError) Error() string {
+    return fmt.Sprintf("查询 %q 失败: %v", e.Query, e.Err)
+}
+
+func (e *QueryError) Unwrap() error {
+    return e.Err
+}
+
+// 自定义 Is: 任意 QueryError 都匹配 ErrNotFound
+func (e *QueryError) Is(target error) bool {
+    return target == ErrNotFound || target == ErrInvalidInput
+}
+
+// ========== errors.As — 类型检查 ==========
+// errors.As 沿错误链查找匹配的自定义错误类型
+
+func asDemo() {
+    err := findUserAPI(-1)
+
+    // 查找链中第一个 *HTTPError
+    var httpErr *HTTPError
+    if errors.As(err, &httpErr) {
+        fmt.Printf("HTTP %d: %s\n", httpErr.StatusCode, httpErr.Message)
+    }
+
+    // 查找链中第一个 *ValidationError
+    var valErr *ValidationError
+    if errors.As(err, &valErr) {
+        fmt.Printf("字段 %s 验证失败\n", valErr.Field)
+    }
+
+    // As 使用接口
+    var temporary interface{ Temporary() bool }
+    if errors.As(err, &temporary) {
+        if temporary.Temporary() {
+            fmt.Println("临时错误, 可重试")
+        }
+    }
+}
+
+// ========== errors.Unwrap ==========
+// 单层解包
+func unwrapDemo() {
+    err := fmt.Errorf("包装: %w", ErrNotFound)
+    fmt.Println(errors.Unwrap(err))  // "not found"
+    fmt.Println(errors.Unwrap(ErrNotFound))  // nil
+}</div>
+    </div>
+    <div class="card">
+        <h2>错误处理策略</h2>
+        <div class="code">// ========== 1. 提前返回 (Early Return) ==========
+// Go 的惯用错误处理模式
+
+func processUser(id int) (*User, error) {
+    if id <= 0 {
+        return nil, ErrInvalidInput
+    }
+
+    user, err := db.FindUser(id)
+    if err != nil {
+        return nil, fmt.Errorf("查询用户 %d 失败: %w", id, err)
+    }
+
+    if !user.Active {
+        return nil, fmt.Errorf("用户 %d 未激活: %w", id, ErrPermission)
+    }
+
+    return user, nil
+    // 正常路径在函数末尾, 清晰明确
+}
+
+// ========== 2. 错误只处理一次 ==========
+// 每条错误只应被处理一次 (打印 或 返回, 不兼得)
+
+// ❌ 错误处理两次
+func badProcess() error {
+    err := doSomething()
+    if err != nil {
+        log.Println("错误:", err)  // 日志
+        return err                // 又返回
+    }
+    return nil
+}
+// 调用方又会打印: 错误日志重复!
+
+// ✅ 错误处理一次
+func goodProcess() error {
+    err := doSomething()
+    if err != nil {
+        // 不打印, 直接包装返回
+        return fmt.Errorf("处理失败: %w", err)
+    }
+    return nil
+}
+// 调用方决定是否打印
+
+// ========== 3. 静默处理 + 降级 ==========
+// 非关键路径错误不影响主流程
+
+func getUserDisplayName(userID int) string {
+    name, err := db.GetDisplayName(userID)
+    if err != nil {
+        // 降级: 使用默认名
+        log.Printf("获取显示名失败 (user=%d): %v", userID, err)
+        return "User"
+    }
+    return name
+}
+
+// ========== 4. 重试模式 ==========
+func retry(attempts int, fn func() error) error {
+    var err error
+    for i := 0; i < attempts; i++ {
+        err = fn()
+        if err == nil {
+            return nil
+        }
+
+        // 不重试不可恢复的错误
+        if errors.Is(err, ErrInvalidInput) {
+            return err
+        }
+
+        // 指数退避
+        time.Sleep(time.Duration(1<<i) * 100 * time.Millisecond)
+    }
+    return fmt.Errorf("重试 %d 次后失败: %w", attempts, err)
+}
+
+// ========== 5. panic/recover 的边界 ==========
+// panic 只用于 "不可能发生的" 错误
+
+// 合适的 panic:
+// - 配置错误 (启动就失败)
+// - 断言 (不应该发生的状态)
+
+func must(err error) {
+    if err != nil {
+        panic(err)
+    }
+}
+
+// 适当的 recover:
+// - HTTP handler 顶层 (防止单个请求崩溃整个服务器)
+func safeHandler(fn http.HandlerFunc) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        defer func() {
+            if err := recover(); err != nil {
+                log.Printf("panic: %v", err)
+                http.Error(w, "Internal Error", 500)
+            }
+        }()
+        fn(w, r)
+    }
+}
+
+// ========== 6. defer 中的错误处理 ==========
+func writeFile(filename string) (err error) {
+    f, err := os.Create(filename)
+    if err != nil {
+        return err
+    }
+
+    // defer 中检查 close 错误
+    defer func() {
+        if closeErr := f.Close(); closeErr != nil {
+            if err != nil {
+                // 已有错误, 包装附加错误
+                err = fmt.Errorf("%v; close: %w", err, closeErr)
+            } else {
+                err = closeErr
+            }
+        }
+    }()
+
+    _, err = f.WriteString("data")
+    return err  // 也会检查 defer 中的 close 错误
+}</div>
+    </div>
+    <div class="card">
+        <h2>错误最佳实践</h2>
+        <div class="code">// ========== 错误设计指南 ==========
+
+// 1. Sentinel 错误用于预期错误
+var ErrNotFound = errors.New("not found")
+
+// 2. 自定义错误用于额外信息
+type NotFoundError struct {
+    Entity string
+    ID     int64
+}
+
+func (e *NotFoundError) Error() string {
+    return fmt.Sprintf("%s (id=%d) 未找到", e.Entity, e.ID)
+}
+
+// 3. 错误分类
+type ErrorType int
+const (
+    ErrorTypeValidation ErrorType = iota
+    ErrorTypeNotFound
+    ErrorTypePermission
+    ErrorTypeInternal
+)
+
+type AppError struct {
+    Type    ErrorType
+    Message string
+    Err     error
+}
+
+func (e *AppError) Error() string {
+    return e.Message
+}
+
+func (e *AppError) Unwrap() error {
+    return e.Err
+}
+
+// 4. HTTP 层错误映射
+func httpStatus(err error) int {
+    var appErr *AppError
+    if errors.As(err, &appErr) {
+        switch appErr.Type {
+        case ErrorTypeValidation:
+            return http.StatusBadRequest
+        case ErrorTypeNotFound:
+            return http.StatusNotFound
+        case ErrorTypePermission:
+            return http.StatusForbidden
+        case ErrorTypeInternal:
+            return http.StatusInternalServerError
+        }
+    }
+    return http.StatusInternalServerError
+}
+
+// ========== 结构化错误 ==========
+type ErrorResponse struct {
+    Code    string      `json:"code"`
+    Message string      `json:"message"`
+    Details interface{} `json:"details,omitempty"`
+}
+
+func (e *ErrorResponse) Error() string {
+    return e.Message
+}
+
+func NewValidationError(field, msg string) *ErrorResponse {
+    return &ErrorResponse{
+        Code:    "VALIDATION_ERROR",
+        Message: "输入验证失败",
+        Details: map[string]string{field: msg},
+    }
+}
+
+func NewNotFoundError(entity string) *ErrorResponse {
+    return &ErrorResponse{
+        Code:    "NOT_FOUND",
+        Message: fmt.Sprintf("%s 未找到", entity),
+    }
+}
+
+// ========== 断言与辅助函数 ==========
+// 测试中辅助
+func assertNoError(t *testing.T, err error) {
+    t.Helper()
+    if err != nil {
+        t.Fatalf("不期望错误: %v", err)
+    }
+}
+
+// 只记录日志不返回
+func logError(err error) {
+    if err != nil {
+        // 包含调用栈信息
+        log.Printf("ERROR: %+v", err)
+    }
+}
+
+// ========== 总结: Go 错误哲学 ==========
+// 1. 错误是值 (values), 不是异常
+// 2. 显式处理每个错误 (if err != nil)
+// 3. 添加上下文 (fmt.Errorf %w)
+// 4. 只处理一次 (打印或返回)
+// 5. 设计可检查的错误链 (errors.Is/As)
+// 6. panic 留给真·异常情况</div>
+        <div class="note">💡 错误处理要点: Sentinel errors (var ErrXxx = errors.New(...)) 用于预期错误; 自定义错误类型实现 Error() 并可选 Unwrap(); fmt.Errorf %w 创建包装错误链; errors.Is 沿链匹配 sentinel error; errors.As 查找链中特定类型; 每条错误只处理一次 (日志或返回); 非关键错误降级; 重试用指数退避 + 不可恢复错误不重试; panic 仅用于不可能发生的错误; HTTP handler 顶层 recover 防止崩溃; defer 中检查 close 错误。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoError()">错误类型</button>
+        <button onclick="demoWrap()">错误包装</button>
+        <button onclick="demoStrategy()">策略模式</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoError() {
+            result.innerHTML = '';
+            log('# Go 错误类型');
+            log('');
+            log('error = interface{ Error() string }');
+            log('');
+            log('三种错误形式:');
+            log('  1. Sentinel: var ErrXxx = errors.New("msg")');
+            log('  2. 自定义: type XxxError struct { ... }');
+            log('  3. 包装: fmt.Errorf("ctx: %w", err)');
+            log('');
+            log('检查方式:');
+            log('  if err == ErrNotFound     ← sentinel');
+            log('  if errors.Is(err, ErrXxx) ← 链');
+            log('  var e *XxxError; errors.As(err, &e)');
+        }
+
+        function demoWrap() {
+            result.innerHTML = '';
+            log('# Error Wrapping');
+            log('');
+            log('包装: fmt.Errorf("ctx: %w", err)');
+            log('解包: errors.Unwrap(err)');
+            log('链查: errors.Is(err, ErrNotFound)');
+            log('类型: errors.As(err, &target)');
+            log('');
+            log('自定义 Unwrap 方法控制错误链:');
+            log('  func (e *MyError) Unwrap() error {');
+            log('    return e.Err');
+            log('  }');
+            log('');
+            log('自定义 Is 方法控制匹配:');
+            log('  func (e *MyError) Is(t error) bool');
+        }
+
+        function demoStrategy() {
+            result.innerHTML = '';
+            log('# 错误处理策略');
+            log('');
+            log('1. 提前返回');
+            log('   if err != nil { return nil, err }');
+            log('');
+            log('2. 只处理一次');
+            log('   日志或返回, 二选一');
+            log('');
+            log('3. 降级');
+            log('   非关键路径: 用默认值替代');
+            log('');
+            log('4. 重试');
+            log('   指数退避, 不可恢复错误不重试');
+            log('');
+            log('5. Panic/Recover');
+            log('   panic = 不可能发生');
+            log('   recover = 顶层防御');
+        }
+    </script>
+</body>
+</html>

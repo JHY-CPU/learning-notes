@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL JSON 操作</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📦 SQL JSON 操作</h2><p>MySQL JSON 数据类型、JSON 函数 (JSON_EXTRACT/JSON_SET/JSON_ARRAY_APPEND)、JSON 索引、PostgreSQL JSONB 操作、JSON 文档与关系型混合设计。</p></div>
+    <div class="card">
+        <h2>JSON 数据类型</h2>
+        <div class="code">// ========== JSON 数据 ==========
+-- MySQL 5.7+ 支持 JSON 类型
+-- PostgreSQL 9.2+ 支持 JSON, 9.4+ 支持 JSONB
+
+-- 优点: 灵活 schema, 适合不固定字段
+-- 缺点: 无法用传统索引, 验证开销
+
+-- ========== MySQL JSON ==========
+-- 创建 JSON 列
+CREATE TABLE products (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(200) NOT NULL,
+    attributes JSON,        -- 动态属性
+    metadata JSON,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 插入 JSON 数据
+INSERT INTO products (name, attributes, metadata) VALUES
+('iPhone 15',
+ '{"color": "black", "storage": "256GB", "features": ["5G", "FaceID", "USB-C"]}',
+ '{"weight": 171, "dimensions": {"width": 71.6, "height": 146.7, "thickness": 7.8}}'
+),
+('MacBook Pro',
+ '{"color": "silver", "storage": "512GB", "memory": "16GB", "features": ["M3", "Retina", "TouchID"]}',
+ '{"weight": 2140, "dimensions": {"width": 312, "height": 221, "thickness": 15.5}}'
+);
+
+-- ========== PostgreSQL JSONB ==========
+-- PostgreSQL 推荐使用 JSONB (二进制 JSON)
+-- CREATE TABLE products (
+--     id SERIAL PRIMARY KEY,
+--     name TEXT NOT NULL,
+--     attributes JSONB,
+--     metadata JSONB
+-- );
+
+-- JSON vs JSONB:
+-- JSON:  保留原格式, 保留空格/键顺序, 较慢
+-- JSONB: 解析后存储, 删除空格, 支持索引, 更快</div>
+    </div>
+    <div class="card">
+        <h2>JSON 查询与提取</h2>
+        <div class="code">// ========== MySQL JSON 查询 ==========
+
+-- 1. JSON_EXTRACT: 提取 JSON 值
+-- 语法: JSON_EXTRACT(json_doc, '$.path')
+-- 简写: -> 操作符
+
+-- 提取颜色
+SELECT
+    name,
+    JSON_EXTRACT(attributes, '$.color') AS color,
+    attributes->'$.color' AS color_short   -- 简写
+FROM products;
+
+-- 注意: JSON_EXTRACT 返回带引号的字符串
+-- 要去掉引号: JSON_UNQUOTE() 或 ->> 操作符
+
+SELECT
+    name,
+    JSON_UNQUOTE(JSON_EXTRACT(attributes, '$.color')) AS color,
+    attributes->>'$.color' AS color_short   -- 去引号简写
+FROM products;
+
+-- 2. 数组元素
+-- 提取第一个 feature
+SELECT
+    name,
+    JSON_EXTRACT(attributes, '$.features[0]') AS first_feature,
+    JSON_EXTRACT(attributes, '$.features') AS all_features
+FROM products;
+
+-- 3. 嵌套对象
+-- 提取 dimensions 中的 width
+SELECT
+    name,
+    metadata->'$.dimensions.width' AS width,
+    metadata->'$.dimensions.height' AS height
+FROM products;
+
+-- ========== JSON 路径表达式 ==========
+-- $.key              根对象的 key
+-- $.nested.key       嵌套对象的 key
+-- $.arr[0]           数组第一个元素
+-- $.arr[*]           数组所有元素
+-- $.arr[0].key       数组元素中的 key
+-- $.*                所有键值
+-- $.key              匹配特定键
+
+-- ========== WHERE 条件中使用 JSON ==========
+-- 查找黑色 (black) 的商品
+SELECT name, attributes->>'$.color' AS color
+FROM products
+WHERE attributes->>'$.color' = 'black';
+
+-- 查找 storage >= 256GB 的商品
+SELECT name, attributes->>'$.storage' AS storage
+FROM products
+WHERE CAST(attributes->>'$.storage' AS UNSIGNED) >= 256;
+
+-- JSON_CONTAINS: 检查是否包含
+-- 检查 features 数组是否包含 '5G'
+SELECT name FROM products
+WHERE JSON_CONTAINS(attributes->'$.features', '"5G"');
+
+-- JSON_SEARCH: 搜索值
+-- 搜索包含 'M3' 的路径
+SELECT name, JSON_SEARCH(attributes, 'one', 'M3') AS path
+FROM products;</div>
+    </div>
+    <div class="card">
+        <h2>JSON 修改与更新</h2>
+        <div class="code">// ========== MySQL JSON 修改 ==========
+
+-- 1. JSON_SET: 设置值 (存在则更新,不存在则添加)
+UPDATE products
+SET attributes = JSON_SET(attributes, '$.color', 'white')
+WHERE id = 1;
+
+-- 同时设置多个值
+UPDATE products
+SET attributes = JSON_SET(
+    attributes,
+    '$.color', 'space black',
+    '$.price', 999
+)
+WHERE id = 1;
+
+-- 2. JSON_INSERT: 只插入新值 (不更新已存在的)
+UPDATE products
+SET attributes = JSON_INSERT(attributes, '$.warranty', '1 year')
+WHERE id = 1;
+-- 如果 $.warranty 已存在,不会修改
+
+-- 3. JSON_REPLACE: 只更新已存在的值
+UPDATE products
+SET attributes = JSON_REPLACE(attributes, '$.color', 'midnight')
+WHERE id = 1;
+
+-- 4. JSON_REMOVE: 删除键
+UPDATE products
+SET attributes = JSON_REMOVE(attributes, '$.warranty')
+WHERE id = 1;
+
+-- 5. JSON_ARRAY_APPEND: 追加数组元素
+UPDATE products
+SET attributes = JSON_ARRAY_APPEND(attributes, '$.features', 'Bluetooth 5.3')
+WHERE id = 1;
+
+-- 6. JSON_MERGE_PATCH: 合并 (替换)
+-- 合并两个 JSON 对象
+UPDATE products
+SET attributes = JSON_MERGE_PATCH(
+    attributes,
+    '{"color": "blue", "new_feature": true}'
+);</div>
+    </div>
+    <div class="card">
+        <h2>JSON 索引与性能</h2>
+        <div class="code">// ========== JSON 索引 ==========
+-- JSON 列不能直接建索引
+-- 通过虚拟列间接索引
+
+-- 1. 创建虚拟列 + 索引 (MySQL 5.7+)
+ALTER TABLE products
+ADD COLUMN color VARCHAR(50) GENERATED ALWAYS AS (attributes->>'$.color') STORED;
+
+CREATE INDEX idx_product_color ON products(color);
+
+-- 查询时使用虚拟列 (走索引!)
+SELECT * FROM products WHERE color = 'black';
+
+-- 2. PostgreSQL JSONB 索引
+-- GIN 索引: 支持 @>, ?, ?|, ?& 操作符
+-- CREATE INDEX idx_products_attrs ON products USING GIN (attributes);
+
+-- 查询走索引:
+-- SELECT * FROM products WHERE attributes @> '{"color": "black"}';
+
+-- BTREE 索引: 特定键的索引
+-- CREATE INDEX idx_products_color ON products ((attributes->>'color'));
+
+-- ========== JSON vs 关系型 ==========
+-- 用 JSON:  字段不固定, 快速迭代, 少量查询
+-- 用列:     字段固定, 频繁查询/过滤, 需要强类型
+
+-- 混合设计: 固定字段用列, 可变字段用 JSON
+-- CREATE TABLE orders (
+--     id INT PRIMARY KEY,
+--     user_id INT NOT NULL,        -- 固定
+--     total DECIMAL(12,2) NOT NULL, -- 固定
+--     extra_info JSON              -- 可变 (配送备注, 优惠信息等)
+-- );
+
+-- ========== PostgreSQL JSONB 操作符 ==========
+-- ->   JSON 对象字段 (返回 JSON)
+-- ->>  JSON 对象字段 (返回 TEXT)
+-- #>   路径访问 (返回 JSON)
+-- #>>  路径访问 (返回 TEXT)
+-- @>   包含 (左包含右)
+-- ?    键是否存在
+-- ?|   任一键存在
+-- ?&   所有键存在
+-- ||   合并
+-- -    删除键</div>
+    </div>
+    <div class="card">
+        <h2>JSON 实战案例</h2>
+        <div class="code">// ========== 实战: 电商商品属性 ==========
+-- 不同品类商品属性不同,适合用 JSON
+
+-- 创建商品表 (混合设计)
+CREATE TABLE products (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    name VARCHAR(200) NOT NULL,
+    category_id INT NOT NULL,
+    price DECIMAL(10,2) NOT NULL,
+    attributes JSON,           -- 品类特定的属性
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 插入不同品类商品
+-- 手机
+INSERT INTO products (name, category_id, price, attributes) VALUES
+('iPhone 15', 1, 7999.00,
+ '{"color": "black", "storage": 256, "ram": 8, "screen": 6.1, "battery": "3349mAh"}');
+
+-- 笔记本
+INSERT INTO products (name, category_id, price, attributes) VALUES
+('MacBook Pro 14', 2, 14999.00,
+ '{"cpu": "M3 Pro", "ram": 18, "storage": 512, "screen": "14.2 inch", "weight": 1.6}');
+
+-- 服装
+INSERT INTO products (name, category_id, price, attributes) VALUES
+('Winter Jacket', 3, 599.00,
+ '{"size": "L", "color": "black", "material": "down", "season": "winter"}');
+
+-- ========== 查询: 按属性过滤 ==========
+-- 查找所有黑色的商品 (任何品类)
+SELECT name, category_id, attributes->>'$.color' AS color
+FROM products
+WHERE LOWER(attributes->>'$.color') = 'black';
+
+-- 查找存储 >= 256GB 的商品
+SELECT name, attributes->>'$.storage' AS storage_gb
+FROM products
+WHERE JSON_VALID(attributes->>'$.storage')
+  AND CAST(attributes->>'$.storage' AS UNSIGNED) >= 256;
+
+-- ========== 查询: JSON 聚合 ==========
+-- 统计所有颜色分布
+SELECT
+    attributes->>'$.color' AS color,
+    COUNT(*) AS cnt
+FROM products
+WHERE attributes->>'$.color' IS NOT NULL
+GROUP BY color
+ORDER BY cnt DESC;
+
+-- ========== 优缺点总结 ==========
+-- 优点:
+--   - 灵活 schema,无需 ALTER TABLE
+--   - 适合异构数据
+--   - 减少 JOIN (一对多关系内嵌)
+--
+-- 缺点:
+--   - JSON 查询性能不如列
+--   - 无法用传统约束 (如 FOREIGN KEY)
+--   - 占用空间更大
+--   - 缺乏类型安全</div>
+        <div class="note">💡 JSON 操作要点: JSON_EXTRACT/->
+ 提取; JSON_SET/INSERT/REPLACE 修改; 虚拟列索引加速 JSON 查询; 固定字段用列+可变字段用 JSON 混合设计; PostgreSQL JSONB 性能优于 MySQL JSON。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoJSON()">JSON 查询演示</button>
+        <button onclick="demoModify()">JSON 修改演示</button>
+        <button onclick="demoDesign()">混合设计演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoJSON() {
+            result.innerHTML = '';
+            log('# JSON 查询');
+            log('');
+            log("attributes = '{\"color\": \"black\", \"storage\": \"256GB\"}'");
+            log('');
+            log("attributes->>'$.color'          → black");
+            log("attributes->'$.storage'         → \"256GB\"");
+            log("JSON_EXTRACT(attributes, '$.color') → \"black\"");
+            log('');
+            log("WHERE条件: attributes->>'$.color' = 'black'");
+        }
+
+        function demoModify() {
+            result.innerHTML = '';
+            log('# JSON 修改函数');
+            log('');
+            log("JSON_SET(attrs, '$.key', val)     设置/更新");
+            log("JSON_INSERT(attrs, '$.key', val)  仅插入新值");
+            log("JSON_REPLACE(attrs, '$.key', val) 仅更新已存在");
+            log("JSON_REMOVE(attrs, '$.key')       删除键");
+            log("JSON_ARRAY_APPEND(attrs, '$.arr', val)  追加数组");
+            log('');
+            log("UPDATE products SET attrs = JSON_SET(attrs, '$.color', 'red') WHERE id = 1;");
+        }
+
+        function demoDesign() {
+            result.innerHTML = '';
+            log('# 混合设计策略');
+            log('');
+            log('CREATE TABLE products (');
+            log('    id INT PRIMARY KEY,');
+            log('    name VARCHAR(200),     -- 固定列');
+            log('    category_id INT,');
+            log('    price DECIMAL(10,2),');
+            log('    attributes JSON,       -- 可变属性');
+            log('    created_at DATETIME');
+            log(');');
+            log('');
+            log('固定字段: name, price, category_id');
+            log('JSON 字段: 品类特定属性 (颜色/尺寸/CPU)');
+            log('索引: 虚拟列 + 索引加速 JSON 查询');
+        }
+    </script>
+</body>
+</html>

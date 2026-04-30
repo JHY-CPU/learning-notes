@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>04-KMP算法-前缀函数 (KMP_ Prefix Function)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+.highlight { background: #ffeaa7; padding: 2px 4px; border-radius: 3px; }
+</style></head>
+<body>
+<h1>04 - KMP 算法 — 前缀函数 (KMP: Prefix Function)</h1>
+
+<div class="card">
+  <h2>什么是前缀函数？</h2>
+  <p>前缀函数 π[i]（也称 failure function / next 数组）是 KMP 算法的核心。它定义为：<strong>字符串 P[0..i] 中，既是真前缀又是真后缀的最长子串的长度</strong>。</p>
+  <div class="note">
+    <strong>形式化定义：</strong><br>
+    π[i] = max{ k | 0 ≤ k < i 且 P[0..k-1] = P[i-k+1..i] }<br>
+    如果不存在这样的 k，则 π[i] = 0<br><br>
+    <strong>直观理解：</strong> 当匹配到位置 i 失败时，π[i-1] 告诉我们模式串应该回退到哪个位置继续匹配。
+  </div>
+</div>
+
+<div class="card">
+  <h2>示例</h2>
+  <p>模式串 P = <strong>"ABABACA"</strong> 的前缀函数：</p>
+  <table border="1" cellpadding="8" cellspacing="0" style="width:100%;border-collapse:collapse;font-family:monospace;text-align:center;">
+    <tr style="background:#3498db;color:white;"><th>i</th><th>P[i]</th><th>子串 P[0..i]</th><th>最长公共前后缀</th><th>π[i]</th></tr>
+    <tr><td>0</td><td>A</td><td>A</td><td>无</td><td>0</td></tr>
+    <tr><td>1</td><td>B</td><td>AB</td><td>无</td><td>0</td></tr>
+    <tr><td>2</td><td>A</td><td>ABA</td><td>"A"</td><td>1</td></tr>
+    <tr><td>3</td><td>B</td><td>ABAB</td><td>"AB"</td><td>2</td></tr>
+    <tr><td>4</td><td>A</td><td>ABABA</td><td>"ABA"</td><td>3</td></tr>
+    <tr><td>5</td><td>C</td><td>ABABAC</td><td>无</td><td>0</td></tr>
+    <tr><td>6</td><td>A</td><td>ABABACA</td><td>"A"</td><td>1</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>前缀函数计算算法</h2>
+  <p>高效计算前缀函数的核心思想是<strong>利用已计算的前缀函数值</strong>，避免重复比较。算法在 O(m) 时间内完成。</p>
+  <pre>
+function computePrefixFunction(P):
+  m = P.length
+  π = new Array(m).fill(0)
+  k = 0  // 当前匹配的前缀长度
+  for i = 1 to m - 1:
+    // 当字符不匹配时，回退到之前的前缀
+    while k > 0 and P[i] !== P[k]:
+      k = π[k - 1]
+    // 如果字符匹配，前缀长度加 1
+    if P[i] === P[k]:
+      k++
+    π[i] = k
+  return π
+  </pre>
+  <div class="note">
+    <strong>关键理解：</strong> while 循环中的 <code>k = π[k-1]</code> 是最精妙的部分。当 P[i] !== P[k] 时，我们不想直接从头开始，而是尝试<strong>更短的前缀</strong>，利用之前算好的 π 值来找到下一个可能的前缀长度。
+  </div>
+</div>
+
+<div class="card">
+  <h2>前缀函数可视化</h2>
+  <p>从下图可以看出前缀函数的本质：π[i] 记录了子串 P[0..i] 中前后缀重叠的长度。</p>
+  <pre>
+示例: P = "ABABACA"
+
+i=2 (P[0..2]="ABA"):
+  "A" B "A"   → 前缀"A" = 后缀"A" → π[2]=1
+
+i=3 (P[0..3]="ABAB"):
+  "AB" A "AB" → 前缀"AB" = 后缀"AB" → π[3]=2
+
+i=4 (P[0..4]="ABABA"):
+  "ABA" B "ABA" → 前缀"ABA" = 后缀"ABA" → π[4]=3
+  </pre>
+</div>
+
+<div class="card">
+  <h2>交互演示：计算前缀函数</h2>
+  <p>输入模式串，实时计算前缀函数：</p>
+  <input type="text" id="patternInput" value="ABABACA" style="width:100%;padding:8px;margin:5px 0;">
+  <br>
+  <button onclick="computeAndShow()">计算前缀函数</button>
+  <button onclick="stepCompute()">逐步计算</button>
+  <div id="result"></div>
+</div>
+
+<script>
+function computePrefixFunction(P) {
+  const m = P.length;
+  const pi = new Array(m).fill(0);
+  let k = 0;
+  for (let i = 1; i < m; i++) {
+    while (k > 0 && P[i] !== P[k]) k = pi[k - 1];
+    if (P[i] === P[k]) k++;
+    pi[i] = k;
+  }
+  return pi;
+}
+
+function computeAndShow() {
+  const P = document.getElementById('patternInput').value;
+  if (!P) { document.getElementById('result').innerHTML = '请输入模式串'; return; }
+
+  const pi = computePrefixFunction(P);
+  let html = '<h3>前缀函数 π 数组</h3>';
+  html += `<p>模式串: <strong>${P}</strong>（长度=${P.length}）</p>`;
+
+  // 表格显示
+  html += '<table border="1" cellpadding="8" cellspacing="0" style="border-collapse:collapse;font-family:monospace;text-align:center;margin:10px 0;">';
+  html += '<tr style="background:#3498db;color:white;"><th>i</th>';
+  for (let i = 0; i < P.length; i++) html += `<td>${i}</td>`;
+  html += '</tr><tr><th>P[i]</th>';
+  for (let i = 0; i < P.length; i++) html += `<td>${P[i]}</td>`;
+  html += '</tr><tr><th>π[i]</th>';
+  for (let i = 0; i < P.length; i++) html += `<td style="background:#ffeaa7;font-weight:bold;">${pi[i]}</td>`;
+  html += '</tr></table>';
+
+  // 显示前后缀对应关系
+  html += '<h4>前后缀对应关系：</h4>';
+  for (let i = 1; i < P.length; i++) {
+    if (pi[i] > 0) {
+      const prefix = P.substring(0, pi[i]);
+      const suffix = P.substring(i - pi[i] + 1, i + 1);
+      html += `<p>π[${i}] = ${pi[i]}: 前缀 "${prefix}" = 后缀 "${suffix}"</p>`;
+    } else {
+      html += `<p>π[${i}] = 0: 无公共前后缀</p>`;
+    }
+  }
+
+  document.getElementById('result').innerHTML = html;
+}
+
+let stepCount = 0;
+function stepCompute() {
+  const P = document.getElementById('patternInput').value;
+  if (!P) { document.getElementById('result').innerHTML = '请输入模式串'; return; }
+
+  const m = P.length;
+  const pi = new Array(m).fill(0);
+  let k = 0;
+  const steps = [];
+  steps.push({ i: -1, desc: '初始化: k = 0, π[0] = 0', pi: [...pi], k: 0 });
+
+  for (let i = 1; i < m; i++) {
+    let desc = `<b>i = ${i}</b>, P[i] = '${P[i]}', k = ${k}<br>`;
+    let loops = 0;
+    while (k > 0 && P[i] !== P[k]) {
+      desc += `&nbsp;&nbsp;P[i] ≠ P[k] ('${P[i]}' ≠ '${P[k]}'), k = π[k-1] = ${pi[k-1]}<br>`;
+      k = pi[k - 1];
+      loops++;
+    }
+    if (P[i] === P[k]) {
+      desc += `&nbsp;&nbsp;P[i] === P[k] ('${P[i]}' === '${P[k]}'), k++ → ${k + 1}<br>`;
+      k++;
+    } else {
+      desc += `&nbsp;&nbsp;P[i] ≠ P[k] 且 k=0，保持 k=0<br>`;
+    }
+    pi[i] = k;
+    desc += `&nbsp;&nbsp;π[${i}] = ${k}`;
+    steps.push({ i, desc, pi: [...pi], k });
+  }
+
+  if (stepCount >= steps.length) stepCount = 0;
+
+  const s = steps[stepCount];
+  let html = `<h3>步骤 ${stepCount + 1} / ${steps.length}</h3>`;
+  if (s.i === -1) {
+    html += `<p>${s.desc}</p>`;
+  } else {
+    html += `<p>${s.desc}</p>`;
+  }
+
+  // 显示当前π数组
+  html += '<table border="1" cellpadding="5" style="border-collapse:collapse;font-family:monospace;text-align:center;margin:10px 0;">';
+  html += '<tr style="background:#3498db;color:white;"><th>i</th>';
+  for (let i = 0; i < m; i++) html += `<td>${i}</td>`;
+  html += '</tr><tr><th>P[i]</th>';
+  for (let i = 0; i < m; i++) html += `<td>${P[i]}</td>`;
+  html += '</tr><tr><th>π[i]</th>';
+  for (let i = 0; i < m; i++) {
+    const val = s.pi[i];
+    const highlight = i === s.i ? 'style="background:#2ecc71;color:white;font-weight:bold;"' : '';
+    html += `<td ${highlight}>${val}</td>`;
+  }
+  html += '</tr></table>';
+
+  html += `<p>进度: ${stepCount + 1} / ${steps.length}</p>`;
+  if (stepCount < steps.length - 1) html += '<button onclick="nextStep()">下一步 →</button>';
+
+  stepCount++;
+  document.getElementById('result').innerHTML = html;
+}
+
+function nextStep() {
+  stepCompute();
+}
+</script>
+</body></html>

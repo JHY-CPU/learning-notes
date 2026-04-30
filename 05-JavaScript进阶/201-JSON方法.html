@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JSON方法</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #json-input, #json-output { font-family: monospace; font-size: 13px; padding: 10px; border: 2px solid #ddd; border-radius: 4px; width: 100%; box-sizing: border-box; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>JSON 方法</h2><p>JSON.stringify / JSON.parse — 序列化与反序列化。</p></div>
+    <div class="card">
+        <h2>JSON.stringify</h2>
+        <div class="code">// 序列化为 JSON 字符串
+JSON.stringify(value);
+JSON.stringify(value, replacer);
+JSON.stringify(value, replacer, space);
+
+// 基本
+JSON.stringify({ a: 1, b: 2 });          // '{"a":1,"b":2}'
+JSON.stringify([1, 2, 3]);                // '[1,2,3]'
+JSON.stringify('hello');                  // '"hello"'
+JSON.stringify(42);                       // '42'
+JSON.stringify(true);                     // 'true'
+JSON.stringify(null);                     // 'null'
+
+// replacer — 过滤或转换
+JSON.stringify(obj, ['key1', 'key2']);    // 只序列化指定键
+JSON.stringify(obj, (key, value) => {      // 函数处理
+    if (key === 'password') return undefined; // 排除
+    if (typeof value === 'bigint') return value.toString();
+    return value;
+});
+
+// space — 美化缩进
+JSON.stringify(obj, null, 2);             // 2 空格缩进
+JSON.stringify(obj, null, '\t');          // Tab 缩进
+
+// toJSON — 自定义对象的序列化
+const obj = {
+    data: 42,
+    toJSON() { return { custom: this.data }; }
+};
+// JSON.stringify(obj) → '{"custom":42}'
+
+// ⚠️ 不支持: undefined, Function, Symbol（会被忽略或转为 null）
+// ⚠️ BigInt 会报错（需要 replacer 处理）
+// ⚠️ 循环引用会抛错</div>
+    </div>
+    <div class="card">
+        <h2>JSON.parse</h2>
+        <div class="code">// 解析 JSON 字符串
+JSON.parse(text);
+JSON.parse(text, reviver);
+
+// 基本
+JSON.parse('{"a":1,"b":2}');   // { a: 1, b: 2 }
+JSON.parse('[1,2,3]');          // [1, 2, 3]
+JSON.parse('"hello"');          // 'hello'
+JSON.parse('42');               // 42
+
+// reviver — 转换解析后的值
+JSON.parse('{"date":"2024-01-01"}', (key, value) => {
+    if (key === 'date') return new Date(value);
+    return value;
+});
+
+// ⚠️ JSON.parse 不会解析 undefined/Symbol/Function
+// ⚠️ 不是真正的 deep clone（Date → string, undefined 丢失, 循环引用崩溃）
+// ⚠️ 安全风险：永远不要解析不可信的 JSON（会执行 reviver）</div>
+    </div>
+    <div class="card">
+        <h2>演示：JSON 操作</h2>
+        <button onclick="demoStringify()">JSON.stringify 演示</button>
+        <button onclick="demoParse()">JSON.parse 演示</button>
+        <button onclick="demoDeepCopy()">JSON 深拷贝陷阱</button>
+        <pre id="json-output">点击按钮查看结果</pre>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const jsonOut = document.getElementById('json-output');
+
+        function log(msg, data) {
+            jsonOut.textContent = msg + '\n' + JSON.stringify(data, null, 2);
+            console.log(msg, data);
+        }
+
+        function demoStringify() {
+            const obj = {
+                name: 'Alice',
+                age: 30,
+                password: 'secret123',
+                role: 'admin',
+                createdAt: new Date(),
+                nested: { x: 1, y: 2 },
+            };
+
+            // 基本
+            log('1. 默认 stringify:', JSON.stringify(obj));
+
+            // 带 replacer（过滤 password）
+            const filtered = JSON.stringify(obj, (key, val) =>
+                key === 'password' ? undefined : val
+            );
+            log('\n2. 过滤 password:', JSON.parse(filtered));
+
+            // 带缩进
+            log('\n3. 美化输出:', JSON.stringify(obj, null, 2));
+
+            // toJSON
+            const withToJSON = {
+                id: 1,
+                data: [1, 2, 3],
+                toJSON() { return { id: this.id, count: this.data.length }; }
+            };
+            log('\n4. toJSON 自定义:', JSON.stringify(withToJSON));
+        }
+
+        function demoParse() {
+            const json = '{"name":"Bob","score":95,"date":"2025-01-15","tags":["js","json"]}';
+            const parsed = JSON.parse(json);
+            log('1. 基本解析:', parsed);
+
+            // reviver 转换日期
+            const withReviver = JSON.parse(json, (key, val) => {
+                if (key === 'date') return new Date(val).toLocaleDateString();
+                return val;
+            });
+            log('\n2. reviver 转换日期:', withReviver);
+
+            // 错误处理
+            try {
+                JSON.parse('invalid json');
+            } catch (e) {
+                log('\n3. 解析错误:', { message: e.message });
+            }
+        }
+
+        function demoDeepCopy() {
+            const original = {
+                name: 'Charlie',
+                age: 25,
+                birth: new Date('2000-01-01'),
+                skills: undefined,  // 会丢失
+                sayHi: () => {},    // 会丢失
+                nested: { scores: [90, 85] },
+            };
+
+            const copied = JSON.parse(JSON.stringify(original));
+
+            log('原始对象:', original);
+            log('\n深拷贝结果（问题展示）:', copied);
+            log('\n⚠️ 问题:\n' +
+                '1. Date → string\n' +
+                '2. undefined 丢失\n' +
+                '3. Function 丢失\n' +
+                '4. 循环引用会报错');
+        }
+
+        console.log('=== JSON 方法 ===');
+        console.log('JSON.stringify 支持:', typeof JSON.stringify);
+        console.log('JSON.parse 支持:', typeof JSON.parse);
+
+        document.getElementById('output').textContent =
+            `JSON: stringify/parse + replacer/reviver + toJSON\n` +
+            `⚠️ JSON 不是万能深拷贝\n` +
+            `✅ JSON 方法演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blob</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #blob-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Blob</h2><p>Binary Large Object — 二进制数据对象。</p></div>
+    <div class="card">
+        <h2>创建与属性</h2>
+        <div class="code">// 创建 Blob
+const blob = new Blob(array, options);
+
+// array — 数据源（ArrayBuffer / TypedArray / Blob / DOMString 的数组）
+const blob1 = new Blob(['Hello World']);                    // 文本
+const blob2 = new Blob(['<html>...</html>'], { type: 'text/html' }); // HTML
+const blob3 = new Blob([JSON.stringify({a:1})], { type: 'application/json' });
+const blob4 = new Blob([uint8Array], { type: 'image/png' }); // 二进制
+
+// options
+// type: MIME 类型（'text/plain' | 'text/html' | 'application/json' | 'image/png'...）
+// endings: 'transparent'（默认）| 'native'（换行符处理）
+
+// 属性
+blob.size;  // 字节大小
+blob.type;  // MIME 类型
+
+// 方法
+blob.slice(start, end, type);  // 截取部分（创建新的 Blob，用于分片上传）
+blob.arrayBuffer();            // 转为 ArrayBuffer（返回 Promise）
+blob.text();                   // 转为文本（返回 Promise）
+blob.stream();                 // 转为 ReadableStream</div>
+    </div>
+    <div class="card">
+        <h2>Blob URL</h2>
+        <div class="code">// 创建 Blob URL
+const url = URL.createObjectURL(blob);  // blob:http://...
+
+// 使用（可以用于 img/a/video/iframe 的 src）
+img.src = url;
+a.href = url;
+a.download = 'filename.txt';  // 指定下载文件名
+
+// 释放
+URL.revokeObjectURL(url);  // 释放内存
+
+// ⚠️ 每次 createObjectURL 都占用内存
+// ⚠️ 用完必须 revoke，否则内存泄漏
+// ⚠️ 同一个 blob 多次 createObjectURL 会得到不同 URL</div>
+    </div>
+    <div class="card">
+        <h2>演示：Blob 操作</h2>
+        <button onclick="createAndDownload()">创建文本 Blob 并下载</button>
+        <button onclick="blobToText()">Blob 转文本</button>
+        <button onclick="blobSlice()">Blob 分片</button>
+        <div id="blob-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const blobResult = document.getElementById('blob-result');
+
+        function log(msg) {
+            blobResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function createAndDownload() {
+            blobResult.innerHTML = '';
+            const content = '这是文件内容：\nBlob API 演示\n时间: ' + new Date().toLocaleString();
+            const blob = new Blob([content], { type: 'text/plain' });
+            log(`Blob size: ${blob.size} bytes`);
+            log(`Blob type: ${blob.type}`);
+
+            // 下载
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'demo-file.txt';
+            a.textContent = '下载文件';
+            a.click();
+            blobResult.innerHTML += `<div>✅ 文件已下载 (${blob.size}B)</div>`;
+
+            // 注意：不能立即 revoke，需要等下载开始
+            setTimeout(() => {
+                URL.revokeObjectURL(url);
+                log('Blob URL 已释放');
+            }, 1000);
+        }
+
+        async function blobToText() {
+            blobResult.innerHTML = '';
+            const blob = new Blob(['Hello Blob! 👋 你好'], { type: 'text/plain' });
+
+            // 方法1: text()
+            const text = await blob.text();
+            log(`text() 方法: ${text}`);
+
+            // 方法2: FileReader
+            const reader = new FileReader();
+            reader.onload = () => log(`FileReader: ${reader.result}`);
+            reader.readAsText(blob);
+        }
+
+        function blobSlice() {
+            blobResult.innerHTML = '';
+            const blob = new Blob(['ABCDEFGHIJKLMNOPQRSTUVWXYZ'], { type: 'text/plain' });
+            log(`原始: ${blob.size}B`);
+
+            const sliced = blob.slice(3, 8);  // "DEFGH"
+            sliced.text().then(text => {
+                log(`分片 (3-8): "${text}" (${sliced.size}B)`);
+            });
+
+            const sliced2 = blob.slice(-5);  // 最后5个
+            sliced2.text().then(text => {
+                log(`分片 (-5): "${text}"`);
+            });
+        }
+
+        console.log('=== Blob API ===');
+        console.log('Blob 支持:', typeof Blob === 'function');
+
+        document.getElementById('output').textContent =
+            `Blob: 二进制大对象\n` +
+            `new Blob([data], {type}) / blob.slice() / blob.text()\n` +
+            `URL.createObjectURL / revokeObjectURL\n` +
+            `✅ Blob 演示完成！`;
+    </script>
+</body>
+</html>

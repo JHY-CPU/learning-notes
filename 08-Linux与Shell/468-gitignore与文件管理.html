@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>gitignore与文件管理</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🚫 .gitignore 与文件管理</h2><p>.gitignore 模式、git rm/mv、清理文件、模板推荐。</p></div>
+    <div class="card">
+        <h2>.gitignore 基础</h2>
+        <div class="code">// ========== .gitignore 是什么 ==========
+// 告诉 Git 哪些文件不需要跟踪
+// 通常用于: 编译产物、依赖目录、环境文件、IDE 配置
+
+// .gitignore 放在仓库根目录
+// 也可以放在子目录 (只对该目录生效)
+// 支持 glob 模式匹配
+
+// ========== 模式语法 ==========
+# 注释        ← 以 # 开头
+
+*.log         # 忽略所有 .log 文件
+/build        # 忽略 build 目录 (从根目录)
+build/        # 忽略所有 build 目录
+node_modules/ # 忽略 node_modules 目录
+
+# 取反 (!)
+*.log         # 忽略所有 .log
+!important.log # 但不忽略 important.log
+
+# 递归 vs 非递归
+*.log         # 递归忽略所有 .log (任何层级)
+/*.log         # 只在根目录忽略 .log
+
+# 通配符
+*.tmp         # 所有 .tmp 文件
+doc/*.pdf     # doc 目录下所有 .pdf
+**/temp       # 任何层级的 temp 目录/文件
+
+# 空目录
+# Git 不跟踪空目录,所以 .gitignore 也不能跟踪空目录
+# 习惯在空目录放 .gitkeep 文件</div>
+    </div>
+    <div class="card">
+        <h2>常见 .gitignore 模板</h2>
+        <div class="code">// ========== Node.js ==========
+node_modules/
+dist/
+.env
+.env.local
+*.log
+npm-debug.log*
+.DS_Store
+coverage/
+.nyc_output/
+
+// ========== Python ==========
+__pycache__/
+*.py[cod]
+*.so
+.env
+venv/
+.venv/
+dist/
+build/
+*.egg-info/
+.eggs/
+*.egg
+.tox/
+.mypy_cache/
+.pytest_cache/
+.coverage
+
+// ========== Java ==========
+target/
+*.class
+*.jar
+*.war
+*.ear
+.idea/
+*.iml
+*.ipr
+*.iws
+.settings/
+.project
+.classpath
+.gradle/
+build/
+
+// ========== Go ==========
+*.exe
+*.test
+*.out
+vendor/
+
+// ========== Rust ==========
+target/
+Cargo.lock  # 库项目忽略,可执行项目保留
+
+// ========== IDE & 系统 ==========
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+
+# 系统
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# 编辑器临时文件
+*.swp
+*.swo
+*~
+
+// ========== 安全 (永远不要提交!) ==========
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+service-account.json
+config/secrets.yml
+**/secrets/**</div>
+    </div>
+    <div class="card">
+        <h2>文件管理命令</h2>
+        <div class="code">// ========== git rm — 删除文件 ==========
+// 从 Git 追踪中移除文件
+
+git rm file.txt                     # 删除文件并暂存删除
+git rm --cached file.txt            # 从 Git 移除但保留文件 (不再跟踪)
+git rm -r dir/                      # 递归删除目录
+
+// ========== git mv — 移动/重命名 ==========
+git mv old.txt new.txt              # 重命名
+
+// 等价于:
+mv old.txt new.txt
+git rm old.txt
+git add new.txt
+
+// ========== 更新 .gitignore 后的处理 ==========
+// 如果文件已被跟踪,加入 .gitignore 不会自动取消跟踪
+// 需要手动移除:
+
+# 1. 加入 .gitignore
+echo "*.env" >> .gitignore
+
+# 2. 取消跟踪已存在的文件
+git rm --cached .env
+
+# 3. 提交
+git commit -m "chore: stop tracking .env files"
+
+// ========== 清理 untracked 文件 ==========
+git clean -n                        # 预览要删除的文件 (dry-run)
+git clean -f                        # 强制删除 untracked 文件
+git clean -fd                       # 包括目录
+git clean -fx                       # 包括 .gitignore 中的文件
+
+// ========== 全局 .gitignore ==========
+// 对于所有仓库都通用的忽略规则
+git config --global core.excludesFile ~/.gitignore_global
+
+// ~/.gitignore_global:
+.DS_Store
+Thumbs.db
+*.swp
+*~</div>
+            <div class="note">💡 .gitignore 的最佳实践: 提交前设置好,避免不小心提交敏感文件。如果文件已经被跟踪,加入 .gitignore 不会生效,需要用 git rm --cached 取消跟踪。GitHub 的 gitignore 模板仓库 (github.com/github/gitignore) 提供了各语言的参考模板。</div>
+    </div>
+    <div class="card">
+        <h2>文件属性与权限</h2>
+        <div class="code">// ========== Git 文件状态 ==========
+// Untracked:   未跟踪 (新文件)
+// Tracked:
+//   Unmodified: 未修改
+//   Modified:   已修改
+//   Staged:     已暂存
+
+// 文件状态转换:
+// Untracked → git add → Staged → commit → Unmodified → 修改 → Modified → git add → Staged
+
+// ========== git ls-files ==========
+git ls-files                        # 列出所有被跟踪的文件
+git ls-files -s                     # 显示暂存区状态 (hash/模式/序号)
+git ls-files --others               # untracked 文件
+git ls-files --ignored              # 被 .gitignore 忽略的文件
+
+// ========== 文件权限 ==========
+// Git 只跟踪两种权限:
+// 100644 → 普通文件 (rw-r--r--)
+// 100755 → 可执行文件 (rwxr-xr-x)
+
+git add --chmod=+x script.sh        # 添加为可执行
+git update-index --chmod=+x script.sh  # 修改已跟踪文件为可执行
+
+// 查看权限:
+git ls-files -s script.sh
+// 100755 7d30d50... 0 script.sh  ← 可执行
+// 100644 7d30d50... 0 script.sh  ← 普通文件</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoGitignore()">.gitignore 演示</button>
+        <button onclick="demoClean()">清理演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoGitignore() {
+            result.innerHTML = '';
+            log('# .gitignore 演示');
+            log('');
+            log('# 仓库 .gitignore 示例:');
+            log('  # 依赖');
+            log('  node_modules/');
+            log('  venv/');
+            log('');
+            log('  # 构建产物');
+            log('  dist/');
+            log('  build/');
+            log('  *.log');
+            log('');
+            log('  # 环境变量');
+            log('  .env');
+            log('  .env.*');
+            log('');
+            log('  # IDE');
+            log('  .vscode/');
+            log('  .idea/');
+            log('  *.swp');
+            log('');
+            log('  # 系统');
+            log('  .DS_Store');
+            log('  Thumbs.db');
+            log('');
+            log('# 注意事项:');
+            log('  已跟踪的文件加入 .gitignore → 不生效!');
+            log('  → 需要 git rm --cached <file> 后再提交');
+        }
+
+        function demoClean() {
+            result.innerHTML = '';
+            log('# git clean 演示');
+            log('');
+            log('$ git status -s');
+            log('  M src/app.js');
+            log('  ?? temp.log');
+            log('  ?? build/');
+            log('');
+            log('$ git clean -n  (预览)');
+            log('  Would remove temp.log');
+            log('  Would remove build/');
+            log('');
+            log('$ git clean -fd  (删除 untracked 文件和目录)');
+            log('  Removing temp.log');
+            log('  Removing build/');
+            log('');
+            log('$ git ls-files');
+            log('  src/app.js');
+            log('  src/utils.js');
+            log('  README.md');
+        }
+    </script>
+</body>
+</html>

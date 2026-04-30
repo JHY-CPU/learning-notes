@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>参数进阶</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #9b59b6; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>函数参数进阶</h2><p>默认参数、剩余参数、arguments 对象。</p></div>
+    <div class="card">
+        <h2>默认参数（Default Parameters）</h2>
+        <div class="code">// ES6 之前：用 || 设置默认值
+function greet1(name) {
+    name = name || '游客';
+    console.log('你好, ' + name);
+}
+
+// ES6 默认参数
+function greet2(name = '游客') {
+    console.log(`你好, ${name}`);
+}
+greet2();          // "你好, 游客"
+greet2('Alice');   // "你好, Alice"
+
+// 多个默认参数
+function createUser(name = '匿名', age = 18, role = 'user') {
+    return { name, age, role };
+}</div>
+    </div>
+    <div class="card">
+        <h2>默认参数注意事项</h2>
+        <div class="code">// 带默认值的参数在 undefined 时触发
+function log(x = 'default') { console.log(x); }
+log(undefined);     // 'default' ✓
+log(null);          // null（不是 undefined，不触发默认值）
+log('');            // ''（空字符串，不触发默认值）
+log(0);             // 0
+
+// 默认值可以是表达式，只在使用时求值
+function getDefault() {
+    console.log('只会在需要时执行');
+    return 42;
+}
+function f(x = getDefault()) { }
+
+// 默认参数可以引用前面的参数
+function f2(a, b = a + 1) { return b; }
+f2(5);  // 6</div>
+    </div>
+    <div class="card">
+        <h2>剩余参数（Rest Parameters）</h2>
+        <div class="code">// ...args 收集剩余参数为数组
+function sum(...numbers) {
+    return numbers.reduce((a, c) => a + c, 0);
+}
+sum(1, 2, 3, 4);    // 10
+
+// 剩余参数必须是最后一个
+function logAll(first, ...rest) {
+    console.log('第一个:', first);
+    console.log('其余:', rest);
+}
+logAll('a', 'b', 'c', 'd');
+// 第一个: a, 其余: ['b', 'c', 'd']</div>
+    </div>
+    <div class="card">
+        <h2>arguments 对象（旧方式）</h2>
+        <div class="code">// arguments 是类数组对象（不是真正的数组）
+function oldSum() {
+    console.log(arguments);        // [1, 2, 3]
+    console.log(arguments.length); // 3
+    console.log(arguments[0]);     // 1
+    // arguments 没有数组方法！
+    // arguments.map(...)  // ❌ 报错
+}
+oldSum(1, 2, 3);
+
+// 转成数组
+function convert() {
+    const args = Array.from(arguments);
+    // 或 const args = [...arguments];
+    return args.map(x => x * 2);
+}</div>
+        <div class="note">💡 推荐用 rest 参数 ...args 代替 arguments（箭头函数也没有 arguments）。</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== 默认参数 ===');
+        function greet(name = '游客', greeting = '你好') {
+            return `${greeting}, ${name}!`;
+        }
+        console.log(greet());
+        console.log(greet('Alice'));
+        console.log(greet('Bob', 'Hello'));
+
+        console.log('=== 默认参数注意 ===');
+        function test(x = 'default') { return x; }
+        console.log('undefined:', test(undefined));
+        console.log('null:', test(null));
+        console.log("'':", test(''));
+
+        console.log('=== rest 参数 ===');
+        function sum(...nums) {
+            return nums.reduce((a, c) => a + c, 0);
+        }
+        console.log('sum(1,2,3,4,5):', sum(1, 2, 3, 4, 5));
+
+        function multiply(multiplier, ...nums) {
+            return nums.map(n => n * multiplier);
+        }
+        console.log('multiply(2, 1,2,3):', multiply(2, 1, 2, 3));
+
+        console.log('=== arguments ===');
+        function showAll() {
+            console.log('arguments:', Array.from(arguments));
+        }
+        showAll('a', 'b', 'c');
+
+        document.getElementById('output').textContent =
+            `默认参数: greet() → ${greet()}\n` +
+            `默认参数: greet('Alice') → ${greet('Alice')}\n` +
+            `rest求和: sum(1,2,3,4,5)=${sum(1,2,3,4,5)}\n` +
+            `multiply(2,...): [${multiply(2, 1, 2, 3)}]\n` +
+            `✅ 参数进阶演示完成！`;
+    </script>
+</body>
+</html>

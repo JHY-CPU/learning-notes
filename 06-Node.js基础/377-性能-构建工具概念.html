@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>性能-构建工具概念</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>性能-构建工具概念</h2><p>打包流程、Webpack/Rollup/Vite 对比、Loader/Plugin、Source Map。</p></div>
+    <div class="card">
+        <h2>构建工具 API</h2>
+        <div class="code">// ========== 构建流程 ==========
+// 入口 → 依赖解析 → 模块转换 → 打包 → 输出
+
+// ========== Loader vs Plugin ==========
+// Loader: 转换文件 (webpack: module.rules)
+// Plugin: 扩展功能 (webpack: plugins)
+
+// ========== Source Map ==========
+// 映射压缩代码 → 源代码 (调试用)
+// devtool: 'source-map' | 'eval-source-map' | 'inline-source-map'</div>
+    </div>
+    <div class="card">
+        <h2>演示：构建工具</h2>
+        <button onclick="demoWebpack()">Webpack</button>
+        <button onclick="demoVite()">Vite</button>
+        <button onclick="demoLoader()">Loader vs Plugin</button>
+        <button onclick="demoSourceMap()">Source Map</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoWebpack() {
+            result.innerHTML = '';
+            log('📦 Webpack:');
+            log('');
+
+            log('1️⃣ 核心概念:');
+            log('   • Entry (入口) — 从哪开始打包');
+            log('   • Output (输出) — 打包到哪');
+            log('   • Loader (加载器) — 转换文件');
+            log('   • Plugin (插件) — 扩展功能');
+            log('   • Mode (模式) — development/production');
+            log('');
+
+            log('2️⃣ 基础配置:');
+            log('   // webpack.config.js');
+            log('   module.exports = {');
+            log('     entry: "./src/index.js",');
+            log('     output: {');
+            log('       path: path.resolve(__dirname, "dist"),');
+            log('       filename: "[name].[contenthash].js"');
+            log('     },');
+            log('     module: {');
+            log('       rules: [');
+            log('         { test: /\.css$/, use: ["style-loader", "css-loader"] },');
+            log('         { test: /\.js$/, use: "babel-loader" }');
+            log('       ]');
+            log('     },');
+            log('     plugins: [');
+            log('       new HtmlWebpackPlugin({ template: "./src/index.html" })');
+            log('     ],');
+            log('     mode: "production"');
+            log('   };');
+            log('');
+
+            log('3️⃣ Webpack 5 新特性:');
+            log('   • Module Federation (模块联邦)');
+            log('   • 内置 Asset Modules (替代 file-loader)');
+            log('   • 持久化缓存 (加速二次构建)');
+            log('   • 更好的 Tree Shaking');
+            log('');
+
+            log('4️⃣ 构建流程:');
+            log('   ① 从 Entry 开始解析依赖图');
+            log('   ② Loader 转换模块 (ts→js, scss→css)');
+            log('   ③ Plugin 处理 (HTML 生成, CSS 提取)');
+            log('   ④ 打包输出到 dist');
+            log('   ⑤ 生成 Source Map');
+        }
+
+        function demoVite() {
+            result.innerHTML = '';
+            log('⚡ Vite:');
+            log('');
+
+            log('1️⃣ 核心特点:');
+            log('   • 开发: 基于 ESM 的 Dev Server (冷启动快)');
+            log('   • 生产: 使用 Rollup 打包');
+            log('   • HMR: 模块热替换 (毫秒级)');
+            log('   • 开箱即用: TypeScript/CSS/图片/JSON');
+            log('');
+
+            log('2️⃣ Vite 配置:');
+            log('   // vite.config.js');
+            log('   import { defineConfig } from "vite";');
+            log('   export default defineConfig({');
+            log('     plugins: [vue()],');
+            log('     build: {');
+            log('       outDir: "dist",');
+            log('       sourcemap: true,');
+            log('       rollupOptions: {');
+            log('         output: {');
+            log('           manualChunks: {');
+            log('             vendor: ["vue", "vue-router"]');
+            log('           }');
+            log('         }');
+            log('       }');
+            log('     }');
+            log('   });');
+            log('');
+
+            log('3️⃣ Webpack vs Vite:');
+            log('   ┌──────────┬──────────────┬──────────────┐');
+            log('   │          │ Webpack      │ Vite         │');
+            log('   ├──────────┼──────────────┼──────────────┤');
+            log('   │ 开发     │ 打包所有     │ 按需编译     │');
+            log('   │ HMR      │ 模块级       │ 文件级       │');
+            log('   │ 冷启动   │ 10-30s       │ <1s          │');
+            log('   │ 配置     │ 复杂         │ 简单         │');
+            log('   │ 生产     │ Webpack      │ Rollup       │');
+            log('   │ 生态     │ 丰富成熟     │ 快速增长     │');
+            log('   └──────────┴──────────────┴──────────────┘');
+            log('');
+
+            log('4️⃣ Rollup:');
+            log('   • Tree Shaking 最彻底');
+            log('   • 输出代码更干净');
+            log('   • 适合打包库/组件');
+            log('   • Vite 生产环境使用 Rollup');
+        }
+
+        function demoLoader() {
+            result.innerHTML = '';
+            log('🔧 Loader vs Plugin:');
+            log('');
+
+            log('1️⃣ Loader (加载器):');
+            log('   作用: 转换文件内容');
+            log('   运行: 在模块加载时');
+            log('   配置: module.rules');
+            log('');
+
+            log('2️⃣ 常用 Loader:');
+            log('   • babel-loader     — ES6+ → ES5');
+            log('   • ts-loader        — TypeScript → JavaScript');
+            log('   • css-loader       — CSS → JS (解析依赖)');
+            log('   • style-loader     — JS → DOM (<style>)');
+            log('   • sass-loader      — SCSS/SASS → CSS');
+            log('   • file-loader      — 文件路径 → URL');
+            log('   • url-loader       — 小文件 → DataURL');
+            log('   • eslint-loader    — 代码检查');
+            log('');
+
+            log('3️⃣ Plugin (插件):');
+            log('   作用: 扩展 Webpack 功能');
+            log('   运行: 在整个构建生命周期');
+            log('   配置: plugins []');
+            log('');
+
+            log('4️⃣ 常用 Plugin:');
+            log('   • HtmlWebpackPlugin      — 生成 HTML');
+            log('   • MiniCssExtractPlugin   — 提取 CSS 文件');
+            log('   • CssMinimizerPlugin     — 压缩 CSS');
+            log('   • TerserPlugin           — 压缩 JS');
+            log('   • BundleAnalyzerPlugin   — 包分析');
+            log('   • DefinePlugin           — 定义环境变量');
+            log('   • CopyWebpackPlugin      — 复制文件');
+            log('');
+
+            log('5️⃣ Loader vs Plugin:');
+            log('   Loader: 文件级别转换');
+            log('   Plugin: 构建生命周期扩展');
+            log('   Loader 在模块加载时工作');
+            log('   Plugin 可触及整个构建过程');
+        }
+
+        function demoSourceMap() {
+            result.innerHTML = '';
+            log('🗺️ Source Map:');
+            log('');
+
+            log('1️⃣ 什么是 Source Map?');
+            log('   映射压缩/转换后的代码 → 源代码');
+            log('   用于调试 (堆栈跟踪显示原始代码位置)');
+            log('');
+
+            log('2️⃣ devtool 选项 (Webpack):');
+            log('   false             — 不生成 (最快)');
+            log('   "source-map"      — 独立 .map 文件 (完整)');
+            log('   "eval-source-map" — 内联 DataURL (开发用)');
+            log('   "cheap-source-map"— 行级, 无列 (构建快)');
+            log('   "inline-source-map" — 内联到文件');
+            log('   "hidden-source-map" — 生成但不引用');
+            log('   "nosources-source-map" — 无源代码 (安全)');
+            log('');
+
+            log('3️⃣ Source Map 格式:');
+            log('   {');
+            log('     "version": 3,');
+            log('     "file": "bundle.js",');
+            log('     "sources": ["src/index.ts"],');
+            log('     "mappings": "AAAA,SAASA...",  // VLQ 编码');
+            log('     "sourceRoot": "",');
+            log('     "sourcesContent": ["原始代码..."]');
+            log('   }');
+            log('');
+
+            log('4️⃣ 生产环境建议:');
+            log('   // 只生成 source map, 不上传');
+            log('   // 用于错误监控 (Sentry)');
+            log('   devtool: "hidden-source-map"');
+            log('');
+            log('   // 或使用 Sentry Webpack Plugin');
+            log('   new SentryCliPlugin({');
+            log('     include: ".",');
+            log('     release: process.env.RELEASE');
+            log('   });');
+            log('');
+
+            log('5️⃣ Vite Source Map:');
+            log('   // vite.config.js');
+            log('   build: {');
+            log('     sourcemap: true,       // 生成');
+            log('     sourcemap: "hidden",   // 隐藏');
+            log('     sourcemap: "inline"    // 内联');
+            log('   }');
+        }
+
+        console.log('=== 构建工具概念 ===');
+        document.getElementById('output').textContent =
+            `构建工具: Webpack / Vite / Rollup / Loader vs Plugin / Source Map\n` +
+            `✅ 构建工具概念演示完成！`;
+    </script>
+</body>
+</html>

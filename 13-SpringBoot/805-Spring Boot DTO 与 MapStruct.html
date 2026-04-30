@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot DTO 与 MapStruct</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔄 DTO 模式与 MapStruct</h2><p>DTO/VO 分层设计、Entity ↔ DTO 转换、MapStruct 编译时映射、BeanUtils 对比、分层架构最佳实践。</p></div>
+    <div class="card">
+        <h2>DTO 分层设计</h2>
+        <div class="code">// ========== DTO (Data Transfer Object) ==========
+// 在不同层之间传输数据
+// 避免直接暴露 Entity 给外部
+
+// ========== 为什么需要 DTO ==========
+// 1. 安全: 不暴露敏感字段 (密码)
+// 2. 解耦: Entity 变更不影响 API
+// 3. 灵活: 自定义展示字段
+// 4. 性能: 只传输需要的数据
+// 5. 避免循环引用: Entity 关联关系复杂
+
+// ========== 三层结构 ==========
+// Controller 层   ↔   Service 层   ↔   Repository 层
+//   DTO/VO              DTO/Entity         Entity
+
+// ========== 请求 DTO (CreateUserRequest) ==========
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class CreateUserRequest {
+    @NotBlank
+    private String username;
+
+    @NotBlank
+    @Size(min = 6)
+    private String password;
+
+    @Email
+    private String email;
+
+    @Min(0) @Max(150)
+    private Integer age;
+}
+
+// ========== 响应 DTO (UserVO) ==========
+@Data
+@Builder
+public class UserVO {
+    private Long id;
+    private String username;
+    private String email;
+    private Integer age;
+    private String status;
+    private LocalDateTime createdAt;
+    // 注意: 不含 password!
+}
+
+// ========== 更新 DTO ==========
+@Data
+public class UpdateUserRequest {
+    @Size(min = 3, max = 50)
+    private String username;
+
+    @Email
+    private String email;
+
+    @Min(0) @Max(150)
+    private Integer age;
+}
+
+// ========== Entity (内部) ==========
+@Entity
+@Table(name = "users")
+@Data
+@NoArgsConstructor
+public class User {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    private String username;
+    private String password;        // 敏感: 不暴露
+    private String email;
+    private Integer age;
+    @Enumerated(EnumType.STRING)
+    private UserStatus status;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+}</div>
+    </div>
+    <div class="card">
+        <h2>手动转换 vs BeanUtils</h2>
+        <div class="code">// ========== 方式 1: 手动转换 ==========
+// 最直接, 但代码冗长
+
+@Service
+public class UserService {
+
+    public UserVO toVO(User user) {
+        return UserVO.builder()
+            .id(user.getId())
+            .username(user.getUsername())
+            .email(user.getEmail())
+            .age(user.getAge())
+            .status(user.getStatus().name())
+            .createdAt(user.getCreatedAt())
+            .build();
+    }
+
+    public User toEntity(CreateUserRequest request) {
+        User user = new User();
+        user.setUsername(request.getUsername());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setEmail(request.getEmail());
+        user.setAge(request.getAge());
+        user.setStatus(UserStatus.ACTIVE);
+        return user;
+    }
+
+    public List&lt;UserVO&gt; toVOList(List&lt;User&gt; users) {
+        return users.stream()
+            .map(this::toVO)
+            .collect(Collectors.toList());
+    }
+}
+
+// ========== 方式 2: BeanUtils (反射, 不推荐) ==========
+// 性能差, 无类型安全, 易出错
+
+public UserVO toVO(User user) {
+    UserVO vo = new UserVO();
+    BeanUtils.copyProperties(user, vo);   // 同名属性复制
+    // 问题: 字段名不同时不工作
+    // 问题: 无编译期检查
+    return vo;
+}
+
+// ========== BeanUtils 的问题 ==========
+// 1. 反射调用 → 性能差 (比 MapStruct 慢 10-100 倍)
+// 2. 无类型安全 → 运行时出错
+// 3. 字段名需完全一致
+// 4. null 复制问题
+// 5. 内存溢出风险 (大对象)</div>
+    </div>
+    <div class="card">
+        <h2>MapStruct</h2>
+        <div class="code">// ========== MapStruct ==========
+// 编译时生成映射代码 (非反射)
+// 性能最佳, 类型安全
+
+// ========== 1. 添加依赖 ==========
+// Maven:
+&lt;dependency&gt;
+    &lt;groupId&gt;org.mapstruct&lt;/groupId&gt;
+    &lt;artifactId&gt;mapstruct&lt;/artifactId&gt;
+    &lt;version&gt;1.5.5.Final&lt;/version&gt;
+&lt;/dependency&gt;
+
+// 注解处理器:
+&lt;plugin&gt;
+    &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+    &lt;artifactId&gt;maven-compiler-plugin&lt;/artifactId&gt;
+    &lt;configuration&gt;
+        &lt;annotationProcessorPaths&gt;
+            &lt;path&gt;
+                &lt;groupId&gt;org.mapstruct&lt;/groupId&gt;
+                &lt;artifactId&gt;mapstruct-processor&lt;/artifactId&gt;
+                &lt;version&gt;1.5.5.Final&lt;/version&gt;
+            &lt;/path&gt;
+            &lt;path&gt;
+                &lt;groupId&gt;org.projectlombok&lt;/groupId&gt;
+                &lt;artifactId&gt;lombok&lt;/artifactId&gt;
+            &lt;/path&gt;
+        &lt;/annotationProcessorPaths&gt;
+    &lt;/configuration&gt;
+&lt;/plugin&gt;
+
+// ========== 2. 定义 Mapper ==========
+@Mapper(componentModel = "spring")         // 生成 Spring Bean
+public interface UserMapper {
+
+    // Entity → DTO
+    UserVO toVO(User user);
+
+    // DTO → Entity
+    User toEntity(CreateUserRequest request);
+
+    // List 映射
+    List&lt;UserVO&gt; toVOList(List&lt;User&gt; users);
+
+    // 多参数映射
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "password", ignore = true)
+    @Mapping(target = "status", constant = "ACTIVE")
+    @Mapping(target = "createdAt", expression = "java(java.time.LocalDateTime.now())")
+    User toEntity(CreateUserRequest request, @Context PasswordEncoder encoder);
+
+    // 更新 Entity (部分字段)
+    @Mapping(target = "id", ignore = true)
+    @Mapping(target = "password", ignore = true)
+    @Mapping(target = "status", ignore = true)
+    @Mapping(target = "createdAt", ignore = true)
+    void updateEntity(UpdateUserRequest request, @MappingTarget User user);
+}
+
+// ========== 3. 使用 ==========
+@Service
+@RequiredArgsConstructor
+public class UserService {
+
+    private final UserRepository userRepository;
+    private final UserMapper userMapper;
+    private final PasswordEncoder passwordEncoder;
+
+    public UserVO createUser(CreateUserRequest request) {
+        User user = userMapper.toEntity(request);
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        User saved = userRepository.save(user);
+        return userMapper.toVO(saved);
+    }
+
+    public UserVO getUser(Long id) {
+        User user = userRepository.findById(id).orElseThrow();
+        return userMapper.toVO(user);
+    }
+
+    public List&lt;UserVO&gt; getAllUsers() {
+        return userMapper.toVOList(userRepository.findAll());
+    }
+
+    public UserVO updateUser(Long id, UpdateUserRequest request) {
+        User user = userRepository.findById(id).orElseThrow();
+        userMapper.updateEntity(request, user);           // 部分更新
+        User saved = userRepository.save(user);
+        return userMapper.toVO(saved);
+    }
+}
+
+// ========== 生成的代码 (编译后) ==========
+// MapStruct 编译时生成 UserMapperImpl
+// 使用 getter/setter 直接赋值, 无反射
+// 性能 ≈ 手动转换</div>
+    </div>
+    <div class="card">
+        <h2>MapStruct 高级</h2>
+        <div class="code">// ========== MapStruct 高级映射 ==========
+
+// ========== 自定义类型转换 ==========
+public class DateMapper {
+    public String asString(LocalDateTime date) {
+        return date != null ? date.format(DateTimeFormatter.ISO_DATE) : null;
+    }
+
+    public LocalDateTime asLocalDateTime(String date) {
+        return date != null ? LocalDateTime.parse(date) : null;
+    }
+}
+
+@Mapper(componentModel = "spring", uses = DateMapper.class)
+public interface OrderMapper {
+    OrderVO toVO(Order order);
+}
+
+// ========== 默认值 ==========
+@Mapper
+public interface ProductMapper {
+    @Mapping(target = "status", defaultValue = "ACTIVE")
+    @Mapping(target = "version", defaultExpression = "java(1L)")
+    @Mapping(target = "tags", defaultExpression = "java(new ArrayList<>())")
+    Product toEntity(CreateProductRequest request);
+}
+
+// ========== 忽略字段 ==========
+@Mapper
+public interface UserMapper {
+    @Mapping(target = "password", ignore = true)   // 忽略字段
+    @Mapping(target = "roles", ignore = true)
+    UserVO toVO(User user);
+}
+
+// ========== 嵌套对象映射 ==========
+// User 有 Address address
+// UserVO 有 AddressVO addressVO
+
+@Mapper(componentModel = "spring")
+public interface AddressMapper {
+    AddressVO toVO(Address address);
+}
+
+@Mapper(componentModel = "spring", uses = AddressMapper.class)
+public interface UserMapper {
+    UserVO toVO(User user);   // 自动使用 AddressMapper 处理嵌套
+}
+
+// ========== 常量映射 ==========
+@Mapping(target = "type", constant = "USER")
+@Mapping(target = "source", constant = "API")
+
+// ========== 多源映射 ==========
+@Mapping(target = "fullName", source = "user.name")
+@Mapping(target = "orderCount", source = "stats.count")
+UserDetailVO toDetailVO(User user, OrderStats stats);
+
+// ========== 反向映射 ==========
+@Mapper
+public interface UserMapper {
+    UserVO toVO(User user);
+    User toEntity(UserVO userVO);         // 反向
+    // 或: @InheritInverseConfiguration
+    @InheritInverseConfiguration
+    User toEntity(UserVO userVO);
+}</div>
+    </div>
+    <div class="card">
+        <h2>最佳实践</h2>
+        <div class="code">// ========== DTO 最佳实践 ==========
+
+// ========== 1. 严格分层 ==========
+// Controller: 接收/返回 DTO
+// Service:    业务逻辑, DTO ↔ Entity
+// Repository: 仅操作 Entity
+
+// ❌ 错误: 在 Controller 暴露 Entity
+@GetMapping("/{id}")
+public User getUser(@PathVariable Long id) {  // 直接返回 Entity
+    return userService.findById(id);
+}
+
+// ✅ 正确: 返回 DTO
+@GetMapping("/{id}")
+public UserVO getUser(@PathVariable Long id) {
+    return userService.getUser(id);
+}
+
+// ========== 2. 不要循环引用 ==========
+// DTO 中避免双向引用
+// UserVO 不含 orders, OrderVO 含 userId
+
+// ========== 3. MapStruct 优先 ==========
+// 编译时生成, 无反射, 类型安全, 高性能
+// 比 BeanUtils 快 10-100 倍
+
+// ========== 4. 验证 ==========
+// 请求 DTO 用 @Valid 校验
+// 响应 DTO 不需要校验
+
+// ========== 5. 不可变 DTO ==========
+// 响应 DTO 用 @Value 或 @Builder
+// 创建后不可修改
+
+// ========== 6. 集合映射 ==========
+// 用 MapStruct 的 List 映射方法
+// 避免手动 stream().map()
+
+// ========== 7. 使用 @MappingTarget ==========
+// 更新已有 Entity 时避免 new 对象
+// 保持 JPA 实体在持久化上下文中
+
+// ========== 8. 关注点分离 ==========
+// 一个 Entity 对应多个 DTO
+// CreateUserRequest / UpdateUserRequest / UserVO</div>
+        <div class="note">💡 DTO 与 MapStruct 要点: DTO 分层避免暴露 Entity; MapStruct 编译时映射 (非反射); @Mapper(componentModel="spring") 注入; @Mapping 控制字段映射; ignore/defaultValue/constant/expression 多种策略; 避免 BeanUtils 反射; 请求 DTO 校验; 响应 DTO 不变; MapStruct 性能 ≈ 手动。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoDTO()">DTO 分层</button>
+        <button onclick="demoMapStruct()">MapStruct</button>
+        <button onclick="demoBest()">最佳实践</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoDTO() {
+            result.innerHTML = '';
+            log('# DTO 分层设计');
+            log('');
+            log('Controller → Service → Repository');
+            log('    DTO    → DTO/Entity → Entity');
+            log('');
+            log('请求 DTO: CreateUserRequest (@Valid)');
+            log('响应 DTO: UserVO (不含 password)');
+            log('Entity:   User (含所有字段)');
+        }
+
+        function demoMapStruct() {
+            result.innerHTML = '';
+            log('# MapStruct 编译时映射');
+            log('');
+            log('@Mapper(componentModel="spring")');
+            log('public interface UserMapper {');
+            log('  UserVO toVO(User user);');
+            log('  User toEntity(CreateUserRequest req);');
+            log('  List&lt;UserVO&gt; toVOList(List&lt;User&gt; users);');
+            log('}');
+            log('');
+            log('@Mapping(target="password", ignore=true)');
+            log('@Mapping(target="status", constant="ACTIVE")');
+        }
+
+        function demoBest() {
+            result.innerHTML = '';
+            log('# 最佳实践');
+            log('');
+            log('✅ MapStruct (编译时, 类型安全)');
+            log('❌ BeanUtils (反射, 慢)');
+            log('✅ 请求 DTO 用 @Valid 校验');
+            log('✅ 响应 DTO 用 @Builder 不可变');
+            log('✅ Controller 暴露 DTO, 非 Entity');
+        }
+    </script>
+</body>
+</html>

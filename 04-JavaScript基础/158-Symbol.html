@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Symbol</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #16a085; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Symbol — 唯一值</h2><p>每个 Symbol 都是唯一的值，常用于对象属性键防止冲突。</p></div>
+    <div class="card">
+        <h2>创建 Symbol</h2>
+        <div class="code">// 无描述
+const s1 = Symbol();
+const s2 = Symbol();
+
+// 带描述（仅供调试用）
+const s3 = Symbol('id');
+const s4 = Symbol('id');
+
+s3 === s4;  // false — 即使描述相同也不相等
+
+// Symbol 的描述
+s3.description;  // 'id'
+
+// ⚠️ Symbol 不能 new
+// const s = new Symbol();  // ❌ TypeError
+
+// ⚠️ Symbol 不会被自动转字符串
+// String(s3)     // ✅ 'Symbol(id)'
+// s3 + ''        // ❌ TypeError
+
+// ⚠️ Symbol 不能和大多数运算符混用
+// s3 + 1         // ❌ TypeError</div>
+    </div>
+    <div class="card">
+        <h2>Symbol 作为属性键</h2>
+        <div class="code">const id = Symbol('id');
+const user = {
+    name: 'Alice',
+    [id]: 12345  // 计算属性名语法
+};
+
+user[id];        // 12345（只有持有该 Symbol 才能访问）
+user.id;         // undefined（普通属性名访问不到）
+
+// 不会被常规遍历到
+for (let key in user) console.log(key);  // 只输出 'name'
+Object.keys(user);     // ['name']
+Object.getOwnPropertyNames(user); // ['name']
+
+// 只有特定方法能获取 Symbol 属性
+Object.getOwnPropertySymbols(user);  // [Symbol(id)]
+
+// Symbol 属性常用于：给第三方对象或库添加元数据而不冲突</div>
+    </div>
+    <div class="card">
+        <h2>全局 Symbol（Symbol.for）</h2>
+        <div class="code">// Symbol.for — 在全局注册表中创建/获取
+const s1 = Symbol.for('app.id');
+const s2 = Symbol.for('app.id');
+
+s1 === s2;  // true（全局注册表中同名 Symbol 是同一个）
+
+// Symbol.keyFor — 获取全局 Symbol 的描述
+Symbol.keyFor(s1);  // 'app.id'
+
+// 普通 Symbol 没有 keyFor
+const s3 = Symbol('test');
+Symbol.keyFor(s3);  // undefined（不在全局注册表中）
+
+// 用途：跨模块共享同一个 Symbol
+// module-a.js
+// export const MY_KEY = Symbol.for('my.key');
+// module-b.js
+// import { MY_KEY } from './module-a';
+// 或者直接用 Symbol.for('my.key') 拿到同一个</div>
+    </div>
+    <div class="card">
+        <h2>常用内置 Symbol</h2>
+        <div class="code">// Symbol.iterator — 使对象可迭代
+const arr = [1, 2, 3];
+arr[Symbol.iterator];  // 内置迭代器函数
+
+// Symbol.toStringTag — 自定义 Object.prototype.toString 结果
+const myObj = {
+    [Symbol.toStringTag]: 'MyObject'
+};
+Object.prototype.toString.call(myObj);  // '[object MyObject]'
+
+// Symbol.hasInstance — 自定义 instanceof
+class MyArray {
+    static [Symbol.hasInstance](instance) {
+        return Array.isArray(instance);
+    }
+}
+[] instanceof MyArray;  // true
+
+// Symbol.toPrimitive — 自定义类型转换
+const obj = {
+    valueOf: () => 42,
+    [Symbol.toPrimitive](hint) {
+        if (hint === 'number') return 100;
+        if (hint === 'string') return 'hello';
+        return 'default';
+    }
+};
++obj;       // 100
+`${obj}`;   // 'hello'
+
+// 其他内置 Symbol：
+// Symbol.species     — 控制衍生对象的构造函数
+// Symbol.match       — 自定义 String.prototype.match
+// Symbol.replace     — 自定义 String.prototype.replace
+// Symbol.search      — 自定义 String.prototype.search
+// Symbol.split       — 自定义 String.prototype.split
+// Symbol.unscopables — 定义 with 语句中哪些属性被排除</div>
+    </div>
+    <div class="card">
+        <h2>Symbol 实际应用</h2>
+        <div class="code">// 1. 避免属性名冲突
+const COLORS = {
+    RED:   Symbol('red'),
+    GREEN: Symbol('green'),
+    BLUE:  Symbol('blue'),
+};
+// 保证每个值唯一，不怕命名冲突
+
+// 2. 定义私有（约定式）属性
+const _password = Symbol('password');
+class User {
+    constructor(name, password) {
+        this.name = name;
+        this[_password] = password;
+    }
+    checkPassword(pwd) {
+        return this[_password] === pwd;
+    }
+}
+// 外部无法通过 for...in/Object.keys 获取密码
+
+// 3. 给第三方对象添加元数据
+// const rating = Symbol('rating');
+//第三方对象
+// const video = api.getVideo(id);
+// 添加元数据而不影响原对象
+// video[rating] = 4.5;</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== Symbol 唯一性 ===');
+        const s1 = Symbol('id');
+        const s2 = Symbol('id');
+        console.log('s1 === s2:', s1 === s2);
+        console.log('s1 description:', s1.description);
+
+        console.log('=== Symbol 作为属性键 ===');
+        const uid = Symbol('uid');
+        const user = {
+            name: 'Alice',
+            [uid]: 9999
+        };
+        console.log('user[uid]:', user[uid]);
+        console.log('user.uid:', user.uid);
+
+        console.log('=== 全局 Symbol ===');
+        const g1 = Symbol.for('shared');
+        const g2 = Symbol.for('shared');
+        console.log('g1 === g2:', g1 === g2);
+        console.log('keyFor:', Symbol.keyFor(g1));
+
+        console.log('=== Symbol 遍历 ===');
+        const sym = Symbol('secret');
+        const obj = { a: 1, [sym]: '隐藏值' };
+        console.log('Object.keys:', Object.keys(obj));
+        console.log('getOwnPropertySymbols:', Object.getOwnPropertySymbols(obj));
+
+        console.log('=== Symbol.toPrimitive ===');
+        const custom = {
+            valueOf: () => 42,
+            [Symbol.toPrimitive](hint) {
+                return hint === 'number' ? 999 : '文字';
+            }
+        };
+        console.log('number:', +custom);
+        console.log('string:', String(custom));
+
+        document.getElementById('output').textContent =
+            `s1 === s2: ${s1 === s2}\n` +
+            `user[uid]: ${user[uid]}\n` +
+            `全局Symbol相同: ${g1 === g2}\n` +
+            `✅ Symbol 演示完成！`;
+    </script>
+</body>
+</html>

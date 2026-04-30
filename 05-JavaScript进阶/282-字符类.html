@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字符类</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #char-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; margin: 5px 0; width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>字符类</h2><p>\d / \w / \s / . / [abc] / [^abc] / Unicode 类 \p{}。</p></div>
+    <div class="card">
+        <h2>字符类大全</h2>
+        <div class="code">// ========== 预定义字符类 ==========
+// \d  — 数字 [0-9]
+// \D  — 非数字 [^0-9]
+// \w  — 单词字符 [a-zA-Z0-9_]
+// \W  — 非单词字符 [^a-zA-Z0-9_]
+// \s  — 空白字符 [ \t\n\r\f\v]
+// \S  — 非空白字符
+// .   — 任意字符（除换行），dotAll 模式 (s) 包含换行
+
+// ========== 自定义字符类 [...] ==========
+[abc]       // a 或 b 或 c
+[^abc]      // 除了 a/b/c 之外的任何字符
+[a-z]       // 小写字母 a-z
+[0-9]       // 数字
+[a-zA-Z]    // 所有字母
+[0-9a-f]    // 十六进制数字
+[一-鿿] // 中文字符 (Unicode 范围)
+
+// ========== Unicode 字符类 \p{} ==========
+// 需要 u flag
+\p{L}       // 任意字母 (Letter)
+\p{N}       // 任意数字 (Number)
+\p{P}       // 标点符号 (Punctuation)
+\p{S}       // 符号 (Symbol)
+\p{Z}       // 分隔符 (Separator)
+\p{Sc}      // 货币符号 ($, €, ¥)
+\p{Han}     // 汉字 (CJK 表意文字)
+
+// ========== 非 Unicode 类 ==========
+// \t — 制表符
+// \n — 换行符
+// \r — 回车符
+// \f — 换页符
+// \v — 垂直制表符
+// \0 — null 字符</div>
+    </div>
+    <div class="card">
+        <h2>演示：字符类</h2>
+        <input id="charInput" value="Hello 世界 123 $100 #tag" placeholder="输入文本">
+        <button onclick="demoCharClass()">测试字符类</button>
+        <div id="char-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const charResult = document.getElementById('char-result');
+
+        function log(msg) {
+            charResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function matchAndLog(re, text, label) {
+            const matches = text.match(re);
+            log(`${label}: ${matches ? `[${matches.join(', ')}]` : '无匹配'}`);
+        }
+
+        function demoCharClass() {
+            charResult.innerHTML = '';
+            const text = document.getElementById('charInput').value;
+            log(`📋 文本: "${text}"`);
+            log('');
+
+            log('1️⃣ 预定义字符类:');
+            matchAndLog(/\d+/g, text, '  \\d+ (数字)');
+            matchAndLog(/\D+/g, text, '  \\D+ (非数字)');
+            matchAndLog(/\w+/g, text, '  \\w+ (单词字符)');
+            matchAndLog(/\W+/g, text, '  \\W+ (非单词字符)');
+            matchAndLog(/\s+/g, text, '  \\s+ (空白)');
+            log('');
+
+            log('2️⃣ 自定义字符类:');
+            matchAndLog(/[aeiou]/gi, text, '  [aeiou] (元音)');
+            matchAndLog(/[^a-zA-Z\s]+/g, text, '  [^a-zA-Z] (非字母)');
+            matchAndLog(/[0-9]+/g, text, '  [0-9] (数字)');
+            log('');
+
+            log('3️⃣ Unicode 类 (需要 u flag):');
+            try {
+                matchAndLog(/\p{L}+/gu, text, '  \\p{L} (所有字母)');
+                matchAndLog(/\p{N}+/gu, text, '  \\p{N} (所有数字)');
+                matchAndLog(/\p{Sc}/gu, text, '  \\p{Sc} (货币符号)');
+                matchAndLog(/\p{Han}+/gu, text, '  \\p{Han} (汉字)');
+            } catch (e) {
+                log('  ⚠️ 浏览器不支持 Unicode 属性转义');
+            }
+            log('');
+
+            log('4️⃣ . 点号 (匹配任意字符):');
+            matchAndLog(/H.llo/g, text, '  H.llo');
+            matchAndLog(/./g, text, '  . (每个字符)');
+        }
+
+        console.log('=== 字符类 ===');
+
+        document.getElementById('output').textContent =
+            `字符类: \\d \\w \\s . [abc] [^abc] [a-z] \\p{L}\n` +
+            `Unicode类: \\p{L} \\p{N} \\p{Sc} \\p{Han} (需 u flag)\n` +
+            `✅ 字符类演示完成！`;
+    </script>
+</body>
+</html>

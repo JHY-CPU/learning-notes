@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>事件类型</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #f39c12; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        .event-box { background: #3498db; color: white; padding: 20px; border-radius: 8px; text-align: center; margin: 5px; cursor: pointer; user-select: none; }
+        .event-box:active { opacity: 0.8; }
+        .event-box.green { background: #2ecc71; }
+        .event-box.orange { background: #e67e22; }
+        .event-box.small { padding: 10px 15px; font-size: 14px; display: inline-block; }
+        #mouse-area { background: #ecf0f1; border: 2px solid #bdc3c7; border-radius: 8px; padding: 30px; text-align: center; margin: 10px 0; height: 150px; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+        #mouse-stats { font-size: 13px; color: #7f8c8d; margin-top: 5px; }
+        .event-log { max-height: 150px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 12px; margin-top: 10px; }
+        .event-log div { padding: 1px 0; border-bottom: 1px solid #eee; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>事件类型</h2><p>常见 DOM 事件：鼠标、键盘、表单、窗口等。</p></div>
+    <div class="card">
+        <h2>鼠标事件</h2>
+        <div class="code">// 鼠标事件类型
+click       — 单击（完整点击：mousedown + mouseup）
+dblclick    — 双击
+mousedown   — 鼠标按下
+mouseup     — 鼠标松开
+mousemove   — 鼠标移动
+mouseover   — 鼠标进入元素（冒泡）
+mouseout    — 鼠标离开元素（冒泡）
+mouseenter  — 鼠标进入元素（不冒泡）
+mouseleave  — 鼠标离开元素（不冒泡）
+contextmenu — 右键菜单
+
+// mouseover vs mouseenter：
+// mouseover 会冒泡，从子元素移入也会触发父元素
+// mouseenter 不冒泡，只进入元素本身时触发
+
+// 鼠标事件对象属性：
+event.clientX / event.clientY  — 视口坐标
+event.pageX / event.pageY      — 页面坐标
+event.screenX / event.screenY  — 屏幕坐标
+event.offsetX / event.offsetY  — 元素内坐标
+event.button                   — 0=左键 1=中键 2=右键
+event.ctrlKey / shiftKey / altKey / metaKey</div>
+    </div>
+    <div class="card">
+        <h2>触摸与指针事件</h2>
+        <div class="code">// 触摸事件（移动端）
+touchstart  — 触摸开始
+touchmove   — 触摸移动
+touchend    — 触摸结束
+touchcancel — 触摸中断
+
+// 触摸事件对象属性：
+event.touches          — 当前所有触摸点
+event.targetTouches    — 目标元素上的触摸点
+event.changedTouches   — 发生变化的触摸点
+// 每个 touch 对象有 clientX/Y, pageX/Y, identifier
+
+// 指针事件（统一鼠标/触摸/笔）
+pointerdown   — 指针按下
+pointerup     — 指针松开
+pointermove   — 指针移动
+pointerover   — 指针进入
+pointerout    — 指针离开
+
+// ⚠️ 优先使用指针事件（兼容鼠标和触摸）</div>
+    </div>
+    <div class="card">
+        <h2>焦点与表单事件</h2>
+        <div class="code">// 焦点事件
+focus     — 获得焦点（不冒泡）
+blur      — 失去焦点（不冒泡）
+focusin   — 获得焦点（冒泡版）
+focusout  — 失去焦点（冒泡版）
+
+// 表单事件
+submit    — 表单提交
+reset     — 表单重置
+change    — 值改变并失去焦点
+input     — 输入值变化（实时）
+select    — 选中文本
+invalid   — 验证不通过
+
+// 窗口事件
+load      — 页面/资源加载完成
+DOMContentLoaded — HTML 解析完成（不等待图片）
+resize    — 窗口大小变化
+scroll    — 滚动
+beforeunload — 页面卸载前
+unload    — 页面卸载
+hashchange   — URL hash 变化
+popstate     — 历史记录变化</div>
+    </div>
+    <div id="mouse-area">
+        <div style="font-size:18px;font-weight:bold;">鼠标事件测试区</div>
+        <div id="mouse-stats">移动鼠标查看坐标</div>
+    </div>
+    <div class="event-log" id="event-log"></div>
+    <pre id="output"></pre>
+    <script>
+        const mouseArea = document.getElementById('mouse-area');
+        const stats = document.getElementById('mouse-stats');
+        const log = document.getElementById('event-log');
+
+        function logEvent(type, detail = '') {
+            const entry = document.createElement('div');
+            entry.textContent = `${new Date().toLocaleTimeString()} - ${type} ${detail}`;
+            log.appendChild(entry);
+            log.scrollTop = log.scrollHeight;
+            console.log(type, detail);
+        }
+
+        console.log('=== 鼠标事件 ===');
+
+        mouseArea.addEventListener('click', () => logEvent('click'));
+        mouseArea.addEventListener('dblclick', () => logEvent('dblclick'));
+        mouseArea.addEventListener('mousedown', (e) => logEvent('mousedown', `按钮:${e.button}`));
+        mouseArea.addEventListener('mouseup', () => logEvent('mouseup'));
+        mouseArea.addEventListener('mouseenter', () => logEvent('mouseenter'));
+        mouseArea.addEventListener('mouseleave', () => logEvent('mouseleave'));
+        mouseArea.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            logEvent('contextmenu', '被阻止');
+        });
+
+        mouseArea.addEventListener('mousemove', (e) => {
+            stats.textContent = `(${e.clientX}, ${e.clientY})  offset:(${e.offsetX}, ${e.offsetY})`;
+        });
+
+        console.log('=== 键盘事件 ===');
+        document.addEventListener('keydown', (e) => {
+            logEvent('keydown', `key:${e.key} code:${e.code} ctrl:${e.ctrlKey}`);
+        });
+        document.addEventListener('keyup', (e) => {
+            logEvent('keyup', `key:${e.key}`);
+        });
+
+        console.log('=== 焦点事件 ===');
+        // 模拟焦点事件
+        mouseArea.tabIndex = 0;
+        mouseArea.addEventListener('focus', () => logEvent('focus', '测试区获得焦点'));
+        mouseArea.addEventListener('blur', () => logEvent('blur', '测试区失去焦点'));
+
+        console.log('=== 窗口事件 ===');
+        window.addEventListener('resize', () => {
+            // 防抖：只记录部分resize
+            stats.textContent += ' [resize]';
+        });
+
+        console.log('=== 事件分类 ===');
+        const categories = {
+            '鼠标': ['click', 'dblclick', 'mousedown', 'mouseup', 'mousemove', 'mouseover', 'mouseout', 'mouseenter', 'mouseleave', 'contextmenu', 'wheel'],
+            '键盘': ['keydown', 'keyup', 'keypress(废弃)'],
+            '焦点': ['focus', 'blur', 'focusin', 'focusout'],
+            '表单': ['submit', 'reset', 'change', 'input', 'select', 'invalid'],
+            '窗口': ['load', 'DOMContentLoaded', 'resize', 'scroll', 'beforeunload', 'unload', 'hashchange', 'popstate'],
+            '触摸': ['touchstart', 'touchmove', 'touchend', 'touchcancel'],
+            '拖拽': ['dragstart', 'drag', 'dragenter', 'dragleave', 'dragover', 'drop', 'dragend'],
+            '剪贴板': ['copy', 'cut', 'paste'],
+            '媒体': ['play', 'pause', 'ended', 'volumechange', 'timeupdate'],
+            '动画': ['animationstart', 'animationend', 'animationiteration'],
+            '过渡': ['transitionstart', 'transitionend', 'transitionrun', 'transitioncancel']
+        };
+        for (let [cat, events] of Object.entries(categories)) {
+            console.log(`  ${cat}: ${events.join(', ')}`);
+        }
+
+        document.getElementById('output').textContent =
+            `鼠标事件: click, dblclick, mousedown, mouseup, mousemove\n` +
+            `键盘事件: keydown, keyup\n` +
+            `焦点事件: focus, blur\n` +
+            `✅ 事件类型演示完成！\n` +
+            `(在测试区操作查看日志)`;
+    </script>
+</body>
+</html>

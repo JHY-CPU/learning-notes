@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python常量枚举与命名规范</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📏 Python 常量、枚举与命名规范</h2><p>常量约定、enum 模块、PEP 8 命名规范、snake_case / PascalCase 使用场景。</p></div>
+    <div class="card">
+        <h2>常量与命名约定</h2>
+        <div class="code">// ========== Python 没有真正的常量 ==========
+// 约定: 全大写 + 下划线表示"常量"
+// 实际上只是变量,但约定不修改
+
+MAX_CONNECTIONS = 100
+DATABASE_URL = "postgresql://localhost:5432/db"
+PI = 3.1415926535
+
+// 可以修改,但不应该:
+MAX_CONNECTIONS = 200    # 语法允许,但不遵守约定
+
+// ========== 命名风格 ==========
+// snake_case:     变量、函数、方法、模块
+// PascalCase:     类名
+// UPPER_SNAKE:    常量
+// _private:       内部/私有
+// __magic__:      Python 特殊方法
+
+// 变量:
+user_name = "Alice"      # ✅ snake_case
+itemCount = 10           # ❌ camelCase (不 Pythonic)
+
+// 函数:
+def get_user_name():     # ✅ snake_case
+    pass
+
+// 类:
+class UserProfile:       # ✅ PascalCase
+    pass
+
+// 常量:
+MAX_SIZE = 1024          # ✅ UPPER_SNAKE
+
+// 私有:
+_internal_cache = {}     # ✅ 下划线开头
+
+// ========== 命名最佳实践 ==========
+// 变量名: 名词,描述性
+users = []               # ✅
+data = []                # ❌ 太模糊
+list_of_all_active_users_from_db = []  # ❌ 太长
+active_users = []        # ✅
+
+// 函数名: 动词 + 名词
+get_users()              # ✅
+users_data()             # ❌
+fetch_user_by_id()       # ✅
+user()                   # ❌
+
+// 布尔变量: is_ / has_ / can_
+is_active = True         # ✅
+active = True            # ❌
+has_permission = True    # ✅
+can_edit = True          # ✅
+
+// 避免保留字冲突:
+list = [1, 2, 3]         # ❌ 覆盖了内置 list
+items = [1, 2, 3]        # ✅</div>
+    </div>
+    <div class="card">
+        <h2>enum 模块</h2>
+        <div class="code">// ========== 为什么需要枚举 ==========
+// 不用枚举的写法 (魔法数字):
+STATUS_ACTIVE = 1
+STATUS_INACTIVE = 2
+STATUS_BANNED = 3
+
+if user.status == 1:      # 1 代表什么? 可读性差
+    pass
+
+// ========== enum.Enum 基础 ==========
+from enum import Enum
+
+class Status(Enum):
+    ACTIVE = 1
+    INACTIVE = 2
+    BANNED = 3
+
+// 使用:
+user.status = Status.ACTIVE
+if user.status == Status.ACTIVE:
+    print("用户活跃")
+
+// ========== 枚举特性 ==========
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+// 访问:
+Color.RED                 # <Color.RED: 1>
+Color.RED.name            # "RED"
+Color.RED.value           # 1
+
+// 遍历:
+for c in Color:
+    print(c.name, c.value)  # RED 1, GREEN 2, BLUE 3
+
+// 从值获取:
+Color(1)                  # <Color.RED: 1>
+Color["RED"]              # <Color.RED: 1>
+
+// 比较:
+Color.RED == Color.RED    # True (身份比较)
+Color.RED is Color.RED    # True
+Color.RED == 1            # False! (不会和整数比较)
+
+// ========== IntEnum ==========
+from enum import IntEnum
+
+class Priority(IntEnum):
+    LOW = 1
+    MEDIUM = 2
+    HIGH = 3
+
+// IntEnum 可以和整数比较:
+Priority.HIGH == 3        # True ✅
+Priority.HIGH > Priority.LOW  # True ✅
+
+// ========== 枚举方法 ==========
+from enum import Enum, auto
+
+class Direction(Enum):
+    NORTH = auto()        # 自动赋值 1
+    SOUTH = auto()        # 2
+    EAST = auto()         # 3
+    WEST = auto()         # 4
+
+    // 枚举可以有方法
+    def opposite(self):
+        mapping = {
+            Direction.NORTH: Direction.SOUTH,
+            Direction.SOUTH: Direction.NORTH,
+            Direction.EAST: Direction.WEST,
+            Direction.WEST: Direction.EAST,
+        }
+        return mapping[self]
+
+Direction.NORTH.opposite()  # <Direction.SOUTH: 2></div>
+        <div class="note">💡 枚举要点: (1) 用枚举代替魔法数字,提高可读性; (2) Enum 成员之间用 is 比较; (3) 需要和整数比较用 IntEnum; (4) auto() 自动分配值; (5) 枚举可以有方法和属性。</div>
+    </div>
+    <div class="card">
+        <h2>PEP 8 规范</h2>
+        <div class="code">// ========== PEP 8 命名规范 ==========
+// 包:        小写, 无下划线    (math, os)
+// 模块:      小写, 下划线     (data_loader, user_utils)
+// 类:        PascalCase       (UserProfile, HttpRequest)
+// 函数:      snake_case       (get_user_name)
+// 变量:      snake_case       (user_name, active_users)
+// 常量:      UPPER_SNAKE      (MAX_SIZE, PI)
+// 私有:      _snake_case      (_internal_cache)
+// 魔术:      __magic__        (__init__, __str__)
+
+// ========== 导入顺序 ==========
+// 标准库
+import os
+import sys
+from datetime import datetime
+
+// 第三方库 (空行)
+import flask
+import requests
+
+// 本地模块 (空行)
+from models import User
+from utils import format_date
+
+// ========== 代码布局 ==========
+// 缩进: 4 空格 (不要用 Tab!)
+// 行宽: 最大 79 字符
+// 空行: 函数之间 2 行, 类之间 2 行
+
+class UserController:
+    """用户控制器"""
+
+    def get_user(self, user_id):
+        """获取用户信息。"""
+        user = database.find(user_id)
+        return user
+
+
+def format_response(data):
+    """格式化 API 响应。"""
+    return {"status": "ok", "data": data}
+
+// ========== 其他规范 ==========
+// 比较 None:  用 is / is not
+// 比较布尔:  用 if x: / if not x:
+// 导入:       每行一个导入
+// 字符串:    引号保持一致 (推荐双引号或单引号均可)</div>
+    </div>
+    <div class="card">
+        <h2>综合示例</h2>
+        <div class="code">// ========== 好的命名示例 ==========
+from enum import Enum, auto
+from typing import Optional
+
+// 常量
+MAX_LOGIN_ATTEMPTS = 5
+SESSION_TIMEOUT_MINUTES = 30
+
+// 枚举
+class UserRole(Enum):
+    ADMIN = auto()
+    EDITOR = auto()
+    VIEWER = auto()
+
+class OrderStatus(Enum):
+    PENDING = "pending"
+    PAID = "paid"
+    SHIPPED = "shipped"
+    DELIVERED = "delivered"
+    CANCELLED = "cancelled"
+
+// 类: PascalCase
+class User:
+    def __init__(self, username: str, role: UserRole):
+        self.username = username
+        self.role = role
+        self._login_attempts = 0  # 私有属性
+
+    // 方法: snake_case
+    def is_admin(self) -> bool:
+        return self.role == UserRole.ADMIN
+
+    def increment_login_attempts(self) -> None:
+        self._login_attempts += 1
+
+    def is_locked(self) -> bool:
+        return self._login_attempts >= MAX_LOGIN_ATTEMPTS
+
+// 函数: snake_case
+def create_user(username: str, role: UserRole) -> User:
+    """创建新用户。"""
+    return User(username=username, role=role)
+
+def send_welcome_email(user: User) -> bool:
+    """发送欢迎邮件。"""
+    if not user.is_admin():
+        print(f"发送邮件到 {user.username}")
+        return True
+    return False
+
+// 使用
+admin = create_user("Alice", UserRole.ADMIN)
+if admin.is_admin():
+    print(f"管理员 {admin.username} 已创建")</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoNaming()">命名规范演示</button>
+        <button onclick="demoEnum()">枚举演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoNaming() {
+            result.innerHTML = '';
+            log('# Python 命名规范演示');
+            log('');
+            log('命名风格:');
+            log('  snake_case   → 变量、函数、方法');
+            log('  PascalCase   → 类名');
+            log('  UPPER_SNAKE  → 常量');
+            log('  _private     → 内部/私有');
+            log('');
+            log('好的变量名:');
+            log('  active_users    ✅ 描述性');
+            log('  is_active       ✅ 布尔前缀');
+            log('  MAX_SIZE        ✅ 常量');
+            log('  UserProfile     ✅ 类名');
+            log('');
+            log('避免:');
+            log('  data            ❌ 模糊');
+            log('  itemCount       ❌ camelCase');
+            log('  list            ❌ 覆盖内置');
+        }
+
+        function demoEnum() {
+            result.innerHTML = '';
+            log('# Python 枚举演示');
+            log('');
+            log('class Status(Enum):');
+            log('    ACTIVE = 1');
+            log('    INACTIVE = 2');
+            log('    BANNED = 3');
+            log('');
+            log('Status.ACTIVE.name  → "ACTIVE"');
+            log('Status.ACTIVE.value → 1');
+            log('Status(1)           → Status.ACTIVE');
+            log('Status["ACTIVE"]    → Status.ACTIVE');
+            log('');
+            log('IntEnum 可和整数比较:');
+            log('  Priority.HIGH == 3  → True');
+            log('');
+            log('auto() 自动赋值:');
+            log('  RED = auto()  → 1');
+            log('  BLUE = auto() → 2');
+        }
+    </script>
+</body>
+</html>

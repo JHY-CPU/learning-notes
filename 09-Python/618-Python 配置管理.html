@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python 配置管理</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚙️ Python 配置管理</h2><p>python-dotenv 环境变量、pydantic-settings、多环境配置、YAML/TOML 配置文件、配置最佳实践。</p></div>
+    <div class="card">
+        <h2>python-dotenv</h2>
+        <div class="code">// ========== dotenv ==========
+# pip install python-dotenv
+
+from dotenv import load_dotenv, find_dotenv
+import os
+
+# 自动查找 .env 文件 (从当前目录向上搜索)
+load_dotenv()  # 加载 .env 文件到环境变量
+
+# 或指定路径:
+load_dotenv(".env.dev")
+load_dotenv(".env.prod")
+
+# 覆盖已有环境变量:
+load_dotenv(override=True)
+
+# .env 文件格式:
+# DATABASE_URL=postgresql://user:pass@localhost/db
+# SECRET_KEY=your-secret-key
+# DEBUG=true
+# MAX_CONNECTIONS=100
+# # 这是注释
+# MULTI_LINE="line1\nline2"  # 支持引号
+
+# 不提交 .env 到 Git (在 .gitignore 中添加)
+# 但提交 .env.example (模板,不含真实值)
+
+# .env.example:
+# DATABASE_URL=postgresql://user:pass@localhost/db
+# SECRET_KEY=change-me
+# DEBUG=false
+
+# 使用:
+db_url = os.getenv("DATABASE_URL", "sqlite:///default.db")
+debug = os.getenv("DEBUG", "false").lower() == "true"
+
+# ========== find_dotenv ==========
+dotenv_path = find_dotenv(usecwd=True)  # 从 cwd 开始查找
+load_dotenv(dotenv_path)</div>
+    </div>
+    <div class="card">
+        <h2>pydantic-settings</h2>
+        <div class="code">// ========== pydantic-settings ==========
+# pip install pydantic-settings
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import Optional
+
+# pydantic-settings: 环境变量 + 类型验证 + 自动转换
+# 推荐用于 FastAPI 项目
+
+class Settings(BaseSettings):
+    # 应用配置
+    app_name: str = "MyApp"
+    version: str = "1.0.0"
+    debug: bool = False
+
+    # 数据库
+    database_url: str = "sqlite:///./dev.db"
+    pool_size: int = 5
+    max_overflow: int = 10
+
+    # Redis
+    redis_url: str = "redis://localhost:6379/0"
+
+    # JWT
+    secret_key: str = "change-this-secret"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 30
+
+    # 外部 API
+    api_key: str = ""
+    api_timeout: int = 30
+
+    # 可选字段
+    sentry_dsn: Optional[str] = None
+
+    # 模型配置 (.env 文件)
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        # 前缀: 所有环境变量加前缀
+        # env_prefix="MYAPP_",
+    )
+
+settings = Settings()
+
+# 使用:
+print(settings.database_url)
+print(f"应用: {settings.app_name} v{settings.version}")
+
+# ========== 环境特定配置 ==========
+class DevSettings(Settings):
+    debug: bool = True
+    database_url: str = "sqlite:///./dev.db"
+
+class ProdSettings(Settings):
+    debug: bool = False
+
+def get_settings() -> Settings:
+    env = os.getenv("APP_ENV", "dev")
+    if env == "prod":
+        return ProdSettings()
+    return DevSettings()
+
+settings = get_settings()</div>
+    </div>
+    <div class="card">
+        <h2>YAML / TOML 配置</h2>
+        <div class="code">// ========== YAML 配置 ==========
+# pip install pyyaml
+
+import yaml
+from pathlib import Path
+
+# config.yaml:
+# app:
+#   name: MyApp
+#   version: "1.0"
+#
+# database:
+#   host: localhost
+#   port: 5432
+#   name: myapp
+#
+# logging:
+#   level: INFO
+#   file: logs/app.log
+
+def load_yaml_config(path="config.yaml"):
+    with open(path, "r") as f:
+        config = yaml.safe_load(f)
+    return config
+
+config = load_yaml_config()
+db_host = config["database"]["host"]
+
+# ========== TOML 配置 ==========
+# pip install tomli (Python 3.11+: import tomllib)
+
+import tomllib  # Python 3.11+
+
+# config.toml:
+# [app]
+# name = "MyApp"
+# version = "1.0.0"
+#
+# [database]
+# host = "localhost"
+# port = 5432
+#
+# [logging]
+# level = "INFO"
+# [logging.handlers]
+# file = "logs/app.log"
+
+with open("config.toml", "rb") as f:
+    config = tomllib.load(f)
+
+print(config["app"]["name"])
+
+# ========== 多环境配置模式 ==========
+# config/            ← 目录
+# ├── default.yaml   ← 默认值
+# ├── dev.yaml       ← 开发环境
+# ├── staging.yaml   ← 预发布
+# └── prod.yaml      ← 生产
+
+def load_env_config(env="dev"):
+    config = {}
+
+    # 先加载默认
+    with open("config/default.yaml") as f:
+        config.update(yaml.safe_load(f))
+
+    # 再加载环境特定 (覆盖)
+    env_file = Path(f"config/{env}.yaml")
+    if env_file.exists():
+        with open(env_file) as f:
+            config.update(yaml.safe_load(f))
+
+    return config</div>
+    </div>
+    <div class="card">
+        <h2>多环境策略</h2>
+        <div class="code">// ========== 多环境策略 ==========
+import os
+from functools import lru_cache
+
+# 原则: 12-Factor App
+# 配置与环境分离,不硬编码
+
+# 方案 1: 环境变量 (推荐)
+# 简单,通用,容器友好
+
+# 方案 2: .env 文件
+# 本地开发方便,生产用环境变量
+
+# 方案 3: 配置文件目录
+# 适合复杂配置结构
+
+# ========== 优先级 ==========
+# 1. 环境变量 (最高)
+# 2. .env 文件
+# 3. 配置文件 (YAML/TOML)
+# 4. 默认值 (最低)
+
+# ========== 推荐模式 ==========
+class AppConfig:
+    """统一的配置入口"""
+
+    def __init__(self):
+        # 1. 加载默认值
+        self.debug = False
+        self.database_url = "sqlite:///default.db"
+
+        # 2. 加载配置文件
+        self._load_config_file()
+
+        # 3. 加载 .env (开发环境)
+        load_dotenv(override=False)
+
+        # 4. 环境变量覆盖 (最高优先级)
+        self._load_from_env()
+
+    def _load_config_file(self):
+        """从 YAML 加载配置"""
+        env = os.getenv("APP_ENV", "dev")
+        config_file = Path(f"config/{env}.yaml")
+        if config_file.exists():
+            data = yaml.safe_load(config_file.read_text())
+            for key, value in data.items():
+                setattr(self, key, value)
+
+    def _load_from_env(self):
+        """从环境变量加载"""
+        mapping = {
+            "DATABASE_URL": "database_url",
+            "DEBUG": "debug",
+            "SECRET_KEY": "secret_key",
+        }
+        for env_key, attr in mapping.items():
+            value = os.getenv(env_key)
+            if value is not None:
+                if attr == "debug":
+                    value = value.lower() == "true"
+                setattr(self, attr, value)
+
+    @classmethod
+    @lru_cache
+    def get_instance(cls):
+        """单例模式"""
+        return cls()
+
+config = AppConfig.get_instance()</div>
+        <div class="note">💡 配置管理要点: dotenv 加载 .env 文件; pydantic-settings 类型验证; YAML/TOML 配置文件; 12-Factor App 配置分离; 环境变量优先; 不提交密钥到 Git。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoDotenv()">dotenv 演示</button>
+        <button onclick="demoSettings()">pydantic-settings 演示</button>
+        <button onclick="demoYAML()">YAML 配置演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoDotenv() {
+            result.innerHTML = '';
+            log('# python-dotenv');
+            log('');
+            log('.env 文件:');
+            log('  DATABASE_URL=postgresql://...');
+            log('  SECRET_KEY=your-key');
+            log('  DEBUG=true');
+            log('');
+            log("load_dotenv()  # 加载到环境变量");
+            log("os.getenv('DATABASE_URL')");
+        }
+
+        function demoSettings() {
+            result.innerHTML = '';
+            log('# pydantic-settings');
+            log('');
+            log('class Settings(BaseSettings):');
+            log('    app_name: str = "MyApp"');
+            log('    database_url: str');
+            log('    debug: bool = False');
+            log('');
+            log("    model_config = SettingsConfigDict(env_file='.env')");
+            log('');
+            log("settings = Settings()  # 自动读取 .env");
+        }
+
+        function demoYAML() {
+            result.innerHTML = '';
+            log('# YAML/TOL 配置');
+            log('');
+            log('config.yaml:');
+            log('  app:');
+            log('    name: MyApp');
+            log('    version: "1.0"');
+            log('');
+            log("with open('config.yaml') as f:");
+            log("    config = yaml.safe_load(f)");
+            log('');
+            log("config['app']['name']  # 'MyApp'");
+        }
+    </script>
+</body>
+</html>

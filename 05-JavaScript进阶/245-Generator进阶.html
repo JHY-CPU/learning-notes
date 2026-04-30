@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator进阶</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #gen2-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Generator 进阶</h2><p>yield* 委托、next() 传参、generator.throw()、return()。</p></div>
+    <div class="card">
+        <h2>Generator 进阶语法</h2>
+        <div class="code">// ========== yield* 委托 ==========
+function* gen1() { yield 1; yield 2; }
+function* gen2() {
+    yield 'a';
+    yield* gen1();   // 委托给 gen1
+    yield 'b';
+}
+// gen2() 产生: 'a', 1, 2, 'b'
+
+// yield* 可委托给任意可迭代对象
+yield* [1, 2, 3];    // 委托数组
+yield* 'abc';        // 委托字符串
+yield* otherGen();   // 委托另一个 generator
+
+// ========== next() 传参 ==========
+function* calc() {
+    const a = yield '输入 a';     // 暂停，等待外部传值
+    const b = yield '输入 b';
+    yield a + b;
+}
+const g = calc();
+g.next();          // 第一个 next() 启动
+g.next(10);        // a = 10
+g.next(20);        // b = 20 → value: 30
+
+// ========== generator.throw() ==========
+function* safeGen() {
+    try {
+        yield 1;
+        yield 2;
+    } catch (e) {
+        yield `错误: ${e.message}`;
+    }
+}
+const g2 = safeGen();
+g2.next();          // { value: 1 }
+g2.throw(new Error('出错了')); // 被 catch 捕获
+
+// ========== generator.return() ==========
+function* countDown() {
+    yield 3;
+    yield 2;
+    yield 1;
+}
+const g3 = countDown();
+g3.next();          // { value: 3 }
+g3.return('结束');  // { value: '结束', done: true }
+// 后续 next() 都是 { done: true }</div>
+    </div>
+    <div class="card">
+        <h2>演示：Generator 进阶</h2>
+        <button onclick="demoDelegate()">yield* 委托</button>
+        <button onclick="demoPassValue()">next() 传参</button>
+        <button onclick="demoThrowReturn()">throw / return</button>
+        <div id="gen2-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const gen2Result = document.getElementById('gen2-result');
+
+        function log(msg) {
+            gen2Result.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function* subGen() {
+            yield '⚡ sub 1';
+            yield '⚡ sub 2';
+        }
+
+        function* mainGen() {
+            yield '★ main 1';
+            yield* subGen();
+            yield '★ main 2';
+            yield* [10, 20, 30];
+            yield '★ main 3';
+            yield* 'AB';
+        }
+
+        function* dialogGen() {
+            const name = yield '你叫什么名字？';
+            const age = yield `${name}，你多大了？`;
+            yield `${name} 今年 ${age} 岁`;
+        }
+
+        function* errorGen() {
+            try {
+                yield '正常运行中';
+                yield '继续运行';
+            } catch (e) {
+                yield `😱 捕获异常: ${e.message}`;
+            }
+            yield '恢复运行';
+        }
+
+        function demoDelegate() {
+            gen2Result.innerHTML = '';
+            log('📦 yield* 委托演示:');
+            log('');
+
+            log('主 Generator 委托了:');
+            log('  - subGen() (另一个 generator)');
+            log('  - [10, 20, 30] (数组)');
+            log('  - "AB" (字符串)');
+            log('');
+
+            for (const val of mainGen()) {
+                log(`  产出的值: ${val}`);
+            }
+            log('');
+            log('✅ yield* 可委托任意可迭代对象');
+        }
+
+        function demoPassValue() {
+            gen2Result.innerHTML = '';
+            log('📤 next() 传参演示:');
+            log('');
+
+            const gen = dialogGen();
+            let step = gen.next();
+            log(`🟢 Generator 问: ${step.value}`);
+
+            step = gen.next('Alice');
+            log(`🔵 我们回答: "Alice"`);
+            log(`🟢 Generator 问: ${step.value}`);
+
+            step = gen.next(25);
+            log(`🔵 我们回答: "25"`);
+            log(`🟢 Generator 说: ${step.value}`);
+            log('');
+            log('✅ 第一个 next() 不能传参 (无意义)');
+            log('✅ 后续 next(value) 成为上一个 yield 的返回值');
+        }
+
+        function demoThrowReturn() {
+            gen2Result.innerHTML = '';
+            log('⚠️ throw / return 演示:');
+            log('');
+
+            // throw
+            const g1 = errorGen();
+            log('Generator 启动:');
+            log(`  ${JSON.stringify(g1.next())}`);
+            log(`  ${JSON.stringify(g1.throw(new Error('出错了！')))}`);
+            log(`  ${JSON.stringify(g1.next())}`);
+            log('');
+
+            // return
+            function* counter() {
+                let i = 0;
+                while (true) {
+                    yield ++i;
+                }
+            }
+            const g2 = counter();
+            log('return() 提前结束无限 Generator:');
+            log(`  ${JSON.stringify(g2.next())}`);
+            log(`  ${JSON.stringify(g2.next())}`);
+            log(`  ${JSON.stringify(g2.next())}`);
+            log(`  ${JSON.stringify(g2.return('提前结束'))}`);
+            log(`  ${JSON.stringify(g2.next())} (之后都是 done)`);
+        }
+
+        console.log('=== Generator 进阶 ===');
+
+        document.getElementById('output').textContent =
+            `Generator 进阶: yield* 委托 / next()传参 / throw() / return()\n` +
+            `yield* 可委托任意 iterable | 双向通信 | 提前终止\n` +
+            `✅ Generator 进阶演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ResizeObserver</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        #resize-box { background: linear-gradient(135deg, #3498db, #2ecc71); padding: 20px; border-radius: 8px; color: white; resize: both; overflow: hidden; width: 300px; height: 100px; min-width: 100px; min-height: 50px; max-width: 600px; max-height: 300px; display: flex; flex-direction: column; justify-content: center; transition: none; }
+        #resize-info { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; margin-top: 10px; }
+        #resize-info .row { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid #eee; }
+        #resize-info .val { font-weight: bold; color: #2c3e50; font-family: monospace; }
+        #event-log { background: #1e1e1e; color: #d4d4d4; padding: 10px; border-radius: 4px; font-size: 12px; max-height: 100px; overflow-y: auto; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>ResizeObserver</h2><p>监听元素的尺寸变化（比 window.resize 更精准，可观察任意元素）。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 创建观察器
+const observer = new ResizeObserver((entries) => {
+    entries.forEach(entry => {
+        entry.contentRect;        // 内容区域尺寸 {width/height/top/left}
+        entry.target;             // 发生变化的元素
+        entry.borderBoxSize;      // border-box 尺寸（最新 API）
+        entry.contentBoxSize;     // content-box 尺寸
+        entry.devicePixelContentBoxSize; // 物理像素尺寸
+    });
+});
+
+// 开始/停止观察
+observer.observe(element);
+observer.observe(element, { box: 'border-box' }); // 指定观察的盒模型
+observer.unobserve(element);
+observer.disconnect();
+
+// 对比 window.resize:
+// ✅ 观察任意元素，不是只能观察 window
+// ✅ 不频繁触发，只在实际尺寸变化时
+// ✅ 回调自带尺寸信息，无需强行读取 layout</div>
+        <div class="note">💡 contentRect 是标准属性，但 borderBoxSize 需要使用 entry.borderBoxSize[0].blockSize/inlineSize。<br>
+        ⚠️ 旧版本浏览器可能只支持 contentRect，注意兼容性。</div>
+    </div>
+    <div class="card">
+        <h2>演示：拖拽缩放元素</h2>
+        <p>拖动右下角手柄改变元素大小。</p>
+        <div id="resize-box">
+            <strong>拖拽右下角调整尺寸</strong>
+            <span id="size-display" style="font-size:14px;margin-top:5px;">300 × 100</span>
+        </div>
+        <div id="resize-info">
+            <div class="row"><span>contentRect.width</span><span class="val" id="r-width">-</span></div>
+            <div class="row"><span>contentRect.height</span><span class="val" id="r-height">-</span></div>
+            <div class="row"><span>borderBoxSize</span><span class="val" id="r-border">-</span></div>
+            <div class="row"><span>变化次数</span><span class="val" id="r-count">0</span></div>
+        </div>
+        <div id="event-log">事件日志：</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const resizeBox = document.getElementById('resize-box');
+        const sizeDisplay = document.getElementById('size-display');
+        const rWidth = document.getElementById('r-width');
+        const rHeight = document.getElementById('r-height');
+        const rBorder = document.getElementById('r-border');
+        const rCount = document.getElementById('r-count');
+        const eventLog = document.getElementById('event-log');
+        let count = 0;
+
+        function addLog(msg) {
+            const div = document.createElement('div');
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+            eventLog.appendChild(div);
+            if (eventLog.children.length > 20) eventLog.removeChild(eventLog.firstChild);
+        }
+
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const cr = entry.contentRect;
+                rWidth.textContent = `${Math.round(cr.width)}px`;
+                rHeight.textContent = `${Math.round(cr.height)}px`;
+                if (entry.borderBoxSize?.[0]) {
+                    const bb = entry.borderBoxSize[0];
+                    rBorder.textContent = `${Math.round(bb.inlineSize)} × ${Math.round(bb.blockSize)}`;
+                } else {
+                    // fallback
+                    rBorder.textContent = `${entry.target.offsetWidth} × ${entry.target.offsetHeight}`;
+                }
+                sizeDisplay.textContent = `${Math.round(cr.width)} × ${Math.round(cr.height)}`;
+                count++;
+                rCount.textContent = count;
+                addLog(`尺寸: ${Math.round(cr.width)} × ${Math.round(cr.height)}`);
+            }
+        });
+
+        observer.observe(resizeBox, { box: 'border-box' });
+
+        console.log('=== ResizeObserver ===');
+        console.log('观察元素:', resizeBox);
+        console.log('初始尺寸:', resizeBox.offsetWidth, resizeBox.offsetHeight);
+
+        document.getElementById('output').textContent =
+            `ResizeObserver: 观察元素尺寸变化\n` +
+            `contentRect/borderBoxSize/contentBoxSize\n` +
+            `observe/unobserve/disconnect 方法\n` +
+            `✅ ResizeObserver 演示完成！`;
+    </script>
+</body>
+</html>

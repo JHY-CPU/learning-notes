@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数组去重</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #3498db; color: white; }
+        tr:nth-child(even) { background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>数组去重</h2><p>Set/Map/filter+indexOf/sort/哈希表、性能对比、对象去重。</p></div>
+    <div class="card">
+        <h2>数组去重方法</h2>
+        <div class="code">// ========== Set 去重 (最简单) ==========
+const unique = [...new Set([1, 2, 2, 3, 3, 4])];
+// [1, 2, 3, 4]
+
+// ========== filter + indexOf ==========
+const unique = arr.filter((v, i) => arr.indexOf(v) === i);
+
+// ========== Map 去重 (推荐对象数组) ==========
+const unique = [...new Map(arr.map(v => [v.id, v])).values()];
+
+// ========== reduce 去重 ==========
+const unique = arr.reduce((acc, v) => acc.includes(v) ? acc : [...acc, v], []);
+
+// ========== 对象去重 ==========
+const unique = arr.filter((v, i, self) =>
+    self.findIndex(o => o.id === v.id) === i
+);</div>
+    </div>
+    <div class="card">
+        <h2>演示：数组去重</h2>
+        <button onclick="demoSet()">Set 去重</button>
+        <button onclick="demoFilter()">filter 去重</button>
+        <button onclick="demoObject()">对象去重</button>
+        <button onclick="demoCompare()">性能对比</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoSet() {
+            result.innerHTML = '';
+            log('🔢 Set 去重:');
+            log('');
+
+            const arr = [1, 2, 2, 3, 4, 4, 5, 5, 5, 6];
+            log(`原始数组: [${arr}]`);
+            const unique = [...new Set(arr)];
+            log(`去重结果: [${unique}]`);
+            log('');
+
+            log('字符串去重:');
+            const words = ['apple', 'banana', 'apple', 'cherry', 'banana'];
+            log(`原始: [${words}]`);
+            log(`去重: [${[...new Set(words)].join(', ')}]`);
+            log('');
+
+            log('混合类型:');
+            const mixed = [1, '1', 2, '2', 1, '1'];
+            log(`原始: [${mixed}]`);
+            log(`去重: [${[...new Set(mixed)].join(', ')}] (区分类型)`);
+        }
+
+        function demoFilter() {
+            result.innerHTML = '';
+            log('🔍 filter + indexOf 去重:');
+            log('');
+
+            const arr = [1, 2, 2, 3, 4, 4, 5, 5, 5];
+            const unique = arr.filter((v, i, self) => self.indexOf(v) === i);
+            log(`原始: [${arr}]`);
+            log(`去重: [${unique}]`);
+            log('');
+
+            log('原理: indexOf 返回第一个匹配的索引');
+            log('只保留 indexOf === 当前索引 的元素');
+            log('');
+
+            log('filter + hasOwnProperty (兼容):');
+            function uniqueFilter(arr) {
+                const seen = {};
+                return arr.filter(v => {
+                    const key = typeof v + v;
+                    if (seen[key]) return false;
+                    seen[key] = true;
+                    return true;
+                });
+            }
+            const data = [1, '1', 2, 1, '1'];
+            log(`类型感知去重: [${uniqueFilter(data)}]`);
+        }
+
+        function demoObject() {
+            result.innerHTML = '';
+            log('📦 对象数组去重:');
+            log('');
+
+            const users = [
+                { id: 1, name: 'Alice' },
+                { id: 2, name: 'Bob' },
+                { id: 1, name: 'Alice' },
+                { id: 3, name: 'Charlie' },
+                { id: 2, name: 'Bob' },
+            ];
+
+            log('用户列表:');
+            users.forEach(u => log(`   { id: ${u.id}, name: "${u.name}" }`));
+            log('');
+
+            // 方法1: Map
+            const byMap = [...new Map(users.map(u => [u.id, u])).values()];
+            log('1️⃣ Map 去重 (保留最后出现的):');
+            byMap.forEach(u => log(`   { id: ${u.id}, name: "${u.name}" }`));
+            log('');
+
+            // 方法2: findIndex
+            const byFindIndex = users.filter((v, i, self) =>
+                self.findIndex(o => o.id === v.id) === i
+            );
+            log('2️⃣ findIndex 去重 (保留最先出现的):');
+            byFindIndex.forEach(u => log(`   { id: ${u.id}, name: "${u.name}" }`));
+            log('');
+
+            // 方法3: reduce
+            const byReduce = users.reduce((acc, u) => {
+                if (!acc.some(v => v.id === u.id)) acc.push(u);
+                return acc;
+            }, []);
+            log('3️⃣ reduce 去重:');
+            byReduce.forEach(u => log(`   { id: ${u.id}, name: "${u.name}" }`));
+            log('');
+
+            log('📌 多字段去重:');
+            const items = [
+                { id: 1, type: 'A', val: 10 },
+                { id: 1, type: 'B', val: 20 },
+                { id: 2, type: 'A', val: 30 },
+            ];
+            const byMulti = [...new Map(items.map(v => [`${v.id}-${v.type}`, v])).values()];
+            log(`   按 id+type 去重: ${byMulti.length} 项`);
+        }
+
+        function demoCompare() {
+            result.innerHTML = '';
+            log('⚡ 去重性能对比:');
+            log('');
+
+            // 生成测试数据
+            const size = 10000;
+            const testArr = Array.from({ length: size }, () => Math.floor(Math.random() * 5000));
+            log(`测试数据: ${size} 个元素, 约 ${new Set(testArr).size} 个唯一值`);
+            log('');
+
+            // Set
+            let start = performance.now();
+            const r1 = [...new Set(testArr)];
+            log(`1️⃣ Set:           ${(performance.now() - start).toFixed(2)}ms (最快)`);
+            log(`   代码: [...new Set(arr)]`);
+
+            // filter + indexOf
+            start = performance.now();
+            const r2 = testArr.filter((v, i, self) => self.indexOf(v) === i);
+            log(`2️⃣ filter+indexOf: ${(performance.now() - start).toFixed(2)}ms (最慢 O(n²))`);
+
+            // reduce + includes
+            start = performance.now();
+            const r3 = testArr.reduce((acc, v) => acc.includes(v) ? acc : [...acc, v], []);
+            log(`3️⃣ reduce+includes: ${(performance.now() - start).toFixed(2)}ms (慢)`);
+
+            // Map
+            start = performance.now();
+            const r4 = [...new Map(testArr.map(v => [v, v])).values()];
+            log(`4️⃣ Map:           ${(performance.now() - start).toFixed(2)}ms (接近 Set)`);
+            log('');
+
+            log('📊 性能排行: Set > Map >> filter+indexOf > reduce+includes');
+            log('');
+
+            log('📌 选型建议:');
+            log('   • 基本类型 → Set (最快最简洁)');
+            log('   • 对象数组 → Map (按字段去重)');
+            log('   • 小数组 → 任意方法均可');
+            log('   • 超大数组 → Set/Map (避免 O(n²))');
+        }
+
+        console.log('=== 数组去重 ===');
+        document.getElementById('output').textContent = `数组去重: Set / Map / filter+indexOf / reduce / 对象去重\n✅ 数组去重演示完成！`;
+    </script>
+</body>
+</html>

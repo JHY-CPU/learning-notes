@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java Set 集合</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🎯 Java Set 集合</h2><p>Set 接口、HashSet (哈希表/去重)、LinkedHashSet (插入顺序)、TreeSet (红黑树/排序)、equals/hashCode 契约、Comparator 与 Comparable。</p></div>
+    <div class="card">
+        <h2>Set 接口与 HashSet</h2>
+        <div class="code">// ========== Set 接口特性 ==========
+// 1. 不重复 (equals 判断)
+// 2. 无索引 (不能 get(index))
+// 3. 最多一个 null (HashSet/LinkedHashSet)
+
+import java.util.*;
+
+public class SetBasics {
+    public static void main(String[] args) {
+        // ========== HashSet ==========
+        // 底层: HashMap (哈希表)
+        // 特点: 最快, 无序
+        // 不重复依据: hashCode() + equals()
+
+        Set<String> set = new HashSet<>();
+
+        // 添加 (重复元素返回 false)
+        System.out.println(set.add("Apple"));   // true
+        System.out.println(set.add("Banana"));  // true
+        System.out.println(set.add("Apple"));   // false (已存在!)
+
+        System.out.println(set);  // [Banana, Apple] (无序)
+
+        // 其他操作
+        set.contains("Apple");    // true
+        set.remove("Apple");      // true
+        set.size();               // 1
+        set.isEmpty();            // false
+        // set.clear();           // 清空
+
+        // ========== 线程安全 ==========
+        Set<String> syncSet = Collections.synchronizedSet(new HashSet<>());
+        Set<String> copyOnWrite = new CopyOnWriteArraySet<>();  // 并发
+
+        // ========== 遍历 ==========
+        for (String s : set) {
+            System.out.println(s);
+        }
+        set.forEach(System.out::println);
+    }
+}
+
+// ========== equals/hashCode 契约 ==========
+// 1. 两个对象 equals 相等 → hashCode 必须相等
+// 2. 两个对象 equals 不等 → hashCode 最好不等 (哈希冲突)
+// 3. hashCode 相等 → equals 不一定相等
+
+// ========== 正确实现 ==========
+class Student {
+    private String id;
+    private String name;
+
+    public Student(String id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) return true;
+        if (obj == null || getClass() != obj.getClass()) return false;
+        Student other = (Student) obj;
+        return Objects.equals(id, other.id);  // 业务相等
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id);  // 用 equals 用到的字段
+    }
+
+    @Override
+    public String toString() {
+        return "Student{" + id + ": " + name + "}";
+    }
+}
+
+class HashSetWithObjects {
+    public static void main(String[] args) {
+        Set<Student> students = new HashSet<>();
+        students.add(new Student("S001", "Alice"));
+        students.add(new Student("S002", "Bob"));
+        students.add(new Student("S001", "Charlie"));  // 同 id → 不会添加!
+
+        System.out.println(students.size());  // 2
+
+        // ========== HashSet 查找原理 ==========
+        // 1. 计算 hashCode() → 定位桶 (bucket)
+        // 2. 桶中元素用 equals() 逐一比较
+        // 3. hashCode 均匀分布 → O(1)
+        // 4. hashCode 都相同 → O(n) 退化为链表
+
+        // 重要: 存入 Set 后不要修改参与 hashCode/equals 的字段!
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>LinkedHashSet</h2>
+        <div class="code">// ========== LinkedHashSet ==========
+// 底层: LinkedHashMap (哈希表 + 双向链表)
+// 特点: 维护插入顺序 (或访问顺序)
+// 性能: 略低于 HashSet, 但可预测顺序
+
+public class LinkedHashSetDemo {
+    public static void main(String[] args) {
+        Set<String> set = new LinkedHashSet<>();
+
+        set.add("Apple");
+        set.add("Banana");
+        set.add("Cherry");
+        set.add("Apple");   // 重复, 不添加, 不改变顺序
+
+        System.out.println(set);  // [Apple, Banana, Cherry] (插入顺序)
+
+        // ========== 应用场景 ==========
+        // 1. 需要去重 + 保留插入顺序
+        // 2. LRU 缓存 (访问顺序)
+
+        // 去重并保持首次出现顺序:
+        List<String> list = List.of("a", "b", "a", "c", "b", "d");
+        Set<String> ordered = new LinkedHashSet<>(list);
+        System.out.println(ordered);  // [a, b, c, d]
+
+        // ========== HashSet vs LinkedHashSet vs TreeSet ==========
+        // ┌──────────────┬───────────────┬──────────────┐
+        // │ HashSet      │ LinkedHashSet │ TreeSet      │
+        // ├──────────────┼───────────────┼──────────────┤
+        // │ 无序         │ 插入顺序      │ 排序 (自然/定制) │
+        // │ O(1)         │ O(1)          │ O(log n)     │
+        // │ 哈希表       │ 哈希表+链表   │ 红黑树       │
+        // │ null ✅      │ null ✅       │ null ❌      │
+        // └──────────────┴───────────────┴──────────────┘
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>TreeSet</h2>
+        <div class="code">// ========== TreeSet ==========
+// 底层: TreeMap (红黑树, 自平衡二叉搜索树)
+// 特点: 排序 (自动升序)
+// 性能: O(log n) 基本操作
+// 要求: 元素实现 Comparable 或传入 Comparator
+
+import java.util.*;
+
+public class TreeSetDemo {
+    public static void main(String[] args) {
+        // ========== 自然排序 (Comparable) ==========
+        TreeSet<Integer> nums = new TreeSet<>();
+        nums.addAll(List.of(5, 3, 1, 4, 2));
+        System.out.println(nums);  // [1, 2, 3, 4, 5] (自动排序)
+
+        // ========== 自定义排序 (Comparator) ==========
+        TreeSet<String> byLength = new TreeSet<>(
+            Comparator.comparingInt(String::length)
+                .thenComparing(Comparator.naturalOrder())
+        );
+        byLength.addAll(List.of("banana", "apple", "cherry", "date", "elderberry"));
+        System.out.println(byLength);
+        // [date, apple, banana, cherry, elderberry] (按长度)
+
+        // ========== TreeSet 特有方法 ==========
+        TreeSet<Integer> ts = new TreeSet<>(List.of(10, 20, 30, 40, 50));
+
+        System.out.println(ts.first());           // 10 (最小)
+        System.out.println(ts.last());            // 50 (最大)
+
+        System.out.println(ts.lower(30));         // 20 (<30 的最大值)
+        System.out.println(ts.floor(30));         // 30 (≤30 的最大值)
+        System.out.println(ts.higher(30));        // 40 (>30 的最小值)
+        System.out.println(ts.ceiling(31));       // 40 (≥31 的最小值)
+
+        // 子集
+        System.out.println(ts.subSet(20, 40));     // [20, 30] ([20, 40))
+        System.out.println(ts.headSet(30));        // [10, 20] (<30)
+        System.out.println(ts.tailSet(30));        // [30, 40, 50] (≥30)
+
+        // 逆序
+        System.out.println(ts.descendingSet());    // [50, 40, 30, 20, 10]
+
+        // ========== pollFirst/pollLast ==========
+        Integer first = ts.pollFirst();  // 取出并移除最小
+        Integer last = ts.pollLast();    // 取出并移除最大
+        System.out.println(ts);          // [20, 30, 40]
+
+        // ========== TreeSet 注意 ==========
+        // 1. 不能存 null (NullPointerException)
+        // 2. 元素必须可比较 (Comparable 或 Comparator)
+        // 3. remove/contains 基于 compareTo, 不是 equals
+        // 4. 排序字段不可变 (修改后删除/查找可能失败)
+    }
+}
+
+// ========== Comparator vs Comparable ==========
+// Comparable: 自然排序 (类自己实现)
+//   int compareTo(T o)  → this vs o
+// Comparator: 定制排序 (独立比较器)
+//   int compare(T a, T b)  → a vs b
+
+class Student2 implements Comparable<Student2> {
+    String name;
+    int score;
+
+    Student2(String name, int score) {
+        this.name = name;
+        this.score = score;
+    }
+
+    @Override
+    public int compareTo(Student2 o) {
+        return Integer.compare(this.score, o.score);  // 按分数升序
+    }
+
+    @Override
+    public String toString() {
+        return name + "=" + score;
+    }
+}
+
+// 使用:
+// TreeSet<Student2> students = new TreeSet<>();  // 自然排序
+// students.add(new Student2("Alice", 85));
+// students.add(new Student2("Bob", 92));
+// System.out.println(students);  // [Alice=85, Bob=92] (按分数)</div>
+        <div class="note">💡 Set 要点: HashSet 哈希表 O(1), 无序; LinkedHashSet 维护插入顺序; TreeSet 红黑树 O(log n), 自动排序; equals/hashCode 务必同时重写; Set 存对象后不要修改影响 hashCode/compareTo 的字段; TreeSet 元素必须可比较, 不能 null; HashSet 允许一个 null; Comparator 灵活定制排序。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoHashSet()">HashSet</button>
+        <button onclick="demoTreeSet()">TreeSet</button>
+        <button onclick="demoCompare()">Comparable/Comparator</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoHashSet() {
+            result.innerHTML = '';
+            log('# HashSet');
+            log('');
+            log('不重复、无序、O(1)');
+            log('基于 HashMap, 依赖 hashCode+equals');
+            log('');
+            log('set.add("a") → true');
+            log('set.add("a") → false (重复)');
+            log('set.contains("a") → true');
+            log('set.remove("a") → true');
+            log('');
+            log('LinkedHashSet: 保留插入顺序');
+        }
+
+        function demoTreeSet() {
+            result.innerHTML = '';
+            log('# TreeSet');
+            log('');
+            log('自动排序、O(log n)');
+            log('基于 TreeMap (红黑树)');
+            log('');
+            log('额外方法:');
+            log('  first() / last()');
+            log('  lower() / higher()');
+            log('  floor() / ceiling()');
+            log('  subSet(from, to)');
+            log('  headSet(to) / tailSet(from)');
+        }
+
+        function demoCompare() {
+            result.innerHTML = '';
+            log('# Comparable vs Comparator');
+            log('');
+            log('Comparable (自然排序):');
+            log('  class A implements Comparable<A> {');
+            log('    int compareTo(A o) {');
+            log('      return this.x - o.x;');
+            log('    }');
+            log('  }');
+            log('');
+            log('Comparator (定制排序):');
+            log('  Comparator<A> cmp = (a,b) -> a.x - b.x;');
+            log('  TreeSet<A> set = new TreeSet<>(cmp);');
+        }
+    </script>
+</body>
+</html>

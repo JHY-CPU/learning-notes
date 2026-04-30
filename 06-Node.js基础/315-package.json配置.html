@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>package.json配置</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #pkg-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>package.json 配置</h2><p>name/version/scripts/dependencies/exports/main、字段详解。</p></div>
+    <div class="card">
+        <h2>package.json 字段详解</h2>
+        <div class="code">// ========== 核心字段 ==========
+{
+    "name": "@scope/package-name",   // 包名 (可带 scope)
+    "version": "1.0.0",              // 语义版本号
+    "description": "A useful package",
+
+    // ========== 入口 ==========
+    "main": "dist/index.js",         // CJS 入口 (require)
+    "module": "dist/index.mjs",      // ESM 入口 (import, 非标准但通用)
+    "types": "dist/index.d.ts",      // TypeScript 类型
+    "exports": {                     // 条件导出 (Node 12+)
+        ".": {
+            "import": "./dist/index.mjs",
+            "require": "./dist/index.js",
+            "types": "./dist/index.d.ts"
+        },
+        "./utils": "./dist/utils.js"
+    },
+
+    // ========== 依赖 ==========
+    "dependencies": {},              // 运行时依赖
+    "devDependencies": {},           // 开发时依赖
+    "peerDependencies": {},          // 宿主依赖 (插件)
+    "optionalDependencies": {},      // 可选依赖
+    "bundledDependencies": [],       // 打包依赖
+
+    // ========== 脚本 ==========
+    "scripts": {
+        "start": "node index.js",
+        "test": "jest",
+        "build": "webpack"
+    },
+
+    // ========== 发布 ==========
+    "private": true,                 // 私有 (防止发布)
+    "files": ["dist/", "README.md"], // 发布的文件
+    "license": "MIT",
+
+    // ========== 限制 ==========
+    "engines": { "node": ">=18" },   // Node 版本要求
+    "os": ["linux", "darwin"],       // 操作系统
+    "cpu": ["x64", "arm64"],         // CPU 架构
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：package.json</h2>
+        <button onclick="demoPackageJson()">package.json 详解</button>
+        <div id="pkg-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const pkgResult = document.getElementById('pkg-result');
+
+        function log(msg) {
+            pkgResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoPackageJson() {
+            pkgResult.innerHTML = '';
+            log('📋 package.json 配置详解:');
+            log('');
+
+            log('1️⃣ 必填字段:');
+            log('   name — 包名 (小写, 无空格)');
+            log('   version — 语义版本号 (semver)');
+            log('');
+
+            log('2️⃣ 入口配置:');
+            log('   main — 主入口 (CJS: require)');
+            log('   module — ESM 入口 (打包工具使用)');
+            log('   exports — 条件导出 (Node 12+)');
+            log('   browser — 浏览器端入口');
+            log('   types — TS 类型声明');
+            log('');
+
+            log('3️⃣ 依赖类型:');
+            log('   dependencies — 运行时依赖');
+            log('   devDependencies — 开发依赖');
+            log('   peerDependencies — 宿主依赖');
+            log('   optionalDependencies — 可选依赖');
+            log('');
+
+            log('4️⃣ 脚本系统:');
+            log('   npm run <script> 执行');
+            log('   pre/post 钩子: prestart → start → poststart');
+            log('   内置: start/test/stop/restart');
+            log('');
+
+            log('5️⃣ 发布配置:');
+            log('   private: true — 防止误发布');
+            log('   files — 包含的文件列表');
+            log('   license — 开源协议');
+            log('');
+
+            log('6️⃣ 其他重要字段:');
+            const fields = [
+                { field: 'engines', desc: '限制 Node/npm 版本' },
+                { field: 'os', desc: '限制操作系统' },
+                { field: 'cpu', desc: '限制 CPU 架构' },
+                { field: 'repository', desc: '源码仓库地址' },
+                { field: 'bugs', desc: 'bug 反馈地址' },
+                { field: 'homepage', desc: '项目主页' },
+                { field: 'keywords', desc: '搜索关键词' },
+                { field: 'author', desc: '作者信息' },
+                { field: 'funding', desc: '赞助信息' },
+            ];
+            fields.forEach(({ field, desc }) => log(`   ${field.padEnd(14)} ${desc}`));
+        }
+
+        console.log('=== package.json 配置 ===');
+
+        document.getElementById('output').textContent =
+            `package.json: name/version/main/module/exports/dependencies/scripts\n` +
+            `条件导出 / 类型声明 / 发布配置 / 引擎限制\n` +
+            `✅ package.json 配置完成！`;
+    </script>
+</body>
+</html>

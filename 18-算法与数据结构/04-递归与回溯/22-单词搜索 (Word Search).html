@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>22-单词搜索 (Word Search)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Word Search</h2>
+  <div class="code">在二维网格中搜索单词是否存在，回溯探索相邻单元格。</div>
+  <pre>function exist(board, word) {
+  const m = board.length, n = board[0].length;
+  function dfs(i, j, idx) {
+    if (idx === word.length) return true;
+    if (i<0||i>=m||j<0||j>=n||board[i][j]!==word[idx]) return false;
+    const tmp = board[i][j];
+    board[i][j] = '#';
+    const found = dfs(i+1,j,idx+1)||dfs(i-1,j,idx+1)||dfs(i,j+1,idx+1)||dfs(i,j-1,idx+1);
+    board[i][j] = tmp;
+    return found;
+  }
+  for (let i = 0; i < m; i++)
+    for (let j = 0; j < n; j++)
+      if (dfs(i, j, 0)) return true;
+  return false;
+}
+const board = [
+  ['A','B','C','E'],
+  ['S','F','C','S'],
+  ['A','D','E','E']
+];
+console.log(exist(board, 'ABCCED')); // true
+console.log(exist(board, 'SEE')); // true
+console.log(exist(board, 'ABCB')); // false</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  const board=[['A','B','C','E'],['S','F','C','S'],['A','D','E','E']];
+  function exist(board,word){
+    const m=board.length,n=board[0].length;
+    function dfs(i,j,idx){if(idx===word.length)return true;if(i<0||i>=m||j<0||j>=n||board[i][j]!==word[idx])return false;const t=board[i][j];board[i][j]='#';const f=dfs(i+1,j,idx+1)||dfs(i-1,j,idx+1)||dfs(i,j+1,idx+1)||dfs(i,j-1,idx+1);board[i][j]=t;return f;}
+    for(let i=0;i<m;i++)for(let j=0;j<n;j++)if(dfs(i,j,0))return true;return false;
+  }
+  document.getElementById('result').textContent =
+    `ABCCED: ${exist(board,'ABCCED')}\nSEE: ${exist(board,'SEE')}\nABCB: ${exist(board,'ABCB')}`;
+}
+</script>
+</body>
+</html>

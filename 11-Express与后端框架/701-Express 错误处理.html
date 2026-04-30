@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express 错误处理</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚠️ Express 错误处理</h2><p>同步/异步错误处理、自定义错误类、asyncHandler 封装、全局错误处理中间件、404 处理、生产环境错误屏蔽、统一错误响应格式、多语言错误消息、错误日志记录。</p></div>
+    <div class="card">
+        <h2>错误处理基础</h2>
+        <div class="code">// ========== Express 错误处理 ==========
+// Express 默认处理同步错误 (自动捕获)
+// 异步错误需要显式传给 next()
+
+// ========== 同步错误 ==========
+// Express 自动捕获同步错误:
+app.get('/users/:id', (req, res) => {
+    throw new Error('Something went wrong');  // Express 自动捕获
+    // → 传给错误处理中间件
+});
+
+// ========== 异步错误 ==========
+// Express 4 不自动捕获异步错误!
+app.get('/users/:id', async (req, res) => {
+    const user = await User.findById(req.params.id);
+    throw new Error('Not found');  // ❌ 不会被捕获!
+    // → 未捕获的 Promise 拒绝 → 进程崩溃!
+});
+
+// 正确方式: try/catch + next:
+app.get('/users/:id', async (req, res, next) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user) {
+            throw new Error('User not found');
+        }
+        res.json(user);
+    } catch (err) {
+        next(err);  // 传给错误处理中间件
+    }
+});
+
+// ========== asyncHandler 封装 ==========
+// 避免每个路由都写 try/catch:
+
+function asyncHandler(fn) {
+    return (req, res, next) => {
+        Promise.resolve(fn(req, res, next)).catch(next);
+    };
+}
+
+// 使用:
+app.get('/users/:id', asyncHandler(async (req, res) => {
+    const user = await User.findById(req.params.id);
+    if (!user) throw new NotFoundError('User not found');
+    res.json(user);
+}));
+
+app.post('/users', asyncHandler(async (req, res) => {
+    const user = await User.create(req.body);
+    res.status(201).json(user);
+}));</div>
+    </div>
+    <div class="card">
+        <h2>自定义错误体系</h2>
+        <div class="code">// ========== 错误类体系 ==========
+// 预定义错误类, 统一错误格式
+
+// ========== 基础错误类 ==========
+class AppError extends Error {
+    constructor(message, statusCode = 500, code = 'INTERNAL_ERROR') {
+        super(message);
+        this.statusCode = statusCode;
+        this.code = code;
+        this.isOperational = true;    // 可预知的操作错误
+        this.timestamp = Date.now();
+
+        Error.captureStackTrace(this, this.constructor);
+    }
+}
+
+// ========== HTTP 错误 ==========
+class BadRequestError extends AppError {
+    constructor(message = 'Bad request') {
+        super(message, 400, 'BAD_REQUEST');
+    }
+}
+
+class UnauthorizedError extends AppError {
+    constructor(message = 'Unauthorized') {
+        super(message, 401, 'UNAUTHORIZED');
+    }
+}
+
+class ForbiddenError extends AppError {
+    constructor(message = 'Forbidden') {
+        super(message, 403, 'FORBIDDEN');
+    }
+}
+
+class NotFoundError extends AppError {
+    constructor(message = 'Resource not found') {
+        super(message, 404, 'NOT_FOUND');
+    }
+}
+
+class ConflictError extends AppError {
+    constructor(message = 'Resource already exists') {
+        super(message, 409, 'CONFLICT');
+    }
+}
+
+class ValidationError extends AppError {
+    constructor(errors) {
+        super('Validation failed', 422, 'VALIDATION_ERROR');
+        this.errors = errors;  // 字段级错误详情
+    }
+}
+
+class TooManyRequestsError extends AppError {
+    constructor(message = 'Too many requests') {
+        super(message, 429, 'RATE_LIMIT_EXCEEDED');
+    }
+}
+
+// ========== 使用示例 ==========
+app.get('/users/:id', asyncHandler(async (req, res) => {
+    const user = await User.findById(req.params.id);
+    if (!user) throw new NotFoundError('User not found');
+    res.json(user);
+}));</div>
+    </div>
+    <div class="card">
+        <h2>全局错误处理中间件</h2>
+        <div class="code">// ========== 全局错误处理 ==========
+// 必须放在所有路由之后, 4 个参数
+
+// config/index.js:
+module.exports = {
+    nodeEnv: process.env.NODE_ENV || 'development',
+    isDev: process.env.NODE_ENV === 'development',
+    isProd: process.env.NODE_ENV === 'production',
+};
+
+// middleware/errorHandler.js:
+const config = require('../config');
+
+function errorHandler(err, req, res, next) {
+    // 记录错误日志
+    console.error(`[${new Date().toISOString()}] Error:`, {
+        message: err.message,
+        stack: err.stack,
+        method: req.method,
+        url: req.originalUrl,
+        ip: req.ip,
+        userId: req.user?.id,
+    });
+
+    // 默认为 500
+    const statusCode = err.statusCode || 500;
+    const code = err.code || 'INTERNAL_ERROR';
+
+    // 生产环境不暴露内部错误详情
+    const response = {
+        success: false,
+        code,
+        message: err.isOperational
+            ? err.message
+            : 'Internal server error',
+        timestamp: Date.now(),
+        requestId: req.id,
+    };
+
+    // 开发环境附加错误堆栈和详情
+    if (config.isDev) {
+        response.stack = err.stack;
+        response.details = err.errors || undefined;
+    }
+
+    // Mongoose 验证错误转换
+    if (err.name === 'ValidationError') {
+        response.code = 'VALIDATION_ERROR';
+        response.message = 'Validation failed';
+        response.details = Object.values(err.errors).map(e => ({
+            field: e.path,
+            message: e.message,
+        }));
+    }
+
+    // MongoDB 重复键错误
+    if (err.code === 11000) {
+        response.code = 'DUPLICATE_KEY';
+        response.message = 'Duplicate key error';
+        response.statusCode = 409;
+    }
+
+    // JWT 错误
+    if (err.name === 'JsonWebTokenError') {
+        response.code = 'INVALID_TOKEN';
+        response.message = 'Invalid token';
+        response.statusCode = 401;
+    }
+
+    res.status(statusCode).json(response);
+}
+
+// app.js — 挂载:
+app.use(errorHandler);</div>
+    </div>
+    <div class="card">
+        <h2>404 与未捕获异常</h2>
+        <div class="code">// ========== 404 处理 ==========
+// 必须放在所有路由之后!
+// 前面所有路由都没匹配到才执行
+
+app.use((req, res, next) => {
+    res.status(404).json({
+        success: false,
+        code: 'NOT_FOUND',
+        message: `Route ${req.method} ${req.originalUrl} not found`,
+        timestamp: Date.now(),
+    });
+});
+
+// ========== 未捕获的 Promise 拒绝 ==========
+// 进程级兜底 (防止崩溃):
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection:', reason);
+    // 记录日志后优雅关闭
+    // server.close(() => process.exit(1));
+});
+
+// 未捕获异常:
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+    // 必须退出进程 (未知状态)
+    // server.close(() => process.exit(1));
+});
+
+// ========== 完整 app.js ==========
+const express = require('express');
+const app = express();
+
+// 1. 安全与解析
+app.use(helmet());
+app.use(cors());
+app.use(express.json());
+
+// 2. 路由
+app.use('/api/users', usersRouter);
+app.use('/api/posts', postsRouter);
+
+// 3. 404
+app.use((req, res) => {
+    res.status(404).json({ code: 'NOT_FOUND', message: 'Not found' });
+});
+
+// 4. 错误处理
+app.use(errorHandler);
+
+// 5. 启动
+const server = app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
+});
+
+// 6. 优雅关闭
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down...');
+    server.close(() => process.exit(0));
+});</div>
+        <div class="note">💡 错误处理要点: 4 参数中间件 (err,req,res,next); 异步错误必须用 asyncHandler 或 try/catch 传给 next(); 自定义错误类区分操作错误和程序错误; 生产环境隐藏错误堆栈; 404 放在所有路由之后; 全局 errorHandler 最后挂载; 添加 unhandledRejection/uncaughtException 进程级兜底。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoAsync()">异步错误</button>
+        <button onclick="demoClasses()">错误类体系</button>
+        <button onclick="demoGlobal()">全局处理</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoAsync() {
+            result.innerHTML = '';
+            log('# 异步错误处理');
+            log('');
+            log('// asyncHandler 封装:');
+            log('function asyncHandler(fn) {');
+            log('  return (req,res,next) => {');
+            log('    Promise.resolve(fn(req,res,next)).catch(next)');
+            log('  };');
+            log('}');
+            log('');
+            log('// 使用:');
+            log('app.get("/path", asyncHandler(async (req, res) => {');
+            log('  const data = await db.find();');
+            log('  res.json(data);');
+            log('}));');
+        }
+
+        function demoClasses() {
+            result.innerHTML = '';
+            log('# 自定义错误类');
+            log('');
+            log('BadRequestError   400');
+            log('UnauthorizedError 401');
+            log('ForbiddenError    403');
+            log('NotFoundError     404');
+            log('ConflictError     409');
+            log('ValidationError   422');
+            log('TooManyRequests   429');
+            log('');
+            log('所有继承 AppError, 含 statusCode');
+        }
+
+        function demoGlobal() {
+            result.innerHTML = '';
+            log('# 全局错误处理中间件');
+            log('');
+            log('app.use((err, req, res, next) => {');
+            log('  const status = err.statusCode || 500;');
+            log('  res.status(status).json({');
+            log('    code: err.code || "INTERNAL_ERROR",');
+            log('    message: err.isOperational ? err.message');
+            log('           : "Internal server error",');
+            log('  });');
+            log('});');
+            log('');
+            log('// 放在所有路由 + 404 之后!');
+        }
+    </script>
+</body>
+</html>

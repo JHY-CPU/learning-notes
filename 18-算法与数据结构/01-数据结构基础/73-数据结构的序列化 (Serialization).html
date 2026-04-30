@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>73-数据结构的序列化 (Serialization)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Serialization</h2>
+  <div class="code">序列化将数据结构转换为字符串/字节流，反序列化是其逆过程。</div>
+  <pre>// 二叉树序列化（前序遍历）
+function serialize(root) {
+  if (!root) return '#';
+  return `${root.val},${serialize(root.left)},${serialize(root.right)}`;
+}
+function deserialize(s) {
+  const arr = s.split(',');
+  let idx = 0;
+  function dfs() {
+    if (arr[idx] === '#') { idx++; return null; }
+    const node = {val: Number(arr[idx]), left: null, right: null};
+    idx++;
+    node.left = dfs();
+    node.right = dfs();
+    return node;
+  }
+  return dfs();
+}
+const tree = {val:1,left:{val:2,left:null,right:null},right:{val:3,left:{val:4,left:null,right:null},right:null}};
+const ser = serialize(tree);
+console.log(ser); // 1,2,#,#,3,4,#,#,#
+console.log(deserialize(ser)); // restored</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  function serialize(root){if(!root)return '#';return root.val+','+serialize(root.left)+','+serialize(root.right);}
+  const tree={val:1,left:{val:2,left:null,right:null},right:{val:3,left:{val:4,left:null,right:null},right:null}};
+  const ser=serialize(tree);
+  document.getElementById('result').textContent = `序列化: ${ser}\n反序列化: ${serialize(JSON.parse(JSON.stringify(tree)))}`;
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bash循环与数组</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔄 Bash 循环与数组</h2><p>for、while、until 循环,break/continue,数组定义与遍历,关联数组。</p></div>
+    <div class="card">
+        <h2>for 循环</h2>
+        <div class="code">// ========== for — 列表循环 ==========
+// 遍历单词列表
+for fruit in apple banana orange; do
+    echo $fruit
+done
+
+// 遍历通配符结果
+for file in *.txt; do
+    echo "找到文件: $file"
+done
+
+// 使用花括号展开
+for num in {1..5}; do
+    echo $num
+done
+
+// 步进
+for num in {0..10..2}; do    # 0 2 4 6 8 10
+    echo $num
+done
+
+// 命令替换作为列表
+for user in $(cat /etc/passwd | cut -d: -f1); do
+    echo "用户: $user"
+done
+
+// ========== for — C 风格 ==========
+for ((i=0; i<10; i++)); do
+    echo "i = $i"
+done
+
+// 二维遍历
+for ((i=0; i<3; i++)); do
+    for ((j=0; j<3; j++)); do
+        echo "($i, $j)"
+    done
+done
+
+// ========== for — 省略 in (隐式 $@) ==========
+// 在脚本/函数中,没有 in 时遍历所有参数
+myfunc() {
+    for arg; do      # 等同于 for arg in "$@"
+        echo "参数: $arg"
+    done
+}</div>
+    </div>
+    <div class="card">
+        <h2>while 与 until 循环</h2>
+        <div class="code">// ========== while 循环 ==========
+// while <命令>; do ... done
+// 当命令退出码为 0 时继续循环
+
+// 计数器
+count=0
+while [ $count -lt 5 ]; do
+    echo "count = $count"
+    ((count++))
+done
+
+// 读取文件 (经典用法)
+while IFS= read -r line; do
+    echo "行: $line"
+done < /etc/hosts
+
+// 读取 CSV
+while IFS=',' read -r name age city; do
+    echo "$name 住在 $city, $age 岁"
+done < data.csv
+
+// 无限循环 (配合 break)
+while true; do
+    read -p "输入 q 退出: " input
+    [ "$input" = "q" ] && break
+done
+
+// 监听文件变化
+while inotifywait -e modify /var/log/app.log; do
+    echo "日志文件被修改!"
+done
+
+// ========== until 循环 ==========
+// until <命令>; do ... done
+// 和 while 相反,命令退出码非 0 时继续
+
+// 等待服务启动
+until curl -s http://localhost:8080/health > /dev/null; do
+    echo "等待服务启动..."
+    sleep 2
+done
+echo "服务已就绪!"
+
+// ========== 循环控制 ==========
+for i in {1..10}; do
+    [ $i -eq 5 ] && break      # 跳出整个循环
+    echo $i
+done  # 1 2 3 4
+
+for i in {1..5}; do
+    [ $i -eq 3 ] && continue   # 跳过本次迭代
+    echo $i
+done  # 1 2 4 5</div>
+        <div class="note">💡 while IFS= read -r line 是 Bash 中安全读取文件的经典模式。IFS= 防止行首尾空白被删除,-r 防止反斜杠转义。如果不加这两者,带空格或反斜杠的行会被错误处理。</div>
+    </div>
+    <div class="card">
+        <h2>数组</h2>
+        <div class="code">// ========== 索引数组 ==========
+// 定义 (括号 + 空格分隔)
+fruits=("apple" "banana" "orange")
+
+// 逐个赋值
+fruits[0]="apple"
+fruits[1]="banana"
+
+// 声明数组
+declare -a numbers
+
+// ========== 访问元素 ==========
+echo ${fruits[0]}        # apple  (第一个)
+echo ${fruits[-1]}       # orange (最后一个, Bash 4.3+)
+echo ${fruits[@]}        # apple banana orange (所有元素)
+echo ${fruits[*]}        # apple banana orange (所有,作为单字符串)
+
+// ========== 数组长度与索引 ==========
+echo ${#fruits[@]}        # 3 (元素个数)
+echo ${!fruits[@]}        # 0 1 2 (所有索引)
+
+// ========== 添加/删除 ==========
+fruits+=("grape")              # 追加
+fruits=("${fruits[@]}" "mango")# 追加 (兼容写法)
+unset fruits[1]                # 删除索引 1 (留下空洞)
+
+// 重新索引 (填空洞)
+fruits=("${fruits[@]}")
+
+// ========== 数组切片 ==========
+nums=(0 1 2 3 4 5)
+echo ${nums[@]:1:3}      # 1 2 3 (从索引1取3个)
+echo ${nums[@]:3}        # 3 4 5 (从索引3到末尾)
+echo ${nums[@]::3}       # 0 1 2 (开头3个)
+
+// ========== 数组遍历 ==========
+for fruit in "${fruits[@]}"; do
+    echo $fruit
+done
+
+// 带索引遍历
+for i in "${!fruits[@]}"; do
+    echo "索引 $i → ${fruits[$i]}"
+done
+
+// 打印所有参数 (脚本中)
+for arg in "$@"; do
+    echo $arg
+done
+
+// ========== 数组拼接 ==========
+arr1=(1 2 3)
+arr2=(4 5 6)
+combined=("${arr1[@]}" "${arr2[@]}")
+
+// ========== 数组排序 ==========
+// Bash 没有内置排序,需要借助外部命令
+sorted=($(echo "${nums[@]}" | tr ' ' '\n' | sort -n))</div>
+    </div>
+    <div class="card">
+        <h2>关联数组 (Bash 4+)</h2>
+        <div class="code">// ========== 关联数组 (类似字典/Map) ==========
+// 必须先用 -A 声明
+declare -A user
+
+user["name"]="Alice"
+user["age"]="25"
+user["city"]="Beijing"
+
+// 访问
+echo ${user["name"]}        # Alice
+
+// 遍历键
+for key in "${!user[@]}"; do
+    echo "$key → ${user[$key]}"
+done
+
+// 遍历值
+for val in "${user[@]}"; do
+    echo $val
+done
+
+// 检查键是否存在
+if [[ -v "user[name]" ]]; then
+    echo "name 键存在"
+fi
+
+// 获取所有键
+echo ${!user[@]}            # name age city
+
+// ========== 关联数组实战 ==========
+// 统计文件扩展名
+declare -A ext_count
+for file in *.*; do
+    ext="${file##*.}"
+    ((ext_count[$ext]++))
+done
+for ext in "${!ext_count[@]}"; do
+    echo ".$ext: ${ext_count[$ext]} 个文件"
+done
+
+// 模拟二维数组
+declare -A matrix
+matrix["0,0"]="a"
+matrix["0,1"]="b"
+matrix["1,0"]="c"
+matrix["1,1"]="d"</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoLoop()">循环演示</button>
+        <button onclick="demoArray()">数组演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoLoop() {
+            result.innerHTML = '';
+            log('# Bash 循环演示');
+            log('');
+            log('for i in {1..5}; do');
+            log('    echo "第 $i 次迭代"');
+            log('done');
+            log('  → 第 1 次迭代');
+            log('  → 第 2 次迭代');
+            log('  → ...');
+            log('');
+            log('while IFS= read -r line; do');
+            log('    echo "读取: $line"');
+            log('done < file.txt');
+            log('');
+            log('until curl -s http://localhost:8080; do');
+            log('    sleep 1');
+            log('done');
+            log('  → 等待服务就绪...');
+        }
+
+        function demoArray() {
+            result.innerHTML = '';
+            log('# Bash 数组演示');
+            log('');
+            log('fruits=("apple" "banana" "orange")');
+            log('${fruits[0]}     → apple');
+            log('${#fruits[@]}    → 3');
+            log('${!fruits[@]}    → 0 1 2');
+            log('');
+            log('fruits+=("grape")');
+            log('${fruits[@]}     → apple banana orange grape');
+            log('');
+            log('--- 关联数组 ---');
+            log('declare -A config');
+            log('config[host]="localhost"');
+            log('config[port]="5432"');
+            log('for key in "${!config[@]}"; do');
+            log('    echo "$key = ${config[$key]}"');
+            log('done');
+            log('  → host = localhost');
+            log('  → port = 5432');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>18-双向链表 (Doubly Linked List)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card"><h2>18-双向链表 (Doubly Linked List)</h2><p>双向链表的每个节点包含 prev 和 next 两个指针，可以从两个方向遍历。插入和删除操作比单链表更灵活。</p></div>
+
+<div class="card"><h2>双向链表节点与类</h2>
+<div class="code">
+// 双向链表节点
+class DoublyListNode {
+  constructor(val) {
+    this.val = val;
+    this.prev = null;
+    this.next = null;
+  }
+}
+
+// 双向链表类（带虚拟头尾节点）
+class DoublyLinkedList {
+  constructor() {
+    this.dummyHead = new DoublyListNode(null);
+    this.dummyTail = new DoublyListNode(null);
+    // 连接虚拟头尾
+    this.dummyHead.next = this.dummyTail;
+    this.dummyTail.prev = this.dummyHead;
+    this.size = 0;
+  }
+
+  // 在指定节点的后面插入
+  addAfter(node, val) {
+    let newNode = new DoublyListNode(val);
+    let nextNode = node.next;
+
+    // 建立新节点的连接
+    newNode.prev = node;
+    newNode.next = nextNode;
+
+    // 更新前后节点的连接
+    node.next = newNode;
+    nextNode.prev = newNode;
+
+    this.size++;
+    return newNode;
+  }
+
+  // 删除指定节点
+  removeNode(node) {
+    if (node === this.dummyHead || node === this.dummyTail) return;
+
+    let prev = node.prev;
+    let next = node.next;
+    prev.next = next;
+    next.prev = prev;
+
+    node.prev = null;
+    node.next = null;
+    this.size--;
+  }
+
+  // 头部插入
+  addFirst(val) {
+    return this.addAfter(this.dummyHead, val);
+  }
+
+  // 尾部插入
+  addLast(val) {
+    return this.addAfter(this.dummyTail.prev, val);
+  }
+
+  // 正向遍历
+  forward() {
+    let result = [];
+    let curr = this.dummyHead.next;
+    while (curr !== this.dummyTail) {
+      result.push(curr.val);
+      curr = curr.next;
+    }
+    return result;
+  }
+
+  // 反向遍历
+  backward() {
+    let result = [];
+    let curr = this.dummyTail.prev;
+    while (curr !== this.dummyHead) {
+      result.push(curr.val);
+      curr = curr.prev;
+    }
+    return result;
+  }
+}
+</div></div>
+
+<div class="card"><h2>交互演示</h2>
+<button onclick="demoDoublyLinkedList()">运行双向链表演示</button>
+<div id="result"></div>
+</div>
+
+<script>
+function demoDoublyLinkedList() {
+  let output = '';
+
+  class DoublyListNode {
+    constructor(val) { this.val = val; this.prev = null; this.next = null; }
+  }
+
+  class DoublyLinkedList {
+    constructor() {
+      this.dummyHead = new DoublyListNode(null);
+      this.dummyTail = new DoublyListNode(null);
+      this.dummyHead.next = this.dummyTail;
+      this.dummyTail.prev = this.dummyHead;
+      this.size = 0;
+    }
+
+    addAfter(node, val) {
+      let newNode = new DoublyListNode(val);
+      let nextNode = node.next;
+      newNode.prev = node;
+      newNode.next = nextNode;
+      node.next = newNode;
+      nextNode.prev = newNode;
+      this.size++;
+      return newNode;
+    }
+
+    removeNode(node) {
+      if (node === this.dummyHead || node === this.dummyTail) return;
+      let prev = node.prev, next = node.next;
+      prev.next = next;
+      next.prev = prev;
+      node.prev = node.next = null;
+      this.size--;
+    }
+
+    addFirst(val) { return this.addAfter(this.dummyHead, val); }
+    addLast(val) { return this.addAfter(this.dummyTail.prev, val); }
+
+    forward() {
+      let result = [];
+      let curr = this.dummyHead.next;
+      while (curr !== this.dummyTail) { result.push(curr.val); curr = curr.next; }
+      return result;
+    }
+
+    backward() {
+      let result = [];
+      let curr = this.dummyTail.prev;
+      while (curr !== this.dummyHead) { result.push(curr.val); curr = curr.prev; }
+      return result;
+    }
+
+    getSize() { return this.size; }
+  }
+
+  output += '=== 双向链表演示 ===\n\n';
+  let list = new DoublyLinkedList();
+
+  output += '尾部添加 1, 2, 3:\n';
+  list.addLast(1); list.addLast(2); list.addLast(3);
+  output += '   正向: [' + list.forward() + ']\n';
+  output += '   反向: [' + list.backward() + ']\n';
+
+  output += '\n头部添加 0:\n';
+  list.addFirst(0);
+  output += '   正向: [' + list.forward() + ']\n';
+
+  output += '\n正向遍历: ';
+  output += list.forward().join(' <-> ') + '\n';
+  output += '反向遍历: ';
+  output += list.backward().join(' <-> ') + '\n';
+
+  output += '\n大小: ' + list.getSize() + '\n';
+
+  // 删除中间节点演示
+  let node2 = list.dummyHead.next.next; // 值为1的节点
+  list.removeNode(node2);
+  output += '\n删除节点(值=1)后:\n';
+  output += '   正向: [' + list.forward() + ']\n';
+  output += '   大小: ' + list.getSize() + '\n';
+
+  document.getElementById('result').textContent = output;
+}
+</script>
+</body></html>

@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>fs异步操作</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #fsAsync-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>fs 异步操作</h2><p>fs.readFile 回调、fs.promises API、watch 文件变化、错误处理。</p></div>
+    <div class="card">
+        <h2>fs 异步 API</h2>
+        <div class="code">// ========== 回调版 (fs.readFile) ==========
+fs.readFile('/path/file.txt', 'utf-8', (err, data) => {
+    if (err) {
+        console.error('读取失败:', err);
+        return;
+    }
+    console.log(data);
+});
+
+// ========== Promise 版 (fs.promises) ==========
+// Node 10+ 推荐
+const fs = require('fs/promises');
+// 或: const { readFile } = require('fs').promises;
+
+async function readConfig() {
+    try {
+        const data = await fs.readFile('/path/config.json', 'utf-8');
+        return JSON.parse(data);
+    } catch (err) {
+        console.error('读取失败:', err);
+    }
+}
+
+// ========== 常用异步操作 ==========
+await fs.readFile(path, options);
+await fs.writeFile(path, data, options);
+await fs.appendFile(path, data);
+await fs.mkdir(path, { recursive: true });
+await fs.readdir(path);
+await fs.unlink(path);
+await fs.rm(path, { recursive: true });
+await fs.stat(path);
+await fs.access(path); // 检查权限
+
+// ========== watch 文件变化 ==========
+const watcher = fs.watch('/path/to/dir', (event, filename) => {
+    console.log(`${filename}: ${event}`);
+});
+watcher.close(); // 停止监听</div>
+    </div>
+    <div class="card">
+        <h2>演示：异步文件操作</h2>
+        <button onclick="demoAsyncFS()">异步 fs 模拟</button>
+        <button onclick="demoWatch()">文件监听模拟</button>
+        <div id="fsAsync-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const fsAsyncResult = document.getElementById('fsAsync-result');
+
+        function log(msg) {
+            fsAsyncResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // 模拟异步文件系统
+        const mockFS = {
+            files: new Map(),
+
+            async readFile(path) {
+                log(`   ⏳ 正在读取: ${path}`);
+                await new Promise(r => setTimeout(r, 300));
+                if (!this.files.has(path)) throw new Error(`ENOENT: ${path}`);
+                return this.files.get(path);
+            },
+
+            async writeFile(path, data) {
+                log(`   ⏳ 正在写入: ${path}`);
+                await new Promise(r => setTimeout(r, 200));
+                this.files.set(path, data);
+                return;
+            },
+
+            async mkdir(path) {
+                log(`   ⏳ 创建目录: ${path}`);
+                await new Promise(r => setTimeout(r, 100));
+            },
+
+            async readdir(path) {
+                log(`   ⏳ 读取目录: ${path}`);
+                await new Promise(r => setTimeout(r, 200));
+                return [...this.files.keys()]
+                    .filter(k => k.startsWith(path))
+                    .map(k => k.replace(path, ''));
+            },
+
+            async unlink(path) {
+                log(`   ⏳ 删除文件: ${path}`);
+                await new Promise(r => setTimeout(r, 150));
+                this.files.delete(path);
+            }
+        };
+
+        async function demoAsyncFS() {
+            fsAsyncResult.innerHTML = '';
+            log('📂 异步文件系统操作 (fs.promises):');
+            log('');
+
+            try {
+                // 初始化数据
+                mockFS.files.set('/app/config.json', '{"port":3000}');
+                mockFS.files.set('/app/data.txt', 'Hello World');
+
+                // 读取文件
+                log('1️⃣ readFile:');
+                const config = await mockFS.readFile('/app/config.json');
+                log(`   内容: ${config}`);
+                log('');
+
+                // 写文件
+                log('2️⃣ writeFile:');
+                await mockFS.writeFile('/app/notes.txt', '异步操作演示');
+                log('');
+
+                // 读取目录
+                log('3️⃣ readdir:');
+                const items = await mockFS.readdir('/app/');
+                log(`   文件列表: [${items.join(', ')}]`);
+                log('');
+
+                // 并行操作
+                log('4️⃣ 并行操作 (Promise.all):');
+                const start = performance.now();
+                const [data1, data2] = await Promise.all([
+                    mockFS.readFile('/app/config.json'),
+                    mockFS.readFile('/app/data.txt'),
+                ]);
+                const elapsed = ((performance.now() - start) / 1000).toFixed(1);
+                log(`   并行耗时: ${elapsed}s (串行需 ~0.6s)`);
+
+            } catch (err) {
+                log(`❌ 错误: ${err.message}`);
+            }
+
+            log('');
+            log('📌 异步 API 优势:');
+            log('   • 不阻塞事件循环');
+            log('   • 支持 Promise/async-await');
+            log('   • 并发操作效率高');
+            log('   • 生产环境推荐');
+        }
+
+        function demoWatch() {
+            fsAsyncResult.innerHTML = '';
+            log('👀 文件变化监听 (fs.watch):');
+            log('');
+
+            log('类似于:');
+            log('   const watcher = fs.watch("/app", (event, filename) => {');
+            log('       console.log(`${filename}: ${event}`);');
+            log('   });');
+            log('');
+
+            // 模拟文件变化事件
+            const events = [
+                { file: 'config.json', event: 'change' },
+                { file: 'data.txt', event: 'change' },
+                { file: 'new-file.js', event: 'rename' },
+            ];
+
+            log('模拟文件变化事件:');
+            events.forEach(({ file, event }) => {
+                log(`   📢 ${event}: ${file}`);
+            });
+
+            log('');
+            log('📌 watch 应用场景:');
+            log('   • 热重载开发服务器');
+            log('   • 自动编译/转译');
+            log('   • 日志轮替检测');
+            log('   • 配置文件重载');
+        }
+
+        console.log('=== fs 异步操作 ===');
+
+        document.getElementById('output').textContent =
+            `fs 异步操作: readFile/writeFile/readdir 回调版 + Promise 版\n` +
+            `fs.promises: async-await / Promise.all / watch 文件变化\n` +
+            `✅ fs 异步操作演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java 抽象类与抽象方法</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔷 Java 抽象类与抽象方法</h2><p>abstract class、abstract method、抽象类 vs 具体类、模板方法模式、abstract 与 final/static/private 组合规则。</p></div>
+    <div class="card">
+        <h2>抽象类与抽象方法</h2>
+        <div class="code">// ========== 抽象类 (Abstract Class) ==========
+// 用 abstract 修饰的类
+// 不能直接实例化 (不能 new)
+// 可以有构造器、字段、具体方法、抽象方法
+
+// ========== 抽象方法 ==========
+// 只有声明, 没有方法体
+// 必须由子类实现
+// 子类必须实现所有抽象方法 (除非子类也是抽象类)
+
+abstract class Shape {
+    protected String color;
+
+    // 抽象类可以有构造器
+    public Shape(String color) {
+        this.color = color;
+        System.out.println("Shape constructor");
+    }
+
+    // 具体方法
+    public String getColor() {
+        return color;
+    }
+
+    // ========== 抽象方法 (没有方法体) ==========
+    public abstract double getArea();
+    public abstract double getPerimeter();
+
+    // 具体方法可以使用抽象方法
+    public void printInfo() {
+        System.out.println("Color: " + color);
+        System.out.println("Area: " + getArea());       // 多态调用
+        System.out.println("Perimeter: " + getPerimeter());
+    }
+}
+
+// ========== 具体子类 ==========
+class Circle extends Shape {
+    private double radius;
+
+    public Circle(String color, double radius) {
+        super(color);  // 调用抽象类构造器
+        this.radius = radius;
+    }
+
+    @Override
+    public double getArea() {
+        return Math.PI * radius * radius;
+    }
+
+    @Override
+    public double getPerimeter() {
+        return 2 * Math.PI * radius;
+    }
+}
+
+class Rectangle extends Shape {
+    private double width, height;
+
+    public Rectangle(String color, double width, double height) {
+        super(color);
+        this.width = width;
+        this.height = height;
+    }
+
+    @Override
+    public double getArea() {
+        return width * height;
+    }
+
+    @Override
+    public double getPerimeter() {
+        return 2 * (width + height);
+    }
+}
+
+// ========== 使用 ==========
+public class AbstractDemo {
+    public static void main(String[] args) {
+        // Shape s = new Shape("red");  // ❌ 不能实例化抽象类!
+
+        Shape s1 = new Circle("red", 5);
+        Shape s2 = new Rectangle("blue", 3, 4);
+
+        System.out.println(s1.getArea());  // 78.54
+        System.out.println(s2.getArea());  // 12
+
+        s1.printInfo();
+        // Color: red
+        // Area: 78.54
+        // Perimeter: 31.42
+
+        // 多态数组
+        Shape[] shapes = {
+            new Circle("green", 2),
+            new Rectangle("yellow", 3, 6),
+            new Circle("purple", 1.5)
+        };
+        for (Shape s : shapes) {
+            s.printInfo();
+            System.out.println("---");
+        }
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>模板方法模式</h2>
+        <div class="code">// ========== 模板方法模式 (Template Method) ==========
+// 抽象类定义算法骨架, 子类实现具体步骤
+// 经典应用: JdbcTemplate, HttpServlet
+
+abstract class DataProcessor {
+    // ========== 模板方法 (final) ==========
+    // 定义处理流程, 子类不能修改
+    public final void process() {
+        loadData();
+        if (isValid()) {           // 钩子方法
+            processData();
+        }
+        saveResult();
+        cleanup();
+    }
+
+    // ========== 抽象方法 (子类必须实现) ==========
+    protected abstract void loadData();
+    protected abstract void processData();
+
+    // ========== 具体方法 (可选重写) ==========
+    protected void saveResult() {
+        System.out.println("Saving to database...");
+    }
+
+    protected void cleanup() {
+        System.out.println("Cleanup resources...");
+    }
+
+    // ========== 钩子方法 (Hook) ==========
+    // 默认行为, 子类可重写控制流程
+    protected boolean isValid() {
+        return true;  // 默认验证通过
+    }
+}
+
+class CSVProcessor extends DataProcessor {
+    @Override
+    protected void loadData() {
+        System.out.println("Loading CSV file...");
+    }
+
+    @Override
+    protected void processData() {
+        System.out.println("Processing CSV rows...");
+    }
+
+    @Override
+    protected boolean isValid() {
+        System.out.println("Validating CSV...");
+        return true;
+    }
+}
+
+class JSONProcessor extends DataProcessor {
+    @Override
+    protected void loadData() {
+        System.out.println("Loading JSON file...");
+    }
+
+    @Override
+    protected void processData() {
+        System.out.println("Parsing JSON objects...");
+    }
+
+    // 不重写 saveResult — 使用默认
+    // 不重写 isValid — 默认 true
+}
+
+// ========== 使用 ==========
+// DataProcessor processor = new CSVProcessor();
+// processor.process();
+// 输出:
+// Loading CSV file...
+// Validating CSV...
+// Processing CSV rows...
+// Saving to database...
+// Cleanup resources...</div>
+    </div>
+    <div class="card">
+        <h2>抽象类使用规则</h2>
+        <div class="code">// ========== 抽象类规则总结 ==========
+
+public abstract class AbstractRules {
+
+    // ========== 可以有的成员 ==========
+    private int x;                   // 字段 (任意类型)
+    public static final int MAX = 100;  // 常量
+    public AbstractRules() { }       // 构造器
+    public void concrete() { }       // 具体方法
+    public abstract void absMethod(); // 抽象方法
+    public static void staticMethod() { } // 静态方法
+    public final void finalMethod() { }   // final 方法
+
+    // ========== 规则 ==========
+    // 1. 抽象类用 abstract class 声明
+    // 2. 抽象方法没有方法体, 子类必须实现
+    // 3. 抽象类可以有 0~n 个抽象方法
+    // 4. 抽象类不能 new (不能实例化)
+    // 5. 抽象类可以有构造器 (子类 super() 调用)
+    // 6. 子类要么实现所有抽象方法, 要么也是抽象类
+    // 7. 抽象方法不能是 private (子类看不到)
+    // 8. 抽象方法不能是 final (不能被重写)
+    // 9. 抽象方法不能是 static (静态属于类)
+
+    // ❌ 不允许:
+    // private abstract void m1();    // ❌
+    // final abstract void m2();      // ❌
+    // static abstract void m3();     // ❌
+    // abstract void m4() { }          // ❌ 有方法体
+}
+
+// ========== 抽象类 vs 具体类 ==========
+// ┌─────────────┬─────────────┬─────────────┐
+// │             │ 抽象类      │ 具体类      │
+// ├─────────────┼─────────────┼─────────────┤
+// │ 实例化      │ ❌          │ ✅          │
+// │ 抽象方法    │ ✅          │ ❌          │
+// │ 构造器      │ ✅          │ ✅          │
+// │ 字段        │ ✅          │ ✅          │
+// │ 具体方法    │ ✅          │ ✅          │
+// └─────────────┴─────────────┴─────────────┘
+
+// ========== 抽象类 vs 接口 ==========
+// ┌─────────────┬─────────────┬─────────────┐
+// │             │ 抽象类      │ 接口        │
+// ├─────────────┼─────────────┼─────────────┤
+// │ 多继承      │ 单继承      │ 多实现      │
+// │ 构造器      │ ✅          │ ❌          │
+// │ 字段        │ 任意        │ public static final │
+// │ 抽象方法    │ abstract    │ default/static/private 也可 │
+// │ 语义        │ is-a        │ can-do      │
+// └─────────────┴─────────────┴─────────────┘
+
+// 选择指南:
+// 有is-a关系 + 共享状态/构造器 → 抽象类
+// 有can-do能力 + 多继承需要 → 接口</div>
+        <div class="note">💡 抽象类要点: abstract class 不能 new; 抽象方法无方法体; 子类必须实现所有抽象方法; 可以有构造器/字段/具体方法/静态方法; 模板方法模式用 final 模板方法定义骨架; 抽象方法不能 private/final/static; 有共享状态选抽象类, 多能力选接口。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoAbstract()">抽象类基础</button>
+        <button onclick="demoTemplate()">模板方法</button>
+        <button onclick="demoCompare()">抽象类 vs 接口</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoAbstract() {
+            result.innerHTML = '';
+            log('# 抽象类与抽象方法');
+            log('');
+            log('abstract class Shape {');
+            log('  abstract double getArea();');
+            log('  void printInfo() { ... }');
+            log('}');
+            log('');
+            log('class Circle extends Shape {');
+            log('  double getArea() { return πr²; }');
+            log('}');
+            log('');
+            log('规则:');
+            log('  ✓ 不能 new Shape()');
+            log('  ✓ 子类必须实现抽象方法');
+            log('  ✓ 可以有构造器/字段/具体方法');
+        }
+
+        function demoTemplate() {
+            result.innerHTML = '';
+            log('# 模板方法模式');
+            log('');
+            log('abstract class Processor {');
+            log('  final void process() {  // 模板');
+            log('    step1();');
+            log('    step2();');
+            log('  }');
+            log('  abstract void step1();');
+            log('  abstract void step2();');
+            log('}');
+            log('');
+            log('骨架固定, 步骤可定制');
+            log('钩子方法: 可选控制流程');
+        }
+
+        function demoCompare() {
+            result.innerHTML = '';
+            log('# 抽象类 vs 接口');
+            log('');
+            log('抽象类 (is-a):');
+            log('  abstract class Animal');
+            log('  class Dog extends Animal');
+            log('  共享状态/构造器');
+            log('');
+            log('接口 (can-do):');
+            log('  interface Flyable');
+            log('  class Bird implements Flyable');
+            log('  多实现, 行为契约');
+            log('');
+            log('Java 8+ 接口也可有 default 方法');
+        }
+    </script>
+</body>
+</html>

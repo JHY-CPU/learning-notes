@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redis 安全与运维</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔒 Redis 安全与运维</h2><p>安全配置 (密码/防火墙/命令重命名)、慢查询日志、内存监控与优化、bigkey/hotkey 发现、性能调优、日常运维命令。</p></div>
+    <div class="card">
+        <h2>安全配置</h2>
+        <div class="code">// ========== Redis 安全 ==========
+
+// ========== 1. 设置密码 ==========
+requirepass your_strong_password_here
+
+// 连接时认证:
+redis-cli -a your_password
+// 或在连接后:
+AUTH your_password
+
+// ========== 2. 绑定地址 ==========
+# 仅监听本地 (禁止外网访问)
+bind 127.0.0.1
+
+# 内网访问
+bind 192.168.1.100 127.0.0.1
+
+// ========== 3. 重命名危险命令 ==========
+# 禁止高危命令
+rename-command FLUSHALL ""
+rename-command FLUSHDB ""
+rename-command CONFIG ""
+rename-command SHUTDOWN ""
+rename-command DEBUG ""
+rename-command SCRIPT KILL ""
+
+# 或者改名 (非完全禁用)
+rename-command FLUSHALL "MY_FLUSHALL_XYZ"
+
+// ========== 4. 防火墙 ==========
+# Linux iptables
+iptables -A INPUT -p tcp --dport 6379 -s 127.0.0.1 -j ACCEPT
+iptables -A INPUT -p tcp --dport 6379 -j DROP
+
+// ========== 5. TLS 加密 ==========
+# redis.conf (Redis 6.0+)
+tls-port 6379
+tls-cert-file /path/to/redis.crt
+tls-key-file /path/to/redis.key
+tls-ca-cert-file /path/to/ca.crt
+
+// ========== 6. 最小权限 ==========
+# Redis 没有用户级权限控制 (6.0+ ACL)
+# ACL 用户 (Redis 6.0+):
+ACL SETUSER app_user on >app_password +@read ~*
+
+# ACL 规则:
+# on: 启用用户
+# >password: 设置密码
+# +@read: 只允许读命令
+# ~*: 可访问所有 key</div>
+    </div>
+    <div class="card">
+        <h2>慢查询日志</h2>
+        <div class="code">// ========== 慢查询日志 ==========
+
+// ========== 配置 ==========
+# 慢查询阈值 (微秒, 10000 = 10ms)
+slowlog-log-slower-than 10000
+
+# 最多保存多少条慢日志
+slowlog-max-len 128
+
+// ========== 查看慢查询 ==========
+SLOWLOG GET 10           // 最近 10 条
+SLOWLOG LEN              // 慢查询总数
+SLOWLOG RESET            // 清空
+
+// 慢查询输出示例:
+1) 1) (integer) 14           // ID
+   2) (integer) 1696118400   // 时间戳
+   3) (integer) 15000        // 耗时 (微秒) = 15ms
+   4) 1) "KEYS"              // 命令
+      2) "user:*"
+   5) "127.0.0.1:54321"     // 客户端
+
+// 常见慢命令:
+// - KEYS * (大数据量)
+// - SMEMBERS (大 Set)
+// - HGETALL (大 Hash)
+// - LRANGE (大 List)
+// - ZRANGE (大 ZSet)
+// - SORT (大集合排序)
+// - DEL (大 key)
+
+// ========== MONITOR 命令 ==========
+// 实时监控所有命令 (生产谨慎使用, 高负载!)
+MONITOR
+
+// 性能影响: 可能降低 50% 吞吐
+// 仅在排查问题时临时使用</div>
+    </div>
+    <div class="card">
+        <h2>bigkey 与 hotkey</h2>
+        <div class="code">// ========== bigkey 发现 ==========
+// bigkey: 占用大量内存的键
+
+// ========== 查找 bigkey ==========
+// 方式 1: redis-cli
+redis-cli --bigkeys
+
+// 输出:
+// Biggest string  found 'session:abc' has 524288 bytes
+// Biggest list   found 'queue:logs' has 100000 items
+// Biggest hash   found 'user:1000' has 500 fields
+
+// 方式 2: MEMORY USAGE
+MEMORY USAGE user:1000        // 查看 key 内存占用
+
+// 方式 3: DEBUG OBJECT
+DEBUG OBJECT user:1000        // 详细信息 (含序列化长度)
+
+// bigkey 危害:
+// 1. 网络延迟: 传输大 key 耗时久
+// 2. 阻塞: DEL 大 key 阻塞 Redis
+// 3. 数据倾斜: 集群中某节点负载过高
+
+// bigkey 处理:
+// - 大 String → 压缩/拆分
+// - 大 Hash → 分桶拆分 (user:1000:part1, part2)
+// - 大 List → 改用 List 分页或 Stream
+// - 大 ZSet → 按时间/分数拆分
+// - 异步删除: UNLINK (非阻塞 DEL)
+
+// ========== hotkey 发现 ==========
+// hotkey: 被频繁访问的键
+
+// 方式 1: redis-cli --hotkeys (4.0+)
+redis-cli --hotkeys
+
+// 方式 2: MONITOR + 分析
+// redis-cli --hotkeys 或自行统计
+
+// 方式 3: INFO commandstats
+INFO commandstats
+// cmdstat_get:calls=10000,usec=5000,usec_per_call=0.50
+
+// hotkey 处理:
+// - 本地缓存 (多级缓存)
+// - 读写分离
+// - 热点分散 (key 加随机后缀)</div>
+    </div>
+    <div class="card">
+        <h2>性能调优与日常运维</h2>
+        <div class="code">// ========== 性能调优 ==========
+
+// ========== 内存优化 ==========
+// 1. 使用更紧凑的数据类型
+//    Hash 小数据用 ziplist (比 String 省内存)
+//    String 用整数共享对象
+
+// 2. 设置 maxmemory
+maxmemory 4gb
+
+// 3. 选择合适淘汰策略
+maxmemory-policy allkeys-lru
+
+// 4. 内存碎片整理
+# 自动整理 (4.0+)
+activedefrag yes
+active-defrag-threshold-lower 10
+active-defrag-threshold-upper 100
+active-defrag-ignore-bytes 100mb
+active-defrag-cycle-min 25
+
+// ========== 内核优化 ==========
+# Linux 系统参数:
+# 允许 overcommit (fork 需要)
+sysctl vm.overcommit_memory=1
+
+# 禁用透明大页 (减少延迟)
+echo never > /sys/kernel/mm/transparent_hugepage/enabled
+
+# SOMAXCONN (高并发连接)
+sysctl net.core.somaxconn=65535
+
+// ========== 日常运维 ==========
+// 查看所有配置
+CONFIG GET *
+
+// 运行时修改 (不重启)
+CONFIG SET maxmemory 2gb
+
+// 持久化配置到文件
+CONFIG REWRITE
+
+// 客户端管理
+CLIENT LIST              // 所有连接
+CLIENT KILL addr:port    // 断开连接
+CLIENT SETNAME app01     // 设置客户端名
+
+// 性能基准测试
+redis-benchmark -n 100000 -q
+// PING: 100000 requests per second
+// SET: 95000 requests per second
+// GET: 98000 requests per second</div>
+        <div class="note">💡 安全与运维要点: 设置密码 + 绑定地址 + 禁用危险命令; 慢查询日志定位性能问题; bigkey 用 UNLINK 异步删除; hotkey 用本地缓存分散; 开启 activedefrag 整理碎片; Linux 内核参数优化; ACL 用户权限控制 (6.0+)。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoSecurity()">安全配置</button>
+        <button onclick="demoSlow()">慢查询</button>
+        <button onclick="demoTune()">性能调优</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoSecurity() {
+            result.innerHTML = '';
+            log('# 安全配置');
+            log('');
+            log('requirepass — 设置密码');
+            log('bind 127.0.0.1 — 仅本地');
+            log('rename-command FLUSHALL ""');
+            log('ACL SETUSER app_user ...');
+            log('TLS: tls-port/tls-cert-file');
+        }
+
+        function demoSlow() {
+            result.innerHTML = '';
+            log('# 慢查询日志');
+            log('');
+            log('slowlog-log-slower-than 10000');
+            log('  (10ms 以上记录)');
+            log('');
+            log('SLOWLOG GET 10 — 查看');
+            log('SLOWLOG LEN — 总数');
+            log('避免: KEYS *, DEL bigkey');
+        }
+
+        function demoTune() {
+            result.innerHTML = '';
+            log('# 性能调优');
+            log('');
+            log('redis-cli --bigkeys');
+            log('  → 查找大键');
+            log('redis-cli --hotkeys');
+            log('  → 查找热键');
+            log('CONFIG SET maxmemory 2gb');
+            log('activedefrag yes — 碎片整理');
+        }
+    </script>
+</body>
+</html>

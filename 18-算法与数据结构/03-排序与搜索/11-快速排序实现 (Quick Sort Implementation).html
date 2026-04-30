@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>11-快速排序实现 (Quick Sort Implementation)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; white-space: pre-wrap; }
+.bar-container { display: flex; align-items: flex-end; height: 200px; gap: 4px; margin: 10px 0; }
+.bar { background: #3498db; width: 28px; text-align: center; color: white; font-size: 11px; transition: height 0.3s; border-radius: 3px 3px 0 0; }
+.bar-pivot { background: #e74c3c; }
+.bar-active { background: #f39c12; }
+.bar-sorted { background: #27ae60; }
+</style></head>
+<body>
+<div class="card">
+  <h2>快速排序实现 (Quick Sort Implementation)</h2>
+  <p>本节展示快速排序的完整递归实现，包含 Hoare 分区方案和 Lomuto 分区方案两种版本。</p>
+  <div class="note">
+    <strong>注意：</strong>递归深度在极端情况下可能达到 O(n)，可通过尾递归优化或改用迭代方式避免栈溢出。
+  </div>
+</div>
+
+<div class="card">
+  <h2>Lomuto 分区实现</h2>
+  <pre>function quickSortLomuto(arr, low = 0, high = arr.length - 1) {
+  if (low < high) {
+    const pi = partitionLomuto(arr, low, high);
+    quickSortLomuto(arr, low, pi - 1);
+    quickSortLomuto(arr, pi + 1, high);
+  }
+  return arr;
+}
+
+function partitionLomuto(arr, low, high) {
+  const pivot = arr[high];
+  let i = low - 1;
+  for (let j = low; j < high; j++) {
+    if (arr[j] <= pivot) {
+      i++;
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+  }
+  [arr[i + 1], arr[high]] = [arr[high], arr[i + 1]];
+  return i + 1;
+}</pre>
+</div>
+
+<div class="card">
+  <h2>Hoare 分区实现</h2>
+  <pre>function quickSortHoare(arr, low = 0, high = arr.length - 1) {
+  if (low < high) {
+    const pi = partitionHoare(arr, low, high);
+    quickSortHoare(arr, low, pi);
+    quickSortHoare(arr, pi + 1, high);
+  }
+  return arr;
+}
+
+function partitionHoare(arr, low, high) {
+  const pivot = arr[Math.floor((low + high) / 2)];
+  let i = low - 1, j = high + 1;
+  while (true) {
+    do { i++; } while (arr[i] < pivot);
+    do { j--; } while (arr[j] > pivot);
+    if (i >= j) return j;
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}</pre>
+</div>
+
+<div class="card">
+  <h2>交互演示</h2>
+  <button onclick="runQuickSort()">开始快速排序</button>
+  <button onclick="resetData()">重置数据</button>
+  <div id="bars" class="bar-container"></div>
+  <div id="result">点击按钮开始演示</div>
+</div>
+
+<script>
+let data = [];
+let sorting = false;
+
+function init() {
+  data = Array.from({length: 10}, () => Math.floor(Math.random() * 150) + 20);
+  render(data);
+}
+
+function render(arr, pivot = -1, active = []) {
+  const c = document.getElementById('bars');
+  const m = Math.max(...arr);
+  c.innerHTML = arr.map((v, i) => {
+    let cls = 'bar';
+    if (i === pivot) cls += ' bar-pivot';
+    else if (active.includes(i)) cls += ' bar-active';
+    return `<div class="${cls}" style="height:${(v/m)*180}px">${v}</div>`;
+  }).join('');
+}
+
+async function runQuickSort() {
+  if (sorting) return;
+  sorting = true;
+  const arr = [...data];
+  await qsort(arr, 0, arr.length - 1);
+  render(arr);
+  document.getElementById('result').textContent = '排序完成: [' + arr.join(', ') + ']';
+  data = arr;
+  sorting = false;
+}
+
+async function qsort(arr, low, high) {
+  if (low >= high) return;
+  const pi = await part(arr, low, high);
+  await qsort(arr, low, pi - 1);
+  await qsort(arr, pi + 1, high);
+}
+
+async function part(arr, low, high) {
+  const pivot = arr[high];
+  let i = low - 1;
+  for (let j = low; j < high; j++) {
+    render(arr, high, [i, j]);
+    await sleep(200);
+    if (arr[j] <= pivot) {
+      i++;
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+      render(arr, high, [i, j]);
+      await sleep(200);
+    }
+  }
+  [arr[i + 1], arr[high]] = [arr[high], arr[i + 1]];
+  render(arr, i + 1);
+  document.getElementById('result').textContent =
+    `基准 ${pivot} 已放到位置 ${i+1}，数组: [${arr.slice(low, high+1).join(', ')}]`;
+  await sleep(400);
+  return i + 1;
+}
+
+function resetData() {
+  if (sorting) return;
+  init();
+  document.getElementById('result').textContent = '数据已重置';
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+init();
+</script>
+</body></html>

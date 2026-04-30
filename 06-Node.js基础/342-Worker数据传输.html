@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Worker数据传输</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Worker 数据传输</h2><p>结构化克隆、Transferable Objects、SharedArrayBuffer、Worker 池。</p></div>
+    <div class="card">
+        <h2>数据传输方式</h2>
+        <div class="code">// ========== 结构化克隆 (默认) ==========
+// 支持: Object, Array, Map, Set, Blob, File, ImageData
+// 不支持: DOM 元素, 函数, Error, Symbol
+// 特点: 深拷贝, 大数据量慢
+
+// ========== Transferable Objects (零拷贝) ==========
+// ArrayBuffer, MessagePort, ImageBitmap, OffscreenCanvas
+// 传输后源对象被"清空" (detached)
+const buffer = new ArrayBuffer(1024);
+worker.postMessage(buffer, [buffer]); // 第二个参数
+// buffer.byteLength === 0 (已转移)
+
+// ========== SharedArrayBuffer (共享内存) ==========
+const shared = new SharedArrayBuffer(1024);
+const view = new Int32Array(shared);
+// 多个 Worker 共享同一内存
+// 需要 Atomics 进行同步
+
+// ========== Atomics 操作 ==========
+Atomics.add(view, 0, 1);  // 原子加
+Atomics.load(view, 0);    // 原子读
+Atomics.store(view, 0, 5); // 原子写
+Atomics.wait(view, 0, 0);  // 等待 (Worker 内)
+Atomics.notify(view, 0, 1); // 通知</div>
+    </div>
+    <div class="card">
+        <h2>演示：数据传输</h2>
+        <button onclick="demoStructured()">结构化克隆</button>
+        <button onclick="demoTransfer()">Transferable</button>
+        <button onclick="demoShared()">SharedArrayBuffer</button>
+        <button onclick="demoCompare()">性能对比</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoStructured() {
+            result.innerHTML = '';
+            log('📦 结构化克隆 (Structured Clone):');
+            log('');
+
+            log('支持的类型:');
+            const types = [
+                '基本类型: string, number, boolean, null',
+                '复合类型: Object, Array, Map, Set',
+                '二进制: ArrayBuffer, Blob, File',
+                '图像: ImageData, ImageBitmap',
+                '正则: RegExp',
+                '日期: Date',
+            ];
+            types.forEach(t => log(`   ✅ ${t}`));
+            log('');
+
+            log('不支持的类型:');
+            const unsupported = [
+                'DOM 元素 (Element, Node)',
+                '函数 (Function)',
+                'Error 对象',
+                'Symbol',
+                'WeakMap, WeakSet',
+            ];
+            unsupported.forEach(t => log(`   ❌ ${t}`));
+            log('');
+
+            // 模拟结构化克隆
+            function structuredClone(obj) {
+                return JSON.parse(JSON.stringify(obj));
+            }
+
+            const data = {
+                name: 'Alice',
+                age: 25,
+                scores: [95, 87, 92],
+                address: { city: 'Beijing', zip: 100000 },
+                active: true,
+                meta: null,
+            };
+
+            log('传输数据:');
+            log(JSON.stringify(data, null, 2));
+            log('');
+
+            const cloned = structuredClone(data);
+            cloned.name = 'Bob';
+            cloned.scores.push(100);
+            log('修改克隆后, 原始不受影响:');
+            log(`   原始 name: ${data.name}`);
+            log(`   克隆 name: ${cloned.name}`);
+            log(`   原始 scores: [${data.scores}]`);
+            log(`   克隆 scores: [${cloned.scores}]`);
+        }
+
+        function demoTransfer() {
+            result.innerHTML = '';
+            log('⚡ Transferable Objects (零拷贝):');
+            log('');
+
+            // 模拟 Transfer
+            function transferBuffer(size) {
+                const buffer = new ArrayBuffer(size);
+                const originalBytes = buffer.byteLength;
+                log(`1️⃣ 创建 ArrayBuffer: ${size} 字节`);
+                log(`   原始大小: ${buffer.byteLength}`);
+
+                // 模拟传输 (源被清空)
+                log('');
+                log('2️⃣ 传输到 Worker:');
+                log(`   传输语法: worker.postMessage(buffer, [buffer])`);
+                log(`   传输后原始 buffer 被 detached`);
+                log(`   buffer.byteLength → ${buffer.byteLength} (传输后: 0)`);
+
+                // 创建可传输的视图
+                const view = new Uint8Array(buffer);
+                for (let i = 0; i < view.length; i++) view[i] = i % 256;
+                log(`   视图数据写入完成`);
+                return buffer;
+            }
+
+            log('Transferable 对象列表:');
+            const transferables = [
+                'ArrayBuffer',
+                'MessagePort',
+                'ImageBitmap',
+                'OffscreenCanvas',
+                'ReadableStream',
+                'WritableStream',
+                'TransformStream',
+                'AudioData',
+                'VideoFrame',
+            ];
+            transferables.forEach(t => log(`   ✅ ${t}`));
+            log('');
+
+            const buf = transferBuffer(1024);
+
+            log('');
+            log('📌 Transfer 优势:');
+            log('   • 零拷贝 (内存直接转移)');
+            log('   • 适合大数据量 (图片/视频)');
+            log('   • 传输后源对象不可用');
+        }
+
+        function demoShared() {
+            result.innerHTML = '';
+            log('🔄 SharedArrayBuffer (共享内存):');
+            log('');
+
+            log('1️⃣ 创建共享内存:');
+            const sab = new SharedArrayBuffer(16 * 4); // 16 个 int32
+            const shared = new Int32Array(sab);
+            log(`   大小: ${sab.byteLength} 字节`);
+            log(`   视图: ${shared.length} 个 Int32`);
+            log('');
+
+            log('2️⃣ 多 Worker 模拟:');
+            log('   两个 Worker 同时操作共享内存:');
+
+            // Worker A: 写入数据
+            log('');
+            log('   Worker A 写入:');
+            for (let i = 0; i < shared.length; i++) {
+                shared[i] = i * 10;
+                log(`      shared[${i}] = ${i * 10}`);
+            }
+
+            // Worker B: 原子操作
+            log('');
+            log('   Worker B 原子操作:');
+            log('      Atomics.add(shared, 0, 5)  → 原子加');
+            log('      Atomics.load(shared, 1)    → 原子读');
+            log('      Atomics.store(shared, 2, 99) → 原子写');
+
+            log('');
+            log('3️⃣ Atomics 操作结果:');
+            log(`   Atomics.add(shared, 0, 5) = ${Atomics.add(shared, 0, 5)} (shared[0] += 5)`);
+            log(`   Atomics.load(shared, 0) = ${Atomics.load(shared, 0)}`);
+            log(`   Atomics.store(shared, 2, 99) → shared[2] = ${Atomics.load(shared, 2)}`);
+            log(`   Atomics.exchange(shared, 3, 55) → 交换 shared[3] = 55`);
+
+            log('');
+            log('4️⃣ 最终共享内存:');
+            const resultArr = [];
+            for (let i = 0; i < shared.length; i++) resultArr.push(Atomics.load(shared, i));
+            log(`   [${resultArr.join(', ')}]`);
+
+            log('');
+            log('📌 Atomics 方法:');
+            log('   add, sub, and, or, xor — 原子运算');
+            log('   load, store — 原子读写');
+            log('   exchange, compareExchange — 原子交换');
+            log('   wait, notify — 等待/通知 (同步)');
+        }
+
+        function demoCompare() {
+            result.innerHTML = '';
+            log('⚡ 数据传输性能对比:');
+            log('');
+
+            const size = 1024 * 1024 * 10; // 10MB
+            log(`传输 ${(size / 1024 / 1024).toFixed(0)}MB 数据:`);
+            log('');
+
+            // 模拟结构化克隆 (串行化)
+            log('1️⃣ 结构化克隆 (JSON):');
+            const largeArray = new Array(size / 8);
+            let start = performance.now();
+            const json = JSON.stringify(largeArray);
+            const jsonTime = performance.now() - start;
+            log(`   JSON.stringify: ${jsonTime.toFixed(2)}ms`);
+
+            start = performance.now();
+            JSON.parse(json);
+            const parseTime = performance.now() - start;
+            log(`   JSON.parse: ${parseTime.toFixed(2)}ms`);
+            log(`   总时间: ${(jsonTime + parseTime).toFixed(2)}ms`);
+            log(`   内存: 约 ${(json.length / 1024 / 1024).toFixed(1)}MB (字符串)`);
+            log('');
+
+            // 模拟 Transfer
+            log('2️⃣ Transfer (零拷贝):');
+            start = performance.now();
+            const buffer = new ArrayBuffer(size);
+            const bufTime = performance.now() - start;
+            log(`   创建 ArrayBuffer: ${bufTime.toFixed(2)}ms`);
+            log(`   传输: 0ms (零拷贝, 指针传递)`);
+            log(`   内存: ${size / 1024 / 1024}MB (无额外开销)`);
+            log('');
+
+            // 模拟 SharedArrayBuffer
+            log('3️⃣ SharedArrayBuffer (共享):');
+            start = performance.now();
+            const sab = new SharedArrayBuffer(size);
+            const sabTime = performance.now() - start;
+            log(`   创建 SharedArrayBuffer: ${sabTime.toFixed(2)}ms`);
+            log(`   共享: 0ms (所有 Worker 直接访问)`);
+            log(`   内存: ${size / 1024 / 1024}MB (共享)`);
+            log('');
+
+            log('📊 总结:');
+            log('   方法'.padEnd(22) + '速度'.padEnd(14) + '使用场景');
+            log('   结构化克隆'.padEnd(22) + '中速'.padEnd(14) + '常规对象');
+            log('   Transferable'.padEnd(22) + '最快(零拷贝)'.padEnd(14) + '大文件/图片');
+            log('   SharedArrayBuffer'.padEnd(22) + '实时共享'.padEnd(14) + '高频数据交换');
+        }
+
+        console.log('=== Worker 数据传输 ===');
+        document.getElementById('output').textContent =
+            `Worker 数据传输: 结构化克隆 / Transferable / SharedArrayBuffer / Atomics\n` +
+            `✅ Worker 数据传输演示完成！`;
+    </script>
+</body>
+</html>

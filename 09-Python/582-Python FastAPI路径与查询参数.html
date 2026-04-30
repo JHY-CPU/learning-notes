@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python FastAPI路径与查询参数</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔗 FastAPI 路径参数与查询参数</h2><p>路径参数类型验证、查询参数默认值/可选参数、参数验证 (Path/Query)、字符串验证 (min_length/max_length/regex)、数字验证 (ge/le/gt/lt)。</p></div>
+    <div class="card">
+        <h2>路径参数</h2>
+        <div class="code">// ========== 路径参数 ==========
+from fastapi import FastAPI
+
+app = FastAPI()
+
+# 基本路径参数:
+@app.get("/items/{item_id}")
+def read_item(item_id: int):        # 类型注解 → 自动验证!
+    return {"item_id": item_id}
+
+# 字符串路径参数:
+@app.get("/users/{username}")
+def read_user(username: str):
+    return {"username": username}
+
+# 枚举路径参数:
+from enum import Enum
+
+class UserType(str, Enum):
+    admin = "admin"
+    user = "user"
+    guest = "guest"
+
+@app.get("/users/{user_type}")
+def get_users(user_type: UserType):
+    # 自动验证: 只接受 admin/user/guest
+    return {"type": user_type.value}
+
+# 路径参数包含路径 (FilePath):
+@app.get("/files/{file_path:path}")
+def read_file(file_path: str):
+    return {"file_path": file_path}
+    # 访问: /files/home/user/data.txt
+    # file_path = "home/user/data.txt"
+
+# 多个路径参数:
+@app.get("/users/{user_id}/items/{item_id}")
+def get_user_item(user_id: int, item_id: int):
+    return {"user_id": user_id, "item_id": item_id}</div>
+    </div>
+    <div class="card">
+        <h2>查询参数</h2>
+        <div class="code">// ========== 查询参数 ==========
+from fastapi import FastAPI
+
+app = FastAPI()
+
+fake_db = [{"id": i, "name": f"Item {i}"} for i in range(100)]
+
+# 查询参数 = 不在路径中的函数参数:
+@app.get("/items")
+def list_items(
+    skip: int = 0,          # 默认值 → 查询参数
+    limit: int = 10         # 默认值 → 查询参数
+):
+    return fake_db[skip:skip + limit]
+
+# 可选查询参数 (Optional):
+from typing import Optional
+
+@app.get("/items/{item_id}")
+def get_item(
+    item_id: int,
+    q: Optional[str] = None,  # 可选查询参数
+    short: bool = False       # 布尔查询参数
+):
+    item = {"item_id": item_id}
+    if q:
+        item["q"] = q
+    if not short:
+        item["description"] = "完整描述"
+    return item
+
+# 必需查询参数 (无默认值):
+@app.get("/search")
+def search_items(q: str):     # 必须提供 ?q=...
+    return {"query": q}
+
+# 布尔查询参数:
+@app.get("/items")
+def list_items(available: bool = True):
+    # URL: /items?available=1 或 ?available=true 或 ?available=True
+    return {"available": available}
+
+# 列表查询参数:
+from typing import List
+
+@app.get("/items")
+def list_items(tags: List[str] = Query([])):
+    # URL: /items?tags=a&tags=b&tags=c
+    return {"tags": tags}</div>
+    </div>
+    <div class="card">
+        <h2>参数验证 (Path / Query)</h2>
+        <div class="code">// ========== Path & Query 验证 ==========
+from fastapi import FastAPI, Path, Query
+
+app = FastAPI()
+
+# Path 验证:
+@app.get("/items/{item_id}")
+def read_item(
+    item_id: int = Path(..., title="文章 ID", ge=1, le=1000),
+):
+    # ... = 必需
+    # ge=1: 大于等于 1
+    # le=1000: 小于等于 1000
+    return {"item_id": item_id}
+
+# Query 验证:
+@app.get("/items")
+def read_items(
+    q: Optional[str] = Query(
+        None,                           # 默认值
+        alias="search",                 # URL 中参数名: ?search=...
+        title="搜索关键词",
+        description="搜索商品的名称",
+        min_length=2,                   # 最小长度
+        max_length=50,                  # 最大长度
+        regex="^[a-zA-Z0-9]+$",        # 正则匹配
+        deprecated=True                 # 标记为已弃用
+    ),
+    page: int = Query(1, ge=1),
+    size: int = Query(10, ge=1, le=100),
+):
+    return {"q": q, "page": page, "size": size}
+
+# 数字验证:
+@app.get("/products/{product_id}")
+def read_product(
+    product_id: int = Path(..., ge=1),     # ≥ 1
+    price: float = Query(..., gt=0),       # > 0
+    discount: float = Query(0, ge=0, le=1) # 0-1 之间
+):
+    return {"product_id": product_id, "price": price}
+
+# 必需查询参数:
+@app.get("/search")
+def search(
+    q: str = Query(..., min_length=1, max_length=100)
+):
+    # ... 表示必须提供
+    return {"query": q}</div>
+    </div>
+    <div class="card">
+        <h2>参数排序与文档</h2>
+        <div class="code">// ========== 参数排序 ==========
+# FastAPI 按以下规则判断参数来源:
+# 1. 路径参数 → 声明在路径中
+# 2. 查询参数 → 其他参数
+
+# 如果参数既是路径又是查询 → 路径优先
+
+# ========== 带文档的 API ==========
+@app.get("/users/{user_id}")
+def get_user(
+    user_id: int = Path(..., title="用户ID", description="用户的唯一标识", example=42),
+    include_posts: bool = Query(False, description="是否包含用户文章"),
+    limit: int = Query(10, ge=1, le=100, description="文章数量限制")
+):
+    """获取用户信息。
+
+    根据用户 ID 获取用户详情,可选择包含文章列表。
+    """
+    return {"user_id": user_id, "include_posts": include_posts}
+
+# 生成的 Swagger 文档会自动包含:
+# - 参数名称、类型、是否必需
+# - 描述和示例值
+# - 验证规则 (min/max/pattern)
+
+# ========== 多个路径和查询 ==========
+@app.get("/products/{category}/{product_id}")
+def get_product(
+    category: str = Path(..., title="分类", regex="^(electronics|clothing|food)$"),
+    product_id: int = Path(..., ge=1),
+    fields: Optional[str] = Query(None, description="返回字段,逗号分隔"),
+    sort: str = Query("name", regex="^(name|price|rating)$")
+):
+    return {
+        "category": category,
+        "product_id": product_id,
+        "fields": fields,
+        "sort": sort
+    }</div>
+        <div class="note">💡 参数要点: (1) 路径参数用类型注解自动验证类型; (2) 有默认值/可选→查询参数,无默认值→必需查询参数; (3) Path/Query 添加验证: ge/le/min_length/regex; (4) ... 表示必需; (5) alias 修改 URL 参数名。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoPath()">路径参数演示</button>
+        <button onclick="demoQuery()">查询参数演示</button>
+        <button onclick="demoValidation()">验证演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoPath() {
+            result.innerHTML = '';
+            log('# 路径参数演示');
+            log('');
+            log('@app.get("/items/{item_id}")');
+            log('def read_item(item_id: int):');
+            log('  # 自动验证 int, 返回 400 如果不是');
+            log('');
+            log('@app.get("/users/{type}")');
+            log('def get_users(type: UserType):');
+            log('  # 枚举验证,只接受 admin/user/guest');
+            log('');
+            log('@app.get("/files/{path:path}")');
+            log('  # 包含斜杠的路径参数');
+        }
+
+        function demoQuery() {
+            result.innerHTML = '';
+            log('# 查询参数演示');
+            log('');
+            log('def list_items(skip: int=0, limit: int=10):');
+            log('  # skip=0, limit=10 → ?skip=0&limit=10');
+            log('');
+            log('def get_item(item_id: int, q: str=None):');
+            log('  # q 可选 → ?q=xxx 或省略');
+            log('');
+            log('def search(q: str):');
+            log('  # q 必需 → ?q=xxx');
+            log('');
+            log('tags: List[str]=Query([])');
+            log('  # ?tags=a&tags=b&tags=c');
+        }
+
+        function demoValidation() {
+            result.innerHTML = '';
+            log('# 参数验证演示');
+            log('');
+            log('Path(..., ge=1, le=1000)');
+            log('  # 必填, 1-1000 之间');
+            log('');
+            log('Query(None, min_length=2, max_length=50)');
+            log('  # 可选,长度 2-50');
+            log('');
+            log('Query(..., regex="^[a-z]+$")');
+            log('  # 必填,正则匹配小写字母');
+            log('');
+            log('Query(1, ge=1, le=100)');
+            log('  # 默认值 1,范围 1-100');
+        }
+    </script>
+</body>
+</html>

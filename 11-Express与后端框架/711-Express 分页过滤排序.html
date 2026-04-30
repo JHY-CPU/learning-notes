@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express 分页过滤排序</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📑 Express 分页过滤排序</h2><p>分页实现 (offset/游标)、过滤中间件 (精确/范围/模糊/多字段)、排序实现 (单字段/多字段/黑名单)、高级查询组合、MongoDB/Mongoose 查询构建器、Prisma 查询示例。</p></div>
+    <div class="card">
+        <h2>分页实现</h2>
+        <div class="code">// ========== 分页方案 ==========
+
+// ========== 方案 1: Offset 分页 ==========
+// GET /api/users?page=1&limit=20
+// 简单, 但大偏移量性能差
+
+const page = Math.max(1, parseInt(req.query.page) || 1);
+const limit = Math.min(100, Math.max(1, parseInt(req.query.limit) || 20));
+const skip = (page - 1) * limit;
+
+const [users, total] = await Promise.all([
+    User.find().skip(skip).limit(limit).lean(),
+    User.countDocuments(),
+]);
+
+// ========== 方案 2: 游标分页 ==========
+// GET /api/users?cursor=xxx&limit=20
+// 性能好, 适合大数据量和实时数据
+
+// 基于 _id 的游标:
+app.get('/api/users', async (req, res) => {
+    const limit = Math.min(100, parseInt(req.query.limit) || 20);
+    const cursor = req.query.cursor;  // 上一页最后一个 _id
+
+    const query = {};
+    if (cursor) {
+        query._id = { $gt: cursor };
+    }
+
+    const users = await User.find(query)
+        .sort({ _id: 1 })
+        .limit(limit + 1)  // 多取一个判断有无下一页
+        .lean();
+
+    const hasNext = users.length > limit;
+    if (hasNext) users.pop();
+
+    res.json({
+        data: users,
+        pagination: {
+            cursor: users.length > 0 ? users[users.length - 1]._id : null,
+            hasNext,
+            limit,
+        },
+    });
+});
+
+// ========== 方案 3: 基于时间游标 ==========
+// 适合按时间排序的场景 (如: 消息列表/Feed)
+app.get('/api/posts', async (req, res) => {
+    const limit = Math.min(100, parseInt(req.query.limit) || 20);
+    const before = req.query.before;  // 时间戳
+
+    const query = {};
+    if (before) {
+        query.createdAt = { $lt: new Date(before) };
+    }
+
+    const posts = await Post.find(query)
+        .sort({ createdAt: -1 })
+        .limit(limit)
+        .lean();
+
+    res.json({
+        data: posts,
+        pagination: {
+            before: posts.length > 0 ? posts[posts.length - 1].createdAt : null,
+            hasNext: posts.length === limit,
+            limit,
+        },
+    });
+});</div>
+    </div>
+    <div class="card">
+        <h2>过滤实现</h2>
+        <div class="code">// ========== 过滤系统 ==========
+// 构建可组合的查询过滤
+
+// ========== 过滤中间件 ==========
+// 从 req.query 构建 MongoDB 查询
+
+function buildQuery(filters) {
+    const query = {};
+
+    // 精确匹配: ?role=admin&status=active
+    if (filters.role) query.role = filters.role;
+    if (filters.status) query.status = filters.status;
+    if (filters.category) query.category = filters.category;
+
+    // 多值匹配: ?status=active,pending
+    if (filters.status?.includes(',')) {
+        query.status = { $in: filters.status.split(',') };
+    }
+
+    // 范围查询:
+    // ?priceMin=100&priceMax=500
+    if (filters.priceMin || filters.priceMax) {
+        query.price = {};
+        if (filters.priceMin) query.price.$gte = Number(filters.priceMin);
+        if (filters.priceMax) query.price.$lte = Number(filters.priceMax);
+    }
+
+    // 时间范围: ?createdAfter=2024-01-01&createdBefore=2024-12-31
+    if (filters.createdAfter || filters.createdBefore) {
+        query.createdAt = {};
+        if (filters.createdAfter) query.createdAt.$gte = new Date(filters.createdAfter);
+        if (filters.createdBefore) query.createdAt.$lte = new Date(filters.createdBefore);
+    }
+
+    // 模糊搜索: ?search=keyword
+    if (filters.search) {
+        query.$or = [
+            { name: { $regex: filters.search, $options: 'i' } },
+            { email: { $regex: filters.search, $options: 'i' } },
+            { description: { $regex: filters.search, $options: 'i' } },
+        ];
+    }
+
+    // ID 列表: ?ids=id1,id2,id3
+    if (filters.ids) {
+        query._id = { $in: filters.ids.split(',') };
+    }
+
+    // 布尔/存在判断: ?hasAvatar=true
+    if (filters.hasAvatar === 'true') query.avatarUrl = { $ne: null };
+    if (filters.hasAvatar === 'false') query.avatarUrl = null;
+
+    return query;
+}
+
+// ========== 中间件集成 ==========
+// 分页/过滤/排序中间件:
+function paginate(model, options = {}) {
+    return async (req, res, next) => {
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(options.maxLimit || 100, parseInt(req.query.limit) || 20);
+        const skip = (page - 1) * limit;
+
+        const query = buildQuery(req.query);
+
+        try {
+            const [data, total] = await Promise.all([
+                model.find(query)
+                    .sort(buildSort(req.query.sort, options.sortableFields))
+                    .skip(skip)
+                    .limit(limit)
+                    .lean(),
+                model.countDocuments(query),
+            ]);
+
+            res.paginated(data, {
+                page, limit, total,
+                totalPages: Math.ceil(total / limit),
+                hasNext: page * limit < total,
+                hasPrev: page > 1,
+            });
+        } catch (err) {
+            next(err);
+        }
+    };
+}
+
+// 使用:
+app.get('/api/users', paginate(User, {
+    maxLimit: 50,
+    sortableFields: ['name', 'email', 'createdAt'],
+}));</div>
+    </div>
+    <div class="card">
+        <h2>排序实现</h2>
+        <div class="code">// ========== 排序系统 ==========
+
+// ========== 排序构建函数 ==========
+function buildSort(sortParam, allowedFields = []) {
+    const sortObj = {};
+
+    if (!sortParam) {
+        return { createdAt: -1 };  // 默认排序
+    }
+
+    // ?sort=name → { name: 1 }
+    // ?sort=-name → { name: -1 }
+    // ?sort=name,-createdAt → { name: 1, createdAt: -1 }
+
+    const fields = sortParam.split(',');
+    for (const field of fields) {
+        let order = 1;
+        let fieldName = field;
+
+        if (field.startsWith('-')) {
+            order = -1;
+            fieldName = field.slice(1);
+        }
+
+        // 安全检查: 只允许排序白名单字段
+        if (allowedFields.length > 0 && !allowedFields.includes(fieldName)) {
+            continue;  // 跳过不允许的字段
+        }
+
+        // 防止 MongoDB 注入 (只允许字段名)
+        if (!/^[a-zA-Z][a-zA-Z0-9_.]*$/.test(fieldName)) {
+            continue;
+        }
+
+        sortObj[fieldName] = order;
+    }
+
+    return sortObj;
+}
+
+// ========== 高级排序 ==========
+// 支持嵌套字段: ?sort=-user.profile.age
+function buildSortNested(sortParam) {
+    const sortObj = {};
+    if (!sortParam) return { createdAt: -1 };
+
+    sortParam.split(',').forEach(field => {
+        let order = 1;
+        let fieldName = field;
+        if (field.startsWith('-')) {
+            order = -1;
+            fieldName = field.slice(1);
+        }
+        sortObj[fieldName] = order;
+    });
+
+    return sortObj;
+}
+
+// ========== 完整控制器 ==========
+app.get('/api/products', asyncHandler(async (req, res) => {
+    const page = Math.max(1, parseInt(req.query.page) || 1);
+    const limit = Math.min(100, parseInt(req.query.limit) || 20);
+
+    const filter = buildQuery(req.query);
+    const sort = buildSort(req.query.sort, ['name', 'price', 'createdAt', 'sales']);
+
+    // 计算总匹配数 (加缓存优化)
+    const cacheKey = `count:${JSON.stringify(filter)}`;
+    const total = await cacheGetOrCompute(cacheKey, () =>
+        Product.countDocuments(filter), 60);
+
+    const products = await Product.find(filter)
+        .sort(sort)
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean();
+
+    res.json({
+        success: true,
+        data: products,
+        pagination: {
+            page, limit, total,
+            totalPages: Math.ceil(total / limit),
+            hasNext: page * limit < total,
+        },
+    });
+}));</div>
+        <div class="note">💡 分页/过滤/排序要点: Offset 分页简单但大偏移慢; 游标分页性能好 (基于 _id 或时间); 过滤用 $regex 做模糊搜索但要防注入; 排序字段白名单防注入; 分页参数有上限 (maxLimit); countDocuments 是慢操作可缓存; 复杂过滤组合用 $and/$or; 前端传参用标准命名 (page/limit/sort/search)。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoPage()">分页方案</button>
+        <button onclick="demoFilter()">过滤构建</button>
+        <button onclick="demoSort()">排序安全</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoPage() {
+            result.innerHTML = '';
+            log('# 分页方案');
+            log('');
+            log('Offset: ?page=1&limit=20');
+            log('  简单, 但 page=10000 慢');
+            log('');
+            log('Cursor: ?cursor=xxx&limit=20');
+            log('  基于 _id > cursor');
+            log('  性能好, 大偏移也快');
+            log('');
+            log('Time: ?before=2024-01-01');
+            log('  适合时间排序 (Feed)');
+        }
+
+        function demoFilter() {
+            result.innerHTML = '';
+            log('# 过滤构建');
+            log('');
+            log('?role=admin          精确');
+            log('?status=active,pending 多值');
+            log('?priceMin=100&priceMax=500 范围');
+            log('?createdAfter=2024-01-01 时间');
+            log('?search=keyword      模糊');
+            log('?ids=a,b,c           ID列表');
+            log('');
+            log('构建为 MongoDB query 对象');
+        }
+
+        function demoSort() {
+            result.innerHTML = '';
+            log('# 排序安全');
+            log('');
+            log('?sort=name           → { name: 1 }');
+            log('?sort=-name          → { name: -1 }');
+            log('?sort=-price,name    → 多字段');
+            log('');
+            log('安全措施:');
+            log('1. 白名单 allowedFields');
+            log('2. 正则验证字段名');
+            log('3. 限制排序字段数');
+            log('4. 默认排序兜底');
+        }
+    </script>
+</body>
+</html>

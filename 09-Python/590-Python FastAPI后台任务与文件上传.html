@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python FastAPI后台任务与文件上传</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📎 FastAPI 后台任务与文件上传</h2><p>BackgroundTasks 后台任务、文件上传 (UploadFile/File)、文件验证、静态文件挂载、WebSocket 基础、Server-Sent Events。</p></div>
+    <div class="card">
+        <h2>BackgroundTasks</h2>
+        <div class="code">// ========== 后台任务 ==========
+# BackgroundTasks: 在返回响应后执行的任务
+# 适合: 发送邮件/处理图片/日志记录/通知推送
+
+from fastapi import FastAPI, BackgroundTasks
+
+app = FastAPI()
+
+# 定义后台任务函数:
+def write_log(message: str):
+    with open("log.txt", "a") as f:
+        f.write(f"{message}\n")
+
+def send_email(email: str, body: str):
+    # 模拟发送邮件
+    import time
+    time.sleep(2)  # 耗时操作
+    print(f"发送邮件到 {email}: {body}")
+
+@app.post("/send-notification")
+async def send_notification(email: str, background_tasks: BackgroundTasks):
+    # 立即返回响应,后台执行任务
+    background_tasks.add_task(write_log, f"通知发送到 {email}")
+    background_tasks.add_task(send_email, email, "你好!")
+    return {"message": "通知将在后台发送"}
+
+# 依赖注入中使用:
+def get_logger(background_tasks: BackgroundTasks):
+    background_tasks.add_task(write_log, "请求已记录")
+    return "logger"
+
+@app.get("/items")
+async def read_items(logger: str = Depends(get_logger)):
+    return {"items": [1, 2, 3]}</div>
+    </div>
+    <div class="card">
+        <h2>文件上传 (UploadFile)</h2>
+        <div class="code">// ========== 单文件上传 ==========
+from fastapi import FastAPI, File, UploadFile, HTTPException
+import shutil
+
+app = FastAPI()
+
+@app.post("/upload")
+async def upload_file(file: UploadFile = File(...)):
+    # UploadFile 属性:
+    print(file.filename)       # 原始文件名
+    print(file.content_type)   # MIME 类型 (如 image/png)
+    print(file.size)           # 文件大小
+
+    # 保存文件:
+    with open(f"uploads/{file.filename}", "wb") as f:
+        shutil.copyfileobj(file.file, f)
+
+    return {
+        "filename": file.filename,
+        "content_type": file.content_type,
+        "size": file.size
+    }
+
+# ========== 文件验证 ==========
+ALLOWED_TYPES = {"image/jpeg", "image/png", "image/gif", "application/pdf"}
+MAX_SIZE = 5 * 1024 * 1024  # 5 MB
+
+@app.post("/upload-validated")
+async def upload_validated(file: UploadFile = File(...)):
+    # 验证类型:
+    if file.content_type not in ALLOWED_TYPES:
+        raise HTTPException(400, f"不支持的文件类型: {file.content_type}")
+
+    # 验证大小:
+    contents = await file.read()
+    if len(contents) > MAX_SIZE:
+        raise HTTPException(400, f"文件过大 (> {MAX_SIZE} bytes)")
+
+    # 重置文件指针 (读取后需要)
+    await file.seek(0)
+
+    # 保存:
+    with open(f"uploads/{file.filename}", "wb") as f:
+        f.write(contents)
+
+    return {"filename": file.filename, "size": len(contents)}</div>
+    </div>
+    <div class="card">
+        <h2>多文件上传</h2>
+        <div class="code">// ========== 多文件上传 ==========
+from fastapi import FastAPI, File, UploadFile
+from typing import List
+
+app = FastAPI()
+
+@app.post("/upload-multiple")
+async def upload_multiple(files: List[UploadFile] = File(...)):
+    results = []
+    for file in files:
+        content = await file.read()
+        results.append({
+            "filename": file.filename,
+            "size": len(content),
+            "type": file.content_type
+        })
+    return {"files": results}
+
+# ========== 表单字段 + 文件 ==========
+from fastapi import Form
+
+@app.post("/upload-with-fields")
+async def create_article(
+    title: str = Form(...),
+    content: str = Form(...),
+    image: UploadFile = File(...)
+):
+    # 保存图片
+    with open(f"uploads/{image.filename}", "wb") as f:
+        shutil.copyfileobj(image.file, f)
+
+    return {
+        "title": title,
+        "content": content,
+        "image": image.filename
+    }
+
+# ========== FileResponse ==========
+from fastapi.responses import FileResponse
+
+@app.get("/download/{filename}")
+async def download_file(filename: str):
+    file_path = f"uploads/{filename}"
+    return FileResponse(
+        path=file_path,
+        filename=filename,              # 下载时的文件名
+        media_type="application/octet-stream"  # 强制下载
+    )</div>
+    </div>
+    <div class="card">
+        <h2>静态文件服务</h2>
+        <div class="code">// ========== 挂载静态文件 ==========
+from fastapi.staticfiles import StaticFiles
+
+# 挂载静态文件目录:
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# 现在可以访问: /static/style.css, /static/js/app.js
+
+# ========== HTML 响应 ==========
+from fastapi.responses import HTMLResponse
+
+@app.get("/", response_class=HTMLResponse)
+async def index():
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head><title>FastAPI</title></head>
+    <body>
+        <h1>Hello from FastAPI!</h1>
+    </body>
+    </html>
+    """
+
+# ========== Jinja2 模板 (需安装) ==========
+# pip install jinja2
+from fastapi.templating import Jinja2Templates
+from fastapi import Request
+
+templates = Jinja2Templates(directory="templates")
+
+@app.get("/hello/{name}")
+async def hello(request: Request, name: str):
+    return templates.TemplateResponse(
+        "hello.html",
+        {"request": request, "name": name}
+    )
+
+# templates/hello.html:
+# &lt;h1&gt;Hello {{ name }}!&lt;/h1&gt;</div>
+    </div>
+    <div class="card">
+        <h2>WebSocket 基础</h2>
+        <div class="code">// ========== WebSocket ==========
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+
+app = FastAPI()
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            # 接收消息:
+            data = await websocket.receive_text()
+            # 发送消息:
+            await websocket.send_text(f"收到: {data}")
+    except WebSocketDisconnect:
+        print("客户端断开连接")
+
+# ========== WebSocket 管理器 ==========
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            await connection.send_text(message)
+
+manager = ConnectionManager()
+
+@app.websocket("/chat")
+async def chat(websocket: WebSocket):
+    await manager.connect(websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            await manager.broadcast(f"用户: {data}")
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+        await manager.broadcast("用户离开")</div>
+        <div class="note">💡 后台任务与文件要点: (1) BackgroundTasks.add_task(func, *args) 响应后执行; (2) UploadFile = File(...) 异步文件上传,read/seek 操作; (3) FileResponse 文件下载; (4) StaticFiles 挂载静态目录; (5) WebSocket 实时双向通信。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoTasks()">后台任务演示</button>
+        <button onclick="demoUpload()">文件上传演示</button>
+        <button onclick="demoWS()">WebSocket 演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoTasks() {
+            result.innerHTML = '';
+            log('# 后台任务演示');
+            log('');
+            log('def send_email(email, body):');
+            log('    time.sleep(2)');
+            log('    print(f"发送到 {email}")');
+            log('');
+            log('@app.post("/notify")');
+            log('async def notify(bg: BackgroundTasks):');
+            log('    bg.add_task(send_email, "a@b.com", "Hi")');
+            log('    return {"msg": "后台发送中"}');
+            log('');
+            log('特点: 立即返回,不阻塞响应');
+        }
+
+        function demoUpload() {
+            result.innerHTML = '';
+            log('# 文件上传演示');
+            log('');
+            log('单文件:');
+            log('  file: UploadFile = File(...)');
+            log('  file.filename / content_type / size');
+            log('');
+            log('多文件:');
+            log('  files: List[UploadFile] = File(...)');
+            log('');
+            log('验证:');
+            log('  content_type 白名单');
+            log('  限制 file.size');
+            log('  UploadFile 异步读取');
+        }
+
+        function demoWS() {
+            result.innerHTML = '';
+            log('# WebSocket 演示');
+            log('');
+            log('@app.websocket("/ws")');
+            log('async def ws(websocket: WebSocket):');
+            log('    await websocket.accept()');
+            log('    while True:');
+            log('        data = await websocket.receive_text()');
+            log('        await websocket.send_text(f"收到: {data}")');
+            log('');
+            log('实时通信场景: 聊天/通知/协作编辑');
+        }
+    </script>
+</body>
+</html>

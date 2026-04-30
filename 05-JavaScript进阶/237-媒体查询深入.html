@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>媒体查询深入</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        #mq-results { background: #f8f9fa; padding: 15px; border-radius: 4px; font-size: 13px; }
+        #mq-results .row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #eee; }
+        #mq-results .key { color: #7f8c8d; }
+        #mq-results .val { font-weight: bold; color: #2c3e50; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>媒体查询深入（matchMedia 高级）</h2><p>响应式设计中 JavaScript 媒体查询的高级用法。</p></div>
+    <div class="card">
+        <h2>CSS 媒体查询与 JS 配合</h2>
+        <div class="code">// prefers-* 用户偏好媒体查询
+matchMedia('(prefers-color-scheme: dark)')      // 深色模式
+matchMedia('(prefers-color-scheme: light)')     // 浅色模式
+matchMedia('(prefers-reduced-motion: reduce)')  // 减少动画
+matchMedia('(prefers-reduced-motion: no-preference)')
+matchMedia('(prefers-contrast: more)')          // 高对比度
+matchMedia('(prefers-contrast: less)')          // 低对比度
+matchMedia('(prefers-transparency: reduce)')    // 减少透明度
+matchMedia('(prefers-reduced-data: reduce)')    // 省流量模式
+matchMedia('(prefers-color-scheme: light)')     // 浅色
+matchMedia('(forced-colors: active)')            // 强制颜色模式
+
+// 打印样式检测
+matchMedia('print')  // 是否在打印模式
+
+// 屏幕尺寸与方向
+matchMedia('(orientation: portrait)')   // 竖屏
+matchMedia('(orientation: landscape)')  // 横屏
+matchMedia('(aspect-ratio: 16/9)')      // 宽高比
+matchMedia('(min-resolution: 2dppx)')   // Retina 屏
+
+// 交互能力
+matchMedia('(hover: hover)')            // 支持悬停
+matchMedia('(hover: none)')             // 不支持悬停（触屏）
+matchMedia('(pointer: fine)')           // 精确指针（鼠标）
+matchMedia('(pointer: coarse)')         // 粗略指针（触摸）
+matchMedia('(any-hover: hover)')        // 任意设备支持悬停
+matchMedia('(any-pointer: fine)')       // 任意设备有精确指针
+
+// 组合查询
+matchMedia('(max-width: 768px) and (prefers-color-scheme: dark)')
+matchMedia('(min-width: 1024px), (orientation: landscape)')
+
+// matchMedia 返回 MediaQueryList
+const mq = matchMedia('(max-width: 600px)');
+mq.matches        // boolean
+mq.media          // 查询字符串
+mq.addEventListener('change', handler)
+mq.removeEventListener('change', handler)</div>
+    </div>
+    <div class="card">
+        <h2>演示：检测所有媒体特性</h2>
+        <div id="mq-results">
+            <div class="row"><span class="key">prefers-color-scheme</span><span class="val" id="mq-scheme">-</span></div>
+            <div class="row"><span class="key">prefers-reduced-motion</span><span class="val" id="mq-motion">-</span></div>
+            <div class="row"><span class="key">prefers-contrast</span><span class="val" id="mq-contrast">-</span></div>
+            <div class="row"><span class="key">orientation</span><span class="val" id="mq-orient">-</span></div>
+            <div class="row"><span class="key">hover 能力</span><span class="val" id="mq-hover">-</span></div>
+            <div class="row"><span class="key">pointer 精度</span><span class="val" id="mq-pointer">-</span></div>
+            <div class="row"><span class="key">Retina (≥2dppx)</span><span class="val" id="mq-retina">-</span></div>
+            <div class="row"><span class="key">forced-colors</span><span class="val" id="mq-forced">-</span></div>
+        </div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        function updateMQ() {
+            const map = {
+                'mq-scheme': matchMedia('(prefers-color-scheme: dark)').matches ? '🌙 深色' : '☀️ 浅色',
+                'mq-motion': matchMedia('(prefers-reduced-motion: reduce)').matches ? '🔽 减少' : '默认',
+                'mq-contrast': matchMedia('(prefers-contrast: more)').matches ? '↑ 高对比度' :
+                    matchMedia('(prefers-contrast: less)').matches ? '↓ 低对比度' : '默认',
+                'mq-orient': matchMedia('(orientation: portrait)').matches ? '📱 竖屏' : '🖥 横屏',
+                'mq-hover': matchMedia('(hover: hover)').matches ? '✅ 支持悬停' : '❌ 不支持',
+                'mq-pointer': matchMedia('(pointer: fine)').matches ? '🖱 精确 (鼠标)' : '👆 粗略 (触屏)',
+                'mq-retina': matchMedia('(min-resolution: 2dppx)').matches ? '✅ Retina' : '❌ 普通屏',
+                'mq-forced': matchMedia('(forced-colors: active)').matches ? '✅ 开启' : '❌ 关闭',
+            };
+            for (const [id, val] of Object.entries(map)) {
+                document.getElementById(id).textContent = val;
+            }
+        }
+
+        updateMQ();
+
+        // 监听变化
+        const queries = [
+            '(prefers-color-scheme: dark)',
+            '(prefers-reduced-motion: reduce)',
+            '(orientation: portrait)',
+        ];
+        queries.forEach(q => {
+            matchMedia(q).addEventListener('change', (e) => {
+                console.log(`媒体查询变化: ${q} = ${e.matches}`);
+                updateMQ();
+            });
+        });
+
+        console.log('=== 媒体查询深入 ===');
+        console.log('深色模式:', matchMedia('(prefers-color-scheme: dark)').matches);
+        console.log('减少动画:', matchMedia('(prefers-reduced-motion: reduce)').matches);
+        console.log('hover:', matchMedia('(hover: hover)').matches);
+        console.log('pointer:', matchMedia('(pointer: fine)').matches ? 'fine' : 'coarse');
+        console.log('Retina:', matchMedia('(min-resolution: 2dppx)').matches);
+
+        document.getElementById('output').textContent =
+            `媒体查询深入: prefers-* 系列 / hover / pointer\n` +
+            `orientation / resolution / forced-colors\n` +
+            `配合 matchMedia change 事件监听变化\n` +
+            `✅ 媒体查询深入演示完成！`;
+    </script>
+</body>
+</html>

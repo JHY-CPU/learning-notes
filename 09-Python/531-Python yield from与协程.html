@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python yield from与协程</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⏳ Python yield from 与协程</h2><p>yield from 委托生成器、send/throw/close 传递、生成器协程、async/await 前身、@asyncio.coroutine 与 future。</p></div>
+    <div class="card">
+        <h2>yield from 基础</h2>
+        <div class="code">// ========== yield from ==========
+// yield from 委托 (delegate) 给另一个生成器
+// 相当于在当前生成器中"展开"另一个生成器
+
+// ========== 没有 yield from ==========
+def gen1():
+    for i in range(3):
+        yield i
+
+def gen2():
+    for value in gen1():     # 手动迭代子生成器
+        yield value
+    yield "end"
+
+print(list(gen2()))          # [0, 1, 2, "end"]
+
+// ========== 用 yield from ==========
+def gen2():
+    yield from gen1()        # 委托给 gen1,自动迭代
+    yield "end"
+
+print(list(gen2()))          # [0, 1, 2, "end"]
+
+// yield from 替我们做了:
+// 1. 循环迭代子生成器
+// 2. 逐个 yield 值
+// 3. 捕获 StopIteration (不传播)
+
+// ========== yield from 展平嵌套 ==========
+def flatten(nested):
+    """递归展平嵌套可迭代对象"""
+    for item in nested:
+        if hasattr(item, "__iter__") and not isinstance(item, str):
+            yield from flatten(item)  # 递归委托
+        else:
+            yield item
+
+print(list(flatten([1, [2, [3, 4], 5], 6])))
+// [1, 2, 3, 4, 5, 6]</div>
+    </div>
+    <div class="card">
+        <h2>yield from 与 send/throw/close</h2>
+        <div class="code">// ========== yield from 传递消息 ==========
+// yield from 自动在调用者和子生成器之间建立双向通道
+// send() 和 throw() 直接传递给子生成器!
+
+def inner():
+    while True:
+        val = yield
+        print(f"内部收到: {val}")
+
+def outer():
+    yield from inner()       # 建立双向管道
+
+g = outer()
+next(g)                      # 启动
+g.send("Hello")              # 直接传递给 inner!
+# 内部收到: Hello
+g.send(42)                   # 直接传递给 inner!
+# 内部收到: 42
+
+// 用普通 yield 做不到这一点
+// 需要手动处理 send 转发
+
+// ========== yield from + return 获取返回值 ==========
+// 子生成器的 return 值会赋给 yield from 表达式
+
+def accumulate():
+    total = 0
+    for i in range(5):
+        total += i
+        yield i
+    return total             # 返回值
+
+def caller():
+    result = yield from accumulate()
+    print(f"总和: {result}")
+
+g = caller()
+for val in g:                # 迭代直到 StopIteration
+    print(val)
+# 0, 1, 2, 3, 4
+# 总和: 10
+
+// ========== yield from 异常传递 ==========
+def risky():
+    try:
+        yield 1
+        yield 2
+    except ValueError:
+        yield "错误处理完成"
+
+def safe():
+    yield from risky()
+
+g = safe()
+print(next(g))               # 1
+g.throw(ValueError)          # 传递给 risky,捕获并 yield "错误处理完成"
+print(next(g))               # StopIteration</div>
+    </div>
+    <div class="card">
+        <h2>生成器协程模式</h2>
+        <div class="code">// ========== 生成器协程 ==========
+// 协程: 可以暂停和恢复执行的函数
+// 生成器通过 yield/send 实现协程
+// async/await 之前的"旧式协程"
+
+// ========== 协程状态 ==========
+from inspect import getgeneratorstate
+
+def simple_coro():
+    x = yield 1
+    y = yield x + 2
+    return y
+
+c = simple_coro()
+print(getgeneratorstate(c))  # GEN_CREATED (刚创建)
+
+next(c)                      # 启动到第一个 yield
+print(getgeneratorstate(c))  # GEN_SUSPENDED (暂停在 yield)
+
+c.send(10)                   # 恢复执行
+c.close()
+print(getgeneratorstate(c))  # GEN_CLOSED (已关闭)
+
+// 协程生命周期:
+// GEN_CREATED → GEN_SUSPENDED → GEN_CLOSED
+//                 ↓
+//           GEN_RUNNING (执行中,很少见)
+
+// ========== 协程装饰器 (自动启动) ==========
+from functools import wraps
+
+def coroutine(func):
+    """自动启动协程的装饰器"""
+    @wraps(func)
+    def start(*args, **kwargs):
+        g = func(*args, **kwargs)
+        next(g)              # 自动推进到第一个 yield
+        return g
+    return start
+
+@coroutine
+def running_avg():
+    total = 0.0
+    count = 0
+    while True:
+        val = yield total / count if count else 0
+        total += val
+        count += 1
+
+avg = running_avg()          # 自动启动了,不需要 next()
+print(avg.send(10))          # 10.0
+print(avg.send(20))          # 15.0
+print(avg.send(30))          # 20.0
+
+// ========== 协程 vs 子例程 ==========
+// 子例程 (普通函数):
+//   一次调用从头到尾,调用者完全控制
+
+// 协程:
+//   可多次暂停/恢复,生成器+调用者双向通信
+//   多个协程可以交替执行 (协作式多任务)</div>
+    </div>
+    <div class="card">
+        <h2>从协程到 async/await</h2>
+        <div class="code">// ========== @asyncio.coroutine 旧式 ==========
+// Python 3.5+ 之前用生成器模拟协程
+import asyncio
+
+@asyncio.coroutine
+def old_style():
+    yield from asyncio.sleep(1)
+    return "完成"
+
+// ========== async/await 新式 ==========
+// Python 3.5+ 引入 async/await 关键字
+// async def 定义协程,await 代替 yield from
+
+async def new_style():
+    await asyncio.sleep(1)   # await 代替 yield from
+    return "完成"
+
+// 关系:
+// async def → 定义原生协程
+// await     → 等待另一个协程完成 (≈ yield from)
+// 但 await 只能用于 async 函数中!
+
+// ========== yield from 的进化 ==========
+// Python 2.5: 生成器支持 send/throw/close → 生成器协程
+// Python 3.3: 引入 yield from → 委托生成器
+// Python 3.5: 引入 async/await → 原生协程
+// Python 3.6: 异步生成器 async for
+// Python 3.7: 简化 asyncio (asyncio.run)
+
+// 现在: 新代码用 async/await
+// 旧代码中可能会看到 yield from 协程
+
+// ========== yield from 实际应用 ==========
+// 1. 递归遍历树/嵌套结构
+def tree_leaves(node):
+    if isinstance(node, list):
+        for child in node:
+            yield from tree_leaves(child)
+    else:
+        yield node
+
+// 2. 简化多个 yield
+def repeat(item, times):
+    yield from (item for _ in range(times))
+
+print(list(repeat("A", 3)))  # ["A", "A", "A"]
+
+// 3. 串联生成器
+def chain(*iterables):
+    for it in iterables:
+        yield from it
+
+print(list(chain([1, 2], [3, 4], "Hi")))  # [1, 2, 3, 4, "H", "i"]</div>
+        <div class="note">💡 yield from 要点: (1) yield from 委托给子生成器,简化迭代; (2) 自动建立双向通道 (send/throw 直达); (3) 子生成器的 return 值赋给 yield from 表达式; (4) 生成器协程是 async/await 的前身; (5) 新代码应使用 async/await,但 yield from 在处理生成器树时仍有用。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoYieldFrom()">yield from 演示</button>
+        <button onclick="demoCoro()">协程演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoYieldFrom() {
+            result.innerHTML = '';
+            log('# yield from 演示');
+            log('');
+            log('def inner():');
+            log('    for i in range(3):');
+            log('        yield i');
+            log('');
+            log('def outer():');
+            log('    yield from inner()');
+            log('    yield "end"');
+            log('');
+            log('list(outer()) → [0, 1, 2, "end"]');
+            log('');
+            log('展平嵌套列表:');
+            log('  flatten([1, [2, [3,4], 5]])');
+            log('  → [1, 2, 3, 4, 5]');
+            log('');
+            log('yield from = 委托生成器');
+            log('自动迭代子生成器!');
+        }
+
+        function demoCoro() {
+            result.innerHTML = '';
+            log('# 协程演示');
+            log('');
+            log('def consumer():');
+            log('    while True:');
+            log('        val = yield');
+            log('        print(f"收到 {val}")');
+            log('');
+            log('c = consumer()');
+            log('next(c)        # 启动');
+            log('c.send(10)     # 收到 10');
+            log('c.send(20)     # 收到 20');
+            log('c.close()      # 关闭');
+            log('');
+            log('协程装饰器自动启动:');
+            log('  @coroutine');
+            log('  def running_avg():');
+            log('      ...');
+            log('  avg.send(10) → 即用,无需 next()');
+        }
+    </script>
+</body>
+</html>

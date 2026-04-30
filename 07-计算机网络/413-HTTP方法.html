@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTTP方法</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🛠️ HTTP 方法</h2><p>GET/POST/PUT/DELETE/PATCH/HEAD/OPTIONS 方法详解、安全与幂等、CRUD 映射。</p></div>
+    <div class="card">
+        <h2>HTTP 方法大全</h2>
+        <div class="code">// ========== 核心 HTTP 方法 ==========
+//
+// GET:    获取资源 (只读)
+// POST:   创建资源 (非幂等)
+// PUT:    替换资源 (幂等)
+// PATCH:  部分更新资源 (非幂等)
+// DELETE: 删除资源 (幂等)
+// HEAD:   获取响应头 (同 GET 但不返回体)
+// OPTIONS: 查询服务器支持的请求方法
+//
+// ========== 方法详解 ==========
+//
+// GET /api/users          → 获取用户列表
+// GET /api/users/123      → 获取单个用户
+// POST /api/users          → 创建新用户
+// PUT /api/users/123       → 完全替换用户
+// PATCH /api/users/123     → 部分更新用户
+// DELETE /api/users/123    → 删除用户
+
+// ========== 完整方法列表 ==========
+// GET      读取资源
+// POST     提交新资源
+// PUT      全量更新资源
+// PATCH    部分更新资源
+// DELETE   删除资源
+// HEAD     获取响应头 (如检查资源是否存在)
+// OPTIONS  查询支持的跨域方法
+// TRACE    回显请求 (诊断用)
+// CONNECT  建立隧道 (HTTPS 代理)</div>
+    </div>
+    <div class="card">
+        <h2>安全方法与幂等方法</h2>
+        <p>安全 (Safe): 不改变服务器状态；幂等 (Idempotent): 多次执行结果相同。</p>
+        <div class="code">// ========== 安全与幂等 ==========
+//
+// 方法      安全    幂等   请求体
+// ─────────────────────────────────────
+// GET       ✅     ✅     ❌
+// HEAD      ✅     ✅     ❌
+// OPTIONS   ✅     ✅     ❌
+// DELETE    ❌     ✅     可选
+// PUT       ❌     ✅     ✅
+// PATCH     ❌     ❌     ✅
+// POST      ❌     ❌     ✅
+
+// ========== 幂等的重要性 ==========
+// 网络不可靠,请求可能重试
+// 幂等方法确保重试安全:
+//
+// PUT /api/users/123 (重试 3 次=1 次效果)
+//   第 1 次: 更新成功
+//   第 2 次: 同样数据再更新 (无变化)
+//   第 3 次: 再次更新 (无变化)
+//   → 最终结果一致
+//
+// POST /api/users (重试 = 多次创建)
+//   第 1 次: 创建用户 A
+//   第 2 次: 创建用户 B (重复!)
+//   → 需幂等键 (Idempotency-Key) 防止重复
+
+// ========== 实际应用 ==========
+// 浏览器刷新页面:
+//   安全方法 (GET) → 安全刷新
+//   非安全方法 (POST) → 浏览器提示"确认重新提交表单"
+//
+// CDN 缓存:
+//   只缓存安全方法 (GET/HEAD)
+//
+// 爬虫:
+//   遵循安全方法约束</div>
+        <div class="note">⚠️ GET 请求必须有"幂等"特性——同一个 GET 请求无论执行多少次,服务器状态都应相同。如果你用 GET 来删除数据,爬虫路过时你的数据就没了。</div>
+    </div>
+    <div class="card">
+        <h2>CRUD 与 REST 映射</h2>
+        <div class="code">// ========== CRUD 到 HTTP 映射 ==========
+//
+// Create  → POST   (或 PUT,若客户端决定 ID)
+// Read    → GET
+// Update  → PUT (全量) 或 PATCH (部分)
+// Delete  → DELETE
+//
+// ========== RESTful API 设计 ==========
+//
+// 操作          POST              GET               PUT               DELETE
+// ──────────────────────────────────────────────────────────────────────────
+// 所有资源      /users            /users
+// 单个资源                          /users/:id        /users/:id        /users/:id
+// 子资源                            /users/:id/posts
+// 操作                              /users/:id/profile
+//
+// GET    /api/articles              # 列表
+// GET    /api/articles/123          # 详情
+// POST   /api/articles              # 创建
+// PUT    /api/articles/123          # 全量更新
+// PATCH  /api/articles/123          # 部分更新
+// DELETE /api/articles/123          # 删除
+
+// ========== 注意事项 ==========
+// PUT vs PATCH:
+//   PUT: 替换整个资源
+//     PUT /users/1 → body: {name, email, age}
+//     缺失的字段会被置空
+//
+//   PATCH: 只更新指定字段
+//     PATCH /users/1 → body: {name: "new"}
+//     只更新 name,其他字段不变</div>
+    </div>
+    <div class="card">
+        <h2>表单场景的方法支持</h2>
+        <div class="code">// ========== HTML 表单的方法限制 ==========
+// HTML 表单只支持 GET 和 POST:
+//   <form method="GET">
+//   <form method="POST">
+//
+// 要使用 PUT/DELETE/PATCH:
+// 1. JavaScript AJAX/Fetch
+//   fetch('/api/users/123', { method: 'DELETE' })
+//
+// 2. 方法伪造 (Method Spoofing):
+//   <form method="POST">
+//     <input type="hidden" name="_method" value="DELETE">
+//   </form>
+
+// ========== 方法覆盖头 ==========
+// 某些代理/防火墙只允许 GET 和 POST
+// 使用自定义头解决:
+//   X-HTTP-Method-Override: PUT
+//   X-HTTP-Method-Override: DELETE
+//
+// 服务器检查该头来覆盖实际方法
+
+// ========== OPTIONS 预检请求 ==========
+// 跨域复杂请求前,浏览器先发 OPTIONS:
+//   OPTIONS /api/users
+//   Origin: https://frontend.com
+//   Access-Control-Request-Method: POST
+//
+// 服务器响应:
+//   Access-Control-Allow-Methods: GET,POST,PUT,DELETE
+//   Access-Control-Allow-Origin: https://frontend.com
+//   Access-Control-Max-Age: 86400</div>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('🛠️ HTTP 方法');
+        log('');
+        log('CRUD 映射: POST(创建) / GET(读取) / PUT(全量更新) / PATCH(部分更新) / DELETE(删除)');
+        log('安全方法: GET/HEAD/OPTIONS — 不改变服务器状态');
+        log('幂等方法: GET/HEAD/OPTIONS/PUT/DELETE — 多次执行结果相同');
+        log('非幂等: POST/PATCH — 重复执行可能产生不同结果');
+        log('HTML 表单限制: 只支持 GET 和 POST');
+    </script>
+</body>
+</html>

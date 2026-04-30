@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>数据校验工具库</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #validateLib-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; margin: 5px 0; width: 280px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>数据校验工具库</h2><p>常见校验函数封装（邮箱/手机/身份证/银行卡/统一社会信用代码）。</p></div>
+    <div class="card">
+        <h2>校验函数库</h2>
+        <div class="code">// ========== 校验工具库 ==========
+const Validators = {
+    // 邮箱
+    email: (v) => /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(v),
+
+    // 手机号 (中国大陆)
+    phone: (v) => /^1[3-9]\d{9}$/.test(v),
+
+    // URL
+    url: (v) => /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(v),
+
+    // IP v4
+    ipv4: (v) => /^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$/.test(v),
+
+    // 身份证 (18位)
+    idCard: (v) => /^[1-9]\d{5}(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]$/.test(v),
+
+    // 银行卡 (16-19位数字)
+    bankCard: (v) => /^\d{16,19}$/.test(v),
+
+    // 统一社会信用代码 (18位)
+    uscc: (v) => /^[0-9A-HJ-NPQRTUWXY]{2}\d{6}[0-9A-HJ-NPQRTUWXY]{10}$/.test(v),
+
+    // 中文
+    chinese: (v) => /^[一-龥]+$/.test(v),
+
+    // 数字
+    number: (v) => /^-?\d+(\.\d+)?$/.test(v),
+
+    // 整数
+    integer: (v) => /^-?\d+$/.test(v),
+
+    // 纯字母
+    alpha: (v) => /^[a-zA-Z]+$/.test(v),
+
+    // 字母+数字
+    alphanumeric: (v) => /^[a-zA-Z0-9]+$/,
+};</div>
+    </div>
+    <div class="card">
+        <h2>演示：校验工具</h2>
+        <p>输入值: <input id="validateInput" value="test@example.com"></p>
+        <button onclick="validateAll()">全部校验</button>
+        <div id="validateLib-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const validateLibResult = document.getElementById('validateLib-result');
+
+        function log(msg) {
+            validateLibResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        const Validators = {
+            email: (v) => /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(v),
+            phone: (v) => /^1[3-9]\d{9}$/.test(v),
+            url: (v) => /^https?:\/\/[^\s/$.?#].[^\s]*$/i.test(v),
+            ipv4: (v) => /^(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)$/.test(v),
+            idCard: (v) => /^[1-9]\d{5}(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]$/.test(v),
+            bankCard: (v) => /^\d{16,19}$/.test(v),
+            chinese: (v) => /^[一-龥]+$/.test(v),
+            number: (v) => /^-?\d+(\.\d+)?$/.test(v),
+            integer: (v) => /^-?\d+$/.test(v),
+            alpha: (v) => /^[a-zA-Z]+$/.test(v),
+            alphanumeric: (v) => /^[a-zA-Z0-9]+$/.test(v),
+        };
+
+        function validateAll() {
+            validateLibResult.innerHTML = '';
+            const value = document.getElementById('validateInput').value;
+            log(`📋 校验值: "${value}"`);
+            log('');
+
+            const results = [
+                { name: '邮箱 (email)', key: 'email' },
+                { name: '手机号 (phone)', key: 'phone' },
+                { name: 'URL', key: 'url' },
+                { name: 'IP v4', key: 'ipv4' },
+                { name: '身份证 (idCard)', key: 'idCard' },
+                { name: '银行卡 (bankCard)', key: 'bankCard' },
+                { name: '中文 (chinese)', key: 'chinese' },
+                { name: '数字 (number)', key: 'number' },
+                { name: '整数 (integer)', key: 'integer' },
+                { name: '纯字母 (alpha)', key: 'alpha' },
+                { name: '字母数字 (alphanumeric)', key: 'alphanumeric' },
+            ];
+
+            let passed = 0;
+            results.forEach(({ name, key }) => {
+                const result = Validators[key](value);
+                if (result) passed++;
+                log(`   ${result ? '✅' : '❌'} ${name}`);
+            });
+
+            log(`\n📊 通过 ${passed}/${results.length} 项校验`);
+        }
+
+        // 预设测试
+        log('📦 校验工具库已加载');
+        log('支持: 邮箱/手机/URL/IP/身份证/银行卡/中文/数字/字母');
+
+        console.log('=== 数据校验工具库 ===');
+
+        document.getElementById('output').textContent =
+            `数据校验工具库: 邮箱/手机/URL/IPv4/身份证/银行卡/中文/数字\n` +
+            `正则: 字符类 / 量词 / 边界 / 分组 / Unicode\n` +
+            `✅ 数据校验工具库完成！`;
+    </script>
+</body>
+</html>

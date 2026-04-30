@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Express node-postgres 数据库</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🐘 Express node-postgres 数据库</h2><p>node-postgres (pg) 连接 PostgreSQL、连接池配置、CRUD 操作、参数化查询防止 SQL 注入、事务管理、迁移、批量操作、监听/通知。</p></div>
+    <div class="card">
+        <h2>pg 连接与连接池</h2>
+        <div class="code">// ========== node-postgres ==========
+// Node.js PostgreSQL 客户端
+
+// 安装:
+// npm install pg
+
+const { Pool, Client } = require('pg');
+
+// ========== 连接池配置 ==========
+const pool = new Pool({
+    host: process.env.DB_HOST || 'localhost',
+    port: parseInt(process.env.DB_PORT, 10) || 5432,
+    database: process.env.DB_NAME || 'myapp',
+    user: process.env.DB_USER || 'postgres',
+    password: process.env.DB_PASS || 'postgres',
+
+    // 连接池设置
+    max: 20,                    // 最大连接数
+    min: 2,                     // 最小空闲连接
+    idleTimeoutMillis: 30000,   // 空闲连接超时
+    connectionTimeoutMillis: 5000,  // 连接超时
+
+    // 自动重连
+    maxRetries: 3,
+    retryDelay: 3000,
+});
+
+// ========== 查询 ==========
+// 简单查询
+const result = await pool.query('SELECT NOW()');
+console.log(result.rows[0].now);
+
+// 参数化查询 (防 SQL 注入)
+const userResult = await pool.query(
+    'SELECT * FROM users WHERE email = $1 AND is_active = $2',
+    [email, true]
+);
+
+// ========== Express 集成 ==========
+// db.js:
+const { Pool } = require('pg');
+
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production'
+        ? { rejectUnauthorized: false }
+        : false,
+});
+
+// 导出 query 方法
+module.exports = {
+    query: (text, params) => pool.query(text, params),
+
+    // 获取客户端 (用于事务)
+    getClient: () => pool.connect(),
+
+    // 健康检查
+    health: async () => {
+        try {
+            await pool.query('SELECT 1');
+            return { status: 'ok', poolSize: pool.totalCount, idle: pool.idleCount };
+        } catch (err) {
+            return { status: 'error', message: err.message };
+        }
+    },
+};
+
+// app.js:
+const db = require('./db');
+
+app.get('/users', async (req, res) => {
+    const result = await db.query(
+        'SELECT id, name, email FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2',
+        [limit, offset]
+    );
+    res.success(result.rows);
+});
+
+// ========== 单个 Client (少用) ==========
+// 用于需要长连接或 LISTEN/NOTIFY
+const client = new Client({
+    connectionString: process.env.DATABASE_URL,
+});
+await client.connect();
+client.on('notification', (msg) => {
+    console.log('Channel:', msg.channel, 'Payload:', msg.payload);
+});
+await client.query('LISTEN new_user');</div>
+    </div>
+    <div class="card">
+        <h2>CRUD 操作</h2>
+        <div class="code">// ========== PostgreSQL CRUD ==========
+// models/user.js:
+
+const db = require('../db');
+
+const User = {
+    // 创建
+    async create({ name, email, password }) {
+        const result = await db.query(
+            `INSERT INTO users (name, email, password_hash, created_at)
+             VALUES ($1, $2, $3, NOW())
+             RETURNING id, name, email, created_at`,
+            [name, email, password]
+        );
+        return result.rows[0];
+    },
+
+    // 查询所有 (分页)
+    async findAll({ page = 1, limit = 20, search, sort = 'created_at DESC' }) {
+        const offset = (page - 1) * limit;
+        const params = [];
+        let where = '';
+
+        if (search) {
+            params.push(`%${search}%`);
+            where = `WHERE name ILIKE $${params.length}`;
+        }
+
+        params.push(limit);
+        params.push(offset);
+
+        const [dataResult, countResult] = await Promise.all([
+            db.query(
+                `SELECT id, name, email, created_at
+                 FROM users ${where}
+                 ORDER BY ${sort}
+                 LIMIT $${params.length - 1} OFFSET $${params.length}`,
+                params
+            ),
+            db.query(`SELECT COUNT(*) FROM users ${where}`, search ? [`%${search}%`] : []),
+        ]);
+
+        return {
+            rows: dataResult.rows,
+            total: parseInt(countResult.rows[0].count),
+            page,
+            limit,
+        };
+    },
+
+    // 查询单条
+    async findById(id) {
+        const result = await db.query(
+            'SELECT id, name, email, created_at FROM users WHERE id = $1',
+            [id]
+        );
+        return result.rows[0] || null;
+    },
+
+    // 更新
+    async update(id, fields) {
+        const setClauses = [];
+        const params = [];
+        let index = 1;
+
+        for (const [key, value] of Object.entries(fields)) {
+            setClauses.push(`${key} = $${index}`);
+            params.push(value);
+            index++;
+        }
+
+        params.push(id);
+        const result = await db.query(
+            `UPDATE users SET ${setClauses.join(', ')}, updated_at = NOW()
+             WHERE id = $${index}
+             RETURNING id, name, email, updated_at`,
+            params
+        );
+        return result.rows[0] || null;
+    },
+
+    // 删除
+    async delete(id) {
+        const result = await db.query(
+            'DELETE FROM users WHERE id = $1 RETURNING id',
+            [id]
+        );
+        return result.rows[0] || null;
+    },
+};
+
+module.exports = User;
+
+// ========== 使用 ==========
+// router.get('/users/:id', async (req, res) => {
+//     const user = await User.findById(req.params.id);
+//     if (!user) throw new NotFoundError('User not found');
+//     res.success(user);
+// });</div>
+    </div>
+    <div class="card">
+        <h2>事务管理</h2>
+        <div class="code">// ========== PostgreSQL 事务 ==========
+// 多条语句原子执行
+
+const db = require('../db');
+
+// ========== 手动事务 ==========
+async function transferMoney(fromId, toId, amount) {
+    const client = await db.getClient();
+
+    try {
+        await client.query('BEGIN');
+
+        // 扣款
+        const debit = await client.query(
+            'UPDATE accounts SET balance = balance - $1 WHERE id = $2 AND balance >= $1 RETURNING balance',
+            [amount, fromId]
+        );
+
+        if (debit.rows.length === 0) {
+            throw new Error('Insufficient funds');
+        }
+
+        // 加款
+        await client.query(
+            'UPDATE accounts SET balance = balance + $1 WHERE id = $2',
+            [amount, toId]
+        );
+
+        // 记录交易
+        await client.query(
+            'INSERT INTO transactions (from_id, to_id, amount) VALUES ($1, $2, $3)',
+            [fromId, toId, amount]
+        );
+
+        await client.query('COMMIT');
+        return { success: true };
+    } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+    } finally {
+        client.release();  // 释放回连接池
+    }
+}
+
+// ========== 事务辅助函数 ==========
+async function transaction(callback) {
+    const client = await db.getClient();
+
+    try {
+        await client.query('BEGIN');
+        const result = await callback(client);
+        await client.query('COMMIT');
+        return result;
+    } catch (err) {
+        await client.query('ROLLBACK');
+        throw err;
+    } finally {
+        client.release();
+    }
+}
+
+// 使用:
+app.post('/transfer', async (req, res) => {
+    const result = await transaction(async (client) => {
+        const { fromId, toId, amount } = req.body;
+
+        await client.query(
+            'UPDATE accounts SET balance = balance - $1 WHERE id = $2',
+            [amount, fromId]
+        );
+        await client.query(
+            'UPDATE accounts SET balance = balance + $1 WHERE id = $2',
+            [amount, toId]
+        );
+
+        return { success: true };
+    });
+
+    res.success(result);
+});
+
+// ========== SAVEPOINT ==========
+await client.query('SAVEPOINT sp1');
+await client.query('ROLLBACK TO SAVEPOINT sp1');  // 部分回滚
+
+// ========== 批量插入 ==========
+async function bulkInsertUsers(users) {
+    const values = [];
+    const params = [];
+    let i = 1;
+
+    for (const user of users) {
+        values.push(`($${i}, $${i + 1}, $${i + 2})`);
+        params.push(user.name, user.email, user.password);
+        i += 3;
+    }
+
+    const result = await db.query(
+        `INSERT INTO users (name, email, password_hash)
+         VALUES ${values.join(', ')}
+         ON CONFLICT (email) DO NOTHING
+         RETURNING id`,
+        params
+    );
+
+    return result.rows;
+}</div>
+    </div>
+    <div class="card">
+        <h2>高级特性</h2>
+        <div class="code">// ========== PostgreSQL 高级特性 ==========
+
+// ========== 迁移 (手动) ==========
+// migrations/001_create_users.js:
+async function up(client) {
+    await client.query(`
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            name VARCHAR(255) NOT NULL,
+            email VARCHAR(255) UNIQUE NOT NULL,
+            password_hash VARCHAR(255) NOT NULL,
+            role VARCHAR(50) DEFAULT 'user',
+            is_active BOOLEAN DEFAULT true,
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            updated_at TIMESTAMPTZ DEFAULT NOW()
+        );
+
+        CREATE INDEX idx_users_email ON users(email);
+        CREATE INDEX idx_users_created_at ON users(created_at);
+    `);
+}
+
+async function down(client) {
+    await client.query('DROP TABLE IF EXISTS users');
+}
+
+// 运行迁移:
+// const client = await pool.connect();
+// await up(client);
+// client.release();
+
+// ========== LISTEN/NOTIFY (实时通知) ==========
+// 数据库事件通知
+
+// 监听 (在初始化时):
+app.listen(3000, async () => {
+    const client = await db.getClient();
+    await client.query('LISTEN new_order');
+    await client.query('LISTEN user_updated');
+
+    client.on('notification', (msg) => {
+        const payload = JSON.parse(msg.payload);
+        console.log(`Channel ${msg.channel}:`, payload);
+
+        if (msg.channel === 'new_order') {
+            // 通知相关用户
+            io.to(`user:${payload.userId}`).emit('order:new', payload);
+        }
+    });
+});
+
+// 触发器发送通知:
+// CREATE OR REPLACE FUNCTION notify_new_order()
+// RETURNS TRIGGER AS $$
+// BEGIN
+//   PERFORM pg_notify('new_order', row_to_json(NEW)::text);
+//   RETURN NEW;
+// END;
+// $$ LANGUAGE plpgsql;
+//
+// CREATE TRIGGER order_after_insert
+// AFTER INSERT ON orders
+// FOR EACH ROW EXECUTE FUNCTION notify_new_order();
+
+// ========== 连接池监控 ==========
+setInterval(async () => {
+    const { totalCount, idleCount, waitingCount } = pool;
+    logger.info('Pool stats', { totalCount, idleCount, waitingCount });
+}, 60000);
+
+// ========== 错误处理 ==========
+pool.on('error', (err) => {
+    logger.error('Unexpected pool error', { err });
+});
+
+// ========== 关闭 ==========
+process.on('SIGTERM', async () => {
+    await pool.end();
+});</div>
+        <div class="note">💡 node-postgres 要点: Pool 连接池管理; 参数化查询 $1, $2 防注入; 事务 BEGIN/COMMIT/ROLLBACK; 批量插入 ON CONFLICT; LISTEN/NOTIFY 实时推送; 迁移手动管理; 连接数 max/min 配置; 空闲超时 idleTimeoutMillis; SSL 生产配置; pool.on('error') 监控异常。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoPool()">连接池</button>
+        <button onclick="demoTx()">事务</button>
+        <button onclick="demoNotify()">LISTEN/NOTIFY</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoPool() {
+            result.innerHTML = '';
+            log('# PostgreSQL 连接池');
+            log('');
+            log('const pool = new Pool({');
+            log('  max: 20,            // 最大连接');
+            log('  min: 2,             // 最小空闲');
+            log('  idleTimeoutMillis: 30000,');
+            log('  connectionString: DATABASE_URL,');
+            log('});');
+            log('');
+            log('查询: pool.query(sql, params)');
+            log('参数: $1, $2  (防注入)');
+            log('事务: pool.connect() → client');
+        }
+
+        function demoTx() {
+            result.innerHTML = '';
+            log('# 事务处理');
+            log('');
+            log('async function transaction(callback) {');
+            log('  const client = await pool.connect();');
+            log('  try {');
+            log('    await client.query("BEGIN");');
+            log('    const result = await callback(client);');
+            log('    await client.query("COMMIT");');
+            log('    return result;');
+            log('  } catch (err) {');
+            log('    await client.query("ROLLBACK");');
+            log('    throw err;');
+            log('  } finally {');
+            log('    client.release();');
+            log('  }');
+            log('}');
+        }
+
+        function demoNotify() {
+            result.innerHTML = '';
+            log('# LISTEN/NOTIFY');
+            log('');
+            log('数据库触发器 → pg_notify → Node.js');
+            log('');
+            log('Node 监听:');
+            log('client.query("LISTEN new_order");');
+            log('client.on("notification", (msg) => {');
+            log('  const data = JSON.parse(msg.payload);');
+            log('});');
+            log('');
+            log('PostgreSQL 触发器:');
+            log('PERFORM pg_notify(');
+            log('  \'new_order\',');
+            log('  row_to_json(NEW)::text');
+            log(');');
+        }
+    </script>
+</body>
+</html>

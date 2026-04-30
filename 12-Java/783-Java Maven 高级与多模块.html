@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java Maven 高级与多模块</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🏗️ Maven 高级与多模块</h2><p>多模块项目设计、BOM 依赖管理、Nexus 私有仓库、Maven Release 发布流程、Maven Enforcer 插件、最佳实践。</p></div>
+    <div class="card">
+        <h2>多模块项目</h2>
+        <div class="code">// ========== 多模块 Maven 项目 ==========
+// 大型项目拆分为多个模块, 共享父 POM 配置
+// 模块间可相互依赖
+
+// ========== 项目结构 ==========
+my-project/
+├── pom.xml                  // 父 POM (packaging=pom)
+├── my-common/               // 公共模块 (工具类、DTO)
+│   └── pom.xml
+├── my-core/                 // 核心业务模块
+│   └── pom.xml
+├── my-service/              // 服务层模块
+│   └── pom.xml
+├── my-web/                  // Web 接口模块
+│   └── pom.xml
+└── my-boot/                 // Spring Boot 启动模块
+    └── pom.xml
+
+// ========== 父 POM ==========
+&lt;project&gt;
+    &lt;modelVersion&gt;4.0.0&lt;/modelVersion&gt;
+    &lt;groupId&gt;com.example&lt;/groupId&gt;
+    &lt;artifactId&gt;my-project&lt;/artifactId&gt;
+    &lt;version&gt;1.0.0-SNAPSHOT&lt;/version&gt;
+    &lt;packaging&gt;pom&lt;/packaging&gt;  &lt;!-- 父模块必须是 pom --&gt;
+
+    &lt;!-- 聚合子模块 --&gt;
+    &lt;modules&gt;
+        &lt;module&gt;my-common&lt;/module&gt;
+        &lt;module&gt;my-core&lt;/module&gt;
+        &lt;module&gt;my-service&lt;/module&gt;
+        &lt;module&gt;my-web&lt;/module&gt;
+        &lt;module&gt;my-boot&lt;/module&gt;
+    &lt;/modules&gt;
+
+    &lt;!-- 全局属性 --&gt;
+    &lt;properties&gt;
+        &lt;java.version&gt;17&lt;/java.version&gt;
+        &lt;spring-boot.version&gt;3.2.0&lt;/spring-boot.version&gt;
+        &lt;spring-cloud.version&gt;2023.0.0&lt;/spring-cloud.version&gt;
+        &lt;mapstruct.version&gt;1.5.5.Final&lt;/mapstruct.version&gt;
+    &lt;/properties&gt;
+
+    &lt;!-- 统一依赖管理 (子模块无需 version) --&gt;
+    &lt;dependencyManagement&gt;
+        &lt;dependencies&gt;
+            &lt;dependency&gt;
+                &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+                &lt;artifactId&gt;spring-boot-dependencies&lt;/artifactId&gt;
+                &lt;version&gt;${spring-boot.version}&lt;/version&gt;
+                &lt;type&gt;pom&lt;/type&gt;
+                &lt;scope&gt;import&lt;/scope&gt;
+            &lt;/dependency&gt;
+            &lt;dependency&gt;
+                &lt;groupId&gt;org.mapstruct&lt;/groupId&gt;
+                &lt;artifactId&gt;mapstruct&lt;/artifactId&gt;
+                &lt;version&gt;${mapstruct.version}&lt;/version&gt;
+            &lt;/dependency&gt;
+            &lt;!-- 内部模块 --&gt;
+            &lt;dependency&gt;
+                &lt;groupId&gt;com.example&lt;/groupId&gt;
+                &lt;artifactId&gt;my-common&lt;/artifactId&gt;
+                &lt;version&gt;${project.version}&lt;/version&gt;
+            &lt;/dependency&gt;
+        &lt;/dependencies&gt;
+    &lt;/dependencyManagement&gt;
+
+    &lt;!-- 所有子模块共用的依赖 --&gt;
+    &lt;dependencies&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.projectlombok&lt;/groupId&gt;
+            &lt;artifactId&gt;lombok&lt;/artifactId&gt;
+            &lt;scope&gt;provided&lt;/scope&gt;
+        &lt;/dependency&gt;
+    &lt;/dependencies&gt;
+&lt;/project&gt;
+
+// ========== 子模块 pom.xml ==========
+&lt;project&gt;
+    &lt;parent&gt;
+        &lt;groupId&gt;com.example&lt;/groupId&gt;
+        &lt;artifactId&gt;my-project&lt;/artifactId&gt;
+        &lt;version&gt;1.0.0-SNAPSHOT&lt;/version&gt;
+        &lt;relativePath&gt;../pom.xml&lt;/relativePath&gt;
+    &lt;/parent&gt;
+
+    &lt;artifactId&gt;my-core&lt;/artifactId&gt;
+    &lt;!-- 继承父 POM 的 groupId/version --&gt;
+
+    &lt;dependencies&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;com.example&lt;/groupId&gt;
+            &lt;artifactId&gt;my-common&lt;/artifactId&gt;
+            &lt;!-- version 从父 POM dependencyManagement 继承 --&gt;
+        &lt;/dependency&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+            &lt;artifactId&gt;spring-boot-starter-validation&lt;/artifactId&gt;
+            &lt;!-- version 从 spring-boot-dependencies BOM 继承 --&gt;
+        &lt;/dependency&gt;
+    &lt;/dependencies&gt;
+&lt;/project&gt;</div>
+    </div>
+    <div class="card">
+        <h2>BOM 依赖管理</h2>
+        <div class="code">// ========== BOM (Bill of Materials) ==========
+// 专门用于管理依赖版本的神 POM
+// 让使用者无需指定版本, 统一管理
+
+// ========== 自定义 BOM ==========
+// my-bom/pom.xml
+&lt;project&gt;
+    &lt;modelVersion&gt;4.0.0&lt;/modelVersion&gt;
+    &lt;groupId&gt;com.example&lt;/groupId&gt;
+    &lt;artifactId&gt;my-bom&lt;/artifactId&gt;
+    &lt;version&gt;1.0.0&lt;/version&gt;
+    &lt;packaging&gt;pom&lt;/packaging&gt;
+
+    &lt;properties&gt;
+        &lt;guava.version&gt;33.0.0-jre&lt;/guava.version&gt;
+        &lt;lombok.version&gt;1.18.30&lt;/lombok.version&gt;
+        &lt;mapstruct.version&gt;1.5.5.Final&lt;/mapstruct.version&gt;
+    &lt;/properties&gt;
+
+    &lt;dependencyManagement&gt;
+        &lt;dependencies&gt;
+            &lt;dependency&gt;
+                &lt;groupId&gt;com.google.guava&lt;/groupId&gt;
+                &lt;artifactId&gt;guava&lt;/artifactId&gt;
+                &lt;version&gt;${guava.version}&lt;/version&gt;
+            &lt;/dependency&gt;
+            &lt;dependency&gt;
+                &lt;groupId&gt;org.projectlombok&lt;/groupId&gt;
+                &lt;artifactId&gt;lombok&lt;/artifactId&gt;
+                &lt;version&gt;${lombok.version}&lt;/version&gt;
+            &lt;/dependency&gt;
+        &lt;/dependencies&gt;
+    &lt;/dependencyManagement&gt;
+&lt;/project&gt;
+
+// ========== 使用 BOM ==========
+// 项目引入 BOM
+&lt;dependencyManagement&gt;
+    &lt;dependencies&gt;
+        &lt;dependency&gt;
+            &lt;groupId&gt;com.example&lt;/groupId&gt;
+            &lt;artifactId&gt;my-bom&lt;/artifactId&gt;
+            &lt;version&gt;1.0.0&lt;/version&gt;
+            &lt;type&gt;pom&lt;/type&gt;
+            &lt;scope&gt;import&lt;/scope&gt;  &lt;!-- import 作用域 --&gt;
+        &lt;/dependency&gt;
+    &lt;/dependencies&gt;
+&lt;/dependencyManagement&gt;
+
+// 使用 BOM 中的依赖, 无需指定版本:
+&lt;dependencies&gt;
+    &lt;dependency&gt;
+        &lt;groupId&gt;com.google.guava&lt;/groupId&gt;
+        &lt;artifactId&gt;guava&lt;/artifactId&gt;
+        &lt;!-- version 由 BOM 提供 --&gt;
+    &lt;/dependency&gt;
+&lt;/dependencies&gt;
+
+// ========== 常用 BOM ==========
+// spring-boot-dependencies     — Spring Boot 所有依赖
+// spring-cloud-dependencies    — Spring Cloud
+// jackson-bom                  — Jackson
+// junit-bom                    — JUnit 5
+// testcontainers-bom           — Testcontainers
+
+// ========== BOM 的好处 ==========
+// 1. 统一版本管理
+// 2. 避免依赖冲突
+// 3. 升级只需改 BOM 版本
+// 4. 跨项目共享版本标准</div>
+    </div>
+    <div class="card">
+        <h2>Nexus 私有仓库</h2>
+        <div class="code">// ========== Nexus Repository Manager ==========
+// 私有 Maven 仓库: 存储内部制品 + 代理中央仓库
+
+// ========== 仓库类型 ==========
+// hosted   — 托管仓库 (存内部制品)
+// proxy    — 代理仓库 (缓存中央仓库)
+// group    — 组合仓库 (合并多个仓库)
+
+// 常见配置:
+// maven-releases    — 正式版 (hosted, 不可覆盖)
+// maven-snapshots   — 快照版 (hosted, 允许覆盖)
+// maven-central     — 中央仓库代理 (proxy)
+// maven-public      — group 组合以上所有
+
+// ========== 配置私服地址 ==========
+// pom.xml 配置分发
+&lt;distributionManagement&gt;
+    &lt;repository&gt;
+        &lt;id&gt;nexus-releases&lt;/id&gt;
+        &lt;name&gt;Nexus Release Repository&lt;/name&gt;
+        &lt;url&gt;https://nexus.example.com/repository/maven-releases/&lt;/url&gt;
+    &lt;/repository&gt;
+    &lt;snapshotRepository&gt;
+        &lt;id&gt;nexus-snapshots&lt;/id&gt;
+        &lt;name&gt;Nexus Snapshot Repository&lt;/name&gt;
+        &lt;url&gt;https://nexus.example.com/repository/maven-snapshots/&lt;/url&gt;
+    &lt;/snapshotRepository&gt;
+&lt;/distributionManagement&gt;
+
+// ========== settings.xml 配置认证 ==========
+&lt;servers&gt;
+    &lt;server&gt;
+        &lt;id&gt;nexus-releases&lt;/id&gt;
+        &lt;username&gt;deploy-user&lt;/username&gt;
+        &lt;password&gt;${env.NEXUS_PASSWORD}&lt;/password&gt;  &lt;!-- 环境变量! --&gt;
+    &lt;/server&gt;
+    &lt;server&gt;
+        &lt;id&gt;nexus-snapshots&lt;/id&gt;
+        &lt;username&gt;deploy-user&lt;/username&gt;
+        &lt;password&gt;${env.NEXUS_PASSWORD}&lt;/password&gt;
+    &lt;/server&gt;
+&lt;/servers&gt;
+
+// ========== 配置镜像代理 ==========
+// settings.xml 中配置阿里云镜像
+&lt;mirrors&gt;
+    &lt;mirror&gt;
+        &lt;id&gt;nexus-public&lt;/id&gt;
+        &lt;mirrorOf&gt;*&lt;/mirrorOf&gt;    &lt;!-- 拦截所有仓库 --&gt;
+        &lt;url&gt;https://nexus.example.com/repository/maven-public/&lt;/url&gt;
+    &lt;/mirror&gt;
+&lt;/mirrors&gt;
+
+// ========== 发布到私服 ==========
+mvn deploy                      // 发布到 distributionManagement 配置的地址
+mvn deploy -P prod              // 使用特定 profile 发布
+
+// ========== 从私服下载 ==========
+// 所有依赖从私服获取 (私服再从中央仓库同步)
+// 内网开发无需访问外网</div>
+    </div>
+    <div class="card">
+        <h2>Maven Release 与 Enforcer</h2>
+        <div class="code">// ========== Maven Release 流程 ==========
+// 用于正式版本发布
+
+// 1. 安装 maven-release-plugin (默认已内置)
+// 2. 准备发布:
+mvn release:prepare
+//    - 检查无未提交的修改
+//    - 移除 -SNAPSHOT (1.0.0-SNAPSHOT → 1.0.0)
+//    - 更新 POM 版本
+//    - 创建 tag (git tag my-project-1.0.0)
+//    - 推进到下一个 SNAPSHOT (1.0.1-SNAPSHOT)
+
+// 3. 执行发布:
+mvn release:perform
+//    - 从 tag 签出代码
+//    - 执行 mvn deploy
+//    - 发布到 Nexus 私服
+
+// 4. 回滚:
+mvn release:rollback
+
+// ========== release 配置 ==========
+&lt;plugin&gt;
+    &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+    &lt;artifactId&gt;maven-release-plugin&lt;/artifactId&gt;
+    &lt;version&gt;3.0.1&lt;/version&gt;
+    &lt;configuration&gt;
+        &lt;tagNameFormat&gt;v{project.version}&lt;/tagNameFormat&gt;
+        &lt;autoVersionSubmodules&gt;true&lt;/autoVersionSubmodules&gt;
+        &lt;pushChanges&gt;false&lt;/pushChanges&gt;
+    &lt;/configuration&gt;
+&lt;/plugin&gt;
+
+// ========== Maven Enforcer ==========
+// 强制执行构建规则
+&lt;plugin&gt;
+    &lt;groupId&gt;org.apache.maven.plugins&lt;/groupId&gt;
+    &lt;artifactId&gt;maven-enforcer-plugin&lt;/artifactId&gt;
+    &lt;version&gt;3.4.1&lt;/version&gt;
+    &lt;executions&gt;
+        &lt;execution&gt;
+            &lt;id&gt;enforce-rules&lt;/id&gt;
+            &lt;goals&gt;&lt;goal&gt;enforce&lt;/goal&gt;&lt;/goals&gt;
+            &lt;configuration&gt;
+                &lt;rules&gt;
+                    &lt;!-- 最低 Maven 版本 --&gt;
+                    &lt;requireMavenVersion&gt;
+                        &lt;version&gt;3.8.0&lt;/version&gt;
+                    &lt;/requireMavenVersion&gt;
+                    &lt;!-- 最低 JDK 版本 --&gt;
+                    &lt;requireJavaVersion&gt;
+                        &lt;version&gt;17&lt;/version&gt;
+                    &lt;/requireJavaVersion&gt;
+                    &lt;!--禁止依赖冲突 --&gt;
+                    &lt;dependencyConvergence/&gt;
+                    &lt;!-- 禁止 SNAPSHOT 依赖 --&gt;
+                    &lt;requireReleaseDeps&gt;
+                        &lt;message&gt;正式发布不能依赖 SNAPSHOT 版本!&lt;/message&gt;
+                    &lt;/requireReleaseDeps&gt;
+                    &lt;!-- 环境属性 --&gt;
+                    &lt;requireEnvironmentVariable&gt;
+                        &lt;variableName&gt;NEXUS_PASSWORD&lt;/variableName&gt;
+                    &lt;/requireEnvironmentVariable&gt;
+                &lt;/rules&gt;
+            &lt;/configuration&gt;
+        &lt;/execution&gt;
+    &lt;/executions&gt;
+&lt;/plugin&gt;
+
+// ========== 最佳实践 ==========
+// 1. 统一 parent POM 管理所有版本
+// 2. 使用 ${project.version} 引用内部模块版本
+// 3. settings.xml 不要提交到 Git (含密码)
+// 4. 使用环境变量注入敏感信息
+// 5. SNAPSHOT 用于开发, release 用于发布
+// 6. 使用 enforcer 强制执行规范
+// 7. 多模块时使用 -pl 指定模块: mvn -pl my-core compile
+// 8. -am 同时构建依赖: mvn -pl my-web -am package</div>
+        <div class="note">💡 Maven 高级要点: 多模块父 POM packaging=pom + modules 聚合; dependencyManagement 统一版本, 子模块自动继承; BOM 通过 import scope 管理依赖版本; Nexus 私服 hosted/proxy/group; mvn deploy 发布; mvn release:prepare + release:perform 正式发布; enforcer 强制执行规则; 最佳实践: 统一版本管理、环境变量加密、SNAPSHOT 开发/Release 发布。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoMulti()">多模块项目</button>
+        <button onclick="demoBOM()">BOM 管理</button>
+        <button onclick="demoRelease()">发布流程</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoMulti() {
+            result.innerHTML = '';
+            log('# 多模块项目结构');
+            log('');
+            log('父 POM:');
+            log('   packaging = pom');
+            log('   &lt;modules&gt; 聚合子模块');
+            log('   &lt;dependencyManagement&gt; 统一版本');
+            log('');
+            log('子模块:');
+            log('   &lt;parent&gt; 指向父 POM');
+            log('   继承 groupId/version');
+            log('   无需指定版本 (由父 POM 管理)');
+            log('');
+            log('常用命令:');
+            log('  mvn -pl my-web compile     // 只编译 web 模块');
+            log('  mvn -pl my-web -am package // 连依赖一起打包');
+        }
+
+        function demoBOM() {
+            result.innerHTML = '';
+            log('# BOM 依赖管理');
+            log('');
+            log('BOM = Bill of Materials');
+            log('专门管理依赖版本的 POM 文件');
+            log('');
+            log('使用方法:');
+            log('  &lt;scope&gt;import&lt;/scope&gt; + &lt;type&gt;pom&lt;/type&gt;');
+            log('');
+            log('常用 BOM:');
+            log('  spring-boot-dependencies');
+            log('  spring-cloud-dependencies');
+            log('  jackson-bom');
+            log('  junit-bom');
+            log('');
+            log('好处: 统一版本, 避免冲突, 简化升级');
+        }
+
+        function demoRelease() {
+            result.innerHTML = '';
+            log('# Maven Release 流程');
+            log('');
+            log('1. mvn release:prepare');
+            log('   - 检查无未提交修改');
+            log('   - 1.0.0-SNAPSHOT → 1.0.0');
+            log('   - 创建 Git tag');
+            log('   - 推进到 1.0.1-SNAPSHOT');
+            log('');
+            log('2. mvn release:perform');
+            log('   - 从 tag 签出');
+            log('   - 执行 mvn deploy');
+            log('   - 发布到私服');
+            log('');
+            log('Enforcer 规则:');
+            log('  requireJavaVersion');
+            log('  dependencyConvergence');
+            log('  requireReleaseDeps');
+        }
+    </script>
+</body>
+</html>

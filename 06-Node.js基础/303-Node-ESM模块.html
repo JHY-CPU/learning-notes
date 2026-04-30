@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Node-ESM模块</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #esm2-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Node ESM 模块</h2><p>.mjs 扩展名、package.json type、import/export、与 CJS 交互。</p></div>
+    <div class="card">
+        <h2>Node.js 中的 ES 模块</h2>
+        <div class="code">// ========== 启用 ESM ==========
+// 方式 1: .mjs 扩展名
+// file.mjs → 始终是 ES module
+
+// 方式 2: package.json 设置
+// { "type": "module" }
+// .js 文件被视为 ES module
+
+// ========== package.json 配置 ==========
+// {
+//   "type": "module",          // .js → ESM
+//   "exports": {
+//     ".": "./index.js",
+//     "./utils": "./utils.js"
+//   },
+//   "main": "./index.js"       // CJS 兼容
+// }
+
+// ========== ESM 导入 ==========
+import fs from 'fs';                 // 默认导入
+import { readFile } from 'fs';       // 命名导入
+import path from 'node:path';        // node: 协议
+import { fileURLToPath } from 'url'; // URL 转换
+
+// ========== __dirname 替代 ==========
+// ESM 中没有 __dirname, __filename
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// ========== CJS 与 ESM 交互 ==========
+// ESM 可以 import CJS 模块
+import lodash from 'lodash'; // ✅ CJS → ESM
+
+// CJS 不能 require ESM 模块 (需动态 import)
+// const esm = await import('./esm-module.mjs');
+
+// ========== 顶级 await (ESM) ==========
+// ESM 支持顶级 await
+const data = await fetch('https://api.example.com/data');
+export default data;</div>
+        <div class="note">💡 ESM 是静态分析，支持 tree-shaking。<br>
+        ⚠️ CJS 和 ESM 行为不同，需注意兼容。<br>
+        💡 Node 默认是 CJS (.js → CJS) 除非设置 type: module。</div>
+    </div>
+    <div class="card">
+        <h2>演示：Node ESM</h2>
+        <button onclick="demoESM()">ESM 特性演示</button>
+        <button onclick="demoCJSESM()">CJS vs ESM</button>
+        <div id="esm2-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const esm2Result = document.getElementById('esm2-result');
+
+        function log(msg) {
+            esm2Result.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoESM() {
+            esm2Result.innerHTML = '';
+            log('📦 Node ESM 特性:');
+            log('');
+
+            log('1️⃣ 启用方式:');
+            log('   • .mjs 扩展名');
+            log('   • package.json: { "type": "module" }');
+            log('');
+
+            log('2️⃣ import.meta (当前模块信息):');
+            log(`   import.meta.url: 在浏览器中可用`);
+            log(`   当前 URL: ${import.meta?.url || '浏览器不支持 import.meta'}`);
+            try {
+                log(`   import.meta.resolve: ${typeof import.meta?.resolve}`);
+            } catch (e) {
+                log('   import.meta: 仅在 module script 中可用');
+            }
+            log('');
+
+            log('3️⃣ 顶级 await (Top-level await):');
+            log('   • ESM 中可以直接 await');
+            log('   • CJS 中必须在 async 函数内');
+            log('   • 简化异步初始化代码');
+            log('');
+
+            log('4️⃣ ESM 导入 CJS:');
+            log('   • ESM 可以 import CJS 模块');
+            log('   • 获取默认导出或命名导出');
+            log('   • Node 自动处理兼容');
+            log('');
+
+            log('🚫 注意: 当前文件通过 script 标签加载');
+            log('  ESM 特性需要在 Node.js 或 module script 中运行');
+        }
+
+        function demoCJSESM() {
+            esm2Result.innerHTML = '';
+            log('⚖️ CJS vs ESM 对比:');
+            log('');
+
+            const comparisons = [
+                {
+                    feature: '模块系统',
+                    cjs: 'require() / module.exports',
+                    esm: 'import / export'
+                },
+                {
+                    feature: '加载方式',
+                    cjs: '同步 (同步 I/O)',
+                    esm: '异步 (静态分析)'
+                },
+                {
+                    feature: '文件扩展',
+                    cjs: '.js (默认) / .cjs',
+                    esm: '.mjs / .js (type: module)'
+                },
+                {
+                    feature: 'Tree-shaking',
+                    cjs: '❌ 不支持',
+                    esm: '✅ 静态分析支持'
+                },
+                {
+                    feature: '顶级 await',
+                    cjs: '❌ 不支持',
+                    esm: '✅ 支持'
+                },
+                {
+                    feature: '__dirname',
+                    cjs: '✅ 有',
+                    esm: '❌ 需 import.meta.url 转换'
+                },
+                {
+                    feature: '循环依赖',
+                    cjs: '⚠️ 部分支持',
+                    esm: '✅ 更好支持'
+                },
+                {
+                    feature: '动态导入',
+                    cjs: 'N/A (同步)',
+                    esm: 'import() 返回 Promise'
+                },
+            ];
+
+            log('特性对比表:');
+            comparisons.forEach(({ feature, cjs, esm }) => {
+                log(`   ${feature}:`);
+                log(`     CJS: ${cjs}`);
+                log(`     ESM: ${esm}`);
+                log('');
+            });
+
+            log('📌 推荐: 新项目使用 ESM');
+            log('📌 兼容: Node 支持两种模块系统共存');
+        }
+
+        console.log('=== Node ESM 模块 ===');
+
+        document.getElementById('output').textContent =
+            `Node ESM: .mjs / type:module / import/export / import.meta\n` +
+            `CJS vs ESM: 加载方式 / tree-shaking / 顶级 await / 兼容\n` +
+            `✅ Node ESM 模块演示完成！`;
+    </script>
+</body>
+</html>

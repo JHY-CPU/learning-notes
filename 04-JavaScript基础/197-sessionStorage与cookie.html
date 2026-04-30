@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>sessionStorage与cookie</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #8e44ad; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        input { padding: 8px 12px; border: 2px solid #ddd; border-radius: 4px; font-size: 14px; margin: 5px; width: 200px; }
+        input:focus { outline: none; border-color: #3498db; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        button.danger { background: #e74c3c; }
+        button.secondary { background: #95a5a6; }
+        .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 4px 15px; font-size: 13px; }
+        .info-grid .key { color: #7f8c8d; font-weight: bold; }
+        #session-list, #cookie-list { background: #f8f9fa; padding: 15px; border-radius: 4px; min-height: 40px; font-size: 13px; }
+        #session-list .entry, #cookie-list .entry { padding: 3px 0; border-bottom: 1px solid #eee; word-break: break-all; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>sessionStorage 与 Cookie</h2><p>会话存储（标签页关闭即失）和 Cookie（HTTP 自动携带）。</p></div>
+    <div class="card">
+        <h2>sessionStorage</h2>
+        <div class="code">// sessionStorage — 会话级存储
+// 和 localStorage 的 API 完全相同
+// 区别：标签页关闭后数据自动清除
+
+// 基本操作（同 localStorage）
+sessionStorage.setItem('key', 'value');
+sessionStorage.getItem('key');
+sessionStorage.removeItem('key');
+sessionStorage.clear();
+sessionStorage.length;
+sessionStorage.key(0);
+
+// ⚠️ 生命周期：标签页关闭即删除
+// ⚠️ 不同标签页之间不共享（即使是同一站点）
+// ⚠️ 页面刷新不会清除数据
+
+// 使用场景：
+// 1. 表单临时数据（防止刷新丢失）
+// 2. 一次性登录 token
+// 3. 多步骤表单的中间状态
+// 4. 页面间临时数据传递</div>
+    </div>
+    <div class="card">
+        <h2>Cookie</h2>
+        <div class="code">// Cookie — 服务器存储在浏览器的小数据（<4KB）
+// 每次 HTTP 请求会自动携带 Cookie
+
+// 读取所有 Cookie（返回字符串）
+document.cookie;  // 'key1=value1; key2=value2'
+
+// 设置 Cookie
+document.cookie = 'username=Alice';
+document.cookie = 'theme=dark';
+
+// 设置过期时间
+document.cookie = 'token=abc123; max-age=3600';  // 1小时后过期
+document.cookie = 'session=xyz; expires=' + new Date('2025-12-31').toUTCString();
+
+// 设置路径
+document.cookie = 'lang=zh-CN; path=/';
+
+// 设置域名
+document.cookie = 'site=example; domain=.example.com';
+
+// 安全标志
+document.cookie = 'secureToken=xxx; secure';           // 仅 HTTPS
+document.cookie = 'httpOnlyToken=yyy; httponly';       // JS 不可读（服务器设置）
+document.cookie = 'sameSiteToken=zzz; samesite=strict'; // SameSite
+
+// 删除 Cookie（设置过期时间为过去）
+document.cookie = 'username=; max-age=0';
+
+// ⚠️ Cookie 大小限制约 4KB
+// ⚠️ 每个域名 Cookie 数量有限（约 50 个）
+// ⚠️ 每次请求都会携带，影响性能
+
+// Cookie vs localStorage：
+// Cookie: 自动携带，适合登录态
+// localStorage: 不自动携带，适合大量数据</div>
+    </div>
+    <div class="card">
+        <h2>三种存储对比</h2>
+        <div class="code">// | 特性         | localStorage | sessionStorage | Cookie          |
+// |--------------|-------------|----------------|-----------------|
+// | 生命周期     | 永不过期    | 标签关闭即删    | 可设置过期时间   |
+// | 大小限制     | ~5MB        | ~5MB           | ~4KB            |
+// | 是否自动发送 | ❌          | ❌             | ✅（HTTP 请求）  |
+// | API 易用性   | ✅ 简洁     | ✅ 简洁         | ❌ 原始字符串    |
+// | 同源共享     | ✅ 同源共享 | ❌ 仅当前标签   | ✅ 同源配置     |
+// | 作用域       | 同源        | 当前标签       | path/domain    |
+
+// 选择建议：
+// 大量数据 → localStorage
+// 临时数据 → sessionStorage
+// 登录态/服务器需要的数据 → Cookie</div>
+    </div>
+    <div class="card">
+        <h2>sessionStorage 演示</h2>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px;">
+                <input type="text" id="session-key" placeholder="键"><br>
+                <input type="text" id="session-value" placeholder="值"><br>
+                <button onclick="sessionSave()">保存</button>
+                <button onclick="sessionLoad()">读取</button>
+                <button onclick="sessionRemove()" class="secondary">删除</button>
+                <button onclick="sessionClear()" class="danger">清空所有</button>
+            </div>
+            <div style="flex:1;min-width:200px;">
+                <strong>sessionStorage 内容</strong>
+                <div id="session-list"></div>
+            </div>
+        </div>
+    </div>
+    <div class="card">
+        <h2>Cookie 演示</h2>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:200px;">
+                <input type="text" id="cookie-key" placeholder="Cookie 键"><br>
+                <input type="text" id="cookie-value" placeholder="Cookie 值"><br>
+                <button onclick="cookieSet()">设置 Cookie</button>
+                <button onclick="cookieGet()">读取所有</button>
+                <button onclick="cookieDelete()" class="danger">删除 Cookie</button>
+            </div>
+            <div style="flex:1;min-width:200px;">
+                <strong>当前 Cookie</strong>
+                <div id="cookie-list"></div>
+            </div>
+        </div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const output = document.getElementById('output');
+
+        console.log('=== sessionStorage ===');
+        sessionStorage.setItem('demo', 'session 数据');
+        console.log('sessionStorage demo:', sessionStorage.getItem('demo'));
+        console.log('sessionStorage length:', sessionStorage.length);
+
+        console.log('=== Cookie ===');
+        // 读取所有 cookie
+        console.log('document.cookie:', document.cookie);
+
+        function refreshSessionList() {
+            const list = document.getElementById('session-list');
+            const len = sessionStorage.length;
+            if (len === 0) {
+                list.innerHTML = '<div style="color:#95a5a6;">（空）</div>';
+                return;
+            }
+            let html = '';
+            for (let i = 0; i < len; i++) {
+                const key = sessionStorage.key(i);
+                const val = sessionStorage.getItem(key);
+                html += `<div class="entry"><strong>${key}</strong> = ${val?.substring(0, 30)}</div>`;
+            }
+            list.innerHTML = html;
+        }
+
+        function refreshCookieList() {
+            const list = document.getElementById('cookie-list');
+            if (!document.cookie) {
+                list.innerHTML = '<div style="color:#95a5a6;">（空）</div>';
+                return;
+            }
+            const cookies = document.cookie.split(';').map(c => c.trim()).filter(Boolean);
+            let html = '';
+            cookies.forEach(c => {
+                const [key, ...vals] = c.split('=');
+                html += `<div class="entry"><strong>${key}</strong> = ${vals.join('=').substring(0, 30)}</div>`;
+            });
+            list.innerHTML = html;
+        }
+
+        // sessionStorage 操作
+        function sessionSave() {
+            const key = document.getElementById('session-key').value.trim();
+            const val = document.getElementById('session-value').value.trim();
+            if (!key) { output.textContent = '请输入键名'; return; }
+            sessionStorage.setItem(key, val);
+            output.textContent = `已保存 session: ${key} = ${val}`;
+            refreshSessionList();
+            console.log(`session save: ${key}=${val}`);
+        }
+
+        function sessionLoad() {
+            const key = document.getElementById('session-key').value.trim();
+            if (!key) { output.textContent = '请输入键名'; return; }
+            const val = sessionStorage.getItem(key);
+            output.textContent = val !== null
+                ? `读取 ${key} = ${val}`
+                : `未找到: ${key}`;
+        }
+
+        function sessionRemove() {
+            const key = document.getElementById('session-key').value.trim();
+            if (!key) { output.textContent = '请输入键名'; return; }
+            sessionStorage.removeItem(key);
+            output.textContent = `已删除 session: ${key}`;
+            refreshSessionList();
+        }
+
+        function sessionClear() {
+            sessionStorage.clear();
+            output.textContent = 'sessionStorage 已清空';
+            refreshSessionList();
+        }
+
+        // Cookie 操作
+        function cookieSet() {
+            const key = document.getElementById('cookie-key').value.trim();
+            const val = document.getElementById('cookie-value').value.trim();
+            if (!key) { output.textContent = '请输入键名'; return; }
+            document.cookie = `${encodeURIComponent(key)}=${encodeURIComponent(val)}; path=/`;
+            output.textContent = `Cookie 已设置: ${key} = ${val}`;
+            refreshCookieList();
+            console.log(`cookie set: ${key}=${val}`);
+        }
+
+        function cookieGet() {
+            const list = document.getElementById('cookie-list');
+            const cookies = document.cookie || '(无)';
+            output.textContent = `Cookie: ${cookies}`;
+            refreshCookieList();
+            console.log('当前 cookies:', document.cookie);
+        }
+
+        function cookieDelete() {
+            const key = document.getElementById('cookie-key').value.trim();
+            if (!key) { output.textContent = '请输入键名'; return; }
+            document.cookie = `${encodeURIComponent(key)}=; max-age=0; path=/`;
+            output.textContent = `Cookie 已删除: ${key}`;
+            refreshCookieList();
+        }
+
+        // 初始显示
+        refreshSessionList();
+        refreshCookieList();
+        console.log('=== 三种存储对比 ===');
+        console.log('localStorage: 同源共享，永不过期');
+        console.log('sessionStorage: 当前标签，关闭即失');
+        console.log('Cookie: 自动携带，大小 4KB 限制');
+
+        document.getElementById('output').textContent += '\n✅ sessionStorage 与 Cookie 演示完成！';
+    </script>
+</body>
+</html>

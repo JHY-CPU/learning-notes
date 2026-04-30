@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>项目实战 FastAPI + MongoDB</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>📦 项目实战 2: FastAPI + MongoDB</h2><p>FastAPI 项目结构、Beanie ODM 模型、异步 CRUD 端点、Pydantic 验证、Docker Compose 开发环境。</p></div>
+    <div class="card">
+        <h2>项目结构</h2>
+        <div class="code"># fastapi-mongo/
+# ├── app/
+# │   ├── __init__.py
+# │   ├── main.py             # FastAPI 入口
+# │   ├── config.py           # 配置
+# │   ├── models/             # Beanie 文档模型
+# │   │   ├── __init__.py
+# │   │   ├── user.py
+# │   │   └── product.py
+# │   ├── schemas/            # Pydantic 模型
+# │   │   ├── __init__.py
+# │   │   ├── user.py
+# │   │   └── product.py
+# │   ├── routers/            # 路由
+# │   │   ├── __init__.py
+# │   │   ├── users.py
+# │   │   └── products.py
+# │   ├── services/           # 业务逻辑
+# │   │   ├── __init__.py
+# │   │   ├── user_service.py
+# │   │   └── product_service.py
+# │   └── dependencies.py     # 依赖注入
+# ├── tests/
+# ├── Dockerfile
+# ├── docker-compose.yml
+# └── requirements.txt
+
+# ========== 配置 ==========
+# config.py
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    mongodb_url: str = "mongodb://localhost:27017"
+    database_name: str = "fastapi_mongo"
+    secret_key: str = "dev-secret"
+    jwt_expires_in: int = 900  # 15分钟
+
+    class Config:
+        env_file = ".env"
+
+settings = Settings()
+
+# ========== Beanie ODM 模型 ==========
+# models/product.py
+from beanie import Document, Indexed
+from datetime import datetime
+from typing import Optional
+
+class Product(Document):
+    name: str
+    description: str
+    price: float
+    category: str
+    tags: list[str] = []
+    stock: int = 0
+    created_at: datetime = datetime.now()
+    updated_at: Optional[datetime] = None
+
+    class Settings:
+        name = "products"  # collection 名
+        indexes = [
+            "category",
+            [("price", 1)],  # 升序索引
+            [("name", "text"), ("description", "text")],  # 全文搜索
+        ]</div>
+    </div>
+    <div class="card">
+        <h2>Pydantic Schema 与路由</h2>
+        <div class="code"># ========== Pydantic Schema ==========
+# schemas/product.py
+from pydantic import BaseModel, Field
+from typing import Optional
+from datetime import datetime
+
+class ProductCreate(BaseModel):
+    name: str = Field(..., min_length=1, max_length=200)
+    description: str = Field("", max_length=2000)
+    price: float = Field(..., gt=0)
+    category: str = Field(..., min_length=1)
+    tags: list[str] = []
+    stock: int = Field(0, ge=0)
+
+class ProductUpdate(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = None
+    price: Optional[float] = Field(None, gt=0)
+    category: Optional[str] = None
+    tags: Optional[list[str]] = None
+    stock: Optional[int] = Field(None, ge=0)
+
+class ProductResponse(BaseModel):
+    id: str
+    name: str
+    description: str
+    price: float
+    category: str
+    tags: list[str]
+    stock: int
+    created_at: datetime
+    updated_at: Optional[datetime]
+
+# ========== 路由 ==========
+# routers/products.py
+from fastapi import APIRouter, HTTPException, status
+from app.models.product import Product
+from app.schemas.product import ProductCreate, ProductUpdate, ProductResponse
+
+router = APIRouter(prefix="/products", tags=["products"])
+
+@router.get("/", response_model=list[ProductResponse])
+async def list_products(
+    category: str | None = None,
+    skip: int = 0,
+    limit: int = 20,
+):
+    query = Product.find()
+    if category:
+        query = query.where(Product.category == category)
+
+    products = await query.sort(-Product.created_at).skip(skip).limit(limit).to_list()
+    return products
+
+@router.get("/{product_id}", response_model=ProductResponse)
+async def get_product(product_id: str):
+    product = await Product.get(product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    return product
+
+@router.post("/", response_model=ProductResponse, status_code=201)
+async def create_product(data: ProductCreate):
+    product = Product(**data.model_dump())
+    await product.insert()
+    return product
+
+@router.put("/{product_id}", response_model=ProductResponse)
+async def update_product(product_id: str, data: ProductUpdate):
+    product = await Product.get(product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+
+    update_data = data.model_dump(exclude_unset=True)
+    if update_data:
+        update_data["updated_at"] = datetime.now()
+        await product.set(update_data)
+
+    return product
+
+@router.delete("/{product_id}", status_code=204)
+async def delete_product(product_id: str):
+    product = await Product.get(product_id)
+    if not product:
+        raise HTTPException(status_code=404, detail="Product not found")
+    await product.delete()</div>
+    </div>
+    <div class="card">
+        <h2>应用入口与 Docker</h2>
+        <div class="code"># ========== 应用入口 ==========
+# main.py
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from beanie import init_beanie
+from motor.motor_asyncio import AsyncIOMotorClient
+
+from app.config import settings
+from app.models.product import Product
+from app.models.user import User
+from app.routers import products, users
+
+app = FastAPI(
+    title="FastAPI MongoDB API",
+    description="Product & User management API",
+    version="1.0.0",
+)
+
+# CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 路由
+app.include_router(products.router, prefix="/api/v1")
+app.include_router(users.router, prefix="/api/v1")
+
+@app.on_event("startup")
+async def startup():
+    client = AsyncIOMotorClient(settings.mongodb_url)
+    await init_beanie(
+        database=client[settings.database_name],
+        document_models=[Product, User],
+    )
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+# ========== Docker Compose ==========
+# docker-compose.yml:
+# version: '3.8'
+# services:
+#   api:
+#     build: .
+#     ports:
+#       - "8000:8000"
+#     environment:
+#       MONGODB_URL: mongodb://mongo:27017
+#     depends_on:
+#       mongo:
+#         condition: service_healthy
+#
+#   mongo:
+#     image: mongo:7
+#     volumes:
+#       - mongodata:/data/db
+#     healthcheck:
+#       test: echo 'db.runCommand("ping").ok' | mongosh
+#       interval: 10s
+#       retries: 5
+#
+# volumes:
+#   mongodata:
+
+# ========== Requirements ==========
+# requirements.txt:
+# fastapi==0.109.0
+# uvicorn[standard]==0.27.0
+# beanie==1.23.0
+# pydantic-settings==2.1.0
+# python-multipart==0.0.6
+# bcrypt==4.1.2
+# pyjwt==2.8.0
+
+# 启动:
+# uvicorn app.main:app --reload --host 0.0.0.0 --port 8000</div>
+        <div class="note">💡 FastAPI + MongoDB 项目要点: Beanie ODM 异步驱动; Pydantic 请求/响应验证; FastAPI 自动生成 Swagger 文档; Motor + Beanie 异步 MongoDB; Docker Compose 编排; 索引优化查询; 类型提示自动验证。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoFastAPI()">FastAPI 项目</button>
+        <button onclick="demoBeanie()">Beanie ODM</button>
+        <button onclick="demoDocker()">Docker 环境</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoFastAPI() {
+            result.innerHTML = '';
+            log('# FastAPI + MongoDB 项目');
+            log('');
+            log('特点:');
+            log('  自动生成 OpenAPI 文档');
+            log('  类型提示 → 自动验证');
+            log('  异步原生支持');
+            log('');
+            log('目录:');
+            log('  models/  Beanie 文档模型');
+            log('  schemas/ Pydantic 验证');
+            log('  routers/ 路由');
+            log('  services/ 业务逻辑');
+        }
+
+        function demoBeanie() {
+            result.innerHTML = '';
+            log('# Beanie ODM');
+            log('');
+            log('特点:');
+            log('  异步 MongoDB ODM');
+            log('  基于 Pydantic');
+            log('  自动索引管理');
+            log('');
+            log('常用操作:');
+            log('  Product.insert()');
+            log('  Product.get(id)');
+            log('  Product.find().sort().limit()');
+            log('  product.set({field: val})');
+            log('  product.delete()');
+        }
+
+        function demoDocker() {
+            result.innerHTML = '';
+            log('# Docker Compose 环境');
+            log('');
+            log('服务:');
+            log('  api: FastAPI 应用');
+            log('  mongo: MongoDB 7');
+            log('');
+            log('启动:');
+            log('  docker-compose up -d');
+            log('  http://localhost:8000/docs');
+            log('  http://localhost:8000/redoc');
+            log('');
+            log('健康检查:');
+            log('  mongo: db.runCommand("ping")');
+            log('  api: GET /health');
+        }
+    </script>
+</body>
+</html>

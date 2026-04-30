@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大文件下载</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        .progress { width: 100%; height: 8px; background: #ecf0f1; border-radius: 4px; overflow: hidden; margin: 8px 0; }
+        .progress .fill { height: 100%; background: linear-gradient(90deg, #3498db, #2ecc71); border-radius: 4px; width: 0; transition: width 0.2s; }
+        .download-card { background: #f8f9fa; border-radius: 8px; padding: 16px; margin: 10px 0; max-width: 400px; }
+        .download-card .row { display: flex; justify-content: space-between; font-size: 13px; padding: 4px 0; }
+        .download-card .label { color: #7f8c8d; }
+        .download-card .value { color: #2c3e50; font-weight: 500; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>大文件下载</h2><p>fetch Stream 下载、Content-Length、进度监听、断点续传(Range)。</p></div>
+    <div class="card">
+        <h2>大文件下载 API</h2>
+        <div class="code">// ========== fetch Stream 下载 ==========
+const response = await fetch(url);
+const reader = response.body.getReader();
+const contentLength = +response.headers.get('Content-Length');
+
+// ========== 进度监听 ==========
+let received = 0;
+while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    received += value.length;
+    const pct = (received / contentLength) * 100;
+}
+
+// ========== 断点续传 (Range) ==========
+fetch(url, {
+    headers: { 'Range': 'bytes=1000-' }  // 从 1000 字节开始
+});
+// Response: 206 Partial Content
+// headers: Content-Range: bytes 1000-1999/2000
+
+// ========== 保存文件 ==========
+const blob = new Blob(chunks);
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = 'file.zip';
+a.click();</div>
+    </div>
+    <div class="card">
+        <h2>演示：大文件下载</h2>
+        <button onclick="demoStream()">流式下载</button>
+        <button onclick="demoProgress()">下载进度</button>
+        <button onclick="demoRange()">断点续传</button>
+        <button onclick="demoSave()">文件保存</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <div id="download-demo"></div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        const downloadDemo = document.getElementById('download-demo');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+        function clearDemo() { downloadDemo.innerHTML = ''; }
+
+        function formatSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function demoStream() {
+            clearDemo();
+            result.innerHTML = '';
+            log('🌊 流式下载 (Stream):');
+            log('');
+
+            log('1️⃣ fetch Stream API:');
+            log('   const response = await fetch(url);');
+            log('   const reader = response.body.getReader();');
+            log('   const decoder = new TextDecoder();');
+            log('');
+            log('   while (true) {');
+            log('     const { done, value } = await reader.read();');
+            log('     if (done) break;');
+            log('     const text = decoder.decode(value, { stream: true });');
+            log('     // 处理数据块...');
+            log('   }');
+            log('');
+
+            log('2️⃣ 流式下载的优势:');
+            log('   • 边下边处理 (不占内存)');
+            log('   • 实时进度反馈');
+            log('   • 适合大文件 (1GB+)');
+            log('   • 可中断和恢复');
+            log('');
+
+            // Simulated stream
+            const totalSize = 200 * 1024 * 1024; // 200MB
+            const chunkSize = 64 * 1024; // 64KB
+
+            log('3️⃣ 下载参数:');
+            log(`   文件大小: ${formatSize(totalSize)}`);
+            log(`   数据块大小: ${formatSize(chunkSize)}`);
+            log(`   总块数: ${Math.ceil(totalSize / chunkSize)}`);
+            log('');
+
+            log('4️⃣ 响应头:');
+            log('   HTTP/1.1 200 OK');
+            log('   Content-Type: application/octet-stream');
+            log('   Content-Length: 209715200');
+            log('   Content-Disposition: attachment; filename="large-file.zip"');
+            log('   Accept-Ranges: bytes');
+            log('');
+
+            log('5️⃣ 内存管理:');
+            log('   // 使用数组收集数据块');
+            log('   const chunks = [];');
+            log('   while (...) {');
+            log('     chunks.push(value);');
+            log('   }');
+            log('   // 最后合并');
+            log('   const blob = new Blob(chunks, { type: "application/zip" });');
+            log('   // 释放 URL');
+            log('   URL.revokeObjectURL(url);');
+        }
+
+        function demoProgress() {
+            clearDemo();
+            result.innerHTML = '';
+            log('📊 下载进度:');
+            log('');
+
+            log('1️⃣ 进度监听实现:');
+            log('   async function downloadWithProgress(url) {');
+            log('     const response = await fetch(url);');
+            log('     const contentLength = response.headers.get("Content-Length");');
+            log('     const total = parseInt(contentLength, 10);');
+            log('     const reader = response.body.getReader();');
+            log('     let received = 0;');
+            log('');
+            log('     while (true) {');
+            log('       const { done, value } = await reader.read();');
+            log('       if (done) break;');
+            log('       received += value.length;');
+            log('       const pct = Math.round((received / total) * 100);');
+            log('       onProgress(pct, received, total);');
+            log('     }');
+            log('   }');
+            log('');
+
+            // Live progress simulation
+            const totalSize = 500 * 1024 * 1024; // 500MB
+            let received = 0;
+            const speed = 2 * 1024 * 1024; // 2MB per tick
+
+            const card = document.createElement('div');
+            card.className = 'download-card';
+            card.innerHTML = `
+                <div class="row"><span class="label">文件</span><span class="value">ubuntu-24.04-desktop.iso</span></div>
+                <div class="row"><span class="label">大小</span><span class="value">${formatSize(totalSize)}</span></div>
+                <div class="progress"><div class="fill" id="dlFill"></div></div>
+                <div class="row"><span class="label" id="dlStatus">准备下载...</span><span class="value" id="dlPct">0%</span></div>
+            `;
+            downloadDemo.appendChild(card);
+
+            const interval = setInterval(() => {
+                received += speed;
+                if (received >= totalSize) {
+                    received = totalSize;
+                    clearInterval(interval);
+                    document.getElementById('dlStatus').textContent = '✅ 下载完成';
+                } else {
+                    document.getElementById('dlStatus').textContent = `⬇️ ${formatSize(speed)}/s`;
+                }
+                const pct = Math.round((received / totalSize) * 100);
+                document.getElementById('dlFill').style.width = pct + '%';
+                document.getElementById('dlPct').textContent = `${pct}% - ${formatSize(received)}`;
+            }, 100);
+
+            log('2️⃣ 下载信息面板 (上方):');
+            log('   实时显示下载速度、进度百分比');
+            log('');
+
+            log('3️⃣ 速率计算:');
+            log('   // 计算下载速度 (每秒)');
+            log('   let lastLoaded = 0;');
+            log('   let lastTime = Date.now();');
+            log('   function onProgress(received) {');
+            log('     const now = Date.now();');
+            log('     const elapsed = (now - lastTime) / 1000;');
+            log('     const delta = received - lastLoaded;');
+            log('     const speed = delta / elapsed;  // bytes/s');
+            log('     lastLoaded = received;');
+            log('     lastTime = now;');
+            log('   }');
+            log('');
+
+            log('4️⃣ 预估剩余时间 (ETA):');
+            log('   const remaining = total - received;');
+            log('   const eta = remaining / speed;  // 秒');
+        }
+
+        function demoRange() {
+            clearDemo();
+            result.innerHTML = '';
+            log('🔄 断点续传 (Range):');
+            log('');
+
+            log('1️⃣ HTTP Range 请求:');
+            log('   // 请求部分内容');
+            log('   fetch(url, {');
+            log('     headers: { "Range": "bytes=0-999999" }');
+            log('   });');
+            log('');
+            log('   // 成功: HTTP 206 Partial Content');
+            log('   // Content-Range: bytes 0-999999/10000000');
+            log('   // Content-Length: 1000000');
+            log('');
+
+            log('2️⃣ Range 语法:');
+            log('   bytes=0-            — 从 0 到末尾');
+            log('   bytes=1000-1999     — 指定范围 (1000-1999)');
+            log('   bytes=0-999,2000-2999 — 多段范围');
+            log('   bytes=-999          — 最后 999 字节');
+            log('');
+
+            log('3️⃣ 断点续传实现:');
+            log('   async function downloadResume(url, savePath) {');
+            log('     let downloadedSize = getLocalSize(savePath);');
+            log('     const headers = downloadedSize > 0');
+            log('       ? { "Range": \`bytes=\${downloadedSize}-\` }');
+            log('       : {};');
+            log('');
+            log('     const res = await fetch(url, { headers });');
+            log('     const reader = res.body.getReader();');
+            log('     // 追加写入本地文件');
+            log('     while (true) {');
+            log('       const { done, value } = await reader.read();');
+            log('       if (done) break;');
+            log('       appendToFile(savePath, value);');
+            log('     }');
+            log('   }');
+            log('');
+
+            log('4️⃣ 服务器要求:');
+            log('   • 支持 Accept-Ranges: bytes');
+            log('   • 响应 206 Partial Content');
+            log('   • 提供 Content-Range 头');
+            log('');
+
+            log('5️⃣ 多线程分片下载:');
+            log('   // 类似 IDM/NDM 的加速方式');
+            log('   const workers = 4;');
+            log('   const partSize = Math.ceil(fileSize / workers);');
+            log('   const tasks = [];');
+            log('   for (let i = 0; i < workers; i++) {');
+            log('     const start = i * partSize;');
+            log('     const end = Math.min(start + partSize - 1, fileSize - 1);');
+            log('     tasks.push(downloadChunk(url, start, end));');
+            log('   }');
+            log('   const chunks = await Promise.all(tasks);');
+            log('   // 合并所有分片');
+            log('');
+
+            // Visual range request
+            const totalC = 100;
+            const doneC = 37;
+            const grid = document.createElement('div');
+            grid.className = 'chunk-grid';
+            for (let i = 0; i < totalC; i++) {
+                const div = document.createElement('div');
+                div.className = 'chunk ' + (i < doneC ? 'done' : 'pending');
+                div.textContent = i < doneC ? '✓' : (i + 1);
+                div.style.width = '24px';
+                div.style.height = '24px';
+                div.style.fontSize = '8px';
+                grid.appendChild(div);
+            }
+            downloadDemo.appendChild(grid);
+            const info = document.createElement('div');
+            info.style.cssText = 'font-size:12px;color:#7f8c8d;';
+            info.textContent = `🔄 已下载 ${doneC}%, Range: bytes=${doneC}- 请求剩余部分`;
+            downloadDemo.appendChild(info);
+        }
+
+        function demoSave() {
+            clearDemo();
+            result.innerHTML = '';
+            log('💾 文件保存:');
+            log('');
+
+            log('1️⃣ Blob + ObjectURL 保存:');
+            log('   const blob = new Blob([data], { type: "application/zip" });');
+            log('   const url = URL.createObjectURL(blob);');
+            log('   const a = document.createElement("a");');
+            log('   a.href = url;');
+            log('   a.download = "file.zip";');
+            log('   a.click();');
+            log('   URL.revokeObjectURL(url);  // 释放内存');
+            log('');
+
+            log('2️⃣ 指定 MIME 类型:');
+            log('   application/zip         — ZIP 压缩包');
+            log('   application/pdf         — PDF 文档');
+            log('   image/png               — PNG 图片');
+            log('   video/mp4               — MP4 视频');
+            log('   text/plain;charset=utf-8 — 文本文件');
+            log('');
+
+            log('3️⃣ 大文件下载注意事项:');
+            log('   • 使用流式写入 (File System Access API)');
+            log('   • 避免一次性放入内存');
+            log('   • 使用 showSaveFilePicker 选择保存位置');
+            log('');
+
+            log('4️⃣ File System Access API:');
+            log('   async function saveFile(blob) {');
+            log('     const handle = await window.showSaveFilePicker({');
+            log('       suggestedName: "download.zip",');
+            log('       types: [{');
+            log('         description: "Archive",');
+            log('         accept: { "application/zip": [".zip"] }');
+            log('       }]');
+            log('     });');
+            log('     const writable = await handle.createWritable();');
+            log('     await writable.write(blob);');
+            log('     await writable.close();');
+            log('   }');
+            log('');
+
+            log('5️⃣ 浏览器下载 vs 流式写入:');
+            log('   ┌────────────┬──────────────┬──────────────┐');
+            log('   │            │  Blob URL    │ File System  │');
+            log('   ├────────────┼──────────────┼──────────────┤');
+            log('   │ 内存占用   │ 高 (全量)    │ 低 (流式)    │');
+            log('   │ 兼容性     │ 全浏览器     │ Chromium 系  │');
+            log('   │ 大文件     │ 不适合       │ 适合         │');
+            log('   │ 进度支持   │ 无           │ 有           │');
+            log('   └────────────┴──────────────┴──────────────┘');
+        }
+
+        console.log('=== 大文件下载 ===');
+        document.getElementById('output').textContent =
+            `大文件下载: fetch Stream / 进度监听 / Range断点续传 / 文件保存\n` +
+            `✅ 大文件下载演示完成！`;
+    </script>
+</body>
+</html>

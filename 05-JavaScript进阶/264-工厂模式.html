@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>工厂模式</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        .product-card { display: inline-block; background: #f8f9fa; border-radius: 8px; padding: 15px; margin: 8px; text-align: center; border: 2px solid #ddd; min-width: 120px; }
+        .product-card h4 { margin: 0 0 5px 0; color: #2c3e50; }
+        .product-card .price { font-size: 20px; font-weight: bold; color: #e74c3c; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>工厂模式 Factory Pattern</h2><p>将对象创建逻辑封装在工厂中，客户端无需关心具体类名和构造细节。分为简单工厂、工厂方法、抽象工厂三种。</p></div>
+    <div class="card"><h2>简单工厂</h2><p>通过一个工厂函数根据参数创建不同类型的对象。适合产品种类较少、变化不频繁的场景。</p></div>
+    <div class="card"><h2>工厂方法</h2><p>将对象创建延迟到子类。父类定义接口，子类决定实例化哪个类。符合开闭原则。</p></div>
+    <div class="card"><h2>抽象工厂</h2><p>创建一组相关或依赖的产品家族。适用于需要保证产品兼容性的场景（如 UI 主题系统）。</p></div>
+    <div class="card" id="demo-area"><h2>在线演示：产品工厂</h2><p>
+        <button onclick="demoSimpleFactory()">简单工厂</button>
+        <button onclick="demoFactoryMethod()">工厂方法</button>
+        <button onclick="demoAbstractFactory()">抽象工厂</button>
+    </p><div id="factory-output" style="margin-top:10px;"></div></div>
+    <pre id="output"></pre>
+    <script>
+        // ========== 1. 简单工厂 ==========
+        // 产品类
+        class Car { constructor(name) { this.name = name; this.type = '汽车'; } drive() { return `${this.name} 在行驶`; } }
+        class Truck { constructor(name) { this.name = name; this.type = '卡车'; } drive() { return `${this.name} 在运输货物`; } }
+        class Motorcycle { constructor(name) { this.name = name; this.type = '摩托车'; } drive() { return `${this.name} 在飞驰`; } }
+
+        // 简单工厂
+        class VehicleFactory {
+            static create(type, name) {
+                switch (type) {
+                    case 'car': return new Car(name);
+                    case 'truck': return new Truck(name);
+                    case 'motorcycle': return new Motorcycle(name);
+                    default: throw new Error(`未知车型: ${type}`);
+                }
+            }
+        }
+
+        // ========== 2. 工厂方法 ==========
+        // 抽象产品
+        class Button {
+            render() { return '<button>按钮</button>'; }
+        }
+
+        class DarkButton extends Button {
+            render() { return '<button style="background:#333;color:#fff;border:1px solid #555;">暗色按钮</button>'; }
+        }
+
+        class LightButton extends Button {
+            render() { return '<button style="background:#f0f0f0;color:#333;border:1px solid #ccc;">亮色按钮</button>'; }
+        }
+
+        // 抽象工厂（工厂方法模式）
+        class Dialog {
+            createButton() { throw new Error('子类必须实现 createButton'); }
+            render() {
+                const btn = this.createButton();
+                return `对话框: ${btn.render()}`;
+            }
+        }
+
+        class DarkDialog extends Dialog {
+            createButton() { return new DarkButton(); }
+        }
+
+        class LightDialog extends Dialog {
+            createButton() { return new LightButton(); }
+        }
+
+        // ========== 3. 抽象工厂（产品家族） ==========
+        // 抽象产品
+        class Window { getStyle() { return ''; } }
+        class ScrollBar { getStyle() { return ''; } }
+
+        // 具体产品 - Windows 风格
+        class WindowsWindow extends Window { getStyle() { return 'Windows 风格窗口'; } }
+        class WindowsScrollBar extends ScrollBar { getStyle() { return 'Windows 风格滚动条'; } }
+
+        // 具体产品 - Mac 风格
+        class MacWindow extends Window { getStyle() { return 'Mac 风格窗口'; } }
+        class MacScrollBar extends ScrollBar { getStyle() { return 'Mac 风格滚动条'; } }
+
+        // 抽象工厂
+        class UIFactory {
+            createWindow() { throw new Error('子类必须实现'); }
+            createScrollBar() { throw new Error('子类必须实现'); }
+        }
+
+        class WindowsUIFactory extends UIFactory {
+            createWindow() { return new WindowsWindow(); }
+            createScrollBar() { return new WindowsScrollBar(); }
+        }
+
+        class MacUIFactory extends UIFactory {
+            createWindow() { return new MacWindow(); }
+            createScrollBar() { return new MacScrollBar(); }
+        }
+
+        // ========== 输出 ==========
+        const output = document.getElementById('output');
+        const demoOutput = document.getElementById('factory-output');
+
+        function log(msg) {
+            output.textContent += msg + '\n';
+            console.log(msg);
+        }
+
+        function clearLog() {
+            output.textContent = '';
+            demoOutput.innerHTML = '';
+        }
+
+        function demoSimpleFactory() {
+            clearLog();
+            log('=== 简单工厂 ===');
+            const car = VehicleFactory.create('car', '特斯拉');
+            const truck = VehicleFactory.create('truck', '解放卡车');
+            const motorcycle = VehicleFactory.create('motorcycle', '哈雷');
+
+            log(car.drive());
+            log(truck.drive());
+            log(motorcycle.drive());
+            log(`car 类型: ${car.type}, truck 类型: ${truck.type}`);
+
+            demoOutput.innerHTML = `
+                <div class="product-card"><h4>${car.name}</h4><div class="price">${car.type}</div></div>
+                <div class="product-card"><h4>${truck.name}</h4><div class="price">${truck.type}</div></div>
+                <div class="product-card"><h4>${motorcycle.name}</h4><div class="price">${motorcycle.type}</div></div>
+            `;
+        }
+
+        function demoFactoryMethod() {
+            clearLog();
+            log('=== 工厂方法 ===');
+
+            const darkDialog = new DarkDialog();
+            const lightDialog = new LightDialog();
+
+            log(`暗色主题: ${darkDialog.render()}`);
+            log(`亮色主题: ${lightDialog.render()}`);
+            log('每个 Dialog 子类决定创建哪种 Button');
+
+            demoOutput.innerHTML = `
+                <div class="product-card"><h4>暗色对话框</h4><div>${darkDialog.render()}</div></div>
+                <div class="product-card"><h4>亮色对话框</h4><div>${lightDialog.render()}</div></div>
+            `;
+        }
+
+        function demoAbstractFactory() {
+            clearLog();
+            log('=== 抽象工厂 ===');
+
+            const winFactory = new WindowsUIFactory();
+            const macFactory = new MacUIFactory();
+
+            const winWindow = winFactory.createWindow();
+            const winScroll = winFactory.createScrollBar();
+            const macWindow = macFactory.createWindow();
+            const macScroll = macFactory.createScrollBar();
+
+            log(`Windows: ${winWindow.getStyle()}, ${winScroll.getStyle()}`);
+            log(`Mac: ${macWindow.getStyle()}, ${macScroll.getStyle()}`);
+            log('抽象工厂确保同一产品家族（风格）的组件兼容');
+
+            demoOutput.innerHTML = `
+                <div class="product-card"><h4>Windows</h4><div>${winWindow.getStyle()}<br>${winScroll.getStyle()}</div></div>
+                <div class="product-card"><h4>Mac</h4><div>${macWindow.getStyle()}<br>${macScroll.getStyle()}</div></div>
+            `;
+        }
+
+        // 初始演示
+        log('=== 工厂模式 ===\n工厂模式将对象创建和使用解耦。\n\n点击上方按钮查看三种工厂的详细演示。');
+    </script>
+</body>
+</html>

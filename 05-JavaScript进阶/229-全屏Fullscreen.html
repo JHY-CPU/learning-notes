@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全屏Fullscreen</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #fullscreen-status { background: #f8f9fa; padding: 15px; border-radius: 4px; font-size: 14px; }
+        #fullscreen-box { background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 40px; border-radius: 8px; text-align: center; margin: 10px 0; transition: all 0.3s; }
+        #fullscreen-box:fullscreen { background: linear-gradient(135deg, #f093fb, #f5576c); padding: 80px; }
+        #fullscreen-box:-webkit-full-screen { background: linear-gradient(135deg, #f093fb, #f5576c); padding: 80px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>全屏 Fullscreen API</h2><p>将元素或页面切换至全屏模式。</p></div>
+    <div class="card">
+        <h2>基本用法</h2>
+        <div class="code">// 进入全屏（必须由用户手势触发）
+element.requestFullscreen();
+element.requestFullscreen({ navigationUI: 'hide' }); // 隐藏导航栏
+
+// 退出全屏
+document.exitFullscreen();
+
+// 检查当前全屏元素
+document.fullscreenElement;   // 当前全屏的元素（null 表示未全屏）
+
+// 检查是否支持全屏
+if (document.fullscreenEnabled) {
+    // 支持全屏
+}
+
+// 事件
+document.addEventListener('fullscreenchange', () => {
+    if (document.fullscreenElement) {
+        console.log('进入全屏');
+    } else {
+        console.log('退出全屏');
+    }
+});
+
+document.addEventListener('fullscreenerror', () => {
+    console.error('全屏切换失败');
+});
+
+// CSS 伪类（全屏时生效）
+// :fullscreen { ... }
+// ::backdrop { background: black; }  // 全屏背景
+
+// ⚠️ 浏览器前缀（旧版）
+// element.webkitRequestFullscreen()
+// document.webkitExitFullscreen()
+// document.webkitFullscreenElement</div>
+        <div class="note">⚠️ 必须由用户手势（click/keydown）触发，不能自动进入全屏。<br>
+        ⚠️ 不同浏览器有前缀（webkit），注意兼容。<br>
+        💡 按 ESC 或 F11 也可以退出全屏。</div>
+    </div>
+    <div class="card">
+        <h2>演示：全屏切换</h2>
+        <button onclick="toggleFullscreen()">切换全屏</button>
+        <button onclick="fullscreenBox()">元素全屏</button>
+        <div id="fullscreen-box"><strong>全屏元素</strong><br><span style="font-size:14px;">点击按钮让这个元素全屏</span></div>
+        <div id="fullscreen-status">
+            <div>fullscreenEnabled: <span id="fs-enabled">-</span></div>
+            <div>fullscreenElement: <span id="fs-element">-</span></div>
+        </div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const fsEnabled = document.getElementById('fs-enabled');
+        const fsElement = document.getElementById('fs-element');
+        const fsBox = document.getElementById('fullscreen-box');
+
+        fsEnabled.textContent = document.fullscreenEnabled ? '✅ 支持' : '❌ 不支持';
+
+        function updateFullscreenStatus() {
+            const el = document.fullscreenElement || document.webkitFullscreenElement;
+            fsElement.textContent = el ? (el.id || el.tagName) : 'null';
+            console.log('全屏元素:', el);
+        }
+
+        document.addEventListener('fullscreenchange', updateFullscreenStatus);
+        document.addEventListener('webkitfullscreenchange', updateFullscreenStatus);
+
+        function toggleFullscreen() {
+            if (!document.fullscreenEnabled) { alert('不支持全屏'); return; }
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+                console.log('退出全屏');
+            } else {
+                document.documentElement.requestFullscreen().catch(err => {
+                    console.error('全屏失败:', err);
+                });
+                console.log('进入全屏');
+            }
+        }
+
+        function fullscreenBox() {
+            if (!document.fullscreenEnabled) { alert('不支持全屏'); return; }
+            if (fsBox.requestFullscreen) {
+                fsBox.requestFullscreen({ navigationUI: 'hide' }).catch(err => {
+                    console.error('元素全屏失败:', err);
+                });
+            } else if (fsBox.webkitRequestFullscreen) {
+                fsBox.webkitRequestFullscreen();
+            }
+        }
+
+        console.log('=== Fullscreen API ===');
+        console.log('fullscreenEnabled:', document.fullscreenEnabled);
+
+        document.getElementById('output').textContent =
+            `Fullscreen API: 全屏切换\n` +
+            `requestFullscreen/exitFullscreen/fullscreenElement/fullscreenEnabled\n` +
+            `fullscreenchange/fullscreenerror 事件\n` +
+            `✅ 全屏演示完成！`;
+    </script>
+</body>
+</html>

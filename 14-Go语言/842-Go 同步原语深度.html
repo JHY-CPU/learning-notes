@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Go 同步原语深度</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔒 Go 同步原语深度</h2><p>sync.Mutex/RWMutex 内部实现、Cond 条件变量、Pool 对象池细节、Map 源码分析、Once 单次执行、atomic 原子操作深入、同步原语选择指南。</p></div>
+    <div class="card">
+        <h2>Mutex 与 RWMutex</h2>
+        <div class="code">// ========== Mutex 内部实现 ==========
+// sync.Mutex 有两种模式:
+// 正常模式: 等待者 FIFO, 但新 goroutine 可插队 (自旋)
+// 饥饿模式: 等待者 > 1ms, 直接传递锁
+
+func mutexState() {
+    var mu sync.Mutex
+
+    // 锁的两种状态:
+    // - 正常模式: 吞吐量高, 有插队
+    // - 饥饿模式: 公平性高, 无插队
+
+    // 进入饥饿模式条件: 等待者等待 > 1ms
+    // 退出饥饿模式: 所有等待者都获得一次锁
+
+    mu.Lock()
+    // 临界区
+    mu.Unlock()
+}
+
+// ========== Mutex 不可复制 ==========
+type Counter struct {
+    mu    sync.Mutex  // 嵌入 Mutex
+    count int
+}
+
+// ❌ 复制 Mutex 会导致死锁
+// func copyMutex() {
+//     c1 := Counter{count: 1}
+//     c2 := c1  // 复制了 Mutex! (锁状态也被复制)
+// }
+
+// 传递指针:
+func process(c *Counter) {
+    c.mu.Lock()
+    c.count++
+    c.mu.Unlock()
+}
+
+// ========== RWMutex 性能 ==========
+// RWMutex 的读写锁性能差异:
+// RLock:  多个可同时读
+// Lock:   独占 (读写都不行)
+
+// 写锁饥饿问题:
+// 如果读锁持续被获取, 写锁可能永远拿不到
+// 解决方案: 写锁优先 (RWMutex 内部实现)
+
+type Config struct {
+    mu     sync.RWMutex
+    values map[string]string
+}
+
+func (c *Config) Get(key string) string {
+    c.mu.RLock()
+    defer c.mu.RUnlock()
+    return c.values[key]
+}
+
+func (c *Config) Set(key, val string) {
+    c.mu.Lock()
+    defer c.mu.Unlock()
+    c.values[key] = val
+}
+
+// 选择指南:
+// 读 >> 写: RWMutex (2x ~ 10x)
+// 读写均衡: Mutex (简单)
+// 高频写: Mutex (RWMutex 写锁退化)</div>
+    </div>
+    <div class="card">
+        <h2>sync.Cond 条件变量</h2>
+        <div class="code">// ========== sync.Cond ==========
+// 条件变量: 一组 goroutine 等待某个条件满足
+// 不如 channel 常用, 但某些场景更高效
+
+func condDemo() {
+    var mu sync.Mutex
+    cond := sync.NewCond(&mu)
+    queue := make([]int, 0, 10)
+
+    // 生产者
+    go func() {
+        for i := 0; i < 10; i++ {
+            mu.Lock()
+            queue = append(queue, i)
+            cond.Signal()  // 唤醒一个等待者
+            mu.Unlock()
+            time.Sleep(100 * time.Millisecond)
+        }
+    }()
+
+    // 消费者
+    go func() {
+        for {
+            mu.Lock()
+            for len(queue) == 0 {
+                cond.Wait()  // 等待条件满足
+            }
+            item := queue[0]
+            queue = queue[1:]
+            fmt.Println("消费:", item)
+            mu.Unlock()
+        }
+    }()
+
+    time.Sleep(2 * time.Second)
+}
+
+// ========== Cond 规则 ==========
+// 1. Wait() 必须在 Lock 后调用
+// 2. Wait() 内部: Unlock → 阻塞等待 → Lock
+// 3. Signal() 唤醒一个等待者
+// 4. Broadcast() 唤醒所有等待者
+// 5. 必须使用 for 循环检查条件 (not if!)
+
+// ========== Cond vs Channel ==========
+// Cond 优点:
+// - 多个 goroutine 等待同一资源
+// - 需要 Broadcast 唤醒所有
+// - 避免 channel 的 1:1 限制
+
+// Channel 优点:
+// - 更符合 Go 哲学
+// - 组合性更好 (select)
+// - 不容易出错
+
+// 选择: 优先 channel, cond 仅用于 Broadcast 场景
+
+// ========== 用 channel 实现 broadcast ==========
+// 关闭 channel 可广播到所有监听者
+type Broadcast struct {
+    ch chan struct{}
+    mu sync.Mutex
+}
+
+func NewBroadcast() *Broadcast {
+    return &Broadcast{ch: make(chan struct{})}
+}
+
+func (b *Broadcast) Wait() <-chan struct{} {
+    return b.ch
+}
+
+func (b *Broadcast) Notify() {
+    b.mu.Lock()
+    defer b.mu.Unlock()
+    close(b.ch)
+    b.ch = make(chan struct{})  // 新 channel
+}
+
+// 使用:
+// b := NewBroadcast()
+// select { case <-b.Wait(): }</div>
+    </div>
+    <div class="card">
+        <h2>原子操作与内存模型</h2>
+        <div class="code">// ========== atomic 包 ==========
+// 无锁同步, 比 Mutex 更高效
+// 适用: 计数器, 标志位, 简单状态
+
+func atomicDemo() {
+    // Go 1.19+ 类型化原子操作
+    var counter atomic.Int64
+    counter.Store(0)
+
+    // 并发安全
+    var wg sync.WaitGroup
+    for i := 0; i < 1000; i++ {
+        wg.Add(1)
+        go func() {
+            counter.Add(1)
+            wg.Done()
+        }()
+    }
+    wg.Wait()
+
+    fmt.Println(counter.Load())  // 1000
+}
+
+// ========== 原子操作种类 ==========
+func atomicOps() {
+    var v atomic.Int64
+
+    v.Store(42)           // 写
+    x := v.Load()         // 读
+    old := v.Swap(100)    // 交换 (返回旧值)
+    swapped := v.CompareAndSwap(100, 200)  // CAS
+
+    v.Add(10)             // 加减
+    v.Add(-5)
+
+    fmt.Println(x, old, swapped)
+
+    // 其他类型:
+    var b atomic.Bool
+    b.Store(true)
+
+    var p atomic.Pointer[Config]
+    p.Store(&Config{})
+    cfg := p.Load()
+    _ = cfg
+
+    // Value (任意类型)
+    var val atomic.Value
+    val.Store(42)
+}
+
+// ========== CAS 实现自旋锁 ==========
+type SpinLock struct {
+    locked atomic.Bool
+}
+
+func (s *SpinLock) Lock() {
+    for !s.locked.CompareAndSwap(false, true) {
+        // 自旋等待 (可加 runtime.Gosched())
+        runtime.Gosched()
+    }
+}
+
+func (s *SpinLock) Unlock() {
+    s.locked.Store(false)
+}
+
+// 性能: 短临界区时自旋锁比 Mutex 快
+// 注意: 长时间持有不要用自旋锁
+
+// ========== Go 内存模型 ==========
+// Go 保证以下 Happens-Before 关系:
+// 1. 同一 goroutine: 顺序一致性
+// 2. Mutex Lock → Unlock → 下一个 Lock
+// 3. atomic Store → Load (同一个变量)
+// 4. channel 发送 → 接收
+// 5. WaitGroup Add → Done → Wait 返回
+
+// 同步原语性能 (相对):
+// atomic (1x) < Mutex (10x) < RWMutex (15x) < Channel (20x)
+// 真实性能取决于竞争程度和临界区大小</div>
+    </div>
+    <div class="card">
+        <h2>sync.Map 与 Once</h2>
+        <div class="code">// ========== sync.Map 内部 ==========
+// sync.Map 用两个 map:
+// - read map (atomic.Load, 无锁读)
+// - dirty map (mutex, 写时复制)
+//
+// 读: 优先读 read (无锁)
+// 写: 加锁写 dirty, 然后同步到 read
+
+func syncMapInternal() {
+    var m sync.Map
+
+    // 读优场景:
+    m.Store("key", "value")
+    v, ok := m.Load("key")
+    fmt.Println(v, ok)
+
+    // 不存在时写入:
+    actual, loaded := m.LoadOrStore("key", "default")
+    // loaded = true (已有), actual = "value"
+
+    // 遍历:
+    m.Range(func(key, value interface{}) bool {
+        fmt.Println(key, value)
+        return true
+    })
+
+    // 删除:
+    m.Delete("key")
+}
+
+// sync.Map 适用条件:
+// - 读多写少 (典型: 配置缓存)
+// - key 类型不固定 (interface{})
+// - 不适合: 写频繁, key 类型固定
+
+// ========== sync.Pool 深入 ==========
+// Pool 维护临时对象, GC 时会回收
+
+type BigStruct struct {
+    Data [1024]byte
+}
+
+var bigPool = sync.Pool{
+    New: func() interface{} {
+        return new(BigStruct)
+    },
+}
+
+func poolDetail() {
+    // Get: 优先从池取, 池空则 New
+    obj := bigPool.Get().(*BigStruct)
+
+    // 使用前必须 Reset!
+    // 因为可能残留上次使用的数据
+
+    // Put: 放回池
+    bigPool.Put(obj)
+
+    // 注意:
+    // 1. GC 会清理 Pool (调用 runtime.GC 后)
+    // 2. 不要假设放回的对象还能 Get 到
+    // 3. 多用于减少 GC 压力, 非连接池
+}
+
+// ========== sync.Once ==========
+// Do 保证函数只执行一次 (即使多个 goroutine 调用)
+
+type Singleton struct{}
+
+var (
+    instance *Singleton
+    once     sync.Once
+)
+
+func GetInstance() *Singleton {
+    once.Do(func() {
+        instance = &Singleton{}
+    })
+    return instance
+}
+
+// sync.Once 内部:
+// 1. atomic.Load 检查 done 标志 (快速路径)
+// 2. 加锁 + 二次检查 (double-checked locking)
+// 3. 执行函数 + atomic.Store 设置 done
+
+// ========== 同步原语选择指南 ==========
+// 计数器 → atomic.Int64
+// 标志位 → atomic.Bool
+// 指针切换 → atomic.Pointer
+// 临界区 → Mutex
+// 多读少写 → RWMutex
+// 配置缓存 → sync.Map
+// 对象池 → sync.Pool
+// 单次执行 → sync.Once
+// 等待完成 → sync.WaitGroup
+// 条件等待 → Cond / channel
+// goroutine 通信 → channel</div>
+        <div class="note">💡 同步原语要点: Mutex 有正常/饥饿两模式; Mutex 不可复制; RWMutex 读 >> 写时用; Cond 用于 Broadcast 唤醒; atomic 无锁 + CAS; sync.Map 双 map (read 无锁/dirty 写时复制); sync.Pool 减少 GC (GC 时清理); sync.Once double-checked locking; 选择: 计数 atomic → 临界区 Mutex → 读多写少 RWMutex/sync.Map → 通信 channel.</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoMutex()">Mutex</button>
+        <button onclick="demoAtomic()">原子操作</button>
+        <button onclick="demoPick()">原语选择</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoMutex() {
+            result.innerHTML = '';
+            log('# Mutex 与 RWMutex');
+            log('');
+            log('Mutex 两模式:');
+            log('  正常: 高吞吐, 允许插队');
+            log('  饥饿: 等待 > 1ms, 无插队');
+            log('');
+            log('RWMutex:');
+            log('  RLock: 多个可同时读');
+            log('  Lock: 完全独占');
+            log('');
+            log('⚡ Mutex 不可复制!');
+            log('  传递指针而非值');
+        }
+
+        function demoAtomic() {
+            result.innerHTML = '';
+            log('# atomic 原子操作');
+            log('');
+            log('类型化原子:');
+            log('  atomic.Int64, atomic.Bool');
+            log('  atomic.Pointer[T]');
+            log('');
+            log('操作:');
+            log('  Load/Store         读写');
+            log('  Add                加减');
+            log('  Swap               交换');
+            log('  CompareAndSwap     CAS');
+            log('');
+            log('CAS 实现自旋锁:');
+            log('  for !locked.CAS(f, t) {');
+            log('    runtime.Gosched()');
+            log('  }');
+        }
+
+        function demoPick() {
+            result.innerHTML = '';
+            log('# 同步原语选择');
+            log('');
+            log('需求 → 原语:');
+            log('  计数器 → atomic.Int64');
+            log('  标志位 → atomic.Bool');
+            log('  临界区 → sync.Mutex');
+            log('  读多写少 → RWMutex');
+            log('  配置缓存 → sync.Map');
+            log('  对象复用 → sync.Pool');
+            log('  单次 → sync.Once');
+            log('  等待完成 → WaitGroup');
+            log('  条件广播 → Cond');
+            log('  goroutine 通信 → chan');
+        }
+    </script>
+</body>
+</html>

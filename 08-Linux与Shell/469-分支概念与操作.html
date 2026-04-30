@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分支概念与操作</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🌿 分支概念与操作</h2><p>分支原理、创建/切换/删除、HEAD 指针、git branch/git checkout/git switch。</p></div>
+    <div class="card">
+        <h2>分支概念</h2>
+        <div class="code">// ========== 分支是什么 ==========
+// 分支 = 指向 commit 的可移动指针
+// 创建分支 = 创建新指针 (瞬间完成,几乎无开销)
+// Git 鼓励大量使用分支 (SVN 做不到)
+
+// HEAD: 指向当前所在分支的指针
+// 当前分支: HEAD 指向的分支
+
+// ========== 分支工作原理 ==========
+// commit 构成有向无环图 (DAG)
+// 每个 commit 指向前一个 commit (parent)
+// 分支只是某个 commit 的引用
+
+// 初始: main → C1 ← HEAD
+//   创建分支: git branch feature
+//   main → C1, feature → C1, HEAD → main
+//
+// 切换分支: git checkout feature
+//   HEAD → feature
+//
+// 在新分支提交: git commit
+//   main → C1, feature → C2, HEAD → feature
+
+// ========== 分支的优势 ==========
+// 1. 并行开发: 同时开发多个功能
+// 2. 隔离: 每个分支独立,互不干扰
+// 3. 实验: 可随时创建实验分支,失败了就删掉
+// 4. 协作: 多人各自在分支上工作</div>
+    </div>
+    <div class="card">
+        <h2>分支命令</h2>
+        <div class="code">// ========== 创建分支 ==========
+git branch feature                 # 创建分支 (基于当前 HEAD)
+git branch fix/login               # 创建 fix/login 分支
+git branch feature main            # 基于 main 创建分支
+git branch feature abc123          # 基于指定 commit 创建
+git branch feature HEAD~3          # 基于前 3 个 commit 创建
+
+// ========== 切换分支 ==========
+git checkout feature               # 切换到 feature 分支
+git checkout -b feature            # 创建并切换 (最常用)
+git checkout -b feature main       # 基于 main 创建并切换
+
+// 新式命令 (Git 2.23+):
+git switch feature                 # 切换分支
+git switch -c feature              # 创建并切换
+git switch -c feature main         # 基于 main 创建并切换
+git switch -                       # 切换到上一个分支
+
+// ========== 查看分支 ==========
+git branch                         # 本地分支列表 (* 当前)
+git branch -v                      # 显示最近提交
+git branch -vv                     # 显示跟踪的远程分支
+git branch -a                      # 所有分支 (含远程)
+git branch -r                      # 远程分支
+git branch --merged                # 已合并到当前的分支
+git branch --no-merged             # 未合并的分支
+git branch --contains abc123       # 包含某 commit 的分支
+
+// git branch -a 输出:
+// * main
+//   feature
+//   remotes/origin/main
+//   remotes/origin/feature
+
+// ========== 删除分支 ==========
+git branch -d feature              # 删除已合并的分支
+git branch -D feature              # 强制删除 (即使未合并)
+git push origin --delete feature   # 删除远程分支
+git branch -dr origin/feature      # 删除远程跟踪分支</div>
+    </div>
+    <div class="card">
+        <h2>分支合并</h2>
+        <div class="code">// ========== git merge ==========
+// 将另一个分支的修改合并到当前分支
+
+// 合并 feature 到 main:
+git checkout main
+git merge feature
+
+// ========== 合并类型 ==========
+// 1. Fast-forward (快进):
+//    feature 基于 main 且 main 没有新提交
+//    main 直接"快进"到 feature 位置
+//    不会创建新的 merge commit
+
+//    前: main → C1, feature → C2 (基于 C1)
+//    git checkout main && git merge feature
+//    后: main → C2, feature → C2 (main 直接指向 C2)
+
+// 2. Three-way merge (三方合并):
+//    main 和 feature 都有新提交
+//    创建新的 merge commit (有 2 个 parent)
+
+//    前: main → C2, feature → C3 (分叉了)
+//    git checkout main && git merge feature
+//    后: main → M1 (merge commit)
+//         M1 的 parents: C2 和 C3
+
+// 禁止 fast-forward:
+git merge --no-ff feature          # 总是创建 merge commit
+git merge --squash feature         # 压缩为单个 commit (不保留分支历史)
+
+// ========== 合并冲突 ==========
+// 当两个分支修改了同一文件的同一区域时发生
+
+// 冲突标记:
+// <<<<<<< HEAD
+// 当前分支的内容
+// =======
+// 合并进来的内容
+// >>>>>>> feature
+
+// 解决步骤:
+// 1. 手动编辑冲突文件 (选择保留/合并内容)
+// 2. git add <file> (标记已解决)
+// 3. git commit (完成合并)
+
+// 中止合并:
+git merge --abort                  # 回到合并前的状态
+
+// 使用合并工具:
+git mergetool                      # 启动配置的合并工具</div>
+        <div class="note">💡 Git 分支极其轻量,只是一个指针。创建分支的成本几乎为零,这也是 Git 鼓励"早分支、常分支"的原因。推荐使用 git switch (新式) 代替 git checkout 切换分支,语义更明确。合并前先用 git diff main..feature 预览差异。</div>
+    </div>
+    <div class="card">
+        <h2>分支策略</h2>
+        <div class="code">// ========== 分支命名规范 ==========
+// feature/<功能名>    feature/user-login
+// fix/<问题描述>      fix/login-error
+// hotfix/<紧急修复>    hotfix/critical-bug
+// chore/<杂项>        chore/update-deps
+// release/<版本号>    release/v1.2.0
+
+// ========== 常用分支模式 ==========
+// 每个功能一个分支:
+git checkout -b feature/user-login main
+# 开发...
+git add -A && git commit -m "feat: add user login"
+git checkout main
+git merge feature/user-login
+
+// 每个 bug 一个分支:
+git checkout -b fix/login-error main
+# 修复...
+git add -A && git commit -m "fix: login error handling"
+git checkout main
+git merge fix/login-error
+
+// ========== 本地 vs 远程分支 ==========
+// 本地分支: 只有你本地有
+// 远程跟踪分支: remotes/origin/* 只在本地记录远程状态
+// 远程分支: 在远程仓库中
+
+// 推送分支到远程:
+git push origin feature            # 推送本地分支到远程
+git push -u origin feature         # 设置 upstream 并推送
+
+// 拉取远程分支到本地:
+git fetch origin
+git checkout -b feature origin/feature  # 基于远程创建本地分支
+git switch feature                 # 如果远程分支存在,可简写
+git switch -c feature origin/feature  # 显式创建</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoBranch()">分支演示</button>
+        <button onclick="demoMerge()">合并演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoBranch() {
+            result.innerHTML = '';
+            log('# Git 分支演示');
+            log('');
+            log('$ git branch main');
+            log('$ git checkout -b feature/login');
+            log('  Switched to a new branch "feature/login"');
+            log('');
+            log('$ git log --oneline --graph --all');
+            log('  * abc123 (HEAD -> feature/login) feat: add login form');
+            log('  * def456 feat: add login API');
+            log('  * 789012 (main) initial commit');
+            log('');
+            log('$ git checkout main');
+            log('$ git branch -a');
+            log('  * main');
+            log('    feature/login');
+            log('    remotes/origin/main');
+        }
+
+        function demoMerge() {
+            result.innerHTML = '';
+            log('# Git 合并演示');
+            log('');
+            log('$ git checkout main');
+            log('$ git merge feature/login');
+            log('  Updating def456..abc123');
+            log('  Fast-forward');
+            log('  (无 merge commit,直接快进)');
+            log('');
+            log('--- 三方合并 ---');
+            log('$ git merge --no-ff feature/login');
+            log('  Merge made by the "ort" strategy.');
+            log('  (创建 merge commit,保留分支历史)');
+            log('');
+            log('--- 冲突解决 ---');
+            log('  <<<<<<< HEAD');
+            log('  console.log("main version");');
+            log('  =======');
+            log('  console.log("feature version");');
+            log('  >>>>>>> feature/login');
+            log('');
+            log('  编辑后:');
+            log('  console.log("merged version");');
+            log('  $ git add file.js');
+            log('  $ git commit -m "fix: merge conflict"');
+        }
+    </script>
+</body>
+</html>

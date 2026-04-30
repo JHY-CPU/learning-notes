@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python Flask REST API</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔌 Flask REST API 构建</h2><p>使用 Flask 构建 RESTful API、Blueprint 模块化组织、请求验证（marshmallow）、统一错误处理、分页与过滤、API 文档生成。</p></div>
+    <div class="card">
+        <h2>RESTful API 设计</h2>
+        <div class="code">// ========== API 路由设计 ==========
+// 资源: POSTS (文章)
+//
+// GET    /posts          — 文章列表
+// POST   /posts          — 创建文章
+// GET    /posts/{id}     — 文章详情
+// PUT    /posts/{id}     — 更新文章
+// DELETE /posts/{id}     — 删除文章
+//
+// GET    /posts/{id}/comments — 文章评论
+
+from flask import Flask, jsonify, request, abort
+from flask_sqlalchemy import SQLAlchemy
+
+app = Flask(__name__)
+db = SQLAlchemy(app)
+
+class Post(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+
+# API 端点:
+@app.route("/api/posts", methods=["GET"])
+def list_posts():
+    posts = Post.query.all()
+    return jsonify([{
+        "id": p.id,
+        "title": p.title,
+        "content": p.content
+    } for p in posts])</div>
+    </div>
+    <div class="card">
+        <h2>完整 CRUD 示例</h2>
+        <div class="code">// ========== 完整 CRUD ==========
+from flask import Blueprint, jsonify, request
+from flask_sqlalchemy import SQLAlchemy
+
+db = SQLAlchemy()
+posts_bp = Blueprint("posts", __name__, url_prefix="/api/posts")
+
+# 列表 + 创建:
+@posts_bp.route("", methods=["GET", "POST"])
+def posts():
+    if request.method == "GET":
+        page = request.args.get("page", 1, type=int)
+        per_page = request.args.get("per_page", 10, type=int)
+        pagination = Post.query.paginate(page=page, per_page=per_page)
+
+        return jsonify({
+            "items": [p.to_dict() for p in pagination.items],
+            "total": pagination.total,
+            "page": page,
+            "pages": pagination.pages
+        })
+
+    # POST
+    data = request.get_json()
+    if not data or "title" not in data:
+        return jsonify({"error": "title 是必填字段"}), 400
+
+    post = Post(title=data["title"], content=data.get("content", ""))
+    db.session.add(post)
+    db.session.commit()
+
+    return jsonify(post.to_dict()), 201
+
+# 详情 / 更新 / 删除:
+@posts_bp.route("/<int:post_id>", methods=["GET", "PUT", "DELETE"])
+def post_detail(post_id):
+    post = Post.query.get_or_404(post_id)
+
+    if request.method == "GET":
+        return jsonify(post.to_dict())
+
+    if request.method == "PUT":
+        data = request.get_json()
+        post.title = data.get("title", post.title)
+        post.content = data.get("content", post.content)
+        db.session.commit()
+        return jsonify(post.to_dict())
+
+    # DELETE
+    db.session.delete(post)
+    db.session.commit()
+    return jsonify({"message": "删除成功"}), 200
+
+# 模型 to_dict 方法:
+class Post(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(200), nullable=False)
+    content = db.Column(db.Text, default="")
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "title": self.title,
+            "content": self.content
+        }</div>
+    </div>
+    <div class="card">
+        <h2>请求验证 (marshmallow)</h2>
+        <div class="code">// ========== Marshmallow 模式验证 ==========
+// 安装: pip install marshmallow
+
+from marshmallow import Schema, fields, validate, ValidationError
+
+class PostSchema(Schema):
+    id = fields.Int(dump_only=True)     # 只用于序列化
+    title = fields.Str(required=True, validate=validate.Length(min=1, max=200))
+    content = fields.Str(missing="")     # 默认为空
+    created_at = fields.DateTime(dump_only=True)
+
+class UserSchema(Schema):
+    username = fields.Str(required=True, validate=validate.Length(min=3, max=50))
+    email = fields.Email(required=True)
+    age = fields.Int(validate=validate.Range(min=0, max=150))
+
+# 使用:
+post_schema = PostSchema()
+posts_schema = PostSchema(many=True)
+
+@posts_bp.route("", methods=["POST"])
+def create_post():
+    try:
+        data = post_schema.load(request.get_json())
+    except ValidationError as e:
+        return jsonify({"errors": e.messages}), 400
+
+    post = Post(**data)
+    db.session.add(post)
+    db.session.commit()
+
+    return post_schema.dump(post), 201
+
+@posts_bp.route("", methods=["GET"])
+def list_posts():
+    posts = Post.query.all()
+    return jsonify(posts_schema.dump(posts))</div>
+    </div>
+    <div class="card">
+        <h2>统一错误处理</h2>
+        <div class="code">// ========== 统一错误处理 ==========
+from flask import jsonify
+
+class APIError(Exception):
+    """自定义 API 错误"""
+    def __init__(self, message, status_code=400, payload=None):
+        super().__init__()
+        self.message = message
+        self.status_code = status_code
+        self.payload = payload
+
+    def to_dict(self):
+        rv = {"error": self.message}
+        if self.payload:
+            rv.update(self.payload)
+        return rv
+
+# 注册错误处理器:
+@app.errorhandler(APIError)
+def handle_api_error(error):
+    response = jsonify(error.to_dict())
+    response.status_code = error.status_code
+    return response
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({"error": "资源不存在"}), 404
+
+@app.errorhandler(400)
+def bad_request(error):
+    return jsonify({"error": "请求无效"}), 400
+
+@app.errorhandler(500)
+def server_error(error):
+    return jsonify({"error": "服务器内部错误"}), 500
+
+# 使用:
+@app.route("/api/users/<int:user_id>")
+def get_user(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        raise APIError("用户不存在", 404)
+    return jsonify(user.to_dict())</div>
+    </div>
+    <div class="card">
+        <h2>API 项目结构</h2>
+        <div class="code">// ========== 推荐结构 ==========
+# myapi/
+# ├── app.py                # 应用工厂
+# ├── config.py             # 配置
+# ├── models/
+# │   ├── __init__.py
+# │   ├── user.py
+# │   └── post.py
+# ├── routes/
+# │   ├── __init__.py
+# │   ├── users.py
+# │   └── posts.py
+# ├── schemas/
+# │   ├── __init__.py
+# │   ├── user_schema.py
+# │   └── post_schema.py
+# ├── errors.py             # 错误处理
+# └── requirements.txt
+
+// ========== app.py ==========
+def create_app():
+    app = Flask(__name__)
+    app.config.from_object("config.Config")
+
+    db.init_app(app)
+    migrate.init_app(app, db)
+
+    # 注册蓝图
+    from routes.posts import posts_bp
+    app.register_blueprint(posts_bp, url_prefix="/api")
+
+    # 错误处理
+    from errors import register_handlers
+    register_handlers(app)
+
+    return app
+
+// ========== flask-cors: 跨域 ==========
+from flask_cors import CORS
+CORS(app)  # 允许所有来源
+
+# 或限制:
+CORS(app, origins=["https://example.com"])</div>
+        <div class="note">💡 REST API 要点: (1) RESTful 路由: GET/POST/PUT/DELETE 对应查询/创建/更新/删除; (2) Blueprint 模块化组织路由; (3) marshmallow Schema 验证请求 + 序列化响应; (4) 统一错误处理 raise APIError + @app.errorhandler; (5) to_dict() 模型方法简化 JSON 序列化。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoREST()">REST 设计演示</button>
+        <button onclick="demoSchema()">Schema 演示</button>
+        <button onclick="demoProject()">项目结构演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoREST() {
+            result.innerHTML = '';
+            log('# RESTful API 设计');
+            log('');
+            log('资源: Posts');
+            log('  GET    /api/posts      — 列表');
+            log('  POST   /api/posts      — 创建');
+            log('  GET    /api/posts/1    — 详情');
+            log('  PUT    /api/posts/1    — 更新');
+            log('  DELETE /api/posts/1    — 删除');
+            log('');
+            log('状态码:');
+            log('  200 OK       — 成功');
+            log('  201 Created  — 创建成功');
+            log('  400 Bad Req  — 参数错误');
+            log('  404 Not Found— 资源不存在');
+        }
+
+        function demoSchema() {
+            result.innerHTML = '';
+            log('# Marshmallow Schema');
+            log('');
+            log('class PostSchema(Schema):');
+            log('    title = fields.Str(required=True,');
+            log('        validate=validate.Length(min=1))');
+            log('    content = fields.Str()');
+            log('');
+            log('验证:');
+            log('  schema.load(data)  → 验证 + 反序列化');
+            log('  schema.dump(obj)   → 序列化为 dict');
+            log('  ValidationError    → 验证失败');
+        }
+
+        function demoProject() {
+            result.innerHTML = '';
+            log('# 推荐项目结构');
+            log('');
+            log('myapi/');
+            log('├── app.py           # 应用工厂');
+            log('├── config.py        # 配置');
+            log('├── models/          # 数据模型');
+            log('├── routes/          # 路由/视图');
+            log('├── schemas/         # 验证模式');
+            log('├── errors.py        # 错误处理');
+            log('└── requirements.txt');
+            log('');
+            log('特点: 模块化/可测试/易扩展');
+        }
+    </script>
+</body>
+</html>

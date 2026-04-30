@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spring Boot Lombok 集成</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>💎 Spring Boot Lombok 集成</h2><p>Lombok 注解大全 (@Data/@Builder/@Slf4j/@AllArgsConstructor/@NonNull/@With/@SneakyThrows)、安装配置、Spring Boot 集成技巧、常见陷阱。</p></div>
+    <div class="card">
+        <h2>Lombok 入门</h2>
+        <div class="code">// ========== Lombok ==========
+// 通过注解减少样板代码 (getter/setter/toString...)
+// 编译时自动生成字节码
+
+// ========== 添加依赖 ==========
+// Maven:
+&lt;dependency&gt;
+    &lt;groupId&gt;org.projectlombok&lt;/groupId&gt;
+    &lt;artifactId&gt;lombok&lt;/artifactId&gt;
+    &lt;optional&gt;true&lt;/optional&gt;          &lt;!-- 不传递依赖 --&gt;
+    &lt;version&gt;1.18.30&lt;/version&gt;
+&lt;/dependency&gt;
+
+// Gradle:
+// compileOnly 'org.projectlombok:lombok:1.18.30'
+// annotationProcessor 'org.projectlombok:lombok:1.18.30'
+
+// ========== IDE 配置 ==========
+// IntelliJ IDEA:
+// 1. 安装 Lombok 插件 (Settings → Plugins)
+// 2. 启用注解处理 (Settings → Build → Compiler → Annotation Processors → Enable)
+
+// ========== 核心注解速览 ==========
+// @Getter / @Setter         — 生成 getter/setter
+// @ToString                 — 生成 toString()
+// @EqualsAndHashCode        — 生成 equals() + hashCode()
+// @NoArgsConstructor        — 无参构造器
+// @AllArgsConstructor       — 全参构造器
+// @RequiredArgsConstructor  — 必需参数构造器 (final 字段)
+// @Data                     — @Getter+@Setter+@ToString+@EqualsAndHashCode+@RequiredArgsCons
+// @Builder                  — Builder 模式
+// @Value                    — 不可变类 (所有字段 final)
+// @Slf4j                    — 生成 log 字段 (日志)
+// @NonNull                  — 空检查
+// @With                     — 生成 withX() 复制修改方法
+// @SneakyThrows             — 静默抛出受检异常
+
+// ========== 使用示例 ==========
+@Getter                     // 所有字段生成 getter
+@Setter                     // 所有字段生成 setter
+@ToString                   // 生成 toString (排除 password)
+@EqualsAndHashCode          // 生成 equals + hashCode
+@NoArgsConstructor          // 无参构造器
+@AllArgsConstructor         // 全参构造器
+public class User {
+    private Long id;
+    private String username;
+    @ToString.Exclude       // 排除敏感字段
+    private String password;
+    private String email;
+}
+
+// 等效于手写 50+ 行代码!</div>
+    </div>
+    <div class="card">
+        <h2>@Data 与 @Builder</h2>
+        <div class="code">// ========== @Data ==========
+// 最常用: 组合注解
+// @Getter + @Setter + @ToString + @EqualsAndHashCode + @RequiredArgsConstructor
+
+@Data
+public class Product {
+    private Long id;
+    private String name;
+    private BigDecimal price;
+    private Integer stock;
+    private LocalDateTime createTime;
+}
+
+// ========== @Builder ==========
+// Builder 模式: 链式构造对象
+// IDE 生成全参静态内部 Builder
+
+@Builder
+@Data
+public class OrderDTO {
+    private Long orderId;
+    private String productName;
+    private Integer quantity;
+    private BigDecimal totalPrice;
+    private String remark;
+}
+
+// 使用:
+OrderDTO order = OrderDTO.builder()
+    .orderId(1001L)
+    .productName("手机")
+    .quantity(2)
+    .totalPrice(new BigDecimal("7998.00"))
+    .remark("尽快发货")
+    .build();
+
+System.out.println(order);  // @ToString 自动生成
+
+// ========== @Builder + @AllArgs ==========
+// @Builder 会生成全参构造器 (自动)
+// 无参构造需额外添加 @NoArgsConstructor
+
+@Builder
+@Data
+@NoArgsConstructor             // Builder 模式需要无参构造
+@AllArgsConstructor            // Builder 需要全参构造
+public class User {
+    private Long id;
+    private String name;
+}
+
+// ========== @Builder.Default ==========
+@Builder
+@Data
+public class Config {
+    @Builder.Default
+    private int timeout = 3000;          // Builder 默认值
+
+    @Builder.Default
+    private boolean retryEnabled = true;
+
+    @Builder.Default
+    private List&lt;String&gt; servers = new ArrayList&lt;&gt;();
+}
+
+// 使用:
+Config config = Config.builder()
+    .timeout(5000)                    // 覆盖默认值
+    .build();
+// servers 默认空列表, 非 null!</div>
+    </div>
+    <div class="card">
+        <h2>Lombok 与 Spring Boot 实战</h2>
+        <div class="code">// ========== Lombok + Spring Boot ==========
+
+// ========== 1. @Slf4j 日志 ==========
+@Slf4j
+@Service
+@RequiredArgsConstructor    // 自动注入 final 字段
+public class UserService {
+
+    private final UserRepository userRepository;  // 自动构造注入
+    private final MailService mailService;
+
+    public User createUser(User user) {
+        log.info("创建用户: {}", user.getUsername());  // log 来自 @Slf4j
+        User saved = userRepository.save(user);
+        mailService.sendWelcome(saved.getEmail());
+        return saved;
+    }
+}
+
+// ========== 2. DTO + @Builder ==========
+@Data
+@Builder
+public class UserCreateRequest {
+    @NotBlank
+    private String username;
+
+    @NotBlank
+    private String password;
+
+    @Email
+    private String email;
+}
+
+// Controller 中使用:
+@PostMapping("/users")
+public ResponseEntity&lt;User&gt; createUser(@Valid @RequestBody UserCreateRequest request) {
+    User user = User.builder()
+        .username(request.getUsername())
+        .password(passwordEncoder.encode(request.getPassword()))
+        .email(request.getEmail())
+        .build();
+    return ResponseEntity.ok(userService.createUser(user));
+}
+
+// ========== 3. @RequiredArgsConstructor + final ==========
+// 替代 @Autowired 构造注入 (推荐!)
+
+// 传统方式:
+@Service
+public class OrderService {
+    private final OrderRepository orderRepository;
+
+    @Autowired                          // 需要显式注解
+    public OrderService(OrderRepository orderRepository) {
+        this.orderRepository = orderRepository;
+    }
+}
+
+// Lombok 方式:
+@Service
+@RequiredArgsConstructor                // 自动生成 final 字段的构造器
+public class OrderService {
+    private final OrderRepository orderRepository;  // Spring 自动注入
+    // 无需 @Autowired, 无需构造器!
+}
+
+// ========== 4. @Value 不可变 DTO ==========
+@Value                             // 所有字段 private final
+public class UserResponse {
+    Long id;
+    String username;
+    String email;
+    LocalDateTime createTime;
+}
+
+// ========== 5. @With 生成不可变修改 ==========
+@With                              // 生成 withXxx() 返回新对象
+@Value
+public class Address {
+    String city;
+    String street;
+    String zipCode;
+}
+
+// 使用:
+Address addr = new Address("北京", "长安街", "100000");
+Address updated = addr.withStreet("王府井街");
+// addr 不变, updated 是新对象</div>
+    </div>
+    <div class="card">
+        <h2>进阶注解</h2>
+        <div class="code">// ========== Lombok 进阶注解 ==========
+
+// ========== @NonNull ==========
+// 自动 null 检查, 抛 NullPointerException
+public void process(@NonNull String data) {
+    // data 为 null 时抛 NPE, 带字段名
+    System.out.println(data.length());
+}
+
+// ========== @SneakyThrows ==========
+// 静默抛出受检异常 (不需在方法签名声明)
+@SneakyThrows
+public void readFile(String path) {
+    // 无需 throws IOException
+    Files.readString(Path.of(path));
+}
+
+// 更精确:
+@SneakyThrows(IOException.class)
+public void writeFile(String path, String content) {
+    Files.writeString(Path.of(path), content);
+}
+
+// ========== @Cleanup ==========
+// 自动关闭资源 (try-with-resources)
+@Cleanup
+InputStream in = new FileInputStream("file.txt");
+// 方法结束自动调用 in.close()
+
+// ========== @UtilityClass ==========
+// 工具类, 自动 private 构造器 + 所有方法 static
+@UtilityClass
+public class StringUtils {
+    public boolean isEmpty(String s) { return s == null || s.isBlank(); }
+    public String truncate(String s, int max) { return s.substring(0, Math.min(s.length(), max)); }
+}
+
+// ========== @Accessors ==========
+// 链式 setter: setter 返回 this
+@Accessors(chain = true)
+@Data
+public class Config {
+    private String host;
+    private int port;
+}
+
+// 使用:
+Config config = new Config()
+    .setHost("localhost")     // 返回 this, 可链式
+    .setPort(8080);
+
+// ========== @FieldDefaults ==========
+// 设置字段访问级别
+@FieldDefaults(level = AccessLevel.PRIVATE, makeFinal = true)
+public class Constants {
+    int MAX_SIZE = 100;             // 自动 private final
+    String APP_NAME = "MyApp";      // 自动 private final
+}
+
+// ========== lombok.config ==========
+// 全局配置: src/main/java/lombok.config
+// 移除 @Data 中的 Setter
+lombok.data.flagUsage = warning
+lombok.setter.flagUsage = error
+lombok.fieldNameConstants.uppercase = true</div>
+    </div>
+    <div class="card">
+        <h2>常见陷阱与最佳实践</h2>
+        <div class="code">// ========== Lombok 常见陷阱 ==========
+
+// ========== 1. @Data + JPA @Entity ==========
+// @Data 包含 @EqualsAndHashCode, 会调用关联实体
+// 可能触发延迟加载的代理对象
+
+// ✅ JPA 实体推荐:
+@Entity
+@Getter
+@Setter
+@NoArgsConstructor                      // JPA 需要
+@ToString(callSuper = true, onlyExplicitlyIncluded = true)
+@EqualsAndHashCode(onlyExplicitlyIncluded = true)
+public class User {
+    @Id
+    @EqualsAndHashCode.Include          // 仅 ID 参与 equal/hash
+    private Long id;
+
+    private String username;
+    private String email;
+}
+
+// ========== 2. @Builder 与 JPA ==========
+// JPA 需要无参构造器 + setter
+@Entity
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder                               // 需要 static builder
+public class Product {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private String name;
+    private BigDecimal price;
+}
+
+// ========== 3. @ToString 循环引用 ==========
+// 双向关联导致 StackOverflow
+
+@ToString.Exclude                       // 排除关联字段
+@ManyToOne
+private Category category;
+
+// ========== 4. @Builder 默认值失效 ==========
+// @Builder 不会使用字段初始值
+// 需要用 @Builder.Default
+
+// ❌ 错误:
+@Builder
+public class Config {
+    private int timeout = 3000;         // 用 builder() 时不会生效!
+}
+
+// ✅ 正确:
+@Builder
+public class Config {
+    @Builder.Default
+    private int timeout = 3000;
+}
+
+// ========== 5. @Data 可变集合 ==========
+// @Data 生成的 setter 会替换整个集合
+// 需要修改集合内容时用 @Getter + 手动初始化
+
+// ========== 最佳实践 ==========
+// 1. @Data 适合 DTO/VO  (无业务逻辑的 POJO)
+// 2. @Getter + @Setter 适合 JPA 实体 (避免 equals/hash 问题)
+// 3. @Builder 适合构建复杂 DTO
+// 4. @Slf4j + @RequiredArgsConstructor 适合 Service
+// 5. @Value 适合不可变 DTO/Response
+// 6. 避开 @SneakyThrows 在生产代码滥用
+// 7. @Builder.Default 确保默认值生效
+// 8. @ToString.Exclude 防止循环引用</div>
+        <div class="note">💡 Lombok 要点: @Data 快速 POJO; @Builder 链式构造; @Slf4j 日志; @RequiredArgsConstructor 构造注入; JPA 实体用 @Getter/@Setter 避免 @Data 问题; @Builder.Default 保证默认值; @ToString.Exclude 防循环; @Value 不可变对象; Lombok 大幅减少样板代码, 需注意与框架的兼容性。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoLombok()">Lombok 核心</button>
+        <button onclick="demoSpring()">Spring 集成</button>
+        <button onclick="demoTrap()">常见陷阱</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoLombok() {
+            result.innerHTML = '';
+            log('# Lombok 核心注解');
+            log('');
+            log('@Data          — Getter+Setter+ToString+EqualsHashCode+RequiredConstructor');
+            log('@Builder       — Builder 模式链式构造');
+            log('@Slf4j         — log 日志字段');
+            log('@RequiredArgsConstructor — final 字段构造注入');
+            log('@Value         — 不可变 (所有字段 final)');
+            log('@With          — 生成 withX() 不变修改');
+        }
+
+        function demoSpring() {
+            result.innerHTML = '';
+            log('# Lombok + Spring Boot');
+            log('');
+            log('Service 层:');
+            log('  @Slf4j');
+            log('  @RequiredArgsConstructor');
+            log('  private final UserRepository repo;');
+            log('  → 自动构造注入, 无需 @Autowired');
+            log('');
+            log('DTO:');
+            log('  @Data @Builder');
+            log('  DTO.builder().field1(val).field2(val).build()');
+            log('');
+            log('Controller:');
+            log('  @Slf4j @RequiredArgsConstructor');
+        }
+
+        function demoTrap() {
+            result.innerHTML = '';
+            log('# 常见陷阱');
+            log('');
+            log('1. JPA + @Data → 懒加载问题');
+            log('   ✅ 用 @Getter/@Setter');
+            log('');
+            log('2. @Builder 默认值');
+            log('   ✅ @Builder.Default');
+            log('');
+            log('3. @ToString 循环引用');
+            log('   ✅ @ToString.Exclude');
+            log('');
+            log('4. @Data 集合 setter');
+            log('   ✅ 手动初始化');
+        }
+    </script>
+</body>
+</html>

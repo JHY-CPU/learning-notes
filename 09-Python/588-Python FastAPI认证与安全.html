@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Python FastAPI认证与安全</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔐 FastAPI 认证与安全</h2><p>OAuth2 密码流、JWT 令牌生成与验证、密码哈希、当前用户依赖、角色权限控制、安全头 Header、CORS 配置。</p></div>
+    <div class="card">
+        <h2>OAuth2 密码流</h2>
+        <div class="code">// ========== OAuth2PasswordBearer ==========
+from fastapi import FastAPI, Depends
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+
+app = FastAPI()
+
+# 声明 OAuth2 方案 (tokenUrl 是获取 token 的路径):
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# 模拟用户数据库:
+fake_users_db = {
+    "alice": {
+        "username": "alice",
+        "password": "secret",
+        "email": "alice@example.com",
+    }
+}
+
+@app.post("/token")
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    """获取访问令牌"""
+    user = fake_users_db.get(form_data.username)
+    if not user or form_data.password != user["password"]:
+        raise HTTPException(status_code=400, detail="用户名或密码错误")
+    return {"access_token": user["username"], "token_type": "bearer"}
+
+# 受保护路由:
+@app.get("/users/me")
+async def read_users_me(token: str = Depends(oauth2_scheme)):
+    # token 从 Authorization: Bearer <token> 提取
+    user = fake_users_db.get(token)
+    if not user:
+        raise HTTPException(status_code=401, detail="认证失败")
+    return user</div>
+    </div>
+    <div class="card">
+        <h2>JWT 令牌</h2>
+        <div class="code">// ========== JWT 认证 ==========
+# pip install python-jose[cryptography]  # JWT 处理
+# pip install passlib[bcrypt]            # 密码哈希
+
+from datetime import datetime, timedelta, timezone
+from jose import JWTError, jwt
+from passlib.context import CryptContext
+
+# 配置:
+SECRET_KEY = "your-secret-key-here"  # 生产用环境变量!
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
+
+# 密码哈希:
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
+
+# 创建 JWT:
+def create_access_token(data: dict, expires_delta: timedelta | None = None):
+    to_encode = data.copy()
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=15))
+    to_encode.update({"exp": expire})
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+
+# 验证 JWT:
+def verify_token(token: str):
+    """解码并验证 token, 返回用户名"""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=401, detail="无效 Token")
+        return username
+    except JWTError:
+        raise HTTPException(status_code=401, detail="无效 Token")</div>
+    </div>
+    <div class="card">
+        <h2>完整认证流程</h2>
+        <div class="code">// ========== 用户模型 ==========
+from pydantic import BaseModel
+
+class User(BaseModel):
+    username: str
+    email: str | None = None
+    disabled: bool | None = None
+
+class UserInDB(User):
+    hashed_password: str
+
+# ========== 登录与令牌 ==========
+from fastapi import FastAPI, Depends, HTTPException
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+
+app = FastAPI()
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+
+# 模拟数据库:
+fake_users_db = {
+    "alice": {
+        "username": "alice",
+        "email": "alice@example.com",
+        "hashed_password": get_password_hash("secret123"),
+        "disabled": False,
+    },
+}
+
+def get_user(db, username: str):
+    if username in db:
+        user_dict = db[username]
+        return UserInDB(**user_dict)
+
+def authenticate_user(db, username: str, password: str):
+    user = get_user(db, username)
+    if not user or not verify_password(password, user.hashed_password):
+        return False
+    return user
+
+@app.post("/token")
+async def login(form_data: OAuth2PasswordRequestForm = Depends()):
+    user = authenticate_user(fake_users_db, form_data.username, form_data.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+    access_token = create_access_token(data={"sub": user.username})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+# ========== 当前用户依赖 ==========
+async def get_current_user(token: str = Depends(oauth2_scheme)):
+    username = verify_token(token)
+    user = get_user(fake_users_db, username)
+    if user is None:
+        raise HTTPException(status_code=401, detail="用户不存在")
+    return user
+
+async def get_current_active_user(current_user: User = Depends(get_current_user)):
+    if current_user.disabled:
+        raise HTTPException(status_code=400, detail="账户已禁用")
+    return current_user
+
+@app.get("/users/me")
+async def read_users_me(current_user: User = Depends(get_current_active_user)):
+    return current_user</div>
+    </div>
+    <div class="card">
+        <h2>角色权限控制</h2>
+        <div class="code">// ========== 角色与权限 ==========
+from fastapi import Depends, HTTPException
+from pydantic import BaseModel
+
+class User(BaseModel):
+    username: str
+    role: str = "user"  # "admin" | "user" | "guest"
+
+# 角色检查依赖:
+def require_role(required_role: str):
+    """创建角色检查依赖的工厂函数"""
+    def role_checker(current_user: User = Depends(get_current_active_user)):
+        if current_user.role != required_role:
+            raise HTTPException(status_code=403, detail=f"需要 {required_role} 角色")
+        return current_user
+    return role_checker
+
+# 使用:
+@app.get("/admin")
+async def admin_only(admin: User = Depends(require_role("admin"))):
+    return {"message": "管理员专属", "user": admin.username}
+
+@app.get("/manager")
+async def manager_only(manager: User = Depends(require_role("manager"))):
+    return {"message": "经理专属"}
+
+# ========== 权限检查 ==========
+def check_permission(required_permission: str):
+    def permission_checker(current_user: User = Depends(get_current_active_user)):
+        # 模拟权限检查
+        permissions = {
+            "admin": ["read", "write", "delete", "manage"],
+            "user": ["read", "write"],
+            "guest": ["read"],
+        }
+        user_perms = permissions.get(current_user.role, [])
+        if required_permission not in user_perms:
+            raise HTTPException(status_code=403, detail="权限不足")
+        return current_user
+    return permission_checker
+
+@app.delete("/items/{item_id}")
+async def delete_item(
+    item_id: int,
+    user: User = Depends(check_permission("delete"))
+):
+    return {"message": f"商品 {item_id} 已删除"}</div>
+    </div>
+    <div class="card">
+        <h2>安全头与 CORS</h2>
+        <div class="code">// ========== CORS 配置 ==========
+from fastapi.middleware.cors import CORSMiddleware
+
+app = FastAPI()
+
+# 允许所有来源 (开发):
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],              # 允许的来源
+    allow_credentials=True,           # 允许 Cookie
+    allow_methods=["*"],              # 允许的方法
+    allow_headers=["*"],              # 允许的请求头
+)
+
+# 生产配置:
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://example.com",
+        "https://www.example.com",
+    ],
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+
+# ========== 安全中间件 ==========
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000"
+    return response
+
+# ========== HTTPS 强制 ==========
+# 生产环境中,应由反向代理 (Nginx) 处理 HTTPS
+# FastAPI 中可用:
+# from fastapi.middleware.httpsredirect import HTTPSRedirectMiddleware
+# app.add_middleware(HTTPSRedirectMiddleware)</div>
+        <div class="note">💡 认证要点: (1) OAuth2PasswordBearer(tokenUrl="...") 声明认证方案; (2) python-jose 生成/验证 JWT, passlib 哈希密码; (3) get_current_user 依赖自动验证 token; (4) require_role/check_permission 控制权限; (5) CORSMiddleware 处理跨域,安全头防御攻击。</div>
+    </div>
+    <div class="card">
+        <h2>练习</h2>
+        <button onclick="demoJWT()">JWT 演示</button>
+        <button onclick="demoAuth()">认证流程演示</button>
+        <button onclick="demoRole()">角色控制演示</button>
+        <div id="result"></div>
+    </div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+
+        function demoJWT() {
+            result.innerHTML = '';
+            log('# JWT 令牌演示');
+            log('');
+            log('创建 token:');
+            log('  jwt.encode({"sub": "alice", "exp": ...}, SECRET)');
+            log('');
+            log('验证 token:');
+            log('  jwt.decode(token, SECRET, algorithms=[...])');
+            log('  → {"sub": "alice", "exp": ...}');
+            log('');
+            log('结构: header.payload.signature');
+        }
+
+        function demoAuth() {
+            result.innerHTML = '';
+            log('# 认证流程演示');
+            log('');
+            log('1. POST /token');
+            log('   发送 username + password');
+            log('   返回 access_token');
+            log('');
+            log('2. GET /users/me');
+            log('   请求头: Authorization: Bearer <token>');
+            log('');
+            log('3. FastAPI 验证:');
+            log('   OAuth2PasswordBearer 提取 token');
+            log('   verify_token 解码 → get_current_user');
+        }
+
+        function demoRole() {
+            result.innerHTML = '';
+            log('# 角色权限控制');
+            log('');
+            log('def require_role(role: str):');
+            log('    def checker(user = Depends(get_user)):');
+            log('        if user.role != role:');
+            log('            raise HTTPException(403)');
+            log('        return user');
+            log('    return checker');
+            log('');
+            log('@app.get("/admin")');
+            log('def admin(admin = Depends(require_role("admin"))):');
+            log('    return {"msg": "管理员"}');
+        }
+    </script>
+</body>
+</html>

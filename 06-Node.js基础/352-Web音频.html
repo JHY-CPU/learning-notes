@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web音频</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        canvas { border: 1px solid #ddd; margin: 10px 0; background: #0a0a1a; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Web 音频</h2><p>AudioContext、OscillatorNode、GainNode、音频可视化、录音。</p></div>
+    <div class="card">
+        <h2>Web Audio API</h2>
+        <div class="code">// ========== AudioContext ==========
+const ctx = new AudioContext();          // 创建音频上下文
+const ctx2 = new AudioContext({          // 可选配置
+    sampleRate: 44100,                   // 采样率 (22050/44100/48000)
+    latencyHint: 'interactive'           // 'balanced' | 'interactive' | 'playback'
+});
+
+// ========== 音频节点 ==========
+// OscillatorNode — 音调发生器
+// GainNode — 音量控制
+// AnalyserNode — 频谱/波形分析
+// BiquadFilterNode — 滤波器 (lowpass/highpass/bandpass)
+// DelayNode — 延迟效果
+// ConvolverNode — 卷积混响
+// AudioBufferSourceNode — 播放音频缓冲
+// MediaStreamSourceNode — 麦克风输入
+
+// ========== 音频节点连接 ==========
+// source.connect(destination);
+// source.connect(gain).connect(destination);
+// source.connect(analyser); analyser.connect(destination);
+
+// ========== 录音 ==========
+// navigator.mediaDevices.getUserMedia({ audio: true })
+// MediaRecorder — 录音控制</div>
+    </div>
+    <div class="card">
+        <h2>演示：Web 音频</h2>
+        <button id="btnInit" onclick="initAudio()">初始化音频</button>
+        <button id="btnPlay" onclick="playTone()" disabled>播放音调</button>
+        <button id="btnStop" onclick="stopTone()" disabled>停止</button>
+        <button onclick="demoNodes()">音频节点图</button>
+        <button onclick="demoAnalyse()">音频可视化</button>
+        <button onclick="demoRecord()">录音模拟</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <canvas id="canvas" width="400" height="150"></canvas>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const btnInit = document.getElementById('btnInit');
+        const btnPlay = document.getElementById('btnPlay');
+        const btnStop = document.getElementById('btnStop');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        // Mock AudioContext for demo
+        class MockAudioContext {
+            constructor() {
+                this.state = 'suspended';
+                this.sampleRate = 44100;
+                this.currentTime = 0;
+                this._nodes = [];
+                this.destination = { _type: 'destination' };
+                console.log('MockAudioContext created');
+            }
+            resume() {
+                this.state = 'running';
+                console.log('AudioContext resumed');
+            }
+            suspend() {
+                this.state = 'suspended';
+                console.log('AudioContext suspended');
+            }
+            close() {
+                this.state = 'closed';
+                console.log('AudioContext closed');
+            }
+            createOscillator() {
+                const node = new MockOscillatorNode(this);
+                this._nodes.push(node);
+                return node;
+            }
+            createGain() {
+                const node = new MockGainNode(this);
+                this._nodes.push(node);
+                return node;
+            }
+            createAnalyser() {
+                return new MockAnalyserNode(this);
+            }
+            createBiquadFilter() {
+                return new MockBiquadFilterNode(this);
+            }
+            createBuffer(numChannels, length, sampleRate) {
+                return { numberOfChannels: numChannels, length, sampleRate, getChannelData: () => new Float32Array(length) };
+            }
+            createBufferSource() {
+                return new MockAudioBufferSourceNode(this);
+            }
+        }
+
+        class MockOscillatorNode {
+            constructor(ctx) {
+                this.context = ctx;
+                this.type = 'sine'; // sine/square/sawtooth/triangle
+                this.frequency = { value: 440, setValueAtTime: (v, t) => { this.frequency.value = v; } };
+                this.detune = { value: 0 };
+                this._connected = null;
+            }
+            connect(dest) { this._connected = dest; return dest; }
+            start(t) { console.log(`Oscillator started at ${t || 0}, type=${this.type}, freq=${this.frequency.value}`); }
+            stop(t) { console.log(`Oscillator stopped at ${t || 0}`); }
+        }
+
+        class MockGainNode {
+            constructor(ctx) {
+                this.context = ctx;
+                this.gain = { value: 1, setValueAtTime: (v, t) => { this.gain.value = v; }, linearRampToValueAtTime: (v, t) => { this.gain.value = v; } };
+                this._connected = null;
+            }
+            connect(dest) { this._connected = dest; return dest; }
+        }
+
+        class MockAnalyserNode {
+            constructor(ctx) {
+                this.context = ctx;
+                this.fftSize = 2048;
+                this.frequencyBinCount = 1024;
+                this._connected = null;
+            }
+            connect(dest) { this._connected = dest; return dest; }
+            getByteFrequencyData(arr) {
+                // Simulate frequency data
+                for (let i = 0; i < arr.length; i++) {
+                    arr[i] = Math.floor(Math.random() * 150 + 50 * Math.sin(i * 0.1 + Date.now() * 0.001));
+                }
+            }
+            getByteTimeDomainData(arr) {
+                for (let i = 0; i < arr.length; i++) {
+                    arr[i] = 128 + Math.floor(100 * Math.sin(i * 0.05 + Date.now() * 0.005));
+                }
+            }
+        }
+
+        class MockAudioBufferSourceNode {
+            constructor(ctx) {
+                this.context = ctx;
+                this.buffer = null;
+                this.loop = false;
+                this._connected = null;
+            }
+            connect(dest) { this._connected = dest; return dest; }
+            start(t) { console.log(`BufferSource started at ${t || 0}`); }
+            stop(t) { console.log(`BufferSource stopped at ${t || 0}`); }
+        }
+
+        class MockBiquadFilterNode {
+            constructor(ctx) {
+                this.context = ctx;
+                this.type = 'lowpass'; // lowpass/highpass/bandpass/notch/peaking/allpass
+                this.frequency = { value: 1000 };
+                this.Q = { value: 1 };
+                this.gain = { value: 0 };
+                this._connected = null;
+            }
+            connect(dest) { this._connected = dest; return dest; }
+        }
+
+        let audioCtx = null;
+        let oscillator = null;
+        let gainNode = null;
+
+        function initAudio() {
+            log('🎵 Web Audio API:');
+            log('');
+
+            audioCtx = new MockAudioContext();
+            log('1️⃣ AudioContext 已创建');
+            log(`   状态: ${audioCtx.state}`);
+            log(`   采样率: ${audioCtx.sampleRate}Hz`);
+
+            // Create gain node
+            gainNode = audioCtx.createGain();
+            log('2️⃣ GainNode 已创建 (音量控制)');
+
+            // Enable buttons
+            btnPlay.disabled = false;
+            btnStop.disabled = false;
+            btnInit.disabled = true;
+            log('3️⃣ 音频系统就绪');
+        }
+
+        function playTone() {
+            if (!audioCtx) return;
+
+            // Ask for tone type
+            const types = ['sine', 'square', 'sawtooth', 'triangle'];
+            const type = types[Math.floor(Math.random() * 4)];
+            const freq = 200 + Math.random() * 800;
+
+            oscillator = audioCtx.createOscillator();
+            oscillator.type = type;
+            oscillator.frequency.value = freq;
+
+            // Connect: oscillator -> gain -> destination
+            oscillator.connect(gainNode);
+            gainNode.connect(audioCtx.destination);
+
+            // Set volume
+            gainNode.gain.value = 0.3;
+
+            oscillator.start(0);
+
+            log(`▶️ 播放: type=${type}, frequency=${freq.toFixed(0)}Hz`);
+            log(`   节点链: Oscillator → Gain → Destination`);
+            log(`   音量: ${gainNode.gain.value * 100}%`);
+        }
+
+        function stopTone() {
+            if (oscillator) {
+                oscillator.stop(0);
+                oscillator = null;
+                log('⏹️ 停止播放');
+            }
+        }
+
+        function demoNodes() {
+            log('🔊 音频节点系统:');
+            log('');
+
+            log('1️⃣ 音频节点类型:');
+            log('   • OscillatorNode — 波形发生器');
+            log(`     type: "sine" | "square" | "sawtooth" | "triangle"`);
+            log(`     frequency: 音调频率 (Hz), detune: 微调 (分)`);
+            log('');
+            log('   • GainNode — 音量控制');
+            log(`     gain.value: 增益 (0 = 静音, 1 = 原始, >1 = 放大)`);
+            log('');
+            log('   • AnalyserNode — 频谱分析');
+            log(`     fftSize: FFT 大小 (32-32768, 2^n)`);
+            log(`     frequencyBinCount: 频率段数 = fftSize / 2`);
+            log('');
+            log('   • BiquadFilterNode — 滤波器');
+            log(`     type: "lowpass" | "highpass" | "bandpass" | "notch"`);
+            log(`     frequency: 截止频率, Q: 品质因数`);
+            log('');
+            log('   • DelayNode — 延迟效果');
+            log(`     delayTime.value: 延迟时间 (秒)`);
+            log('');
+            log('   • ConvolverNode — 卷积混响 (模拟空间)`);
+            log('');
+
+            log('2️⃣ 音频路由示例:');
+            log('   // 简单播放');
+            log('   osc.connect(ctx.destination);');
+            log('');
+            log('   // 音量控制');
+            log('   osc.connect(gain).connect(ctx.destination);');
+            log('');
+            log('   // 可视化');
+            log('   osc.connect(analyser); analyser.connect(ctx.destination);');
+            log('');
+            log('   // 滤波');
+            log('   osc.connect(filter).connect(gain).connect(ctx.destination);');
+            log('');
+
+            log('3️⃣ AudioContext 控制:');
+            log('   ctx.resume()   — 恢复 (浏览器自动暂停)');
+            log('   ctx.suspend()  — 暂停');
+            log('   ctx.close()    — 关闭');
+            log('   ctx.state      — "suspended" | "running" | "closed"');
+        }
+
+        function demoAnalyse() {
+            log('📊 音频可视化:');
+            log('');
+
+            log('1️⃣ AnalyserNode 分析:');
+            log('   • getByteFrequencyData(arr) — 频率数据 (0-255)');
+            log('   • getByteTimeDomainData(arr) — 波形数据 (0-255)');
+            log('   • fftSize — 傅里叶变换大小 (默认 2048)');
+            log('   • frequencyBinCount — 频率条数 (fftSize/2)');
+            log('');
+
+            // Simulate visualization on canvas
+            const width = canvas.width;
+            const height = canvas.height;
+            let frame = 0;
+
+            function drawVisualization() {
+                ctx.fillStyle = '#0a0a1a';
+                ctx.fillRect(0, 0, width, height);
+
+                const analyser = new MockAnalyserNode(null);
+                analyser.fftSize = 256;
+                const bufferLength = analyser.frequencyBinCount;
+                const dataArray = new Uint8Array(bufferLength);
+                analyser.getByteFrequencyData(dataArray);
+
+                const barWidth = (width / bufferLength) * 2;
+                let x = 0;
+
+                for (let i = 0; i < bufferLength; i++) {
+                    const barHeight = (dataArray[i] / 255) * height;
+                    const hue = 180 + (i / bufferLength) * 180;
+                    ctx.fillStyle = `hsl(${hue}, 80%, ${50 + barHeight / height * 30}%)`;
+                    ctx.fillRect(x, height - barHeight, barWidth - 1, barHeight);
+                    x += barWidth;
+                }
+
+                frame++;
+                if (frame < 30) {
+                    requestAnimationFrame(drawVisualization);
+                }
+            }
+
+            drawVisualization();
+            log('2️⃣ 频谱可视化: 频率分布 (左低右高)');
+            log('3️⃣ 实时频率数据通过 getByteFrequencyData 获取');
+            log('');
+
+            log('📌 可视化类型:');
+            log('   • 频谱 (频率分布) — 柱状图');
+            log('   • 波形 (时域信号) — 折线图');
+            log('   • 环形频谱 — 极坐标');
+            log('   • 瀑布图 — 频率随时间变化');
+        }
+
+        function demoRecord() {
+            log('🎙️ 录音:');
+            log('');
+
+            log('1️⃣ 获取麦克风权限:');
+            log('   const stream = await navigator.mediaDevices.getUserMedia({');
+            log('     audio: {');
+            log('       sampleRate: 44100,');
+            log('       channelCount: 1,  // 单声道');
+            log('       echoCancellation: true,');
+            log('       noiseSuppression: true,');
+            log('       autoGainControl: true');
+            log('     }');
+            log('   });');
+            log('');
+
+            // Simulate MediaRecorder
+            class MockMediaRecorder {
+                constructor(stream, options = {}) {
+                    this.stream = stream;
+                    this.mimeType = options.mimeType || 'audio/webm';
+                    this.state = 'inactive';
+                    this.ondataavailable = null;
+                    this.onstop = null;
+                    this.onerror = null;
+                    this._chunks = [];
+                    log(`   MediaRecorder 创建: mimeType=${this.mimeType}`);
+                }
+                start(timeslice) {
+                    this.state = 'recording';
+                    log(`   录音开始 (timeslice=${timeslice || 'N/A'}ms)`);
+                    // Simulate data
+                    this._interval = setInterval(() => {
+                        if (this.ondataavailable) {
+                            this.ondataavailable({ data: { size: Math.random() * 10000 + 5000, type: this.mimeType } });
+                        }
+                    }, 1000);
+                }
+                stop() {
+                    this.state = 'inactive';
+                    clearInterval(this._interval);
+                    if (this.onstop) this.onstop({});
+                    log('   录音停止');
+                }
+                pause() { this.state = 'paused'; log('   录音暂停'); }
+                resume() { this.state = 'recording'; log('   录音恢复'); }
+                static isTypeSupported(type) {
+                    return ['audio/webm', 'audio/webm;codecs=opus', 'audio/ogg;codecs=opus'].includes(type);
+                }
+            }
+
+            const mockStream = { getTracks: () => [{ stop: () => log('   音频轨道已释放') }] };
+            const recorder = new MockMediaRecorder(mockStream, { mimeType: 'audio/webm;codecs=opus' });
+
+            log('');
+            log('2️⃣ 录音流程:');
+            log('   ① getUserMedia 获取音频流');
+            log('   ② 创建 MediaRecorder(stream)');
+            log('   ③ recorder.start(timeslice) 开始录制');
+            log('   ④ recorder.ondataavailable 获取数据块');
+            log('   ⑤ recorder.stop() 停止录制');
+            log('   ⑥ 合并 Blob 生成音频文件');
+            log('');
+
+            log('3️⃣ 支持的 MIME 类型:');
+            MockMediaRecorder.isTypeSupported = (type) => {
+                const result = { 'audio/webm': true, 'audio/webm;codecs=opus': true, 'audio/ogg;codecs=opus': true, 'audio/wav': false }[type] || false;
+                log(`   ${type}: ${result ? '✅' : '❌'}`);
+                return result;
+            };
+            MockMediaRecorder.isTypeSupported('audio/webm');
+            MockMediaRecorder.isTypeSupported('audio/webm;codecs=opus');
+            MockMediaRecorder.isTypeSupported('audio/wav');
+
+            log('');
+            log('4️⃣ 录音应用:');
+            log('   • 语音笔记');
+            log('   • 音频消息');
+            log('   • 语音识别 (SpeechRecognition)');
+            log('   • 实时音频处理 (AudioWorklet)');
+        }
+
+        console.log('=== Web 音频 ===');
+        document.getElementById('output').textContent =
+            `Web 音频: AudioContext / OscillatorNode / GainNode / AnalyserNode / 录音\n` +
+            `✅ Web 音频演示完成！`;
+    </script>
+</body>
+</html>

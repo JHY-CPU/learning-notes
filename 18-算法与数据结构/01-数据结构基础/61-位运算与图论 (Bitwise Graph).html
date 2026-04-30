@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head><meta charset="UTF-8"><title>61-位运算与图论 (Bitwise Graph)</title>
+<style>
+.card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+.card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+.code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; border-left: 3px solid #3498db; white-space: pre-wrap; }
+.note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; }
+pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background: #3498db; color: white; }
+button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+button:hover { opacity: 0.9; }
+#result { background: #f8f9fa; padding: 10px; border-radius: 4px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+</style></head>
+<body>
+<div class="card">
+  <h2>Bitwise Graph</h2>
+  <div class="code">位运算在图论中用于快速邻接判断、传递闭包（Bitset 优化）。</div>
+  <pre>// 位运算邻接矩阵
+function buildGraph(n, edges) {
+  const g = new Array(n).fill(0);
+  for (const [u,v] of edges) {
+    g[u] |= (1 << v);
+    g[v] |= (1 << u);
+  }
+  return g;
+}
+function hasEdge(g, u, v) { return (g[u] & (1 << v)) !== 0; }
+function neighbors(g, u, n) {
+  const res = [];
+  for (let i = 0; i < n; i++) if (g[u] & (1 << i)) res.push(i);
+  return res;
+}
+const g = buildGraph(4, [[0,1],[1,2],[2,3]]);
+console.log(hasEdge(g, 0, 1)); // true
+console.log(neighbors(g, 1, 4)); // [0,2]</pre>
+  <button onclick="runDemo()">运行演示</button>
+  <div id="result">点击按钮查看结果</div>
+</div>
+<script>
+function runDemo() {
+  function bg(n,edges){const g=new Array(n).fill(0);for(const [u,v] of edges){g[u]|=1<<v;g[v]|=1<<u;}return g;}
+  function has(g,u,v){return (g[u]&(1<<v))!==0;}
+  const g=bg(4,[[0,1],[1,2],[2,3]]);
+  document.getElementById('result').textContent =
+    `0-1连接: ${has(g,0,1)}\n1-3连接: ${has(g,1,3)}\n1的邻居: 0和${(g[1]&(1<<2))!==0?'2':''}`;
+}
+</script>
+</body>
+</html>

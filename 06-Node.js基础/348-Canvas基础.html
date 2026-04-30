@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas基础</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        canvas { border: 1px solid #ddd; margin: 10px 0; background: white; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Canvas 基础</h2><p>getContext、fillRect/strokeRect、颜色渐变、路径(path)、样式。</p></div>
+    <div class="card">
+        <h2>Canvas 2D API</h2>
+        <div class="code">// ========== 获取上下文 ==========
+const canvas = document.getElementById('myCanvas');
+const ctx = canvas.getContext('2d');
+// 也支持: 'webgl', 'webgl2', 'bitmaprenderer'
+
+// ========== 矩形 ==========
+ctx.fillStyle = 'red';
+ctx.fillRect(10, 10, 100, 50);   // 填充矩形
+ctx.strokeRect(10, 70, 100, 50); // 边框矩形
+ctx.clearRect(15, 15, 90, 40);   // 清除区域
+
+// ========== 路径 ==========
+ctx.beginPath();
+ctx.moveTo(50, 50);     // 起点
+ctx.lineTo(150, 50);    // 直线
+ctx.arc(100, 100, 50, 0, Math.PI * 2); // 圆
+ctx.closePath();
+ctx.fill();    // 填充
+ctx.stroke();  // 描边
+
+// ========== 样式 ==========
+ctx.fillStyle = '#3498db';   // 填充色
+ctx.strokeStyle = '#2c3e50'; // 描边色
+ctx.lineWidth = 2;           // 线宽
+ctx.globalAlpha = 0.5;       // 全局透明度</div>
+    </div>
+    <div class="card">
+        <h2>演示：Canvas</h2>
+        <button onclick="demoBasic()">基本图形</button>
+        <button onclick="demoPath()">路径绘制</button>
+        <button onclick="demoGradient()">渐变与样式</button>
+        <button onclick="demoTransform()">变换</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <canvas id="canvas" width="400" height="300"></canvas>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function clearCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#f8f9fa';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
+
+        function demoBasic() {
+            clearCanvas();
+            result.innerHTML = '';
+            log('🔷 Canvas 基本图形:');
+            log('');
+
+            // 填充矩形
+            ctx.fillStyle = '#3498db';
+            ctx.fillRect(20, 20, 80, 60);
+            log('1️⃣ fillRect(20, 20, 80, 60)');
+
+            // 边框矩形
+            ctx.strokeStyle = '#e74c3c';
+            ctx.lineWidth = 3;
+            ctx.strokeRect(120, 20, 80, 60);
+            log('2️⃣ strokeRect(120, 20, 80, 60) 红色边框');
+
+            // 半透明矩形
+            ctx.fillStyle = 'rgba(46, 204, 113, 0.5)';
+            ctx.fillRect(220, 20, 80, 60);
+            log('3️⃣ 半透明绿色矩形');
+
+            // 圆角 (使用路径)
+            ctx.fillStyle = '#9b59b6';
+            ctx.beginPath();
+            ctx.roundRect(320, 20, 60, 60, 10);
+            ctx.fill();
+            log('4️⃣ roundRect 圆角矩形');
+
+            // 清除区域
+            ctx.clearRect(40, 30, 40, 40);
+            log('5️⃣ clearRect(40, 30, 40, 40) 清除部分');
+
+            log('');
+            log('📌 Canvas 坐标: 左上角为 (0, 0)');
+            log('   x 向右增加, y 向下增加');
+        }
+
+        function demoPath() {
+            clearCanvas();
+            result.innerHTML = '';
+            log('✏️ 路径绘制:');
+            log('');
+
+            // 三角形
+            ctx.fillStyle = '#3498db';
+            ctx.beginPath();
+            ctx.moveTo(50, 100);
+            ctx.lineTo(100, 20);
+            ctx.lineTo(150, 100);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#2c3e50';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            log('1️⃣ 三角形: moveTo + lineTo + closePath');
+
+            // 圆形
+            ctx.fillStyle = '#e74c3c';
+            ctx.beginPath();
+            ctx.arc(250, 60, 40, 0, Math.PI * 2);
+            ctx.fill();
+            log('2️⃣ 圆形: arc(250, 60, 40, 0, 2π)');
+
+            // 圆弧
+            ctx.strokeStyle = '#2ecc71';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.arc(250, 160, 40, 0, Math.PI * 1.5);
+            ctx.stroke();
+            log('3️⃣ 圆弧: arc(250, 160, 40, 0, 1.5π)');
+
+            // 二次贝塞尔曲线
+            ctx.strokeStyle = '#f39c12';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(20, 200);
+            ctx.quadraticCurveTo(100, 100, 200, 200);
+            ctx.stroke();
+            // 控制点
+            ctx.fillStyle = '#e74c3c';
+            ctx.beginPath();
+            ctx.arc(100, 100, 4, 0, Math.PI * 2);
+            ctx.fill();
+            log('4️⃣ 二次贝塞尔: quadraticCurveTo(100, 100, 200, 200)');
+
+            // 三次贝塞尔曲线
+            ctx.strokeStyle = '#9b59b6';
+            ctx.beginPath();
+            ctx.moveTo(220, 200);
+            ctx.bezierCurveTo(260, 100, 320, 100, 360, 200);
+            ctx.stroke();
+            log('5️⃣ 三次贝塞尔: bezierCurveTo');
+        }
+
+        function demoGradient() {
+            clearCanvas();
+            result.innerHTML = '';
+            log('🌈 渐变与样式:');
+            log('');
+
+            // 线性渐变
+            const gradient = ctx.createLinearGradient(20, 20, 180, 120);
+            gradient.addColorStop(0, '#3498db');
+            gradient.addColorStop(0.5, '#9b59b6');
+            gradient.addColorStop(1, '#e74c3c');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(20, 20, 160, 100);
+            log('1️⃣ 线性渐变: createLinearGradient(20, 20, 180, 120)');
+            log('   色标: #3498db → #9b59b6 → #e74c3c');
+
+            // 径向渐变
+            const gradient2 = ctx.createRadialGradient(280, 70, 10, 280, 70, 60);
+            gradient2.addColorStop(0, '#f1c40f');
+            gradient2.addColorStop(0.5, '#e67e22');
+            gradient2.addColorStop(1, '#e74c3c');
+            ctx.fillStyle = gradient2;
+            ctx.beginPath();
+            ctx.arc(280, 70, 60, 0, Math.PI * 2);
+            ctx.fill();
+            log('2️⃣ 径向渐变: createRadialGradient(圆心, 内径, 外径)');
+
+            // 图案填充
+            ctx.fillStyle = '#2ecc71';
+            ctx.fillRect(20, 140, 80, 60);
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+            for (let y = 140; y < 200; y += 15) {
+                for (let x = 20; x < 100; x += 15) {
+                    ctx.beginPath();
+                    ctx.arc(x, y, 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            log('3️⃣ 自定义图案: 网格覆盖');
+
+            // 阴影
+            ctx.shadowColor = 'rgba(0, 0, 0, 0.3)';
+            ctx.shadowBlur = 10;
+            ctx.shadowOffsetX = 5;
+            ctx.shadowOffsetY = 5;
+            ctx.fillStyle = '#3498db';
+            ctx.fillRect(140, 140, 80, 60);
+            ctx.shadowColor = 'transparent';
+            log('4️⃣ 阴影: shadowBlur=10, offset=(5, 5)');
+
+            // 透明度和组合
+            ctx.globalAlpha = 0.7;
+            ctx.fillStyle = '#e74c3c';
+            ctx.beginPath();
+            ctx.arc(300, 170, 40, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.globalAlpha = 1.0;
+            log('5️⃣ 透明度: globalAlpha=0.7');
+        }
+
+        function demoTransform() {
+            clearCanvas();
+            result.innerHTML = '';
+            log('🔄 变换:');
+            log('');
+
+            // 保存/恢复
+            ctx.save();
+            log('1️⃣ ctx.save() — 保存当前状态');
+
+            // 平移
+            ctx.translate(50, 50);
+            ctx.fillStyle = '#3498db';
+            ctx.fillRect(0, 0, 60, 40);
+            log('2️⃣ translate(50, 50) — 平移原点');
+
+            // 旋转
+            ctx.rotate(Math.PI / 6); // 30度
+            ctx.fillStyle = '#e74c3c';
+            ctx.fillRect(0, 50, 60, 40);
+            log('3️⃣ rotate(30°) — 旋转 30 度');
+
+            // 缩放
+            ctx.restore();
+            ctx.save();
+            ctx.scale(1.5, 1.5);
+            ctx.fillStyle = '#2ecc71';
+            ctx.fillRect(20, 150, 50, 35);
+            log('4️⃣ scale(1.5, 1.5) — 放大 1.5 倍');
+
+            // 矩阵变换
+            ctx.restore();
+            ctx.fillStyle = '#9b59b6';
+            ctx.transform(1, 0.3, 0.2, 1, 200, 20);
+            ctx.fillRect(0, 0, 80, 60);
+            ctx.setTransform(1, 0, 0, 1, 0, 0); // 重置为单位矩阵
+            log('5️⃣ transform() — 自定义矩阵');
+            log('   setTransform() — 重置变换矩阵');
+            log('');
+
+            // 绘制坐标系
+            ctx.strokeStyle = '#ccc';
+            ctx.lineWidth = 1;
+            ctx.beginPath();
+            ctx.moveTo(0, 0); ctx.lineTo(400, 0);
+            ctx.moveTo(0, 0); ctx.lineTo(0, 300);
+            ctx.stroke();
+
+            log('📌 变换方法:');
+            log('   save/restore — 保存/恢复状态栈');
+            log('   translate — 平移');
+            log('   rotate — 旋转 (弧度)');
+            log('   scale — 缩放');
+            log('   transform/setTransform — 矩阵变换');
+        }
+
+        console.log('=== Canvas 基础 ===');
+
+        // 初始绘制
+        clearCanvas();
+        ctx.fillStyle = '#3498db';
+        ctx.font = '18px sans-serif';
+        ctx.fillStyle = '#7f8c8d';
+        ctx.fillText('点击按钮查看 Canvas 绘图', 80, 150);
+        document.getElementById('output').textContent =
+            `Canvas 基础: getContext / fillRect / strokeRect / path / 渐变 / 变换\n` +
+            `✅ Canvas 基础演示完成！`;
+    </script>
+</body>
+</html>

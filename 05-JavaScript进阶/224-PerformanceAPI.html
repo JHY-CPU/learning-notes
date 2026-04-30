@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance API</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #27ae60; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #perf-results { background: #f8f9fa; padding: 15px; border-radius: 4px; font-size: 13px; }
+        #perf-results .row { display: flex; justify-content: space-between; padding: 3px 0; border-bottom: 1px solid #eee; font-family: monospace; }
+        #perf-results .key { color: #7f8c8d; }
+        #perf-results .val { font-weight: bold; color: #2c3e50; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Performance API</h2><p>高精度时间测量与性能指标收集。</p></div>
+    <div class="card">
+        <h2>performance.now()</h2>
+        <div class="code">// 高精度时间戳（毫秒，从页面加载开始，精度微秒级）
+const t = performance.now();  // e.g. 1234.567
+
+// 比 Date.now() 更精确：
+// - 精度微秒级（vs 毫秒级）
+// - 单调递增（不会受系统时间影响）
+// - 可用于精确测量代码执行时间
+
+// 测量执行时间
+const start = performance.now();
+// ... 要测量的代码 ...
+const end = performance.now();
+console.log(`耗时: ${end - start}ms`);</div>
+    </div>
+    <div class="card">
+        <h2>performance.mark / measure</h2>
+        <div class="code">// 标记时间点
+performance.mark('start');
+// ... 操作 ...
+performance.mark('end');
+
+// 测量两个标记之间的时间
+performance.measure('my-operation', 'start', 'end');
+
+// 获取测量结果
+const measures = performance.getEntriesByType('measure');
+// 或: performance.getEntriesByName('my-operation')
+
+// 清除标记/测量
+performance.clearMarks('start');
+performance.clearMeasures('my-operation');</div>
+    </div>
+    <div class="card">
+        <h2>performance.getEntriesByType</h2>
+        <div class="code">// 获取不同类型的性能条目
+performance.getEntriesByType('navigation');  // 页面加载信息
+//   → domContentLoadedEventEnd, loadEventEnd, type(navigate/reload/back_forward)
+
+performance.getEntriesByType('paint');       // 绘制时间
+//   → first-paint, first-contentful-paint (FCP)
+
+performance.getEntriesByType('resource');   // 资源加载信息
+//   每个资源的 DNS/TCP/TTFB/下载时间
+
+// PerformanceObserver — 监听未来出现的条目
+const observer = new PerformanceObserver((list) => {
+    const entries = list.getEntries();
+    entries.forEach(e => console.log(e.name, e.startTime, e.duration));
+});
+observer.observe({ entryTypes: ['paint', 'largest-contentful-paint'] });</div>
+    </div>
+    <div class="card">
+        <h2>演示：性能测量</h2>
+        <button onclick="measureTime()">测量耗时操作</button>
+        <button onclick="measureMark()">使用 mark/measure</button>
+        <button onclick="showNavigation()">导航信息</button>
+        <div id="perf-results">
+            <div class="row"><span class="key">performance.now()</span><span class="val" id="p-now">-</span></div>
+            <div class="row"><span class="key">Date.now()</span><span class="val" id="d-now">-</span></div>
+            <div class="row"><span class="key">测量结果</span><span class="val" id="measure-result">-</span></div>
+        </div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const pNow = document.getElementById('p-now');
+        const dNow = document.getElementById('d-now');
+        const measureResult = document.getElementById('measure-result');
+
+        // 更新时间显示
+        function updateTime() {
+            pNow.textContent = performance.now().toFixed(3) + 'ms';
+            dNow.textContent = Date.now();
+        }
+        setInterval(updateTime, 200);
+        updateTime();
+
+        function measureTime() {
+            const start = performance.now();
+            // 模拟耗时操作
+            let sum = 0;
+            for (let i = 0; i < 1000000; i++) sum += Math.sqrt(i);
+            const end = performance.now();
+            measureResult.textContent = `${(end - start).toFixed(3)}ms (循环 100 万次)`;
+            console.log(`耗时操作: ${(end - start).toFixed(3)}ms`);
+        }
+
+        function measureMark() {
+            performance.mark('step1');
+            let arr = [];
+            for (let i = 0; i < 50000; i++) arr.push(i);
+            performance.mark('step2');
+            arr.sort(() => Math.random() - 0.5);
+            performance.mark('step3');
+            performance.measure('创建数组', 'step1', 'step2');
+            performance.measure('排序数组', 'step2', 'step3');
+            const m1 = performance.getEntriesByName('创建数组')[0];
+            const m2 = performance.getEntriesByName('排序数组')[0];
+            const msg = `创建: ${m1.duration.toFixed(2)}ms, 排序: ${m2.duration.toFixed(2)}ms`;
+            measureResult.textContent = msg;
+            console.log(msg);
+            performance.clearMarks();
+            performance.clearMeasures();
+        }
+
+        function showNavigation() {
+            const nav = performance.getEntriesByType('navigation')[0];
+            if (nav) {
+                const info = [
+                    `DOMContentLoaded: ${nav.domContentLoadedEventEnd.toFixed(0)}ms`,
+                    `Load: ${nav.loadEventEnd.toFixed(0)}ms`,
+                    `类型: ${nav.type}`,
+                    `重定向次数: ${nav.redirectCount}`,
+                ].join(' | ');
+                measureResult.textContent = info;
+                console.log('导航信息:', info);
+            } else {
+                measureResult.textContent = 'Navigation API 不可用';
+            }
+        }
+
+        // 页面加载后输出 Paint 时间
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                const paints = performance.getEntriesByType('paint');
+                paints.forEach(p => console.log(`${p.name}: ${p.startTime.toFixed(2)}ms`));
+            }, 100);
+        });
+
+        console.log('=== Performance API ===');
+        console.log('performance.now() - 高精度时间戳');
+        console.log('performance.mark/measure - 自定义标记');
+        console.log('getEntriesByType - 获取资源/导航/绘制时间');
+
+        document.getElementById('output').textContent =
+            `Performance API: 高精度测量\n` +
+            `performance.now() vs Date.now()\n` +
+            `mark/measure/getEntriesByType\n` +
+            `✅ Performance API 演示完成！`;
+    </script>
+</body>
+</html>

@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分组与捕获</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #group-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        input { padding: 6px 10px; border: 1px solid #ddd; border-radius: 4px; margin: 5px 0; width: 300px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>分组与捕获</h2><p>() 捕获组、(?:) 非捕获组、命名组、反向引用。</p></div>
+    <div class="card">
+        <h2>分组语法</h2>
+        <div class="code">// ========== 捕获组 () ==========
+// 捕获匹配的子字符串
+const match = '2024-01-15'.match(/(\d{4})-(\d{2})-(\d{2})/);
+// match[1] = '2024'
+// match[2] = '01'
+// match[3] = '15'
+
+// ========== 非捕获组 (?:) ==========
+// 仅用于分组，不捕获
+'hello world'.match(/(?:hello)\s(world)/);
+// 只有 1 个捕获组: 'world'
+
+// ========== 命名捕获组 (?&lt;name&gt;) (ES2018) ==========
+const m = '2024-01-15'.match(/(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})/);
+console.log(m.groups.year);  // '2024'
+console.log(m.groups.month); // '01'
+console.log(m.groups.day);   // '15'
+
+// ========== 反向引用 ==========
+// \1, \2... — 引用第 n 个捕获组
+// \k&lt;name&gt; — 引用命名组
+/(['"]).*?\1/       // 匹配 'text' 或 "text"
+/(?<quote>['"]).*?\k<quote>/ // 同上，命名版
+
+// 应用: 匹配重复单词
+/\b(\w+)\s+\1\b/    // 匹配 'hello hello'
+
+// ========== replace 中的引用 ==========
+// $1, $2... — 捕获组
+// $& — 整个匹配
+// $` — 匹配前文本
+// $' — 匹配后文本
+'2024-01-15'.replace(/(\d{4})-(\d{2})-(\d{2})/, '$2/$3/$1')
+// '01/15/2024'</div>
+    </div>
+    <div class="card">
+        <h2>演示：分组与捕获</h2>
+        <input id="groupInput" value="2024-01-15  hello hello  'text'  price: $100" placeholder="输入文本">
+        <button onclick="demoGroups()">分组演示</button>
+        <button onclick="demoReplace()">替换引用</button>
+        <div id="group-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const groupResult = document.getElementById('group-result');
+
+        function log(msg) {
+            groupResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function demoGroups() {
+            groupResult.innerHTML = '';
+            const text = document.getElementById('groupInput').value;
+            log(`📋 文本: "${text}"`);
+            log('');
+
+            log('1️⃣ 捕获组:');
+            const dateMatch = text.match(/(\d{4})-(\d{2})-(\d{2})/);
+            if (dateMatch) {
+                log(`   完整匹配: ${dateMatch[0]}`);
+                log(`   年: ${dateMatch[1]}`);
+                log(`   月: ${dateMatch[2]}`);
+                log(`   日: ${dateMatch[3]}`);
+            }
+            log('');
+
+            log('2️⃣ 非捕获组 (?:):');
+            const nonCap = 'abc123'.match(/(?:abc)(\d+)/);
+            log(`   (?:abc)(\\d+) → 捕获: ${nonCap[1]}`);
+            log('');
+
+            log('3️⃣ 命名捕获组:');
+            try {
+                const named = text.match(/(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})/);
+                if (named) {
+                    log(`   year: ${named.groups.year}`);
+                    log(`   month: ${named.groups.month}`);
+                    log(`   day: ${named.groups.day}`);
+                }
+            } catch (e) {
+                log('   ⚠️ 命名组可能不受支持');
+            }
+            log('');
+
+            log('4️⃣ 反向引用 \\1:');
+            const dup = text.match(/\b(\w+)\s+\1\b/);
+            log(`   \\b(\\w+)\\s+\\1\\b → ${dup ? `"${dup[0]}"` : '无重复单词'}`);
+
+            const quoteMatch = text.match(/(['"]).*?\1/);
+            log(`   (['"]).*?\\1 → ${quoteMatch ? `"${quoteMatch[0]}"` : '无引号字符串'}`);
+        }
+
+        function demoReplace() {
+            groupResult.innerHTML = '';
+            const text = document.getElementById('groupInput').value;
+            log('🔄 replace 引用演示:');
+            log('');
+
+            // 日期格式转换
+            log('1️⃣ 日期格式转换:');
+            const newDate = text.replace(
+                /(\d{4})-(\d{2})-(\d{2})/,
+                '$2/$3/$1'
+            );
+            log(`   原始: "${text}"`);
+            log(`   转换: "${newDate}"`);
+            log('');
+
+            log('2️⃣ $& (完整匹配):');
+            console.log('使用 $& 替换为【】:', text.replace(/\d{4}/g, '【$&】'));
+
+            log('3️⃣ 命名组替换:');
+            try {
+                const namedReplace = text.replace(
+                    /(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})/,
+                    '$<month>/$<day>/$<year>'
+                );
+                log(`   命名组替换: "${namedReplace}"`);
+            } catch (e) {
+                log('   ⚠️ 命名组替换可能不受支持');
+            }
+            log('');
+
+            log('4️⃣ 函数作为 replacer:');
+            const funcResult = text.replace(/(\d{4})-(\d{2})-(\d{2})/g, (match, y, m, d) => {
+                return `${m}月${d}日${y}年`;
+            });
+            log(`   函数替换: "${funcResult}"`);
+        }
+
+        console.log('=== 分组与捕获 ===');
+
+        document.getElementById('output').textContent =
+            `分组与捕获: ()捕获 / (?:)非捕获 / (?&lt;name&gt;)命名 / \\1反向引用\n` +
+            `replace引用: $1 $& $` + "`" + ` $' / 函数 replacer\n` +
+            `✅ 分组与捕获演示完成！`;
+    </script>
+</body>
+</html>

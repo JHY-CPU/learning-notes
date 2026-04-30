@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>记忆化Memoization</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        .stats { display: flex; gap: 15px; flex-wrap: wrap; margin: 10px 0; }
+        .stat-box { background: #f8f9fa; border-radius: 8px; padding: 15px; flex: 1; min-width: 140px; text-align: center; border: 2px solid #eee; }
+        .stat-box .num { font-size: 28px; font-weight: bold; color: #3498db; }
+        .stat-box .label { font-size: 12px; color: #7f8c8d; margin-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>记忆化 Memoization</h2><p>缓存函数计算结果的技术。对相同输入直接返回缓存结果，避免重复计算。适合纯函数和计算密集型操作。</p></div>
+    <div class="card"><h2>通用 memoize 实现</h2><p>使用 Map 作为缓存，根据参数生成缓存键。支持递归函数优化（如 Fibonacci 从 O(2^n) 降到 O(n)）。</p></div>
+    <div class="card"><h2>LRU 缓存 & WeakMap</h2><p>LRU（Least Recently Used）限制缓存大小，淘汰最久未使用的条目。WeakMap 用于对象参数，避免内存泄漏。</p></div>
+    <div class="card"><h2>交互演示</h2><p>
+        <button onclick="demoFibonacci()">Fibonacci 对比</button>
+        <button onclick="demoFactorial()">阶乘缓存</button>
+        <button onclick="demoLruCache()">LRU 缓存</button>
+        <button onclick="demoPerformance()">性能测试</button>
+    </p></div>
+    <div id="stats-area" class="stats"></div>
+    <pre id="output"></pre>
+    <script>
+        const output = document.getElementById('output');
+        const statsArea = document.getElementById('stats-area');
+
+        function log(msg) {
+            output.textContent += msg + '\n';
+            console.log(msg);
+        }
+
+        function clearLog() {
+            output.textContent = '';
+            statsArea.innerHTML = '';
+        }
+
+        // ========== 通用 memoize 实现 ==========
+        function memoize(fn) {
+            const cache = new Map();
+            return function(...args) {
+                const key = JSON.stringify(args);
+                if (cache.has(key)) {
+                    return cache.get(key);
+                }
+                const result = fn.apply(this, args);
+                cache.set(key, result);
+                return result;
+            };
+        }
+
+        // ========== 支持递归优化的 memoize ==========
+        function memoizeRecursive(fn) {
+            const cache = new Map();
+            const memoized = function(...args) {
+                const key = JSON.stringify(args);
+                if (cache.has(key)) {
+                    return cache.get(key);
+                }
+                const result = fn.apply(this, args);
+                cache.set(key, result);
+                return result;
+            };
+            return memoized;
+        }
+
+        // ========== LRU 缓存 ==========
+        class LRUCache {
+            constructor(capacity = 10) {
+                this.capacity = capacity;
+                this.cache = new Map(); // Map 保持插入顺序
+            }
+
+            get(key) {
+                if (!this.cache.has(key)) return undefined;
+                // 移动到末尾（最新）
+                const value = this.cache.get(key);
+                this.cache.delete(key);
+                this.cache.set(key, value);
+                return value;
+            }
+
+            set(key, value) {
+                if (this.cache.has(key)) {
+                    this.cache.delete(key);
+                } else if (this.cache.size >= this.capacity) {
+                    // 删除最久未使用的（第一个）
+                    const oldestKey = this.cache.keys().next().value;
+                    this.cache.delete(oldestKey);
+                    log(`[LRU] 淘汰: ${oldestKey}`);
+                }
+                this.cache.set(key, value);
+            }
+
+            has(key) { return this.cache.has(key); }
+            get size() { return this.cache.size; }
+            clear() { this.cache.clear(); }
+        }
+
+        function memoizeLRU(fn, capacity = 10) {
+            const cache = new LRUCache(capacity);
+            return function(...args) {
+                const key = JSON.stringify(args);
+                const cached = cache.get(key);
+                if (cached !== undefined) {
+                    log(`[缓存命中] ${key}`);
+                    return cached;
+                }
+                const result = fn.apply(this, args);
+                cache.set(key, result);
+                log(`[缓存未命中] ${key} = ${result}, 缓存大小: ${cache.size}`);
+                return result;
+            };
+        }
+
+        // ========== 1. Fibonacci 对比 ==========
+        function demoFibonacci() {
+            clearLog();
+            log('=== Fibonacci 性能对比 ===\n');
+
+            // 朴素递归（指数级 O(2^n)）
+            function fib(n) {
+                if (n <= 1) return n;
+                return fib(n - 1) + fib(n - 2);
+            }
+
+            // 记忆化递归（线性 O(n)）
+            const fibMemo = memoizeRecursive(function(n) {
+                if (n <= 1) return n;
+                return fibMemo(n - 1) + fibMemo(n - 2);
+            });
+
+            const n = 40;
+            log(`计算 fibonacci(${n})...`);
+
+            // 测试无缓存
+            let start = performance.now();
+            const result1 = fib(n);
+            const time1 = performance.now() - start;
+            log(`无缓存: fib(${n}) = ${result1}, 耗时 ${time1.toFixed(2)}ms (O(2^n))`);
+
+            // 测试有缓存
+            start = performance.now();
+            const result2 = fibMemo(n);
+            const time2 = performance.now() - start;
+            log(`有缓存: fib(${n}) = ${result2}, 耗时 ${time2.toFixed(2)}ms (O(n))`);
+
+            const speedup = (time1 / time2).toFixed(0);
+            log(`\n加速比: ${speedup}x`);
+
+            statsArea.innerHTML = `
+                <div class="stat-box"><div class="num">${time1.toFixed(0)}ms</div><div class="label">无缓存</div></div>
+                <div class="stat-box"><div class="num">${time2.toFixed(1)}ms</div><div class="label">有缓存</div></div>
+                <div class="stat-box"><div class="num">${speedup}x</div><div class="label">加速比</div></div>
+            `;
+        }
+
+        // ========== 2. 阶乘缓存 ==========
+        function demoFactorial() {
+            clearLog();
+            log('=== 阶乘缓存 ===\n');
+
+            const factorial = memoize(function(n) {
+                if (n <= 1) return 1;
+                return n * factorial(n - 1);
+            });
+
+            log('第一次计算:');
+            log(`factorial(10) = ${factorial(10)}`);
+            log(`factorial(20) = ${factorial(20)}`);
+            log(`factorial(30) = ${factorial(30)}`);
+
+            log('\n第二次调用（全部命中缓存）:');
+            const start = performance.now();
+            [10, 20, 30, 5, 15, 25].forEach(n => factorial(n));
+            const elapsed = (performance.now() - start).toFixed(2);
+            log(`6 次查询耗时 ${elapsed}ms (Map 查找)`);
+        }
+
+        // ========== 3. LRU 缓存 ==========
+        function demoLruCache() {
+            clearLog();
+            log('=== LRU 缓存（容量 = 5）===\n');
+
+            const compute = memoizeLRU(function(x) {
+                log(`  计算: heavyCompute(${x})`);
+                return x * x;
+            }, 5);
+
+            for (let i = 1; i <= 7; i++) {
+                log(`\ncompute(${i}):`);
+                compute(i);
+            }
+
+            log('\n再次访问前几个（应触发淘汰检测）:');
+            log('\ncompute(1)（可能已被淘汰）:');
+            compute(1);
+
+            log('\ncompute(2):');
+            compute(2);
+
+            log('\nLRU 保证热点数据保留在缓存中');
+        }
+
+        // ========== 4. 性能测试 ==========
+        function demoPerformance() {
+            clearLog();
+            log('=== 性能基准测试 ===\n');
+
+            // 模拟计算密集函数
+            function heavyCalc(n) {
+                let sum = 0;
+                for (let i = 0; i < n * 1000000; i++) sum += i;
+                return sum;
+            }
+
+            const memoHeavy = memoize(heavyCalc);
+
+            log('首次调用 heavyCalc(200)（无缓存）:');
+            let start = performance.now();
+            const r1 = heavyCalc(200);
+            let elapsed = (performance.now() - start).toFixed(2);
+            log(`结果: ${r1}, 耗时: ${elapsed}ms`);
+
+            log('\n第二次调用 heavyCalc(200)（有缓存）:');
+            start = performance.now();
+            const r2 = memoHeavy(200);
+            elapsed = (performance.now() - start).toFixed(2);
+            log(`结果: ${r2}, 耗时: ${elapsed}ms`);
+
+            log('\n第三次调用（再次命中缓存）:');
+            start = performance.now();
+            const r3 = memoHeavy(200);
+            elapsed = (performance.now() - start).toFixed(2);
+            log(`结果: ${r3}, 耗时: ${elapsed}ms`);
+
+            statsArea.innerHTML = `
+                <div class="stat-box"><div class="num">首次</div><div class="label">无缓存 - 完整计算</div></div>
+                <div class="stat-box"><div class="num">次次</div><div class="label">有缓存 - Map 查找</div></div>
+            `;
+        }
+
+        log('=== 记忆化 Memoization 演示 ===\n记忆化通过缓存避免重复计算，特别适合递归和计算密集型纯函数。\n\n点击上方按钮查看不同示例。');
+    </script>
+</body>
+</html>

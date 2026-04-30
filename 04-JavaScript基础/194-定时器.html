@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>定时器</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #f39c12; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        button:disabled { background: #bdc3c7; cursor: not-allowed; }
+        #counter { font-size: 48px; font-weight: bold; text-align: center; padding: 20px; color: #3498db; }
+        #timer-display { font-size: 20px; font-family: monospace; text-align: center; padding: 10px; }
+        .progress-bar { height: 20px; background: #ecf0f1; border-radius: 10px; overflow: hidden; margin: 10px 0; }
+        .progress-bar .fill { height: 100%; background: #2ecc71; border-radius: 10px; transition: width 0.1s; width: 0%; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>定时器</h2><p>setTimeout / setInterval / clearTimeout / clearInterval。</p></div>
+    <div class="card">
+        <h2>setTimeout — 延时执行</h2>
+        <div class="code">// setTimeout(函数, 延迟毫秒数, 参数...)
+// 在指定延迟后执行一次函数
+
+const timerId = setTimeout(() => {
+    console.log('1秒后执行');
+}, 1000);
+
+// 带参数
+setTimeout((a, b) => {
+    console.log('参数:', a, b);
+}, 500, 'Hello', 'World');
+
+// 字符串形式（不推荐，类似 eval）
+setTimeout('console.log("不推荐")', 1000);
+
+// clearTimeout — 取消定时器
+clearTimeout(timerId);
+
+// ⚠️ 延迟时间是最小延迟，不是精确时间
+// 如果主线程繁忙，实际执行可能更晚
+
+// ⚠️ this 指向问题
+// setTimeout 中的函数 this 指向 window（严格模式 undefined）
+// 箭头函数可以保持 this</div>
+    </div>
+    <div class="card">
+        <h2>setInterval — 间隔执行</h2>
+        <div class="code">// setInterval(函数, 间隔毫秒数, 参数...)
+// 每隔指定时间执行一次
+
+const intervalId = setInterval(() => {
+    console.log('每秒执行');
+}, 1000);
+
+// clearInterval — 取消间隔
+clearInterval(intervalId);
+
+// ✅ 推荐：用递归 setTimeout 替代 setInterval
+// 因为 setInterval 不管前一次是否完成，可能累积
+function recursiveTimeout() {
+    setTimeout(() => {
+        // 执行操作
+        recursiveTimeout();  // 完成后再次调度
+    }, 1000);
+}
+
+// 递归 setTimeout 保证每次执行之间有固定间隔
+// setInterval 不保证（回调执行时间也计算在内）
+
+// ⚠️ 最小间隔：浏览器通常限制最小 4ms
+// ⚠️ 页面隐藏时（切换标签），浏览器会降低定时器频率</div>
+    </div>
+    <div class="card">
+        <h2>clearTimeout / clearInterval</h2>
+        <div class="code">// setTimeout 和 setInterval 都返回一个数字 ID
+// 可以通过这个 ID 取消
+
+// setTimeout
+const timeoutId = setTimeout(() => {
+    console.log('不会执行');
+}, 1000);
+clearTimeout(timeoutId);
+
+// setInterval
+const intervalId = setInterval(() => {
+    console.log('不会执行');
+}, 1000);
+clearInterval(intervalId);
+
+// 最佳实践
+// 1. 总是保存返回值（timer ID）
+// 2. 在组件卸载/页面离开时清理定时器
+// 3. 用递归 setTimeout 替代 setInterval
+
+// Node.js 额外 API
+// setImmediate — 在当前事件循环之后立即执行
+// process.nextTick — 在当前操作完成后立即执行（微任务）</div>
+    </div>
+    <div class="card">
+        <h2>实际应用：倒计时</h2>
+        <div id="timer-display">准备开始...</div>
+        <div class="progress-bar">
+            <div class="fill" id="progress-fill"></div>
+        </div>
+        <div id="counter" style="font-size:48px;font-weight:bold;text-align:center;color:#3498db;">0</div>
+    </div>
+    <div style="display:flex;gap:10px;margin:10px 0;flex-wrap:wrap;">
+        <button id="start-timer">开始 setInterval</button>
+        <button id="stop-timer" disabled>停止</button>
+        <button id="start-timeout-chain">递归 setTimeout</button>
+        <button id="clear-all">清理所有</button>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const counter = document.getElementById('counter');
+        const timerDisplay = document.getElementById('timer-display');
+        const progressFill = document.getElementById('progress-fill');
+        const startBtn = document.getElementById('start-timer');
+        const stopBtn = document.getElementById('stop-timer');
+        const chainBtn = document.getElementById('start-timeout-chain');
+        const clearAllBtn = document.getElementById('clear-all');
+
+        let intervalId = null;
+        let chainId = null;
+        let count = 0;
+
+        console.log('=== setTimeout ===');
+        const timeoutId = setTimeout(() => {
+            console.log('setTimeout 执行（1秒后）');
+        }, 1000);
+        console.log('timeoutId:', timeoutId);
+
+        console.log('=== clearTimeout ===');
+        const cancelledId = setTimeout(() => {
+            console.log('这条不会输出');
+        }, 1000);
+        clearTimeout(cancelledId);
+        console.log('已取消定时器:', cancelledId);
+
+        console.log('=== setInterval ===');
+
+        function startInterval() {
+            if (intervalId) return;
+            count = 0;
+            counter.textContent = '0';
+            timerDisplay.textContent = '运行中...';
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+
+            intervalId = setInterval(() => {
+                count++;
+                counter.textContent = count;
+                progressFill.style.width = (count % 100) + '%';
+                timerDisplay.textContent = `setInterval × ${count}`;
+                console.log('interval tick:', count);
+
+                if (count >= 20) {
+                    stopInterval();
+                    timerDisplay.textContent = '已到达 20 次';
+                }
+            }, 200);
+            console.log('setInterval 已启动, id:', intervalId);
+        }
+
+        function stopInterval() {
+            if (intervalId) {
+                clearInterval(intervalId);
+                console.log('已停止 interval:', intervalId);
+                intervalId = null;
+                startBtn.disabled = false;
+                stopBtn.disabled = true;
+                timerDisplay.textContent = '已停止';
+            }
+        }
+
+        let chainCount = 0;
+
+        function startChain() {
+            if (chainId) return;
+            chainCount = 0;
+            timerDisplay.textContent = '递归 setTimeout 运行中...';
+            chainBtn.disabled = true;
+
+            function tick() {
+                chainCount++;
+                counter.textContent = 'C:' + chainCount;
+                timerDisplay.textContent = `递归 setTimeout × ${chainCount}`;
+                progressFill.style.width = (chainCount % 100) + '%';
+                console.log('timeout chain:', chainCount);
+
+                if (chainCount >= 20) {
+                    timerDisplay.textContent = '递归完成';
+                    chainBtn.disabled = false;
+                    chainId = null;
+                    return;
+                }
+
+                chainId = setTimeout(tick, 200);
+            }
+
+            chainId = setTimeout(tick, 200);
+            console.log('递归 setTimeout 已启动');
+        }
+
+        function clearAll() {
+            stopInterval();
+            if (chainId) {
+                clearTimeout(chainId);
+                chainId = null;
+                chainBtn.disabled = false;
+                console.log('已停止递归 setTimeout');
+            }
+            count = 0;
+            chainCount = 0;
+            counter.textContent = '0';
+            progressFill.style.width = '0%';
+            timerDisplay.textContent = '已清理';
+        }
+
+        startBtn.addEventListener('click', startInterval);
+        stopBtn.addEventListener('click', stopInterval);
+        chainBtn.addEventListener('click', startChain);
+        clearAllBtn.addEventListener('click', clearAll);
+
+        console.log('=== setTimeout vs setInterval ===');
+        console.log('setTimeout: 一次性的延时执行');
+        console.log('setInterval: 重复间隔执行');
+        console.log('推荐：递归 setTimeout 替代 setInterval');
+
+        document.getElementById('output').textContent =
+            `定时器演示已启动\n` +
+            `点击按钮体验 setTimeout / setInterval\n` +
+            `✅ 定时器演示完成！`;
+    </script>
+</body>
+</html>

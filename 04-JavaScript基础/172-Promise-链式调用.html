@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Promise-链式调用</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #2980b9; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Promise 链式调用</h2><p>每个 .then 返回新 Promise，可以无限链式调用。</p></div>
+    <div class="card">
+        <h2>链式调用基础</h2>
+        <div class="code">// .then() 返回一个新的 Promise
+// 所以可以一直 .then().then().then()
+
+Promise.resolve(1)
+    .then(v => {
+        console.log('第1步:', v);
+        return v + 1;  // 返回普通值
+    })
+    .then(v => {
+        console.log('第2步:', v);
+        return v + 1;
+    })
+    .then(v => {
+        console.log('第3步:', v);
+        return v + 1;
+    });
+// 输出：
+// 第1步: 1
+// 第2步: 2
+// 第3步: 3
+
+// .then() 的返回值决定下一个 .then() 接收的值</div>
+    </div>
+    <div class="card">
+        <h2>then 的返回值</h2>
+        <div class="code">// then 的回调可以返回3种类型：
+
+// 1. 返回普通值 → 下一个 then 接收该值
+Promise.resolve(1)
+    .then(v => v * 2)       // 返回 2
+    .then(v => console.log(v));  // 2
+
+// 2. 返回 Promise → 等待 Promise 完成，then 接收结果
+Promise.resolve(1)
+    .then(v => {
+        return new Promise(resolve => {
+            setTimeout(() => resolve(v * 10), 500);
+        });
+    })
+    .then(v => console.log(v));  // 10（500ms后）
+
+// 3. 抛出错误 → 跳到 catch
+Promise.resolve(1)
+    .then(v => {
+        throw new Error('出错了');
+    })
+    .catch(e => console.log(e.message));  // '出错了'
+
+// 4. 返回 thenable 对象 → 自动展开
+Promise.resolve(1)
+    .then(v => ({
+        then(resolve) { resolve(v + 100); }
+    }))
+    .then(v => console.log(v));  // 101</div>
+    </div>
+    <div class="card">
+        <h2>错误传播</h2>
+        <div class="code">// 错误会跳过中间的 then，直达最近的 catch
+Promise.resolve(1)
+    .then(v => {
+        console.log('第1步:', v);
+        return v + 1;
+    })
+    .then(v => {
+        console.log('第2步:', v);
+        throw new Error('第2步出错');
+    })
+    .then(v => {
+        // 这个不会执行
+        console.log('第3步:', v);
+    })
+    .catch(e => {
+        console.log('捕获错误:', e.message);  // '第2步出错'
+    })
+    .then(v => {
+        // catch 之后可以继续链式调用
+        console.log('catch 之后的 then, v =', v);  // undefined（catch 没有 return）
+    });
+
+// catch 也可以返回值，相当于恢复错误
+Promise.resolve(1)
+    .then(() => { throw new Error('失败了'); })
+    .catch(e => {
+        console.log('错误:', e.message);
+        return '恢复值';  // 错误恢复了
+    })
+    .then(v => console.log('恢复后:', v));  // '恢复后: 恢复值'</div>
+    </div>
+    <div class="card">
+        <h2>异步操作串行</h2>
+        <div class="code">// Promise 链的核心用法：串行异步操作
+const delay = ms => new Promise(r => setTimeout(r, ms));
+
+// 模拟：用户 → 订单 → 物流信息
+function getUser(id) {
+    return delay(300).then(() => ({ id, name: 'Alice' }));
+}
+function getOrders(userId) {
+    return delay(300).then(() => ([
+        { id: 1, product: '手机' },
+        { id: 2, product: '电脑' }
+    ]));
+}
+function getTracking(orderId) {
+    return delay(300).then(() => ({ orderId, status: '已发货' }));
+}
+
+// 链式调用：每个异步操作依赖上一步的结果
+getUser(1)
+    .then(user => {
+        console.log('用户:', user.name);
+        return getOrders(user.id);
+    })
+    .then(orders => {
+        console.log('订单数:', orders.length);
+        return getTracking(orders[0].id);
+    })
+    .then(tracking => {
+        console.log('物流状态:', tracking.status);
+    })
+    .catch(err => console.error('错误:', err));
+
+// 扁平化：避免嵌套回调（对比回调地狱）</div>
+        <div class="note">💡 链式调用将嵌套的回调地狱（callback hell）变成了扁平的链式结构。</div>
+    </div>
+    <div class="card">
+        <h2>链式调用的常见误区</h2>
+        <div class="code">// ❌ 误区1：嵌套而不是链式
+Promise.resolve(1).then(v1 => {
+    Promise.resolve(v1 + 1).then(v2 => {
+        console.log('嵌套:', v2);  // 能工作，但嵌套了
+    });
+});
+// 应该用链式：
+Promise.resolve(1)
+    .then(v1 => v1 + 1)
+    .then(v2 => console.log('链式:', v2));
+
+// ❌ 误区2：在 then 中创建 Promise 但不返回
+Promise.resolve(1)
+    .then(v => {
+        new Promise(r => r(v + 1));  // 没 return！
+    })
+    .then(v => console.log('没返回:', v));  // undefined
+
+// ✅ 正确：返回 Promise
+Promise.resolve(1)
+    .then(v => {
+        return new Promise(r => r(v + 1));
+    })
+    .then(v => console.log('正确:', v));  // 2
+
+// ❌ 误区3：忘记 catch 错误
+// 链式调用末尾建议加 catch
+
+// ✅ 正确：finally 做清理
+Promise.resolve(1)
+    .then(v => v * 2)
+    .then(v => console.log(v))
+    .catch(e => console.log(e))
+    .finally(() => console.log('清理'));</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== 链式调用 ===');
+        Promise.resolve(10)
+            .then(v => {
+                console.log('第1步:', v);
+                return v + 5;
+            })
+            .then(v => {
+                console.log('第2步:', v);
+                return v * 2;
+            })
+            .then(v => {
+                console.log('第3步:', v);
+                return v;
+            });
+
+        console.log('=== 返回 Promise ===');
+        const delay = ms => new Promise(r => setTimeout(r, ms));
+        Promise.resolve('开始')
+            .then(v => {
+                return delay(200).then(() => v + ' → 200ms后');
+            })
+            .then(v => console.log('异步链:', v));
+
+        console.log('=== 错误跳过 then ===');
+        Promise.resolve(1)
+            .then(v => {
+                console.log('正常步骤');
+                throw new Error('跳过错');
+            })
+            .then(v => console.log('被跳过'))
+            .catch(e => console.log('捕获:', e.message));
+
+        console.log('=== catch 恢复 ===');
+        Promise.resolve(1)
+            .then(() => { throw new Error('出错'); })
+            .catch(e => {
+                console.log('错误:', e.message);
+                return 42;  // 恢复
+            })
+            .then(v => console.log('恢复后得到:', v));
+
+        console.log('=== 串行模拟 ===');
+        // 模拟串行请求
+        function fetchUser(id) {
+            return delay(100).then(() => ({ id, name: 'Alice' }));
+        }
+        function fetchPosts(userId) {
+            return delay(100).then(() => ['post1', 'post2']);
+        }
+        fetchUser(1)
+            .then(user => {
+                console.log('用户:', user.name);
+                return fetchPosts(user.id);
+            })
+            .then(posts => {
+                console.log('帖子:', posts.join(', '));
+            });
+
+        document.getElementById('output').textContent =
+            `链式调用: 10 → 15 → 30\n` +
+            `错误传播: catch 恢复值=42\n` +
+            `✅ Promise 链式调用演示完成！`;
+    </script>
+</body>
+</html>

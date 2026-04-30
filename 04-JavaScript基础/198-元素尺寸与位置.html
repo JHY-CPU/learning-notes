@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>元素尺寸与位置</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #f39c12; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #target-box { background: #3498db; color: white; padding: 20px; margin: 20px; border: 5px solid #2980b9; border-radius: 8px; width: 200px; overflow: hidden; }
+        #scroll-box { background: #ecf0f1; border: 2px solid #bdc3c7; border-radius: 8px; padding: 10px; width: 300px; height: 120px; overflow: auto; margin: 10px 0; }
+        #scroll-content { height: 400px; padding: 10px; }
+        #scroll-content div { padding: 8px; margin: 4px 0; background: #3498db; color: white; border-radius: 4px; }
+        .info-grid { display: grid; grid-template-columns: auto 1fr; gap: 3px 10px; font-size: 13px; background: #f8f9fa; padding: 15px; border-radius: 4px; }
+        .info-grid .key { color: #7f8c8d; font-weight: bold; }
+        .info-grid .val { font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>元素尺寸与位置</h2><p>offset / client / scroll / getBoundingClientRect。</p></div>
+    <div class="card">
+        <h2>offset 系列 — 元素自身尺寸与偏移</h2>
+        <div class="code">// offsetWidth — 元素总宽度（content + padding + border + scrollbar）
+// offsetHeight — 元素总高度
+const width = element.offsetWidth;
+const height = element.offsetHeight;
+
+// offsetLeft — 元素左上角相对于 offsetParent 的水平偏移
+// offsetTop — 元素左上角相对于 offsetParent 的垂直偏移
+const left = element.offsetLeft;
+const top = element.offsetTop;
+
+// offsetParent — 最近的已定位祖先元素（position ≠ static）
+// 如果无定位祖先，则为 body
+const parent = element.offsetParent;
+
+// 图示：
+// ┌────── offsetParent ──────┐
+// │         ...               │
+// │  ┌──── element ─────┐     │
+// │  │  offsetLeft →    │     │
+// │  │  offsetTop  ↓    │     │
+// │  │  ┌─content─┐     │     │
+// │  │  │         │     │     │
+// │  │  └─────────┘     │     │
+// │  │←──offsetWidth──→│     │
+// │  └─────────────────┘     │
+// └──────────────────────────┘</div>
+    </div>
+    <div class="card">
+        <h2>client 系列 — 内容可见区域</h2>
+        <div class="code">// clientWidth — 可见内容宽度（content + padding，不含 border 和 scrollbar）
+// clientHeight — 可见内容高度
+const visibleWidth = element.clientWidth;
+const visibleHeight = element.clientHeight;
+
+// clientLeft — 左边框宽度
+// clientTop — 上边框宽度
+const borderLeft = element.clientLeft;
+const borderTop = element.clientTop;
+
+// 对于 document.documentElement（&lt;html&gt;）
+// document.documentElement.clientWidth   // 视口宽度（不含滚动条）
+// document.documentElement.clientHeight  // 视口高度（不含滚动条）
+
+// ⚠️ clientWidth/Height 不包含滚动条
+// ⚠️ offsetWidth/Height 包含滚动条</div>
+    </div>
+    <div class="card">
+        <h2>scroll 系列 — 滚动尺寸</h2>
+        <div class="code">// scrollWidth — 内容总宽度（包含溢出部分）
+// scrollHeight — 内容总高度
+const totalWidth = element.scrollWidth;
+const totalHeight = element.scrollHeight;
+
+// scrollLeft — 水平滚动距离（可读写）
+// scrollTop — 垂直滚动距离（可读写）
+element.scrollLeft = 0;
+element.scrollTop = 100;
+
+// 判断是否滚动到底部
+const isBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 1;
+
+// 判断是否有滚动条
+const hasScroll = element.scrollHeight > element.clientHeight;
+
+// 滚动百分比
+const scrollPercent = element.scrollTop / (element.scrollHeight - element.clientHeight);</div>
+    </div>
+    <div class="card">
+        <h2>getBoundingClientRect — 元素视口坐标</h2>
+        <div class="code">// getBoundingClientRect() — 返回元素的视口坐标
+// 返回 DOMRect 对象（相对于视口，不是文档）
+
+const rect = element.getBoundingClientRect();
+
+// 返回对象：
+rect.x       // 元素左边缘的 X 坐标
+rect.y       // 元素上边缘的 Y 坐标
+rect.width   // 元素宽度（含 border）
+rect.height  // 元素高度（含 border）
+rect.top     // 元素上边缘的 Y 坐标（同 y）
+rect.right   // 元素右边缘的 X 坐标（x + width）
+rect.bottom  // 元素下边缘的 Y 坐标（y + height）
+rect.left    // 元素左边缘的 X 坐标（同 x）
+
+// 相对文档的坐标（+ 滚动距离）
+const docX = rect.left + window.scrollX;
+const docY = rect.top + window.scrollY;
+
+// 判断元素是否在视口内
+function isInViewport(el) {
+    const rect = el.getBoundingClientRect();
+    return (
+        rect.top < window.innerHeight &&
+        rect.bottom > 0 &&
+        rect.left < window.innerWidth &&
+        rect.right > 0
+    );
+}
+
+// getClientRects() — 获取文本的每一行矩形
+const textRects = element.getClientRects();
+// 常用于获取文本行的精确位置</div>
+    </div>
+    <div id="target-box">
+        <strong>目标元素</strong><br>
+        padding: 20px, border: 5px
+    </div>
+    <div id="scroll-box">
+        <div id="scroll-content">
+            <div>第 1 项</div>
+            <div>第 2 项</div>
+            <div>第 3 项</div>
+            <div>第 4 项</div>
+            <div>第 5 项</div>
+            <div>第 6 项</div>
+            <div>第 7 项</div>
+            <div>第 8 项</div>
+            <div>第 9 项</div>
+            <div>第 10 项</div>
+        </div>
+    </div>
+    <div style="display:flex;gap:10px;margin:10px 0;flex-wrap:wrap;">
+        <button onclick="measureElement()">测量元素</button>
+        <button onclick="measureScroll()">测量滚动</button>
+        <button onclick="measureBounding()">getBoundingClientRect</button>
+        <button onclick="checkInView()">检测是否在视口</button>
+    </div>
+    <div id="measure-result" class="info-grid"></div>
+    <pre id="output"></pre>
+    <script>
+        const target = document.getElementById('target-box');
+        const scrollBox = document.getElementById('scroll-box');
+        const scrollContent = document.getElementById('scroll-content');
+        const result = document.getElementById('measure-result');
+
+        function displayMeasurements(label, data) {
+            let html = `<span class="key" style="grid-column:1/-1;border-bottom:1px solid #ddd;margin-bottom:4px;">${label}</span>`;
+            for (let [key, val] of Object.entries(data)) {
+                html += `<span class="key">${key}:</span><span class="val">${val}</span>`;
+            }
+            result.innerHTML = html;
+        }
+
+        function measureElement() {
+            const data = {
+                offsetWidth: target.offsetWidth + 'px',
+                offsetHeight: target.offsetHeight + 'px',
+                offsetLeft: target.offsetLeft + 'px',
+                offsetTop: target.offsetTop + 'px',
+                offsetParent: target.offsetParent?.tagName || 'null',
+                clientWidth: target.clientWidth + 'px',
+                clientHeight: target.clientHeight + 'px',
+                clientLeft: target.clientLeft + 'px',
+                clientTop: target.clientTop + 'px',
+            };
+            displayMeasurements('元素尺寸与偏移', data);
+            console.log('offset:', target.offsetWidth, target.offsetHeight);
+            console.log('client:', target.clientWidth, target.clientHeight);
+        }
+
+        function measureScroll() {
+            const data = {
+                'scrollWidth (内容总宽)': scrollBox.scrollWidth + 'px',
+                'scrollHeight (内容总高)': scrollBox.scrollHeight + 'px',
+                'clientWidth (可见宽)': scrollBox.clientWidth + 'px',
+                'clientHeight (可见高)': scrollBox.clientHeight + 'px',
+                'scrollTop (已滚距离)': scrollBox.scrollTop + 'px',
+                'scrollLeft': scrollBox.scrollLeft + 'px',
+                '滚动百分比': ((scrollBox.scrollTop / (scrollBox.scrollHeight - scrollBox.clientHeight)) * 100).toFixed(1) + '%',
+            };
+            displayMeasurements('滚动尺寸', data);
+            console.log('scroll:', scrollBox.scrollWidth, scrollBox.scrollHeight);
+            console.log('client:', scrollBox.clientWidth, scrollBox.clientHeight);
+        }
+
+        function measureBounding() {
+            const rect = target.getBoundingClientRect();
+            const data = {
+                left: rect.left.toFixed(1) + 'px',
+                top: rect.top.toFixed(1) + 'px',
+                right: rect.right.toFixed(1) + 'px',
+                bottom: rect.bottom.toFixed(1) + 'px',
+                width: rect.width.toFixed(1) + 'px',
+                height: rect.height.toFixed(1) + 'px',
+                x: rect.x.toFixed(1) + 'px',
+                y: rect.y.toFixed(1) + 'px',
+                '文档X (含滚动)': (rect.left + window.scrollX).toFixed(1) + 'px',
+                '文档Y (含滚动)': (rect.top + window.scrollY).toFixed(1) + 'px',
+            };
+            displayMeasurements('getBoundingClientRect（视口坐标）', data);
+            console.log('bounding rect:', rect);
+        }
+
+        function checkInView() {
+            const rect = target.getBoundingClientRect();
+            const inView = (
+                rect.top < window.innerHeight &&
+                rect.bottom > 0 &&
+                rect.left < window.innerWidth &&
+                rect.right > 0
+            );
+            displayMeasurements('视口检测', {
+                '元素是否在视口内': inView ? '✅ 是' : '❌ 否',
+                '视口宽高': `${window.innerWidth} x ${window.innerHeight}`,
+                '元素 top': rect.top.toFixed(1) + 'px',
+                '元素 bottom': rect.bottom.toFixed(1) + 'px',
+            });
+            console.log('in viewport:', inView);
+        }
+
+        // 初始测量
+        measureElement();
+
+        // 滚动事件演示
+        scrollBox.addEventListener('scroll', function() {
+            const percent = this.scrollTop / (this.scrollHeight - this.clientHeight);
+            console.log(`滚动: ${(percent * 100).toFixed(1)}%`);
+        });
+
+        console.log('=== 尺寸属性总结 ===');
+        console.log('offsetWidth/Height: content+padding+border+scrollbar');
+        console.log('clientWidth/Height: content+padding（不含border和scrollbar）');
+        console.log('scrollWidth/Height: 内容总尺寸（含溢出）');
+        console.log('getBoundingClientRect: 视口坐标');
+
+        document.getElementById('output').textContent =
+            `offsetWidth=${target.offsetWidth}px, offsetHeight=${target.offsetHeight}px\n` +
+            `clientWidth=${target.clientWidth}px, clientHeight=${target.clientHeight}px\n` +
+            `✅ 元素尺寸与位置演示完成！`;
+    </script>
+</body>
+</html>

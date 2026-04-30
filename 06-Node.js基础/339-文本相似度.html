@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文本相似度</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>文本相似度</h2><p>Levenshtein 编辑距离、最长公共子串、余弦相似度、拼写纠正。</p></div>
+    <div class="card">
+        <h2>文本相似度算法</h2>
+        <div class="code">// ========== Levenshtein 编辑距离 ==========
+function levenshtein(a, b) {
+    const m = a.length, n = b.length;
+    const dp = Array(m + 1).fill(0).map(() => Array(n + 1).fill(0));
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++) {
+        for (let j = 1; j <= n; j++) {
+            const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+            dp[i][j] = Math.min(
+                dp[i - 1][j] + 1,      // 删除
+                dp[i][j - 1] + 1,      // 插入
+                dp[i - 1][j - 1] + cost // 替换
+            );
+        }
+    }
+    return dp[m][n];
+}
+
+// ========== 最长公共子串 ==========
+function longestCommonSubstring(a, b) {
+    let maxLen = 0, endIdx = 0;
+    const dp = Array(a.length + 1).fill(0).map(() => Array(b.length + 1).fill(0));
+    for (let i = 1; i <= a.length; i++) {
+        for (let j = 1; j <= b.length; j++) {
+            if (a[i - 1] === b[j - 1]) {
+                dp[i][j] = dp[i - 1][j - 1] + 1;
+                if (dp[i][j] > maxLen) { maxLen = dp[i][j]; endIdx = i; }
+            }
+        }
+    }
+    return a.slice(endIdx - maxLen, endIdx);
+}
+
+// ========== 余弦相似度 ==========
+function cosineSimilarity(text1, text2) { /* ... */ }</div>
+    </div>
+    <div class="card">
+        <h2>演示：文本相似度</h2>
+        <button onclick="demoLevenshtein()">编辑距离</button>
+        <button onclick="demoLCS()">最长公共子串</button>
+        <button onclick="demoCosine()">余弦相似度</button>
+        <button onclick="demoSpell()">拼写纠正</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoLevenshtein() {
+            result.innerHTML = '';
+            log('📏 Levenshtein 编辑距离:');
+            log('');
+
+            function levenshtein(a, b) {
+                const m = a.length, n = b.length;
+                const dp = Array(m + 1).fill(0).map(() => Array(n + 1).fill(0));
+                for (let i = 0; i <= m; i++) dp[i][0] = i;
+                for (let j = 0; j <= n; j++) dp[0][j] = j;
+                for (let i = 1; i <= m; i++) {
+                    for (let j = 1; j <= n; j++) {
+                        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+                        dp[i][j] = Math.min(
+                            dp[i - 1][j] + 1,
+                            dp[i][j - 1] + 1,
+                            dp[i - 1][j - 1] + cost
+                        );
+                    }
+                }
+                return dp[m][n];
+            }
+
+            function similarity(a, b) {
+                const dist = levenshtein(a, b);
+                const maxLen = Math.max(a.length, b.length);
+                return ((1 - dist / maxLen) * 100).toFixed(1);
+            }
+
+            const tests = [
+                ['kitten', 'sitting'],
+                ['hello', 'hallo'],
+                ['中国', '中国人'],
+                ['book', 'back'],
+                ['abc', 'abc'],
+                ['abc', 'xyz'],
+            ];
+
+            log('相似度计算:');
+            log('');
+            tests.forEach(([a, b]) => {
+                const dist = levenshtein(a, b);
+                const sim = similarity(a, b);
+                log(`   "${a}" ↔ "${b}"`);
+                log(`   编辑距离: ${dist}, 相似度: ${sim}%`);
+                log('');
+            });
+
+            log('📌 编辑距离操作:');
+            log('   • 插入 (Insert): +1');
+            log('   • 删除 (Delete): +1');
+            log('   • 替换 (Replace): +1');
+            log('   • 匹配 (Match): +0');
+        }
+
+        function demoLCS() {
+            result.innerHTML = '';
+            log('📎 最长公共子串:');
+            log('');
+
+            function longestCommonSubstring(a, b) {
+                let maxLen = 0, endIdx = 0;
+                const dp = Array(a.length + 1).fill(0).map(() => Array(b.length + 1).fill(0));
+                for (let i = 1; i <= a.length; i++) {
+                    for (let j = 1; j <= b.length; j++) {
+                        if (a[i - 1] === b[j - 1]) {
+                            dp[i][j] = dp[i - 1][j - 1] + 1;
+                            if (dp[i][j] > maxLen) { maxLen = dp[i][j]; endIdx = i; }
+                        }
+                    }
+                }
+                return a.slice(endIdx - maxLen, endIdx);
+            }
+
+            function longestCommonSubsequence(a, b) {
+                const m = a.length, n = b.length;
+                const dp = Array(m + 1).fill(0).map(() => Array(n + 1).fill(0));
+                for (let i = 1; i <= m; i++) {
+                    for (let j = 1; j <= n; j++) {
+                        if (a[i - 1] === b[j - 1]) dp[i][j] = dp[i - 1][j - 1] + 1;
+                        else dp[i][j] = Math.max(dp[i - 1][j], dp[i][j - 1]);
+                    }
+                }
+                // 回溯
+                let i = m, j = n, result = '';
+                while (i > 0 && j > 0) {
+                    if (a[i - 1] === b[j - 1]) { result = a[i - 1] + result; i--; j--; }
+                    else if (dp[i - 1][j] >= dp[i][j - 1]) i--;
+                    else j--;
+                }
+                return result;
+            }
+
+            const pairs = [
+                ['abcdef', 'zcdemf'],
+                ['ABABAB', 'BABABA'],
+                ['你好世界', '世界你好'],
+                ['编程语言', '程序语言'],
+            ];
+
+            log('最长公共子串 (连续) vs 最长公共子序列 (不连续):');
+            log('');
+            pairs.forEach(([a, b]) => {
+                const substr = longestCommonSubstring(a, b);
+                const subseq = longestCommonSubsequence(a, b);
+                log(`   "${a}" ↔ "${b}"`);
+                log(`   公共子串: "${substr}" (长度 ${substr.length})`);
+                log(`   公共子序列: "${subseq}" (长度 ${subseq.length})`);
+                log('');
+            });
+
+            log('📌 区别:');
+            log('   • 子串: 必须连续 (如 "abc" 在 "xabcy" 中)');
+            log('   • 子序列: 可以不连续 (如 "abc" 在 "axbyc" 中)');
+        }
+
+        function demoCosine() {
+            result.innerHTML = '';
+            log('📐 余弦相似度:');
+            log('');
+
+            function tokenize(text) {
+                return text.toLowerCase().split(/[\s,.\!?;:]+/).filter(Boolean);
+            }
+
+            function wordCounts(words) {
+                const counts = {};
+                for (const w of words) counts[w] = (counts[w] || 0) + 1;
+                return counts;
+            }
+
+            function cosineSimilarity(text1, text2) {
+                const words1 = tokenize(text1), words2 = tokenize(text2);
+                const freq1 = wordCounts(words1), freq2 = wordCounts(words2);
+                const allWords = new Set([...Object.keys(freq1), ...Object.keys(freq2)]);
+
+                let dotProduct = 0, mag1 = 0, mag2 = 0;
+                for (const word of allWords) {
+                    const f1 = freq1[word] || 0, f2 = freq2[word] || 0;
+                    dotProduct += f1 * f2;
+                    mag1 += f1 * f1;
+                    mag2 += f2 * f2;
+                }
+                if (mag1 === 0 || mag2 === 0) return 0;
+                return dotProduct / (Math.sqrt(mag1) * Math.sqrt(mag2));
+            }
+
+            const docs = [
+                { text: '我喜欢编程和读书', id: 'doc1' },
+                { text: '编程是我最大的爱好', id: 'doc2' },
+                { text: '今天天气很好适合运动', id: 'doc3' },
+                { text: '读书和编程都能学到知识', id: 'doc4' },
+            ];
+
+            const query = '我喜欢编程';
+            log(`查询: "${query}"`);
+            log('');
+
+            log('余弦相似度排名:');
+            const results = docs.map(({ text, id }) => ({
+                id, text,
+                score: cosineSimilarity(query, text)
+            }));
+            results.sort((a, b) => b.score - a.score);
+            results.forEach(({ id, text, score }) => {
+                log(`   ${id.padEnd(6)} "${text.padEnd(20)}" 相似度: ${(score * 100).toFixed(1)}%`);
+            });
+
+            log('');
+            log('📌 余弦相似度应用:');
+            log('   • 搜索引擎相关性排序');
+            log('   • 文本聚类/分类');
+            log('   • 推荐系统');
+            log('   • 抄袭检测');
+            log('   值范围: 0 (完全不同) ~ 1 (完全相同)');
+        }
+
+        function demoSpell() {
+            result.innerHTML = '';
+            log('✏️ 拼写纠正:');
+            log('');
+
+            const dictionary = ['apple', 'banana', 'orange', 'grape', 'peach',
+                'application', 'book', 'cook', 'look', 'took',
+                'hello', 'help', 'helm', 'held', 'world'];
+
+            function levenshtein(a, b) {
+                const m = a.length, n = b.length;
+                const dp = Array(m + 1).fill(0).map(() => Array(n + 1).fill(0));
+                for (let i = 0; i <= m; i++) dp[i][0] = i;
+                for (let j = 0; j <= n; j++) dp[0][j] = j;
+                for (let i = 1; i <= m; i++) {
+                    for (let j = 1; j <= n; j++) {
+                        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+                        dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+                    }
+                }
+                return dp[m][n];
+            }
+
+            function spellCheck(word) {
+                const suggestions = dictionary.map(dictWord => ({
+                    word: dictWord,
+                    distance: levenshtein(word.toLowerCase(), dictWord)
+                }));
+                suggestions.sort((a, b) => a.distance - b.distance);
+                return suggestions.slice(0, 5);
+            }
+
+            const typos = ['appl', 'helo', 'banan', 'wrold', 'orng', 'grapef'];
+
+            log('拼写纠正建议:');
+            log('');
+            log(`词典: [${dictionary.join(', ')}]`);
+            log('');
+
+            typos.forEach(typo => {
+                const suggestions = spellCheck(typo);
+                log(`"${typo}" → 建议:`);
+                suggestions.forEach(s => {
+                    log(`   ${s.word.padEnd(15)} (距离: ${s.distance})`);
+                });
+                log('');
+            });
+
+            log('📌 拼写纠正技术:');
+            log('   • Levenshtein 编辑距离');
+            log('   • Damerau-Levenshtein (加换位)');
+            log('   • N-gram 相似度');
+            log('   • Soundex (发音相似)');
+            log('   • BK-tree (加速搜索)');
+        }
+
+        console.log('=== 文本相似度 ===');
+        document.getElementById('output').textContent = `文本相似度: 编辑距离 / 公共子串 / 余弦相似度 / 拼写纠正\n✅ 文本相似度演示完成！`;
+    </script>
+</body>
+</html>

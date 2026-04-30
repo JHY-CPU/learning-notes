@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Node错误处理</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #err-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 13px; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #3498db; color: white; }
+        tr:nth-child(even) { background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>Node 错误处理</h2><p>异步错误、uncaughtException/unhandledRejection、错误码、日志。</p></div>
+    <div class="card">
+        <h2>Node 错误处理机制</h2>
+        <div class="code">// ========== 同步错误 ==========
+try {
+    JSON.parse('invalid');
+} catch (err) {
+    console.error('解析错误:', err.message);
+}
+
+// ========== 异步错误 (回调) ==========
+fs.readFile('/notfound', (err, data) => {
+    if (err) return console.error('读取失败:', err);
+});
+
+// ========== Promise 错误 ==========
+Promise.reject(new Error('失败'))
+    .catch(err => console.error(err));
+
+// ========== async/await 错误 ==========
+async function read() {
+    try {
+        await fs.promises.readFile('/notfound');
+    } catch (err) {
+        console.error(err.code); // 'ENOENT'
+    }
+}
+
+// ========== 全局未捕获 ==========
+process.on('uncaughtException', (err) => {
+    console.error('未捕获异常:', err);
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+    console.error('未处理拒绝:', reason);
+});
+
+// ========== 错误码 ==========
+// ENOENT — 文件不存在
+// EACCES — 权限不足
+// EEXIST — 文件已存在
+// ENOTDIR — 不是目录
+// ECONNREFUSED — 连接被拒
+// ETIMEDOUT — 连接超时</div>
+    </div>
+    <div class="card">
+        <h2>演示：错误处理</h2>
+        <button onclick="demoErrorTypes()">错误类型</button>
+        <button onclick="demoAsyncErrors()">异步错误处理</button>
+        <button onclick="demoErrorCodes()">错误码</button>
+        <button onclick="demoErrorStrategy()">最佳实践</button>
+        <div id="err-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const errResult = document.getElementById('err-result');
+
+        function log(msg) {
+            errResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        // ========== 自定义错误类 ==========
+        class AppError extends Error {
+            constructor(message, code, statusCode = 500) {
+                super(message);
+                this.name = 'AppError';
+                this.code = code;
+                this.statusCode = statusCode;
+                this.timestamp = new Date().toISOString();
+            }
+        }
+
+        class NotFoundError extends AppError {
+            constructor(resource) {
+                super(`${resource} 未找到`, 'NOT_FOUND', 404);
+                this.name = 'NotFoundError';
+            }
+        }
+
+        class ValidationError extends AppError {
+            constructor(field, message) {
+                super(`字段 ${field}: ${message}`, 'VALIDATION_ERROR', 400);
+                this.name = 'ValidationError';
+            }
+        }
+
+        function demoErrorTypes() {
+            errResult.innerHTML = '';
+            log('❌ Node.js 错误类型:');
+            log('');
+
+            // 1. JavaScript Error
+            log('1️⃣ JavaScript 标准错误:');
+            const errors = [
+                { name: 'Error', example: () => new Error('通用错误') },
+                { name: 'SyntaxError', example: () => { try { eval('invalid js'); } catch (e) { return e; } } },
+                { name: 'TypeError', example: () => { try { null.f(); } catch (e) { return e; } } },
+                { name: 'ReferenceError', example: () => { try { console.log(x); } catch (e) { return e; } } },
+                { name: 'RangeError', example: () => { try { new Array(-1); } catch (e) { return e; } } },
+            ];
+            errors.forEach(({ name, example }) => {
+                const e = example();
+                log(`   ${name}: ${e.message}`);
+            });
+
+            log('');
+            log('2️⃣ Node.js 系统错误:');
+            const sysErrors = [
+                { code: 'ENOENT', msg: '文件/目录不存在' },
+                { code: 'EACCES', msg: '权限不足' },
+                { code: 'EADDRINUSE', msg: '端口已被占用' },
+                { code: 'ECONNREFUSED', msg: '连接被拒绝' },
+                { code: 'ETIMEDOUT', msg: '连接超时' },
+                { code: 'ENOSPC', msg: '磁盘空间不足' },
+            ];
+            sysErrors.forEach(({ code, msg }) => log(`   ${code.padEnd(14)} ${msg}`));
+
+            log('');
+            log('3️⃣ 自定义应用错误:');
+            try {
+                throw new NotFoundError('用户');
+            } catch (e) {
+                log(`   ${e.name}: ${e.message}`);
+                log(`   code: ${e.code}, statusCode: ${e.statusCode}`);
+                log(`   timestamp: ${e.timestamp}`);
+            }
+
+            try {
+                throw new ValidationError('email', '格式不正确');
+            } catch (e) {
+                log(`   ${e.name}: ${e.message}`);
+            }
+        }
+
+        function demoAsyncErrors() {
+            errResult.innerHTML = '';
+            log('🔄 异步错误处理模式:');
+            log('');
+
+            // 模拟异步操作
+            function mockAsyncOp(shouldFail, delay = 100) {
+                return new Promise((resolve, reject) => {
+                    setTimeout(() => {
+                        shouldFail ? reject(new Error('操作失败')) : resolve('操作成功');
+                    }, delay);
+                });
+            }
+
+            // 1. Callback 模式
+            log('1️⃣ Callback 模式:');
+            function callbackRead(cb) {
+                setTimeout(() => {
+                    cb(new Error('ENOENT: 文件不存在'), null);
+                }, 50);
+            }
+            callbackRead((err, data) => {
+                if (err) {
+                    log(`   ❌ 回调错误: ${err.message}`);
+                } else {
+                    log(`   数据: ${data}`);
+                }
+            });
+
+            setTimeout(async () => {
+                // 2. Promise 模式
+                log('');
+                log('2️⃣ Promise 模式:');
+                try {
+                    await mockAsyncOp(true);
+                } catch (err) {
+                    log(`   ❌ Promise 错误: ${err.message}`);
+                }
+
+                // 3. async/await try/catch
+                log('');
+                log('3️⃣ async/await try/catch:');
+                async function safeOp() {
+                    try {
+                        await mockAsyncOp(true);
+                    } catch (err) {
+                        log(`   ❌ async 捕获: ${err.message}`);
+                        return null;
+                    }
+                }
+                await safeOp();
+
+                // 4. 全局错误模拟
+                log('');
+                log('4️⃣ 全局错误处理:');
+                log('   process.on("uncaughtException") — 同步未捕获');
+                log('   process.on("unhandledRejection") — Promise 未处理');
+                log('   process.on("warning") — 警告');
+                log('');
+
+                // 5. 错误传播
+                log('5️⃣ 错误传播链:');
+                async function level3() { throw new Error('深层错误'); }
+                async function level2() { await level3(); }
+                async function level1() {
+                    try {
+                        await level2();
+                    } catch (err) {
+                        log(`   捕获到: ${err.message} (正确传播)`);
+                    }
+                }
+                await level1();
+            }, 200);
+        }
+
+        function demoErrorCodes() {
+            errResult.innerHTML = '';
+            log('🔢 Node.js 错误码大全:');
+            log('');
+
+            const errorCodes = [
+                { category: '文件系统', codes: [
+                    { code: 'ENOENT', desc: '文件或目录不存在' },
+                    { code: 'EACCES', desc: '权限被拒绝' },
+                    { code: 'EEXIST', desc: '文件已存在' },
+                    { code: 'ENOTDIR', desc: '路径中的组件不是目录' },
+                    { code: 'EISDIR', desc: '期望文件但路径是目录' },
+                    { code: 'EMFILE', desc: '打开的文件过多' },
+                    { code: 'ENOSPC', desc: '设备无剩余空间' },
+                    { code: 'EROFS', desc: '只读文件系统' },
+                ]},
+                { category: '网络', codes: [
+                    { code: 'ECONNREFUSED', desc: '连接被拒绝' },
+                    { code: 'ECONNRESET', desc: '连接被重置' },
+                    { code: 'ETIMEDOUT', desc: '操作超时' },
+                    { code: 'ENOTFOUND', desc: 'DNS 解析失败' },
+                    { code: 'EADDRINUSE', desc: '地址/端口已在使用' },
+                    { code: 'EPIPE', desc: '管道破裂 (写入已关闭的流)' },
+                ]},
+                { category: '子进程', codes: [
+                    { code: 'ERR_CHILD_PROCESS_IPC_REQUIRED', desc: 'IPC 通道未开启' },
+                    { code: 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER', desc: 'stdio 缓冲超出上限' },
+                ]},
+                { category: 'HTTP', codes: [
+                    { code: 'ERR_HTTP_HEADERS_SENT', desc: 'Headers 已发送' },
+                    { code: 'ERR_HTTP_INVALID_STATUS_CODE', desc: '无效状态码' },
+                ]},
+            ];
+
+            errorCodes.forEach(({ category, codes }) => {
+                log(`📁 ${category}:`);
+                codes.forEach(({ code, desc }) => log(`   ${code.padEnd(32)} ${desc}`));
+                log('');
+            });
+
+            log('📌 错误处理最佳实践:');
+            log('   • 根据 err.code 区分错误类型');
+            log('   • 不要吞错误 (空的 catch 块)');
+            log('   • 区分操作错误和程序员错误');
+            log('   • 进程管理员错误 → 退出重启');
+        }
+
+        function demoErrorStrategy() {
+            errResult.innerHTML = '';
+            log('📋 Node 错误处理最佳实践:');
+            log('');
+
+            log('1️⃣ 区分错误类型:');
+            log('   操作错误 (可恢复): ENOENT, EACCES, ETIMEDOUT');
+            log('   程序错误 (不可恢复): TypeError, ReferenceError');
+            log('');
+
+            log('2️⃣ 错误处理层级:');
+            log('   层级1: try/catch 同步代码');
+            log('   层级2: .catch() Promise 链');
+            log('   层级3: 中间件错误 (Express/Koa)');
+            log('   层级4: 全局 uncaughtException');
+            log('   层级5: 进程退出 & 重启 (PM2/Supervisor)');
+            log('');
+
+            log('3️⃣ 优雅错误处理示例:');
+            const strategy = `
+            async function readConfig(path) {
+                try {
+                    const data = await fs.promises.readFile(path, 'utf8');
+                    return JSON.parse(data);
+                } catch (err) {
+                    if (err.code === 'ENOENT') {
+                        return {}; // 默认配置
+                    }
+                    if (err instanceof SyntaxError) {
+                        logger.error('配置格式错误', { path });
+                        throw new AppError('配置格式错误', 'INVALID_CONFIG');
+                    }
+                    throw err; // 未知错误继续传播
+                }
+            }`;
+            log(strategy);
+
+            log('');
+            log('4️⃣ 日志级别:');
+            log('   error — 导致功能不可用的错误');
+            log('   warn  — 可能的问题但不影响核心功能');
+            log('   info  — 正常操作信息');
+            log('   debug — 调试信息 (开发环境)');
+            log('');
+
+            log('5️⃣ 退出策略:');
+            log('   process.exit(1) — 致命错误');
+            log('   process.exit(0) — 正常退出');
+            log('   process.exitCode = 1 — 设置退出码');
+            log('   ️ 不要用 uncaughtException 恢复程序');
+        }
+
+        console.log('=== Node.js 错误处理 ===');
+
+        document.getElementById('output').textContent =
+            `Node 错误处理: try/catch / callback / Promise / async-await\n` +
+            `错误类型: Error / SystemError / 自定义错误 / 错误码\n` +
+            `✅ Node 错误处理演示完成！`;
+    </script>
+</body>
+</html>

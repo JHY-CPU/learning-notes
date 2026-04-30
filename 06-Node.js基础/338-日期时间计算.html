@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日期时间计算</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>日期时间计算</h2><p>日期差计算、工作日判断、时区转换、相对时间、日历生成。</p></div>
+    <div class="card">
+        <h2>日期计算方法</h2>
+        <div class="code">// ========== 日期差计算 ==========
+function daysDiff(d1, d2) {
+    const msDiff = Math.abs(d2 - d1);
+    return Math.floor(msDiff / (1000 * 60 * 60 * 24));
+}
+
+// ========== 工作日判断 ==========
+function isWeekday(date) {
+    const day = date.getDay();
+    return day !== 0 && day !== 6;
+}
+
+// ========== 添加天数 ==========
+function addDays(date, days) {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+}
+
+// ========== 相对时间 ==========
+function timeAgo(date) {
+    const diff = Date.now() - date;
+    const units = [
+        { name: '年', ms: 365 * 24 * 60 * 60 * 1000 },
+        { name: '月', ms: 30 * 24 * 60 * 60 * 1000 },
+        { name: '天', ms: 24 * 60 * 60 * 1000 },
+        { name: '小时', ms: 60 * 60 * 1000 },
+        { name: '分钟', ms: 60 * 1000 },
+    ];
+    for (const unit of units) {
+        if (diff >= unit.ms) {
+            const count = Math.floor(diff / unit.ms);
+            return `${count} ${unit.name}前`;
+        }
+    }
+    return '刚刚';
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：日期时间计算</h2>
+        <button onclick="demoDateDiff()">日期差计算</button>
+        <button onclick="demoWorkday()">工作日判断</button>
+        <button onclick="demoCalendar()">日历生成</button>
+        <button onclick="demoTimezone()">时区与相对时间</button>
+        <div id="result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; console.log(msg); }
+
+        function demoDateDiff() {
+            result.innerHTML = '';
+            log('📅 日期差计算:');
+            log('');
+
+            function daysDiff(d1, d2) {
+                const ms = Math.abs(new Date(d2) - new Date(d1));
+                return Math.floor(ms / (1000 * 60 * 60 * 24));
+            }
+
+            function hoursDiff(d1, d2) {
+                const ms = Math.abs(new Date(d2) - new Date(d1));
+                return Math.floor(ms / (1000 * 60 * 60));
+            }
+
+            function monthsDiff(d1, d2) {
+                const a = new Date(d1), b = new Date(d2);
+                let months = (b.getFullYear() - a.getFullYear()) * 12;
+                months += b.getMonth() - a.getMonth();
+                if (b.getDate() < a.getDate()) months--;
+                return months;
+            }
+
+            log('常见日期差:');
+            const now = new Date();
+            const newYear = new Date(now.getFullYear(), 0, 1);
+            const nextNewYear = new Date(now.getFullYear() + 1, 0, 1);
+
+            log(`   距离今年元旦: ${daysDiff(now, newYear)} 天`);
+            log(`   距离明年元旦: ${daysDiff(now, nextNewYear)} 天`);
+            log(`   今年已过: ${Math.floor((now - newYear) / (1000 * 60 * 60 * 24))} 天`);
+            log(`   今年剩余: ${daysDiff(nextNewYear, now)} 天`);
+
+            log('');
+            log('计算两个日期:');
+            const d1 = '2024-01-15', d2 = '2025-03-20';
+            log(`   从 ${d1} 到 ${d2}:`);
+            log(`      ${daysDiff(d1, d2)} 天`);
+            log(`      ${hoursDiff(d1, d2)} 小时`);
+            log(`      ${monthsDiff(d1, d2)} 个月`);
+
+            log('');
+            log('年龄计算:');
+            const birth = new Date(1990, 5, 15); // 1990-06-15
+            const age = monthsDiff(birth, now);
+            log(`   出生: 1990-06-15`);
+            log(`   年龄: ${Math.floor(age / 12)} 岁 ${age % 12} 个月`);
+        }
+
+        function demoWorkday() {
+            result.innerHTML = '';
+            log('🏢 工作日判断:');
+            log('');
+
+            function isWeekday(date) {
+                const day = date.getDay();
+                return day !== 0 && day !== 6;
+            }
+
+            function getDayName(date) {
+                const names = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+                return names[date.getDay()];
+            }
+
+            function countWorkdays(start, end) {
+                let count = 0;
+                const current = new Date(start);
+                while (current <= end) {
+                    if (isWeekday(current)) count++;
+                    current.setDate(current.getDate() + 1);
+                }
+                return count;
+            }
+
+            function addWorkdays(date, days) {
+                const result = new Date(date);
+                let added = 0;
+                while (added < days) {
+                    result.setDate(result.getDate() + 1);
+                    if (isWeekday(result)) added++;
+                }
+                return result;
+            }
+
+            log('本周工作日:');
+            const today = new Date();
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - today.getDay() + 1); // 周一
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(weekStart);
+                d.setDate(weekStart.getDate() + i);
+                log(`   ${d.toLocaleDateString('zh-CN')} ${getDayName(d)} → ${isWeekday(d) ? '✅ 工作日' : '❌ 休息日'}`);
+            }
+
+            log('');
+            log('工作日统计:');
+            const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+            const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            const workdays = countWorkdays(monthStart, monthEnd);
+            log(`   本月 (${today.getFullYear()}-${today.getMonth() + 1}): ${workdays} 个工作日`);
+
+            log('');
+            log('增加工作日:');
+            const after10 = addWorkdays(today, 10);
+            log(`   今天: ${today.toLocaleDateString('zh-CN')}`);
+            log(`   10 个工作日后: ${after10.toLocaleDateString('zh-CN')} (${getDayName(after10)})`);
+        }
+
+        function demoCalendar() {
+            result.innerHTML = '';
+            log('📆 日历生成:');
+            log('');
+
+            function generateCalendar(year, month) {
+                const firstDay = new Date(year, month, 1);
+                const lastDay = new Date(year, month + 1, 0);
+                const startDay = firstDay.getDay(); // 0=周日
+                const daysInMonth = lastDay.getDate();
+
+                log(`   ${year}年${month + 1}月`);
+                log(`   日  一  二  三  四  五  六`);
+
+                let line = '';
+                // 空白占位
+                for (let i = 0; i < startDay; i++) line += '    ';
+
+                for (let day = 1; day <= daysInMonth; day++) {
+                    line += day.toString().padStart(2) + '  ';
+                    if ((day + startDay) % 7 === 0) {
+                        log(line);
+                        line = '';
+                    }
+                }
+                if (line.trim()) log(line);
+            }
+
+            const now = new Date();
+            log('本月日历:');
+            generateCalendar(now.getFullYear(), now.getMonth());
+
+            log('');
+            log('下月日历:');
+            generateCalendar(now.getFullYear(), now.getMonth() + 1);
+
+            log('');
+            log('判断闰年:');
+            function isLeapYear(year) {
+                return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+            }
+            [1900, 2000, 2024, 2025].forEach(y => {
+                log(`   ${y}年 → ${isLeapYear(y) ? '✅ 闰年' : '❌ 平年'}`);
+            });
+
+            log('');
+            log('月中天数:');
+            const monthDays = [31, isLeapYear(now.getFullYear()) ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+            log(`   本年各月天数: [${monthDays}]`);
+        }
+
+        function demoTimezone() {
+            result.innerHTML = '';
+            log('🌐 时区与相对时间:');
+            log('');
+
+            log('1️⃣ 时区转换:');
+            const date = new Date('2025-01-15T12:00:00Z');
+            log(`   UTC 时间: ${date.toISOString()}`);
+
+            const timezones = [
+                { tz: 'Asia/Shanghai', label: '北京时间' },
+                { tz: 'America/New_York', label: '纽约时间' },
+                { tz: 'Europe/London', label: '伦敦时间' },
+                { tz: 'Asia/Tokyo', label: '东京时间' },
+            ];
+            timezones.forEach(({ tz, label }) => {
+                const str = date.toLocaleString('zh-CN', { timeZone: tz });
+                log(`   ${label}: ${str}`);
+            });
+
+            log('');
+            log('2️⃣ 相对时间:');
+            function timeAgo(date) {
+                const diff = Date.now() - date.getTime();
+                if (diff < 0) return '将来';
+                const units = [
+                    { name: '年', ms: 365 * 24 * 60 * 60 * 1000 },
+                    { name: '个月', ms: 30 * 24 * 60 * 60 * 1000 },
+                    { name: '天', ms: 24 * 60 * 60 * 1000 },
+                    { name: '小时', ms: 60 * 60 * 1000 },
+                    { name: '分钟', ms: 60 * 1000 },
+                    { name: '秒', ms: 1000 },
+                ];
+                for (const unit of units) {
+                    if (diff >= unit.ms) {
+                        const count = Math.floor(diff / unit.ms);
+                        return `${count} ${unit.name}前`;
+                    }
+                }
+                return '刚刚';
+            }
+
+            const times = [
+                new Date(Date.now() - 5000),
+                new Date(Date.now() - 60000),
+                new Date(Date.now() - 3600000),
+                new Date(Date.now() - 86400000 * 3),
+                new Date(Date.now() - 86400000 * 30),
+                new Date(Date.now() - 86400000 * 365),
+            ];
+            times.forEach(d => log(`   ${d.toISOString().slice(0, 19)} → ${timeAgo(d)}`));
+
+            log('');
+            log('3️⃣ 日期格式化:');
+            log(`   ${new Date().toLocaleDateString('zh-CN', {
+                year: 'numeric', month: 'long', day: 'numeric',
+                weekday: 'long'
+            })}`);
+
+            log('');
+            log('4️⃣ Intl.RelativeTimeFormat:');
+            const rtf = new Intl.RelativeTimeFormat('zh-CN', { numeric: 'auto' });
+            log(`   ${rtf.format(-1, 'day')}`);
+            log(`   ${rtf.format(3, 'month')}`);
+            log(`   ${rtf.format(-7, 'hour')}`);
+        }
+
+        console.log('=== 日期时间计算 ===');
+        document.getElementById('output').textContent = `日期时间: 日期差 / 工作日 / 日历 / 时区 / 相对时间\n✅ 日期时间计算演示完成！`;
+    </script>
+</body>
+</html>

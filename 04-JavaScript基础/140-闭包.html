@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>闭包</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>闭包（Closure）</h2><p>函数 + 其创建时对外部变量的引用 = 闭包。函数能"记住"它出生时的环境。</p></div>
+    <div class="card">
+        <h2>什么是闭包</h2>
+        <div class="code">// 当一个函数可以记住并访问它所在词法作用域时就形成了闭包
+function outer() {
+    let count = 0;  // outer 的局部变量
+
+    function inner() {
+        count++;     // inner 引用了 outer 的变量
+        console.log(count);
+    }
+
+    return inner;
+}
+
+const counter = outer();  // outer 执行完毕了...
+counter();  // 1 但 inner 还能访问 count！
+counter();  // 2
+counter();  // 3
+
+// ❓ outer 执行完了，count 不是应该被销毁吗？
+// → 闭包让 count 继续存活在内存中
+// → inner 持有对 count 的引用</div>
+        <div class="note">闭包 = 函数 + 函数能访问的外部变量。即使外部函数执行完，这些变量也不会被销毁。</div>
+    </div>
+    <div class="card">
+        <h2>闭包的作用</h2>
+        <div class="code">// 1. 数据私有化
+function createCounter() {
+    let count = 0;  // 私有变量，外部不能直接访问
+    return {
+        increment: () => ++count,
+        decrement: () => --count,
+        getCount: () => count
+    };
+}
+const c = createCounter();
+c.increment();  // 1
+c.increment();  // 2
+// c.count;      // undefined（不能直接访问！）
+console.log(c.getCount());  // 2</div>
+    </div>
+    <div class="card">
+        <h2>闭包应用：函数工厂</h2>
+        <div class="code">function makeMultiplier(x) {
+    return function(y) {
+        return x * y;
+    };
+}
+
+const double = makeMultiplier(2);
+const triple = makeMultiplier(3);
+
+double(5);   // 10
+triple(5);   // 15
+
+// 每个函数都有自己的 x
+// double 记住 x=2
+// triple 记住 x=3</div>
+    </div>
+    <div class="card">
+        <h2>闭包经典问题：循环中的 var</h2>
+        <div class="code">// 问题：var i 是全局的
+for (var i = 0; i < 3; i++) {
+    setTimeout(function() {
+        console.log(i);  // 3, 3, 3（都是3！）
+    }, 100);
+}
+
+// 修复1：用 let（块级作用域）
+for (let i = 0; i < 3; i++) {
+    setTimeout(function() {
+        console.log(i);  // 0, 1, 2 ✅
+    }, 100);
+}
+
+// 修复2：用闭包（IIFE）
+for (var i = 0; i < 3; i++) {
+    (function(j) {
+        setTimeout(function() {
+            console.log(j);  // 0, 1, 2 ✅
+        }, 100);
+    })(i);
+}</div>
+    </div>
+    <div class="card">
+        <h2>闭包注意事项</h2>
+        <div class="code">// 1. 内存占用：闭包引用的变量不会被垃圾回收
+// 不用闭包时解除引用：counter = null;
+
+// 2. 闭包只能获取外部变量的"最新值"
+function buildFunctions() {
+    const arr = [];
+    for (var i = 0; i < 3; i++) {
+        arr.push(function() { return i; });
+    }
+    return arr;
+}
+// buildFunctions()[0]() → 3（不是0！）</div>
+        <div class="note">💡 闭包很强大，但不要滥用。每次闭包都有内存开销。</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== 闭包基础 ===');
+        function outer() {
+            let count = 0;
+            return function inner() {
+                count++;
+                console.log('count =', count);
+                return count;
+            };
+        }
+        const counter = outer();
+        counter();  // 1
+        counter();  // 2
+        counter();  // 3
+
+        console.log('=== 数据私有化 ===');
+        function createBank(initial) {
+            let balance = initial;
+            return {
+                deposit: (amount) => { balance += amount; return balance; },
+                withdraw: (amount) => { balance -= amount; return balance; },
+                getBalance: () => balance
+            };
+        }
+        const account = createBank(100);
+        console.log('存款50:', account.deposit(50));
+        console.log('取款30:', account.withdraw(30));
+        console.log('余额:', account.getBalance());
+        // console.log(account.balance);  // undefined
+
+        console.log('=== 函数工厂 ===');
+        function makeAdder(x) {
+            return (y) => x + y;
+        }
+        const add5 = makeAdder(5);
+        const add10 = makeAdder(10);
+        console.log('add5(3):', add5(3));   // 8
+        console.log('add10(3):', add10(3)); // 13
+
+        document.getElementById('output').textContent =
+            `计数器执行3次: count 从0到3\n` +
+            `闭包私有化: balance = ${account.getBalance()}\n` +
+            `add5(3)=${add5(3)}, add10(3)=${add10(3)}\n` +
+            `✅ 闭包演示完成！`;
+    </script>
+</body>
+</html>

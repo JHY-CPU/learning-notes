@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>实战-星级评分</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; max-width: 500px; margin: 0 auto; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        /* Star Rating 基础样式 */
+        .star-rating { display: inline-flex; gap: 4px; font-size: 32px; cursor: pointer; direction: ltr; }
+        .star-rating .star { position: relative; display: inline-block; width: 1em; height: 1em; color: #ddd; transition: color 0.15s, transform 0.15s; user-select: none; }
+        .star-rating .star::before { content: '★'; position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+        .star-rating .star.filled { color: #f1c40f; }
+        .star-rating .star.half { color: #f1c40f; }
+        .star-rating .star.half::after { content: '★'; position: absolute; left: 0; top: 0; width: 50%; height: 100%; color: #f1c40f; overflow: hidden; }
+        .star-rating .star.hover { color: #f39c12; }
+        .star-rating .star.filled.hover { color: #f39c12; }
+        .star-rating.readonly { cursor: default; }
+        .star-rating.readonly .star { cursor: default; }
+        .star-rating .star:hover { transform: scale(1.1); }
+        .star-rating.readonly .star:hover { transform: none; }
+        /* 评分显示 */
+        .rating-display { display: flex; align-items: center; gap: 12px; margin: 8px 0; }
+        .rating-value { font-size: 24px; font-weight: bold; color: #2c3e50; min-width: 30px; }
+        .rating-text { font-size: 13px; color: #95a5a6; }
+        .rating-count { font-size: 12px; color: #95a5a6; }
+        /* 示例区域 */
+        .demo-section { padding: 16px; background: #f8f9fa; border-radius: 8px; margin: 10px 0; }
+        .demo-section label { display: block; font-size: 13px; color: #666; margin-bottom: 8px; }
+        .controls { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
+        .controls button { padding: 6px 14px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; font-size: 12px; }
+        .controls button:hover { opacity: 0.9; }
+        .controls button.danger { background: #e74c3c; }
+        #result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 20px; font-family: monospace; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>⭐ 星级评分</h2>
+        <p style="color:#7f8c8d;font-size:13px;">Star Rating 组件、半星支持、可编辑/只读模式、hover 效果。</p>
+
+        <div class="demo-section">
+            <label>📝 可编辑评分 (点击评分)</label>
+            <div class="rating-display">
+                <div class="star-rating" id="editableRating" data-value="0">
+                    <span class="star" data-index="1"></span>
+                    <span class="star" data-index="2"></span>
+                    <span class="star" data-index="3"></span>
+                    <span class="star" data-index="4"></span>
+                    <span class="star" data-index="5"></span>
+                </div>
+                <span class="rating-value" id="ratingValue">0</span>
+                <span class="rating-text" id="ratingText">请评分</span>
+            </div>
+            <div class="controls">
+                <button onclick="resetRating()">重置</button>
+                <button onclick="setRating(3.5)">设为 3.5 星</button>
+                <button onclick="toggleHalfStar()">切换: 半星</button>
+                <button onclick="toggleReadonly()" id="readonlyToggle">切换: 只读</button>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <label>🔒 只读评分 (显示用)</label>
+            <div class="rating-display">
+                <div class="star-rating readonly" id="readonlyRating">
+                    <span class="star" data-index="1"></span>
+                    <span class="star" data-index="2"></span>
+                    <span class="star" data-index="3"></span>
+                    <span class="star" data-index="4"></span>
+                    <span class="star" data-index="5"></span>
+                </div>
+                <span class="rating-value" id="roValue">4.5</span>
+                <span class="rating-count">(128 评价)</span>
+            </div>
+            <div class="controls">
+                <button onclick="roRating(1)">1★</button>
+                <button onclick="roRating(2.5)">2.5★</button>
+                <button onclick="roRating(3)">3★</button>
+                <button onclick="roRating(4.5)">4.5★</button>
+                <button onclick="roRating(5)">5★</button>
+            </div>
+        </div>
+
+        <div class="demo-section">
+            <label>📊 评分统计</label>
+            <div id="stats">
+                <div style="font-size:13px;color:#666;margin-bottom:8px;">平均: <strong id="avgRating">0.0</strong> (共 <span id="totalRatings">0</span> 次评分)</div>
+                <div style="font-size:12px;color:#95a5a6;" id="statsDetail">暂无评分数据</div>
+            </div>
+        </div>
+    </div>
+    <div id="result"></div>
+    <script>
+        const result = document.getElementById('result');
+        function log(msg) { result.innerHTML += msg + '<br>'; }
+        log('⭐ 星级评分演示:');
+        log('');
+
+        // ========== 工具函数 ==========
+        const ratingTexts = ['', '很差', '较差', '一般', '满意', '非常满意'];
+
+        function updateDisplay(ratingEl, valueEl, textEl, value) {
+            const stars = ratingEl.querySelectorAll('.star');
+            const halfEnabled = ratingEl.dataset.half === 'true';
+            stars.forEach(star => {
+                const idx = parseInt(star.dataset.index);
+                star.classList.remove('filled', 'half');
+                if (halfEnabled) {
+                    if (value >= idx) {
+                        star.classList.add('filled');
+                    } else if (value >= idx - 0.5) {
+                        star.classList.add('half');
+                    }
+                } else {
+                    if (value >= idx) star.classList.add('filled');
+                }
+            });
+            if (valueEl) valueEl.textContent = value;
+            if (textEl) {
+                const rounded = Math.round(value);
+                textEl.textContent = ratingTexts[rounded] || '';
+            }
+        }
+
+        // ========== 可编辑评分 ==========
+        const editableRating = document.getElementById('editableRating');
+        const ratingValue = document.getElementById('ratingValue');
+        const ratingText = document.getElementById('ratingText');
+        let halfEnabled = true; // 默认支持半星
+
+        function initEditable() {
+            editableRating.dataset.half = 'true';
+            const stars = editableRating.querySelectorAll('.star');
+
+            stars.forEach(star => {
+                // hover
+                star.addEventListener('mousemove', (e) => {
+                    if (editableRating.classList.contains('readonly')) return;
+                    const rect = star.getBoundingClientRect();
+                    const isHalf = halfEnabled && (e.clientX - rect.left) < rect.width / 2;
+                    const idx = parseInt(star.dataset.index);
+                    const hoverValue = isHalf ? idx - 0.5 : idx;
+
+                    // 清除 hover
+                    stars.forEach(s => s.classList.remove('hover'));
+                    // 计算所有应该高亮的星
+                    stars.forEach(s => {
+                        const si = parseInt(s.dataset.index);
+                        if (hoverValue >= si) {
+                            s.classList.add('filled', 'hover');
+                        } else if (halfEnabled && hoverValue >= si - 0.5) {
+                            s.classList.add('half', 'hover');
+                        }
+                    });
+                });
+
+                star.addEventListener('mouseleave', () => {
+                    if (editableRating.classList.contains('readonly')) return;
+                    stars.forEach(s => s.classList.remove('hover'));
+                    // 重新应用当前值
+                    const val = parseFloat(editableRating.dataset.value) || 0;
+                    updateDisplay(editableRating, null, null, val);
+                });
+
+                star.addEventListener('click', (e) => {
+                    if (editableRating.classList.contains('readonly')) return;
+                    const rect = star.getBoundingClientRect();
+                    const isHalf = halfEnabled && (e.clientX - rect.left) < rect.width / 2;
+                    const idx = parseInt(star.dataset.index);
+                    const val = isHalf ? idx - 0.5 : idx;
+                    setRating(val);
+                });
+            });
+        }
+
+        function setRating(val) {
+            val = Math.max(0, Math.min(5, val));
+            editableRating.dataset.value = val;
+            updateDisplay(editableRating, ratingValue, ratingText, val);
+            // 统计
+            ratings.push(val);
+            updateStats();
+            log(`⭐ 评分: ${val} 星`);
+        }
+
+        function resetRating() {
+            setRating(0);
+            log('🔄 评分已重置');
+        }
+
+        function toggleHalfStar() {
+            halfEnabled = !halfEnabled;
+            editableRating.dataset.half = halfEnabled ? 'true' : 'false';
+            const val = parseFloat(editableRating.dataset.value) || 0;
+            updateDisplay(editableRating, ratingValue, ratingText, val);
+            log(`🔄 半星: ${halfEnabled ? '启用' : '禁用'}`);
+        }
+
+        function toggleReadonly() {
+            const isReadonly = editableRating.classList.toggle('readonly');
+            log(`🔒 ${isReadonly ? '只读模式' : '编辑模式'}`);
+        }
+
+        // ========== 只读评分 ==========
+        const readonlyRating = document.getElementById('readonlyRating');
+        const roValue = document.getElementById('roValue');
+
+        function roRating(val) {
+            roValue.textContent = val;
+            updateDisplay(readonlyRating, null, null, val);
+            log(`🔒 显示评分: ${val} 星`);
+        }
+
+        // ========== 评分统计 ==========
+        let ratings = []; // 存储所有评分
+
+        function updateStats() {
+            if (ratings.length === 0) {
+                document.getElementById('avgRating').textContent = '0.0';
+                document.getElementById('totalRatings').textContent = '0';
+                document.getElementById('statsDetail').textContent = '暂无评分数据';
+                return;
+            }
+            const sum = ratings.reduce((a, b) => a + b, 0);
+            const avg = (sum / ratings.length).toFixed(1);
+            document.getElementById('avgRating').textContent = avg;
+            document.getElementById('totalRatings').textContent = ratings.length;
+
+            // 分布
+            const dist = {5:0,4:0,3:0,2:0,1:0};
+            ratings.forEach(r => {
+                const k = Math.round(r);
+                if (dist[k] !== undefined) dist[k]++;
+            });
+            const detail = Object.entries(dist).reverse()
+                .map(([k, v]) => `${'★'.repeat(parseInt(k))} ${v}票`)
+                .join(' | ');
+            document.getElementById('statsDetail').textContent = detail;
+        }
+
+        // ========== 初始化 ==========
+        initEditable();
+        roRating(4.5);
+        log('✅ 星级评分就绪 (支持半星、只读、统计)');
+    </script>
+</body>
+</html>

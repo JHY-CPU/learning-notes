@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>请求重试与超时</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        #retry-result { background: #f8f9fa; padding: 10px; border-radius: 4px; font-size: 13px; min-height: 40px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>请求重试与超时</h2><p>为 fetch 添加超时控制和自动重试机制。</p></div>
+    <div class="card">
+        <h2>超时控制</h2>
+        <div class="code">// 方式1: AbortSignal.timeout (Chrome 103+)
+fetch(url, { signal: AbortSignal.timeout(5000) })
+    .catch(err => {
+        if (err.name === 'TimeoutError') console.log('请求超时');
+    });
+
+// 方式2: AbortController 手动
+function fetchWithTimeout(url, timeoutMs = 5000) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(`超时 ${timeoutMs}ms`), timeoutMs);
+    return fetch(url, { signal: controller.signal })
+        .finally(() => clearTimeout(timer));
+}
+
+// 方式3: Promise.race
+function fetchWithRace(url, timeoutMs = 5000) {
+    return Promise.race([
+        fetch(url),
+        new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('超时')), timeoutMs)
+        ),
+    ]);
+}</div>
+    </div>
+    <div class="card">
+        <h2>重试机制</h2>
+        <div class="code">// 带重试的 fetch
+async function fetchWithRetry(url, options = {}, retries = 3) {
+    for (let i = 0; i < retries; i++) {
+        try {
+            const res = await fetch(url, options);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.json();
+        } catch (err) {
+            if (i === retries - 1) throw err; // 最后一次失败则抛出
+            console.log(`第 ${i + 1} 次失败 (${err.message}), 准备重试...`);
+            await delay(Math.pow(2, i) * 1000); // 指数退避
+        }
+    }
+}
+
+// 指数退避 + jitter
+function delay(ms) {
+    const jitter = Math.random() * 200; // 随机抖动，避免雪崩
+    return new Promise(r => setTimeout(r, ms + jitter));
+}
+
+// 完整封装
+async function request(url, {
+    timeout = 10000,
+    retries = 3,
+    backoffBase = 1000,
+    ...fetchOptions
+} = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort('timeout'), timeout);
+
+    const mergedOptions = {
+        ...fetchOptions,
+        signal: controller.signal,
+    };
+
+    for (let i = 0; i <= retries; i++) {
+        try {
+            const res = await fetch(url, mergedOptions);
+            clearTimeout(timer);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return await res.json();
+        } catch (err) {
+            clearTimeout(timer);
+            if (i === retries || err.name === 'AbortError') throw err;
+            const wait = backoffBase * Math.pow(2, i) + Math.random() * 500;
+            await new Promise(r => setTimeout(r, wait));
+        }
+    }
+}</div>
+    </div>
+    <div class="card">
+        <h2>演示：重试与超时</h2>
+        <button onclick="demoTimeout()">⏰ 超时演示</button>
+        <button onclick="demoRetry()">🔄 重试演示</button>
+        <div id="retry-result">点击按钮查看</div>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        const retryResult = document.getElementById('retry-result');
+
+        function log(msg) {
+            retryResult.innerHTML += msg + '<br>';
+            console.log(msg);
+        }
+
+        function delay(ms) {
+            return new Promise(r => setTimeout(r, ms + Math.random() * 200));
+        }
+
+        // 模拟不稳定的 API
+        let failCount = 0;
+        async function unstableAPI() {
+            failCount++;
+            await delay(300);
+            if (failCount <= 2) throw new Error('模拟网络错误 #' + failCount);
+            return { success: true, attempt: failCount };
+        }
+
+        async function demoTimeout() {
+            retryResult.innerHTML = '';
+            log('⏰ 设置 1ms 超时（必然超时）...');
+            try {
+                await fetch('https://jsonplaceholder.typicode.com/posts/1', {
+                    signal: AbortSignal.timeout(1)
+                });
+            } catch (err) {
+                log(`❌ 错误名: ${err.name}`);
+                log(`❌ 错误信息: ${err.message}`);
+                log('\n💡 AbortSignal.timeout(ms) 自动超时');
+            }
+        }
+
+        async function demoRetry() {
+            retryResult.innerHTML = '';
+            failCount = 0;
+            log('🔄 模拟不稳定 API（前 2 次失败）...');
+
+            for (let i = 0; i < 4; i++) {
+                try {
+                    const result = await unstableAPI();
+                    log(`✅ 第 ${i + 1} 次尝试成功! attempt=${result.attempt}`);
+                    break;
+                } catch (err) {
+                    log(`❌ 第 ${i + 1} 次失败: ${err.message}`);
+                    if (i < 3) {
+                        const wait = Math.pow(2, i) * 500;
+                        log(`  等待 ${wait}ms 后重试...`);
+                        await delay(wait);
+                    } else {
+                        log('❌ 已超出最大重试次数');
+                    }
+                }
+            }
+
+            log('\n📋 指数退避: 500ms → 1000ms → 2000ms + jitter');
+        }
+
+        console.log('=== 请求重试与超时 ===');
+
+        document.getElementById('output').textContent =
+            `请求重试: AbortSignal.timeout / Promise.race\n` +
+            `重试策略: 指数退避(exponential backoff) + jitter\n` +
+            `最佳实践: 只重试网络错误，不重试 4xx\n` +
+            `✅ 重试与超时演示完成！`;
+    </script>
+</body>
+</html>

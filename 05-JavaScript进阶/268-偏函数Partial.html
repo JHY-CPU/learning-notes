@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>偏函数Partial</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        button { padding: 8px 16px; border: none; border-radius: 4px; background: #3498db; color: white; cursor: pointer; margin: 5px; }
+        button:hover { opacity: 0.9; }
+        .compare-table { display: flex; gap: 20px; margin: 10px 0; }
+        .compare-table > div { flex: 1; background: #f8f9fa; padding: 15px; border-radius: 8px; }
+        .compare-table h4 { margin: 0 0 8px 0; color: #2c3e50; }
+        .compare-table ul { margin: 0; padding-left: 20px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>偏函数 Partial Application</h2><p>固定函数的部分参数，返回一个接受剩余参数的新函数。与柯里化的区别：偏函数预设任意位置的参数，柯里化将多参数函数转为单参数函数链。</p></div>
+    <div class="card"><h2>偏函数 vs 柯里化</h2><div class="compare-table"><div><h4>偏函数 (Partial)</h4><ul><li>固定部分参数，剩余参数稍后传入</li><li>不要求每次只传一个参数</li><li>可以对任意位置的参数进行预设</li><li>示例: partial(fn, 1, _, 3)(2)</li></ul></div><div><h4>柯里化 (Currying)</h4><ul><li>将 f(a,b,c) 转为 f(a)(b)(c)</li><li>每次只接收一个参数</li><li>严格从左到右逐个接收</li><li>示例: curry(fn)(1)(2)(3)</li></ul></div></div></div>
+    <div class="card"><h2>使用 bind() 实现偏函数</h2><p>Function.prototype.bind() 不仅可以绑定 this，还能固定部分参数，是内置的偏函数工具。</p></div>
+    <div class="card"><h2>应用场景</h2><p>固定地区/货币的格式化函数、预设 HTTP 请求头、API 请求封装、事件处理函数参数预设。</p></div>
+    <div class="card"><h2>交互演示</h2><p>
+        <button onclick="demoPartialBasic()">基础偏函数</button>
+        <button onclick="demoPartialBind()">bind 实现</button>
+        <button onclick="demoCurrency()">货币格式化</button>
+        <button onclick="demoPartialVsCurry()">偏函数 vs 柯里化</button>
+    </p></div>
+    <pre id="output"></pre>
+    <script>
+        const output = document.getElementById('output');
+
+        function log(msg) {
+            output.textContent += msg + '\n';
+            console.log(msg);
+        }
+
+        function clearLog() {
+            output.textContent = '';
+        }
+
+        // ========== 偏函数实现（通用） ==========
+        // 占位符
+        const _ = Symbol('placeholder');
+
+        function partial(fn, ...presetArgs) {
+            return function(...laterArgs) {
+                const args = presetArgs.map(a => a === _ ? laterArgs.shift() : a);
+                return fn.apply(this, [...args, ...laterArgs]);
+            };
+        }
+
+        // ========== 1. 基础偏函数演示 ==========
+        function demoPartialBasic() {
+            clearLog();
+            log('=== 基础偏函数 ===\n');
+
+            const multiply = (a, b, c) => a * b * c;
+            log(`multiply(2, 3, 4) = ${multiply(2, 3, 4)}`);
+
+            // 预设第一个参数为 2
+            const double = partial(multiply, 2);
+            log(`partial(multiply, 2)(3, 4) = ${double(3, 4)}`);
+
+            // 预设前两个参数
+            const doubleTriple = partial(multiply, 2, 3);
+            log(`partial(multiply, 2, 3)(4) = ${doubleTriple(4)}`);
+
+            // 使用占位符跳过中间参数
+            const withPlaceholder = partial(multiply, _, 10);
+            log(`partial(multiply, _, 10)(2)(3) = ${withPlaceholder(2, 3)}`);
+
+            // 字符串拼接
+            const greet = (greeting, name, punctuation) => `${greeting}, ${name}${punctuation}`;
+            const sayHello = partial(greet, 'Hello');
+            log(`\nsayHello = partial(greet, 'Hello')`);
+            log(`sayHello('张三', '!') = ${sayHello('张三', '!')}`);
+            log(`sayHello('李四', '.') = ${sayHello('李四', '.')}`);
+        }
+
+        // ========== 2. bind 实现偏函数 ==========
+        function demoPartialBind() {
+            clearLog();
+            log('=== 使用 bind() 实现偏函数 ===\n');
+
+            function logMessage(level, tag, message) {
+                return `[${new Date().toLocaleTimeString()}] [${level}] [${tag}] ${message}`;
+            }
+
+            // bind 固定第一个参数 (this = null, 因为不需要 this)
+            const infoLog = logMessage.bind(null, 'INFO');
+            const errorLog = logMessage.bind(null, 'ERROR');
+
+            log(infoLog('系统', '服务启动成功'));
+            log(infoLog('DB', '连接正常'));
+            log(errorLog('系统', '发生错误'));
+
+            // 固定多个参数
+            const apiErrorLog = logMessage.bind(null, 'ERROR', 'API');
+            log(apiErrorLog('请求超时'));
+            log(apiErrorLog('认证失败'));
+
+            log('\n注意: bind 返回的函数无法使用占位符，只能从左到右固定参数');
+        }
+
+        // ========== 3. 货币格式化（实际应用） ==========
+        function demoCurrency() {
+            clearLog();
+            log('=== 货币格式化应用 ===\n');
+
+            function formatCurrency(locale, currency, amount) {
+                return new Intl.NumberFormat(locale, {
+                    style: 'currency',
+                    currency: currency
+                }).format(amount);
+            }
+
+            // 预设地区
+            const formatCNY = partial(formatCurrency, 'zh-CN', 'CNY');
+            const formatUSD = partial(formatCurrency, 'en-US', 'USD');
+            const formatEUR = partial(formatCurrency, 'de-DE', 'EUR');
+            const formatJPY = partial(formatCurrency, 'ja-JP', 'JPY');
+
+            log(formatCNY(1234.56));
+            log(formatUSD(1234.56));
+            log(formatEUR(1234.56));
+            log(formatJPY(1234.56));
+
+            // 固定金额大小，只传入地区
+            const amounts = [99.99, 199.99, 999.99];
+            log('\n批量格式化:');
+            amounts.forEach(amount => {
+                log(`  ${formatCNY(amount)}  |  ${formatUSD(amount)}  |  ${formatEUR(amount)}`);
+            });
+        }
+
+        // ========== 4. 偏函数 vs 柯里化 ==========
+        function demoPartialVsCurry() {
+            clearLog();
+            log('=== 偏函数 vs 柯里化 对比 ===\n');
+
+            function add(a, b, c) { return a + b + c; }
+
+            // 柯里化版本
+            function curry(fn) {
+                return function curried(...args) {
+                    if (args.length >= fn.length) return fn(...args);
+                    return (...more) => curried(...args, ...more);
+                };
+            }
+
+            const curriedAdd = curry(add);
+            log('--- 柯里化 ---');
+            log(`curriedAdd(1)(2)(3) = ${curriedAdd(1)(2)(3)}`);
+            log(`必须严格从左到右每次一个参数`);
+            log(`curriedAdd(1)(2, 3) = ${curriedAdd(1)(2, 3)}`); // OK, 也可以一次传多个
+
+            log('\n--- 偏函数 ---');
+            const partialAdd1 = partial(add, 1);
+            const partialAdd12 = partial(add, 1, 2);
+            const partialAddMiddle = partial(add, _, 10, _);
+            log(`partial(add, 1)(2, 3) = ${partialAdd1(2, 3)}`);
+            log(`partial(add, 1, 2)(3) = ${partialAdd12(3)}`);
+            log(`partial(add, _, 10, _)(1, 3) = ${partialAddMiddle(1, 3)}`);
+
+            log('\n--- 核心区别 ---');
+            log('偏函数: 固定任意位置的任意数量参数');
+            log('柯里化: 将多参数函数转为嵌套单参数函数');
+            log('偏函数输出一个函数，柯里化输出一个函数链');
+            log('偏函数关注"预设"，柯里化关注"分解"');
+        }
+
+        log('=== 偏函数 Partial 演示 ===\n偏函数通过固定预设参数减少重复传参，与柯里化互补。\n\n点击上方按钮查看不同示例。');
+    </script>
+</body>
+</html>

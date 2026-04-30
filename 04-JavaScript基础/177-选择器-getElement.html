@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>选择器-getElement</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        .box { display: inline-block; margin: 5px; padding: 10px 15px; background: #3498db; color: white; border-radius: 4px; }
+        .highlight { background: #e74c3c !important; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>选择器 — getElement 系列</h2><p>传统的 DOM 选择方法，返回 HTMLCollection（动态集合）。</p></div>
+    <div class="card">
+        <h2>getElementById</h2>
+        <div class="code">// 通过 id 获取单个元素（最常用、最快）
+// 返回 Element | null
+
+const header = document.getElementById('header');
+// 如果没找到，返回 null
+
+// ⚠️ id 在页面中应该是唯一的
+// ⚠️ 不需要写 # 前缀（区别于 CSS 选择器）
+
+// 也可以直接用 window.idName（不推荐）
+// 浏览器会将部分 id 作为 window 的属性</div>
+    </div>
+    <div class="card">
+        <h2>getElementsByClassName</h2>
+        <div class="code">// 通过 class 获取元素集合
+// 返回 HTMLCollection（动态集合 — DOM 变化时自动更新）
+
+const items = document.getElementsByClassName('item');
+// 所有 class 包含 'item' 的元素
+
+// 可以在指定元素下查找
+const container = document.getElementById('container');
+const containerItems = container.getElementsByClassName('item');
+
+// HTMLCollection 特征：
+// 1. 类数组，有 length，可以下标访问 [0]
+// 2. 动态的（live）— DOM 增删自动反映
+// 3. 不是数组（不能用 forEach/map/filter）
+// 4. 转数组：[...items] 或 Array.from(items)
+
+// ⚠️ HTMLCollection 没有 forEach！
+// 需要用 for...of 或 for 循环遍历
+for (let item of items) {
+    console.log(item.textContent);
+}
+
+// 多个 class 名顺序不重要，空格分隔
+// getElementsByClassName('foo bar') 匹配 class="foo bar" 或 class="bar foo"</div>
+    </div>
+    <div class="card">
+        <h2>getElementsByTagName</h2>
+        <div class="code">// 通过标签名获取元素集合
+// 返回 HTMLCollection（动态集合）
+
+const allDivs = document.getElementsByTagName('div');
+const allPs = document.getElementsByTagName('p');
+const allSpans = document.getElementsByTagName('span');
+
+// 获取所有元素（*）
+const allElements = document.getElementsByTagName('*');
+
+// 不区分大小写
+getElementsByTagName('DIV') === getElementsByTagName('div');  // true
+
+// 可以在指定元素下查找
+const main = document.getElementById('main');
+const mainDivs = main.getElementsByTagName('div');</div>
+    </div>
+    <div class="card">
+        <h2>HTMLCollection vs NodeList</h2>
+        <div class="code">// HTMLCollection（getElement 系列返回）
+// — 动态集合（live），DOM 变化自动更新
+// — 只有元素节点（Element）
+// — 可以用 name/id 索引（如 form.elements）
+// — 没有 forEach
+
+// NodeList（querySelectorAll 返回）
+// — 静态集合（static），不会自动更新
+// — 包含所有节点类型（元素+文本+注释）
+// — 有 forEach（现代浏览器）
+// — 可以用 for...of 遍历
+
+// 示例对比：
+const liveCollection = document.getElementsByTagName('div');
+const staticList = document.querySelectorAll('div');
+
+console.log('HTMLCollection 动态:', liveCollection.length);
+console.log('NodeList 静态:', staticList.length);
+
+// 新增一个 div 后：
+document.body.appendChild(document.createElement('div'));
+console.log('HTMLCollection 自动更新:', liveCollection.length);  // +1
+console.log('NodeList 不变:', staticList.length);               // 不变</div>
+    </div>
+    <div id="header" style="background:#2ecc71;padding:10px;border-radius:4px;color:white;text-align:center;">这是 id="header" 的 div</div>
+    <div id="container" style="margin:10px 0;">
+        <span class="item box">项目 1</span>
+        <span class="item box">项目 2</span>
+        <span class="item box">项目 3</span>
+    </div>
+    <pre id="output"></pre>
+    <script>
+        console.log('=== getElementById ===');
+        const header = document.getElementById('header');
+        if (header) {
+            console.log('找到 header:', header.textContent.trim());
+        }
+
+        console.log('=== getElementsByClassName ===');
+        const items = document.getElementsByClassName('item');
+        console.log('item 数量:', items.length);
+        for (let item of items) {
+            console.log('  -', item.textContent);
+        }
+
+        console.log('=== getElementsByTagName ===');
+        const allSpans = document.getElementsByTagName('span');
+        console.log('span 数量:', allSpans.length);
+        const allDivs = document.getElementsByTagName('div');
+        console.log('div 数量:', allDivs.length);
+
+        console.log('=== HTMLCollection 动态性 ===');
+        const liveItems = document.getElementsByClassName('item');
+        console.log('当前 item 数:', liveItems.length);
+
+        // 新增一个
+        const newItem = document.createElement('span');
+        newItem.className = 'item box';
+        newItem.textContent = '新项目（动态添加）';
+        document.getElementById('container').appendChild(newItem);
+        console.log('添加后 item 数:', liveItems.length);  // 自动 +1
+
+        console.log('=== HTMLCollection 不是数组 ===');
+        console.log('是数组吗:', Array.isArray(liveItems));
+        const itemsArray = [...liveItems];
+        console.log('转数组后是数组吗:', Array.isArray(itemsArray));
+
+        console.log('=== 获取所有元素 ===');
+        const all = document.getElementsByTagName('*');
+        console.log('页面总元素数:', all.length);
+
+        document.getElementById('output').textContent =
+            `item 数量: ${items.length}\n` +
+            `span 数量: ${allSpans.length}\n` +
+            `动态添加后 item 数: ${liveItems.length}\n` +
+            `✅ 选择器-getElement 演示完成！`;
+    </script>
+</body>
+</html>
