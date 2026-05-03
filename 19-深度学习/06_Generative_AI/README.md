@@ -1,8 +1,22 @@
-# 06_Generative_AI
+# 06_Generative_AI — 生成式AI
 
-生成式AI：GAN、VAE、扩散模型、ControlNet、评估指标
+> 生成模型的三大流派——GAN、VAE、扩散模型——及其在现代生成式AI中的应用。从基础理论到Stable Diffusion、ControlNet等工程实践，覆盖图像生成、视频生成、3D生成、Prompt工程等热点方向。
 
-共 50 篇笔记
+---
+
+## 基础知识
+
+- **前置知识**：03_NN_Core; 04_Computer_Vision（图像相关）
+- **关联目录**：04_Computer_Vision（图像生成的下游应用）; 05_NLP_Sequence（文本条件生成）
+- **笔记数量**：共 50 篇
+
+---
+
+## 内容结构
+
+#### 生成对抗网络 (GAN)
+
+GAN基础、DCGAN、WGAN、StyleGAN、CycleGAN、Pix2Pix
 
 | 编号 | 笔记 |
 |------|------|
@@ -15,17 +29,38 @@
 | 07 | [StyleGAN：风格混合与自适应实例归一化](07_StyleGAN：风格混合与自适应实例归一化.md) |
 | 08 | [CycleGAN：无配对数据的图像翻译](08_CycleGAN：无配对数据的图像翻译.md) |
 | 09 | [Pix2Pix：基于条件的图像翻译](09_Pix2Pix：基于条件的图像翻译.md) |
+
+#### 变分自编码器 (VAE)
+
+VAE原理、重参数化技巧、CVAE、VQ-VAE
+
+| 编号 | 笔记 |
+|------|------|
 | 10 | [VAE 变分自编码器原理](10_VAE 变分自编码器原理.md) |
 | 11 | [重参数化技巧 (Reparameterization Trick) 推导](11_重参数化技巧 (Reparameterization Trick) 推导.md) |
 | 12 | [VAE 损失函数：重构误差与 KL 散度权衡](12_VAE 损失函数：重构误差与 KL 散度权衡.md) |
 | 13 | [CVAE：条件变分自编码器](13_CVAE：条件变分自编码器.md) |
 | 14 | [VQ-VAE：向量量化与离散潜在空间](14_VQ-VAE：向量量化与离散潜在空间.md) |
+
+#### 扩散模型 (Diffusion)
+
+物理直觉、DDPM、前向/反向过程、Score Matching、DDIM
+
+| 编号 | 笔记 |
+|------|------|
 | 15 | [扩散模型 (Diffusion Models) 物理直觉](15_扩散模型 (Diffusion Models) 物理直觉.md) |
 | 16 | [DDPM：去噪扩散概率模型数学推导](16_DDPM：去噪扩散概率模型数学推导.md) |
 | 17 | [前向加噪过程与马尔可夫链](17_前向加噪过程与马尔可夫链.md) |
 | 18 | [反向去噪过程与神经网络预测](18_反向去噪过程与神经网络预测.md) |
 | 19 | [Score Matching 与 Langevin Dynamics](19_Score Matching 与 Langevin Dynamics.md) |
 | 20 | [DDIM：确定性采样与加速推理](20_DDIM：确定性采样与加速推理.md) |
+
+#### 条件生成与控制
+
+Stable Diffusion、ControlNet、LoRA、DreamBooth、CLIP、视频/3D/音频生成
+
+| 编号 | 笔记 |
+|------|------|
 | 21 | [Stable Diffusion：Latent Space 压缩技术](21_Stable Diffusion：Latent Space 压缩技术.md) |
 | 22 | [ControlNet：添加空间约束条件](22_ControlNet：添加空间约束条件.md) |
 | 23 | [LoRA 在生成模型微调中的应用](23_LoRA 在生成模型微调中的应用.md) |
@@ -35,12 +70,26 @@
 | 27 | [视频生成：AnimateDiff 原理](27_视频生成：AnimateDiff 原理.md) |
 | 28 | [3D 生成：Point-E 与 Shap-E](28_3D 生成：Point-E 与 Shap-E.md) |
 | 29 | [音频生成：AudioLDM 基础](29_音频生成：AudioLDM 基础.md) |
+
+#### 评估与理论
+
+FID、IS、流形假设、能量基模型、SDE视角
+
+| 编号 | 笔记 |
+|------|------|
 | 30 | [生成模型评估指标：FID 与 IS](30_生成模型评估指标：FID 与 IS.md) |
 | 31 | [Inception Score (IS) 的计算逻辑](31_Inception Score (IS) 的计算逻辑.md) |
 | 32 | [Precision and Recall for GANs](32_Precision and Recall for GANs.md) |
 | 33 | [流形假设与生成模型的关系](33_流形假设与生成模型的关系.md) |
 | 34 | [能量基模型 (EBM) 基础](34_能量基模型 (EBM) 基础.md) |
 | 35 | [扩散模型的 SDE 视角解释](35_扩散模型的 SDE 视角解释.md) |
+
+#### 加速与应用
+
+Consistency Models、LCM、CFG、Prompt工程、Negative Prompt、模型合并、蒸馏、伦理
+
+| 编号 | 笔记 |
+|------|------|
 | 36 | [Consistency Models：一步生成技术](36_Consistency Models：一步生成技术.md) |
 | 37 | [Latent Consistency Models (LCM)](37_Latent Consistency Models (LCM).md) |
 | 38 | [Guidance Scale：分类器引导与无分类器引导](38_Guidance Scale：分类器引导与无分类器引导.md) |
@@ -56,3 +105,15 @@
 | 48 | [Masked Generative Modeling (MAGVIT)](48_Masked Generative Modeling (MAGVIT).md) |
 | 49 | [多模态大模型 (LMM) 的生成能力](49_多模态大模型 (LMM) 的生成能力.md) |
 | 50 | [世界模型 (World Models) 与生成式 AI](50_世界模型 (World Models) 与生成式 AI.md) |
+---
+
+## 学习建议
+
+1. 按编号顺序阅读每个子主题内的笔记，因为内部存在递进关系
+2. 每个子主题完成后，尝试用「深度学习关联」部分串联知识点
+3. 代码示例可以直接复制运行（需要 PyTorch 和 transformers 库）
+4. 遇到数学推导不熟悉时，回到 01_Math_Foundations 查阅对应基础
+
+---
+
+*本 README 由笔记元数据自动生成。*

@@ -1,8 +1,22 @@
-# 04_Computer_Vision
+# 04_Computer_Vision — 计算机视觉
 
-计算机视觉：CNN架构、目标检测、分割、生成模型、3D视觉
+> 从经典卷积网络到现代视觉Transformer，从基础图像处理到3D视觉与多模态理解。本目录覆盖了计算机视觉的核心技术栈：CNN架构、目标检测、语义分割、图像生成、3D重建、视觉-语言模型。
 
-共 70 篇笔记
+---
+
+## 基础知识
+
+- **前置知识**：03_NN_Core; 01_Math_Foundations（线性代数、傅里叶变换）
+- **关联目录**：05_NLP_Sequence（多模态中的文本编码）; 06_Generative_AI（图像生成）
+- **笔记数量**：共 70 篇
+
+---
+
+## 内容结构
+
+#### 卷积基础与变体
+
+卷积运算、池化、步长填充、转置卷积、空洞卷积、深度可分离卷积、分组卷积
 
 | 编号 | 笔记 |
 |------|------|
@@ -14,6 +28,13 @@
 | 06 | [空洞卷积 (Dilated Conv) 扩大感受野](06_空洞卷积 (Dilated Conv) 扩大感受野.md) |
 | 07 | [深度可分离卷积 (Depthwise Separable Conv)](07_深度可分离卷积 (Depthwise Separable Conv).md) |
 | 08 | [分组卷积 (Group Conv) 与 ShuffleNet](08_分组卷积 (Group Conv) 与 ShuffleNet.md) |
+
+#### 经典与现代架构
+
+LeNet、AlexNet、VGG、GoogLeNet、ResNet、DenseNet、MobileNet、EfficientNet、ViT、Swin
+
+| 编号 | 笔记 |
+|------|------|
 | 09 | [LeNet-5：现代 CNN 的雏形](09_LeNet-5：现代 CNN 的雏形.md) |
 | 10 | [AlexNet：ReLU、Dropout 与 GPU 训练](10_AlexNet：ReLU、Dropout 与 GPU 训练.md) |
 | 11 | [VGGNet：小卷积核堆叠的设计哲学](11_VGGNet：小卷积核堆叠的设计哲学.md) |
@@ -25,6 +46,13 @@
 | 17 | [EfficientNet：复合缩放系数 (Compound Scaling)](17_EfficientNet：复合缩放系数 (Compound Scaling).md) |
 | 18 | [Vision Transformer (ViT) 架构详解](18_Vision Transformer (ViT) 架构详解.md) |
 | 19 | [Swin Transformer：层级式设计与移位窗口](19_Swin Transformer：层级式设计与移位窗口.md) |
+
+#### 目标检测与分割
+
+R-CNN系列、YOLO、SSD、FPN、U-Net、DeepLab、PANet
+
+| 编号 | 笔记 |
+|------|------|
 | 20 | [R-CNN：区域选择与特征提取的两阶段逻辑](20_R-CNN：区域选择与特征提取的两阶段逻辑.md) |
 | 21 | [Fast R-CNN 与 ROI Pooling 实现](21_Fast R-CNN 与 ROI Pooling 实现.md) |
 | 22 | [Faster R-CNN 与 RPN (Region Proposal Network)](22_Faster R-CNN 与 RPN (Region Proposal Network).md) |
@@ -36,6 +64,13 @@
 | 28 | [U-Net：编码器-解码器结构与跳跃连接](28_U-Net：编码器-解码器结构与跳跃连接.md) |
 | 29 | [DeepLab 系列：ASPP 与空洞空间金字塔池化](29_DeepLab 系列：ASPP 与空洞空间金字塔池化.md) |
 | 30 | [PANet 与 FPN 的双向特征融合](30_PANet 与 FPN 的双向特征融合.md) |
+
+#### 图像处理与3D视觉
+
+数据增强、风格迁移、超分辨率、人脸检测、光流、3D CNN、点云、NeRF
+
+| 编号 | 笔记 |
+|------|------|
 | 31 | [图像分类中的标签平滑与 Mixup 增强](31_图像分类中的标签平滑与 Mixup 增强.md) |
 | 32 | [CutMix 数据增强策略的实现细节](32_CutMix 数据增强策略的实现细节.md) |
 | 33 | [风格迁移 (Style Transfer) 原理与 Gram 矩阵](33_风格迁移 (Style Transfer) 原理与 Gram 矩阵.md) |
@@ -46,6 +81,13 @@
 | 38 | [TimeSformer：视频中的时空注意力](38_TimeSformer：视频中的时空注意力.md) |
 | 39 | [点云处理：PointNet 与 PointNet++](39_点云处理：PointNet 与 PointNet++.md) |
 | 40 | [体素化 (Voxelization) 与 3D 卷积](40_体素化 (Voxelization) 与 3D 卷积.md) |
+
+#### 多模态与自监督
+
+3D Gaussian Splatting、图像检索、零样本、MAE、DINOv2、CLIP、Stable Diffusion、SAM
+
+| 编号 | 笔记 |
+|------|------|
 | 41 | [神经辐射场 (NeRF) 基础原理](41_神经辐射场 (NeRF) 基础原理.md) |
 | 42 | [3D Gaussian Splatting 渲染技术](42_3D Gaussian Splatting 渲染技术.md) |
 | 43 | [图像检索与哈希学习 (Hash Learning)](43_图像检索与哈希学习 (Hash Learning).md) |
@@ -56,6 +98,13 @@
 | 48 | [Stable Diffusion 在图像编辑中的应用](48_Stable Diffusion 在图像编辑中的应用.md) |
 | 49 | [ControlNet：精确控制生成图像结构](49_ControlNet：精确控制生成图像结构.md) |
 | 50 | [Segment Anything Model (SAM) 架构分析](50_Segment Anything Model (SAM) 架构分析.md) |
+
+#### 应用系统
+
+VQA、图像描述、OCR、场景文本检测、医学图像分割、自动驾驶、BEV、SLAM
+
+| 编号 | 笔记 |
+|------|------|
 | 51 | [视觉问答 (VQA) 系统设计](51_视觉问答 (VQA) 系统设计.md) |
 | 52 | [图像描述 (Image Captioning) 生成技术](52_图像描述 (Image Captioning) 生成技术.md) |
 | 53 | [OCR 光学字符识别与 CRNN 模型](53_OCR 光学字符识别与 CRNN 模型.md) |
@@ -66,6 +115,13 @@
 | 58 | [自动驾驶中的多任务学习网络](58_自动驾驶中的多任务学习网络.md) |
 | 59 | [BEV (Bird's Eye View) 视角转换技术](59_BEV (Bird's Eye View) 视角转换技术.md) |
 | 60 | [视觉 SLAM 与深度学习结合](60_视觉 SLAM 与深度学习结合.md) |
+
+#### 经典图像处理
+
+插值算法、颜色空间、边缘检测、Hough变换、SIFT、ORB、相机标定、立体视觉
+
+| 编号 | 笔记 |
+|------|------|
 | 61 | [图像插值算法：双线性与双三次插值](61_图像插值算法：双线性与双三次插值.md) |
 | 62 | [颜色空间转换：RGB, HSV, LAB 的差异](62_颜色空间转换：RGB, HSV, LAB 的差异.md) |
 | 63 | [边缘检测算子：Sobel, Canny 原理](63_边缘检测算子：Sobel, Canny 原理.md) |
@@ -76,3 +132,15 @@
 | 68 | [立体视觉与深度图生成](68_立体视觉与深度图生成.md) |
 | 69 | [全景拼接与图像配准](69_全景拼接与图像配准.md) |
 | 70 | [视频目标跟踪：Siamese 网络](70_视频目标跟踪：Siamese 网络.md) |
+---
+
+## 学习建议
+
+1. 按编号顺序阅读每个子主题内的笔记，因为内部存在递进关系
+2. 每个子主题完成后，尝试用「深度学习关联」部分串联知识点
+3. 代码示例可以直接复制运行（需要 PyTorch 和 transformers 库）
+4. 遇到数学推导不熟悉时，回到 01_Math_Foundations 查阅对应基础
+
+---
+
+*本 README 由笔记元数据自动生成。*

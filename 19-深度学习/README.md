@@ -1,23 +1,83 @@
 # DeepLearningNotes
 
-深度学习笔记，共 390 篇，覆盖 8 个主题领域。
-
-## 目录
-
-- [01_Math_Foundations](01_Math_Foundations/README.md) — 数学基础：线性代数、概率统计、信息论、优化理论（50 篇）
-- [02_ML_Basics](02_ML_Basics/README.md) — 机器学习基础：监督学习、无监督学习、特征工程、模型评估（40 篇）
-- [03_NN_Core](03_NN_Core/README.md) — 神经网络核心：前向/反向传播、激活函数、损失函数、优化器、正则化、归一化（60 篇）
-- [04_Computer_Vision](04_Computer_Vision/README.md) — 计算机视觉：CNN架构、目标检测、分割、生成模型、3D视觉（70 篇）
-- [05_NLP_Sequence](05_NLP_Sequence/README.md) — NLP与序列模型：RNN/LSTM/GRU、Transformer、BERT/GPT、微调技术、LLM（70 篇）
-- [06_Generative_AI](06_Generative_AI/README.md) — 生成式AI：GAN、VAE、扩散模型、ControlNet、评估指标（50 篇）
-- [07_Reinforcement_Learning](07_Reinforcement_Learning/README.md) — 强化学习：MDP、价值/策略迭代、DQN、策略梯度、PPO、SAC（30 篇）
-- [08_Engineering_Deployment](08_Engineering_Deployment/README.md) — 工程与部署：PyTorch生态、分布式训练、模型压缩、推理优化（20 篇）
+> 深度学习系统性笔记，共 **390 篇**，覆盖 **8 个主题领域**。每篇笔记遵循统一模板：核心概念 → 数学推导 → 直观理解 → 代码示例 → 深度学习关联。
 
 ---
 
-### 学习路径建议
+## 目录概览
 
-1. **数学基础** → **机器学习基础** → **神经网络核心**（理论学习）
-2. **计算机视觉** / **NLP与序列模型** / **生成式AI**（方向选择）
-3. **强化学习**（进阶）
-4. **工程与部署**（实操落地）
+| 目录 | 领域 | 数量 | 核心内容 |
+|------|------|------|---------|
+| [01_Math_Foundations](01_Math_Foundations/README.md) | 数学基础 | 50 篇 | 深度学习的数学根基。 |
+| [02_ML_Basics](02_ML_Basics/README.md) | 机器学习基础 | 40 篇 | 传统机器学习核心方法与其数学原理。 |
+| [03_NN_Core](03_NN_Core/README.md) | 神经网络核心 | 60 篇 | 深度神经网络的核心组件与技术。 |
+| [04_Computer_Vision](04_Computer_Vision/README.md) | 计算机视觉 | 70 篇 | 从经典卷积网络到现代视觉Transformer，从基础图像处理到3D视觉与多模态理解。 |
+| [05_NLP_Sequence](05_NLP_Sequence/README.md) | NLP与序列模型 | 70 篇 | 从词嵌入到ChatGPT，自然语言处理的技术全景。 |
+| [06_Generative_AI](06_Generative_AI/README.md) | 生成式AI | 50 篇 | 生成模型的三大流派——GAN、VAE、扩散模型——及其在现代生成式AI中的应用。 |
+| [07_Reinforcement_Learning](07_Reinforcement_Learning/README.md) | 强化学习 | 30 篇 | 从MDP到PPO，系统地覆盖强化学习的理论基础与算法实现。 |
+| [08_Engineering_Deployment](08_Engineering_Deployment/README.md) | 工程与部署 | 20 篇 | 从PyTorch基础到生产级部署的全链路工程实践。 |
+
+---
+
+## 学习路径
+
+根据你的目标和背景，可以选择以下学习路径：
+
+### 路径 A：系统学习（推荐）
+
+适合从零开始系统掌握深度学习。
+
+```
+01_Math_Foundations  ──▶  02_ML_Basics  ──▶  03_NN_Core
+        │                                              │
+        │                              ┌───────────────┼───────────────┐
+        │                              ▼               ▼               ▼
+        │                   04_CV (视觉)   05_NLP (文本)   06_GenAI (生成)
+        │                                              │
+        │                              ┌───────────────┘
+        │                              ▼
+        └──▶  07_RL (强化学习)  ──▶  08_Engineering (工程部署)
+```
+
+### 路径 B：按方向选择
+
+| 目标方向 | 必修目录 | 选修目录 |
+|---------|---------|---------|
+| 计算机视觉工程师 | 01 → 02 → 03 → **04** | 06（图像生成）、08（部署） |
+| NLP/LLM 工程师 | 01 → 02 → 03 → **05** | 06（生成式AI）、08（部署） |
+| AI 生成/多模态 | 01 → 02 → 03 → **06** | 04（CV）、05（NLP） |
+| 强化学习/AI研究员 | 01 → 02 → 03 → **07** | 05（RLHF） |
+| MLE/部署工程师 | 01 → 02 → 03 → **08** | 04、05、06（模型理解） |
+
+### 路径 C：快速参考
+
+已有基础，需要快速查阅特定知识点：直接进入对应目录的 README，根据编号表格定位笔记。
+
+---
+
+## 笔记格式
+
+每篇笔记遵循统一五段式结构：
+
+| 章节 | 内容 |
+|------|------|
+| **核心概念** | 关键术语定义、公式总结、核心洞察的罗列 |
+| **数学推导** | 完整的公式推导过程，含 LaTeX 标记 |
+| **直观理解** | 物理类比和直觉解释 |
+| **代码示例** | 可运行的 Python/PyTorch 代码片段 |
+| **深度学习关联** | 与其它知识点的联系和实际应用场景 |
+
+---
+
+## 快速定位
+
+遇到以下问题，可以直接跳到对应笔记：
+
+| 你想了解 | 推荐笔记 |
+|---------|---------|
+| 梯度消失/爆炸 | [03/06 Sigmoid 与梯度消失](03_NN_Core/06_Sigmoid%20激活函数与梯度消失问题.md)、[03/07 Tanh](03_NN_Core/07_Tanh%20激活函数的零中心特性.md)、[03/41 梯度裁剪](03_NN_Core/41_梯度裁剪%20(Gradient%20Clipping)%20防止爆炸.md) |
+| Transformer 架构 | [05/18 Encoder](05_NLP_Sequence/18_Transformer%20Encoder%20架构细节.md)、[05/19 Decoder](05_NLP_Sequence/19_Transformer%20Decoder%20与%20Causal%20Masking.md)、[05/16 Multi-Head Attention](05_NLP_Sequence/16_Multi-head%20Attention%20多头机制与子空间表示.md) |
+| 模型训练技巧 | [03/45 Warmup](03_NN_Core/45_Warmup%20预热阶段的必要性分析.md)、[03/46 混合精度](03_NN_Core/46_混合精度训练%20(Mixed%20Precision)%20原理.md)、[03/42 学习率调度](03_NN_Core/42_学习率调度器：StepLR%20与%20MultiStepLR.md) |
+| 扩散模型/Stable Diffusion | [06/15-20 扩散系列](06_Generative_AI/15_扩散模型%20(Diffusion%20Models)%20物理直觉.md)、[06/21 Stable Diffusion](06_Generative_AI/21_Stable%20Diffusion：Latent%20Space%20压缩技术.md) |
+| LoRA 微调 | [05/41 LoRA](05_NLP_Sequence/41_LoRA：低秩自适应微调原理.md)、[06/23 LoRA 生成](06_Generative_AI/23_LoRA%20在生成模型微调中的应用.md) |
+| 模型部署/ONNX | [08/15 ONNX](08_Engineering_Deployment/15_ONNX%20格式转换与算子兼容性处理.md)、[08/16 TensorRT](08_Engineering_Deployment/16_TensorRT%20加速：层融合%20(Layer%20Fusion)%20优化.md) |
