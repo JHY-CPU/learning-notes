@@ -100,6 +100,6 @@ print(f"小尺度输出: {out_large.shape}")   # (2, 52, 52, 3, 85)
 
 ## 深度学习关联
 
-- **实时检测的标准**：YOLO系列定义了"实时目标检测"的标准——在保证可用精度的前提下追求极致速度。YOLOv3成为工业界最广泛使用的检测器之一，被集成到OpenCV、TensorFlow Object Detection API等框架中。后续的YOLOv4-v7在速度和精度上持续刷新记录。
+- **实时检测的标准**：YOLO系列定义了"实时目标检测"的标准——在保证可用精度的前提下追求极致速度。YOLOv3成为工业界最广泛使用的检测器之一，被集成到OpenCV、TensorFlow Object Detection API等框架中。后续的YOLOv4-v7在速度和精度上持续刷新记录。YOLOv8-v11（Ultralytics）进一步引入了 anchor-free 检测、Mamba 架构和任务解耦头，同时提供了 CLI/Python 一体化的训练部署工具链。
 - **单阶段检测的普及**：YOLO的成功证明了"简洁即高效"——单阶段检测在速度上远超两阶段检测，且随着技术改进（FPN、Focal Loss、GIoU等），精度差距也在缩小。单阶段检测成为边缘计算和移动部署的首选方案。
 - **统一框架的趋势**：YOLO的"统一网络、统一损失"设计思想影响了后续的DETR（Transformer端到端检测）、YOLOS（纯ViT检测）等模型，体现了计算机视觉从多阶段流水线向端到端统一框架演进的大趋势。

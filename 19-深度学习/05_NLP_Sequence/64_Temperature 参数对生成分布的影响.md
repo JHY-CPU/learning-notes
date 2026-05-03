@@ -41,7 +41,6 @@ $$
 import torch
 import torch.nn.functional as F
 import numpy as np
-import matplotlib.pyplot as plt
 
 def softmax_with_temperature(logits, temperature):
     """带温度的 softmax"""

@@ -45,7 +45,6 @@ Sigmoid 的梯度饱和可以想象成一个"传送带"：在传送带中间（$
 
 ```python
 import torch
-import matplotlib.pyplot as plt
 
 # Sigmoid 函数及其导数
 x = torch.linspace(-10, 10, 100)

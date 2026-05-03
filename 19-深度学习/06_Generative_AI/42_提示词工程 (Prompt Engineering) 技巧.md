@@ -121,13 +121,13 @@ class PromptOptimizer:
 
 # 模拟权重对 token 嵌入的影响
 class SimulatedCLIPEmbedding:
-    """模拟 CLIP 文本编码器中加权语法对嵌入的影响"""
+    """模拟 CLIP 文本编码器中加权语法对嵌入的影响 ⚠️ 模拟代码，仅用于示意"""
     def __init__(self, dim=768):
         self.dim = dim
     
     def encode_token(self, token, weight=1.0):
         """模拟带权重的 token 编码"""
-        # 均值向量
+        # ⚠️ 模拟代码：实际 CLIP 编码器使用多层 Transformer，此处简化为随机向量
         vec = torch.randn(self.dim)
         vec = vec / vec.norm()  # 归一化
         return vec * weight

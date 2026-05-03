@@ -51,6 +51,7 @@ $$
 ```python
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 class DeepVO(nn.Module):
     """端到端深度视觉里程计 (简化版)"""
@@ -140,7 +141,6 @@ class LoopClosureDetector(nn.Module):
         is_loop = max_sim > threshold
         return is_loop, max_idx
 
-import torch.nn.functional as F
 # 测试
 vo_model = DeepVO()
 img1 = torch.randn(1, 3, 256, 256)

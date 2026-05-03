@@ -43,16 +43,18 @@ $$
 ## 代码示例
 
 ```python
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, AutoModelForCausalLM
 import numpy as np
 
 # 模拟 RAG 的简化实现
 
 class SimpleRAG:
     """简化的 RAG 系统"""
-    def __init__(self, llm_name='t5-small'):
+    def __init__(self, llm_name='gpt2'):
         self.tokenizer = AutoTokenizer.from_pretrained(llm_name)
-        self.llm = AutoModelForSeq2SeqLM.from_pretrained(llm_name)
+        if self.tokenizer.pad_token is None:
+            self.tokenizer.pad_token = self.tokenizer.eos_token
+        self.llm = AutoModelForCausalLM.from_pretrained(llm_name)
         # 模拟文档库
         self.documents = [
             "上海是中国最大的城市之一，位于长江入海口。",
@@ -61,12 +63,12 @@ class SimpleRAG:
             "BERT 是由 Google 开发的预训练语言模型。",
             "注意力机制允许模型在生成每个词时关注输入的不同位置。",
         ]
-        # 模拟文档嵌入（实际中由 Sentence-BERT 等生成）
+        # 模拟文档嵌入（实际中由 Sentence-BERT 等生成）⚠️ 模拟代码，仅用于示意
         self.doc_embeddings = np.random.randn(len(self.documents), 128)
 
     def retrieve(self, query, k=2):
         """模拟检索过程"""
-        query_emb = np.random.randn(128)  # 实际中需要编码
+        query_emb = np.random.randn(128)  # ⚠️ 模拟代码，实际需用编码器生成 query embedding
         scores = [np.dot(query_emb, de) for de in self.doc_embeddings]
         top_k = np.argsort(scores)[-k:][::-1]
         return [self.documents[i] for i in top_k]

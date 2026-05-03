@@ -44,7 +44,6 @@ $$
 import torch
 import torch.nn as nn
 import math
-import matplotlib.pyplot as plt
 
 class SinusoidalPositionalEncoding(nn.Module):
     def __init__(self, d_model, max_len=5000):

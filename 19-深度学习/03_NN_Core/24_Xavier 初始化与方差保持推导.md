@@ -85,6 +85,14 @@ Xavier 初始化可以想象为"给每层的信息铺设一条合适宽度的管
 
 需要注意的是，Xavier 假设激活函数在 0 附近是线性的（恒等映射）。这对于 Tanh 是合理的（在 0 附近近似线性），但对于 ReLU 则不适用（因为 ReLU 在负半轴输出为 0，破坏了零均值的假设）。
 
+| 对比维度 | Xavier 初始化 | He 初始化 |
+|---------|-------------|----------|
+| 适用激活函数 | Tanh、Sigmoid、线性 | ReLU、PReLU、Leaky ReLU |
+| 方差公式 | $1/n_{in}$ | $2/n_{in}$ |
+| 假设前提 | 激活函数在 0 附近线性、零对称 | ReLU 将一半神经元置零 |
+| 均匀分布范围 | $\pm\sqrt{3/n_{in}}$ | $\pm\sqrt{6/n_{in}}$ |
+| 对深层网络的信号影响 | 使用 ReLU 时信号衰减 | 信号稳定传播 |
+
 ## 代码示例
 
 ```python
@@ -94,7 +102,7 @@ import torch.nn as nn
 # Xavier 初始化在 PyTorch 中的使用
 def xavier_init(m):
     if isinstance(m, nn.Linear):
-        nn.init.xavier_uniform_(m.weight)
+        nn.init.xavier_uniform_(m.weight)  # Xavier 均匀分布：范围 ±sqrt(3/n_in)，保持前向/反向方差
         nn.init.zeros_(m.bias)
 
 # 验证方差保持特性

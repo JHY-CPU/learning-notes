@@ -2,7 +2,7 @@
 
 ## 核心概念
 
-- **PyTorch Mobile**：PyTorch 的移动端部署方案，支持在 Android 和 iOS 设备上直接运行 PyTorch 模型。核心组件包括：`torchscript`（模型序列化格式）、`libtorch`（移动端 C++ 运行时库）和 `pytorch_android_lite`（Android Java API）。
+- **PyTorch Mobile**：PyTorch 的移动端部署方案，支持在 Android 和 iOS 设备上直接运行 PyTorch 模型。核心组件包括：`torchscript`（模型序列化格式）、`libtorch`（移动端 C++ 运行时库）和 `pytorch_android_lite`（Android Java API）。**注意：PyTorch Mobile 已被 ExecuTorch（2024）取代**，后者提供了更轻量的运行时、更优的算子融合和更好的硬件后端抽象。
 - **TorchScript**：PyTorch 模型的静态图表示，是 PyTorch Mobile 的模型格式。通过 `torch.jit.trace` 或 `torch.jit.script` 将动态 PyTorch 模型转换为静态 TorchScript 图，移除了 Python 依赖，可在没有 Python 运行时的环境中执行。
 - **模型量化与优化**：移动端部署前必须进行模型压缩。典型流程包括：FP32 -> FP16 量化（iOS 上的 CoreML）或 FP32 -> INT8 量化（Android 上的 NNAPI）。模型大小的目标通常控制在 50MB 以下。
 - **CoreML**：Apple 的原生机器学习框架，支持在 iOS 设备上高效执行模型推理。CoreML 利用 Apple Neural Engine (ANE) 和 GPU 实现硬件加速。PyTorch 模型可以通过 `torch.onnx.export` -> ONNX -> CoreML 工具链转换，或使用 `coremltools` 直接转换。

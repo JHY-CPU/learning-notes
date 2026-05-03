@@ -111,7 +111,8 @@ print(f"Unexpected keys: {unexpected}")  # state_dict 有但当前模型没有�
 
 # 4. 处理 DDP 的 module. 前缀
 if torch.cuda.device_count() > 1:
-    model_ddp = nn.DataParallel(model)
+    from torch.nn.parallel import DistributedDataParallel as DDP
+    model_ddp = DDP(model)
     # 方案 A: 保存时剥离前缀
     torch.save(model_ddp.module.state_dict(), "ddp_weights.pt")
     # 方案 B: 加载时创建新字典

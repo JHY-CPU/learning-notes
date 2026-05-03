@@ -41,7 +41,7 @@ $$
 # ChatGLM-6B 使用示例
 # 需要安装: pip install transformers accelerate
 
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+from transformers import AutoTokenizer, AutoModel  # ChatGLM 使用 custom code，需 trust_remote_code=True
 import torch
 
 # 注意：需要从 HuggingFace 下载模型权重

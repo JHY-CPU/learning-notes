@@ -100,7 +100,6 @@ for _ in range(20000):
     lr = scheduler.step()
     lrs.append(lr)
 
-import matplotlib.pyplot as plt
 print(f"最大学习率: {max(lrs):.6f}")
 print(f"最终学习率: {lrs[-1]:.6f}")
 print(f"预热在 {scheduler.warmup_steps} 步后结束")

@@ -88,5 +88,5 @@ print(f"\nZero-shot 结果: {result}")
 ## 深度学习关联
 
 - **LLM 范式的转折点**：GPT-3 标志着 NLP 从"预训练 + 微调"范式转向"预训练 + 提示"范式。不再需要为每个任务微调模型，使非研究人员也能使用 LLM。
-- **大规模涌现能力的论证**：GPT-3 系统性地证明了模型规模对涌现能力的预测性——某些能力在模型达到一定规模前几乎为零，超过阈值后急剧提升。这一发现指导了后续更大模型（GPT-4、PaLM、LLaMA）的训练决策。
+- **大规模涌现能力的论证**：GPT-3 系统性地证明了模型规模对涌现能力的预测性——某些能力在模型达到一定规模前几乎为零，超过阈值后急剧提升。这一发现指导了后续更大模型（GPT-4/4o、PaLM、LLaMA、Claude）的训练决策。
 - **Prompt 工程的兴起**：GPT-3 的 In-context Learning 催生了 Prompt Engineering 和 Prompt Tuning 等新研究方向，包括 Chain-of-Thought、Few-shot 选择策略等技巧。

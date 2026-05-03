@@ -2,6 +2,14 @@
 
 ## 核心概念
 
+| 属性 | BatchNorm | LayerNorm | InstanceNorm | GroupNorm |
+|------|-----------|-----------|-------------|-----------|
+| 归一化维度 | $(N, H, W)$ 跨通道 | $(C, H, W)$ 跨样本 | $(H, W)$ 单通道 | 分组内 $(H, W)$ |
+| 适用场景 | 固定 batch size 训练 | 变长序列 / 小 batch | 风格迁移 | 小 batch 视觉任务 |
+| batch 依赖 | 依赖 batch 统计量 | 不依赖 | 不依赖 | 不依赖 |
+| 训练/推理差异 | 有（使用 running stats） | 无 | 无 | 无 |
+| 计算量 | 中 | 低 | 低 | 中 |
+
 - **Layer Normalization 的定义**：Layer Normalization（LN）对单个样本的所有特征维度进行标准化，而不是像 BN 那样跨样本维度。对输入 $x \in \mathbb{R}^d$，LN 计算 $\mu = \frac{1}{d}\sum_i x_i$，$\sigma^2 = \frac{1}{d}\sum_i (x_i - \mu)^2$，然后标准化。
 - **与 BN 的核心区别**：BN 在 batch 维度（跨样本）计算统计量，LN 在特征维度（跨特征）计算统计量。BN 依赖于 batch size，LN 不依赖。BN 需要存储全局统计量用于推理，LN 不需要。
 - **BN 的缺点**：BN 在小 batch 时统计量估计不准确；对 RNN 不适用（序列长度变化导致统计量不稳定）；训练和推理行为不一致。LN 解决了所有这些缺点。
@@ -102,7 +110,7 @@ class LayerNormManual(nn.Module):
         # 在最后 normalized_shape 维上标准化
         dims = tuple(range(-len(self.normalized_shape), 0))
         mean = x.mean(dim=dims, keepdim=True)
-        var = x.var(dim=dims, keepdim=True, unbiased=False)
+        var = x.var(dim=dims, keepdim=True, unbiased=False)  # unbiased=False: LN 使用总体方差而非样本方差，与 BatchNorm 行为一致
         x_norm = (x - mean) / (var + self.eps).sqrt()
         return self.gamma * x_norm + self.beta
 
