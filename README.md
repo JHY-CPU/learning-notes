@@ -1,162 +1,136 @@
 <div align="center">
 
-# 📚 Deep Learning & Full-Stack Learning Notes
+# 📚 深度学习与全栈学习笔记
 
-**一份持续更新的深度学习与全栈开发知识笔记合集**
+**一份持续更新的个人知识库：全栈 / 算法（HTML） + 深度学习（Markdown）**
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-![Notes Count](https://img.shields.io/badge/Notes-100+-blue)
-![Topics](https://img.shields.io/badge/Topics-20+-green)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![Deep Learning Notes](https://img.shields.io/badge/Deep%20Learning-390%2B-blue)
+![Full-Stack Modules](https://img.shields.io/badge/Modules-18-green)
 
 </div>
 
 ---
 
-## 📖 Overview | 概览
+## 📖 概览 | Overview
 
-This repository contains a comprehensive collection of personal learning notes covering **Deep Learning** and **Full-Stack Web Development**. All notes are written in Chinese with precise technical terminology in English, featuring mathematical derivations, core concept explanations, and practical code examples.
+本仓库是**单体知识库**：前 18 个编号目录为**前端 → 后端 → 运维 → 算法**的渐进式专题（以 **HTML** 页面为主，便于浏览器直接打开）；**`19-深度学习/`** 为**深度学习专题**，以 **Markdown** 为主，按「数学基础 → 传统 ML → 神经网络 → CV / NLP / 生成式 / 强化学习 → 工程部署」组织，含公式推导与代码示例。
 
-> **目的**：系统地记录和整理学习过程中的核心知识点，通过"核心概念 + 数学推导 + 代码实践"的结构化方式，帮助加深理解并方便日后回顾。
-
----
-
-## 🧠 Deep Learning Notes
-
-The deep learning section is the core of this repository, covering **8 major areas** with **100+ detailed notes**. Each note follows a consistent structure: core concepts → mathematical derivations → practical insights.
-
-### Structure | 目录结构
-
-```
-DeepLearningNotes/
-├── 01_Math_Foundations/          # 数学基础 (15 notes)
-│   ├── 向量空间与线性组合
-│   ├── 矩阵乘法与线性变换
-│   ├── 特征值与特征向量
-│   ├── SVD 奇异值分解
-│   ├── 梯度下降法收敛性
-│   └── ...
-│
-├── 02_ML_Basics/                 # 机器学习基础 (10 notes)
-│   ├── 线性回归 (Normal Equation)
-│   ├── 逻辑回归与 Sigmoid
-│   ├── SVM 硬间隔/软间隔/对偶/Kernel
-│   ├── 决策树 (ID3, C4.5, CART)
-│   └── 随机森林
-│
-├── 03_NN_Core/                   # 神经网络核心 (10 notes)
-│   ├── 感知机与 MLP
-│   ├── 前向传播与反向传播
-│   ├── 激活函数 (Sigmoid, Tanh, ReLU, GELU, Swish, Softmax)
-│   └── 梯度消失与爆炸
-│
-├── 04_Computer_Vision/           # 计算机视觉 (19 notes)
-│   ├── 卷积运算 / 步长填充 / 转置卷积 / 空洞卷积
-│   ├── 深度可分离卷积 / 分组卷积
-│   ├── LeNet → AlexNet → VGG → GoogLeNet → ResNet → DenseNet
-│   ├── MobileNet / EfficientNet
-│   └── Vision Transformer / Swin Transformer
-│
-├── 05_NLP_Sequence/              # NLP与序列模型 (16 notes)
-│   ├── BoW / TF-IDF / Word2Vec / GloVe / FastText
-│   ├── RNN / BPTT / LSTM / GRU / BiRNN
-│   └── Seq2Seq / Attention / Self-Attention / Multi-Head / Transformer
-│
-├── 06_Generative_AI/             # 生成式 AI (10 notes)
-│   ├── GAN / DCGAN / WGAN / WGAN-GP
-│   ├── StyleGAN / CycleGAN / Pix2Pix
-│   └── VAE
-│
-├── 07_Reinforcement_Learning/    # 强化学习 (10 notes)
-│   ├── MDP / 回报与折扣因子
-│   ├── 价值函数 / 贝尔曼方程
-│   ├── 策略迭代 / 价值迭代
-│   └── Monte Carlo / TD Learning
-│
-└── 08_Engineering_Deployment/    # 工程部署 (10 notes)
-    ├── PyTorch Tensor / Dataset / DataLoader
-    ├── Autograd / nn.Module
-    ├── 模型保存与加载
-    └── 分布式训练 / FSDP / DeepSpeed / AMP
-```
-
-### Topic Coverage | 覆盖范围
-
-| Area | Count | Key Topics |
-|------|-------|-----------|
-| Math Foundations | 15 | Linear algebra, calculus, probability, optimization |
-| ML Basics | 10 | Regression, SVM, decision trees, ensemble |
-| NN Core | 10 | Perceptron, backpropagation, activation functions |
-| Computer Vision | 19 | CNN architectures from LeNet to Swin Transformer |
-| NLP & Sequence | 16 | Word embeddings, RNN variants, Attention, Transformer |
-| Generative AI | 10 | GAN variants, VAE |
-| Reinforcement Learning | 10 | MDP, Bellman equations, MC, TD |
-| Engineering Deployment | 10 | PyTorch, distributed training, mixed precision |
+> **目的**：用固定结构（核心概念、推导、直觉、代码、关联）把学过的东西写清楚，方便日后检索与复盘。
 
 ---
 
-## 🌐 Full-Stack Development Notes
+## 🗂️ 仓库结构 | Repository Layout
 
-A complete learning path covering **17 topics** from frontend to backend, databases, DevOps, and algorithms.
+克隆后你会看到**按序号排列的模块**，与 README 中的描述一一对应：
 
-```
-01-HTML基础          → HTML5 fundamentals
-02-CSS基础            → CSS basics
-03-CSS进阶            → CSS advanced (flexbox, animation, responsive)
-04-JavaScript基础     → JS fundamentals
-05-JavaScript进阶     → JS advanced
-06-Node.js基础        → Node.js basics
-07-计算机网络         → Computer networking
-08-Linux与Shell       → Linux & shell
-09-Python             → Python programming
-10-数据库             → Databases
-11-Express与后端框架  → Express & backend frameworks
-12-Java               → Java
-13-SpringBoot         → Spring Boot
-14-Go语言             → Go language
-15-Docker与DevOps     → Docker & DevOps
-16-后端架构与安全     → Backend architecture & security
-17-项目实战与总结     → Project practice
-18-算法与数据结构     → Algorithms & data structures
-```
+| 路径 | 内容 | 主要格式 |
+|------|------|----------|
+| `01-HTML基础` … `18-算法与数据结构` | 全栈与算法数据结构学习路径 | 多为 `.html`（可直接双击或用 Live Server 打开） |
+| `19-深度学习/` | 深度学习系统化笔记（8 个子目录） | `.md`（GitHub / VS Code / Typora 均可） |
+
+深度学习子目录与**领域索引**详见 **[`19-深度学习/README.md`](19-深度学习/README.md)**（内含各目录篇数、学习路径 A/B/C、按问题速查表）。
 
 ---
 
-## 🎯 Features | 特点
+## 🧠 深度学习笔记 | Deep Learning
 
-- **Mathematical rigor** — Each deep learning note includes detailed mathematical derivations
-- **Structured format** — Consistent "Core Concepts → Math Derivation → Insights" pattern
-- **Bilingual precision** — Chinese explanations with precise English technical terminology
-- **Comprehensive coverage** — From math foundations to cutting-edge architectures (ViT, Swin, FSDP)
-- **Practical code** — PyTorch engineering notes with real deployment techniques
-- **Regularly updated** — Continuously expanding with new topics and deeper coverage
+路径：**`19-深度学习/`**（勿与旧文档中的 `DeepLearningNotes/` 混淆；本仓库已合并为上述目录）。
+
+### 目录结构（与仓库内一致）
+
+```
+19-深度学习/
+├── 01_Math_Foundations/          # 数学基础
+├── 02_ML_Basics/                 # 机器学习基础
+├── 03_NN_Core/                   # 神经网络核心（优化器、正则化、训练技巧等）
+├── 04_Computer_Vision/           # 计算机视觉（CNN、检测、分割、ViT 等）
+├── 05_NLP_Sequence/              # NLP 与序列模型（嵌入、RNN、Transformer、LLM 相关）
+├── 06_Generative_AI/             # 生成式 AI（GAN、VAE、扩散等）
+├── 07_Reinforcement_Learning/    # 强化学习
+└── 08_Engineering_Deployment/    # 工程与部署（PyTorch、分布式、量化、服务等）
+```
+
+各子目录的**篇数统计与 README 索引**以 [`19-深度学习/README.md`](19-深度学习/README.md) 为准（会随笔记增减更新）。
 
 ---
 
-## 🚀 Getting Started | 快速开始
+## 🌐 全栈与算法 | Full-Stack & Algorithms
 
-Simply browse the markdown files in each directory. No special tools required — any markdown viewer works (GitHub, VS Code, Typora, etc.).
+共 **18 个模块**（`01` … `18`），从基础到项目与算法：
+
+| 序号 | 目录 | 说明 |
+|------|------|------|
+| 01 | `01-HTML基础` | HTML5 与页面结构 |
+| 02 | `02-CSS基础` | 样式与布局入门 |
+| 03 | `03-CSS进阶` | Flex、动画、响应式等 |
+| 04 | `04-JavaScript基础` | JS 语言基础 |
+| 05 | `05-JavaScript进阶` | 异步、模块化、进阶 API 等 |
+| 06 | `06-Node.js基础` | Node 与 npm 生态 |
+| 07 | `07-计算机网络` | 协议栈、HTTP、缓存等 |
+| 08 | `08-Linux与Shell` | 命令行与脚本 |
+| 09 | `09-Python` | Python 语言与常用库 |
+| 10 | `10-数据库` | SQL 与 NoSQL |
+| 11 | `11-Express与后端框架` | Express / Koa 等 |
+| 12 | `12-Java` | Java 基础与集合等 |
+| 13 | `13-SpringBoot` | Spring Boot 与生态 |
+| 14 | `14-Go语言` | Go 语言与并发 |
+| 15 | `15-Docker与DevOps` | 容器与交付 |
+| 16 | `16-后端架构与安全` | 架构与安全实践 |
+| 17 | `17-项目实战与总结` | 综合项目笔记 |
+| 18 | `18-算法与数据结构` | 算法、数据结构、专题与实战 |
+
+---
+
+## ✨ 特点 | Features
+
+- **深度学习**：五段式模板（核心概念 → 数学推导 → 直观理解 → 代码示例 → 与 DL 的关联），技术名词中英对照。
+- **全栈 / 算法**：按专题分目录，单页 HTML 便于对照练习与演示。
+- **可追溯**：重要专题在 `19-深度学习` 各子目录配有 `README.md` 作目录与导航。
+
+---
+
+## 🚀 快速开始 | Getting Started
+
+1. **克隆本仓库**
 
 ```bash
-# Clone the repo
-git clone https://github.com/JHY-CPU/DeepLearningNotes.git
-cd DeepLearningNotes
-
-# Start with the math foundations
-open "01_Math_Foundations/01_向量空间与线性组合的物理意义.md"
+git clone git@github.com:JHY-CPU/learning-notes.git
+cd learning-notes
 ```
+
+（若使用 HTTPS，将地址改为 `https://github.com/JHY-CPU/learning-notes.git` 即可。）
+
+2. **阅读深度学习笔记**：从数学基础或 [`19-深度学习/README.md`](19-深度学习/README.md) 中的学习路径进入，例如：
+
+```bash
+# Windows（PowerShell）— 用默认程序打开示例文件
+start "" "19-深度学习\01_Math_Foundations\01_向量空间与线性组合的物理意义.md"
+```
+
+3. **阅读全栈 HTML**：在资源管理器中进入对应 `01-` … `18-` 目录，用浏览器打开 `.html` 文件，或在 VS Code 中使用 Live Server。
+
+---
+
+## 📎 相关文件 | Related
+
+| 文件 | 作用 |
+|------|------|
+| [`19-深度学习/README.md`](19-深度学习/README.md) | 深度学习总索引、篇数、学习路径、速查 |
+| 各 `19-深度学习/0x_*/README.md` | 分领域目录与说明 |
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License — feel free to use, share, and learn from these notes.
+内容以 **MIT 精神**（可自由阅读、分享与二次学习）整理；若你希望 GitHub 显示标准协议栏，可在仓库根目录添加 `LICENSE` 文本文件（例如从 [Choose a License](https://choosealicense.com/licenses/mit/) 复制 MIT 全文）。
 
 ---
 
 <div align="center">
 
-**If you find these notes helpful, please consider giving a ⭐!**
+若笔记对你有帮助，欢迎点个 ⭐
 
-Happy Learning! 🚀
+Happy Learning!
 
 </div>
