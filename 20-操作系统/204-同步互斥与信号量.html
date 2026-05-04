@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>同步互斥与信号量</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>🔒 同步、互斥与信号量</h2><p><strong>408：</strong>PV 操作、记录型信号量、经典同步问题（生产者-消费者等）常出综合题。竞态条件 Race condition、临界区、mutex、semaphore、条件变量（概念层）。</p></div>
+
+    <div class="card">
+        <h2>临界区 Critical Section</h2>
+        <p>访问共享资源的代码段必须<strong>互斥</strong>执行：同一时刻最多一个执行流进入临界区。</p>
+        <div class="code">// ========== 竞态示例（错误）==========
+// 两个线程同时对 counter++ 
+// 底层可能是 read-modify-write，交错执行导致丢失更新
+
+// ========== 正确思路 ==========
+// 进入前 acquire 锁；离开后 release
+// 锁的实现最终依赖硬件原子指令（如 compare-and-swap）</div>
+    </div>
+
+    <div class="card">
+        <h2>互斥锁 Mutex</h2>
+        <div class="code">// ========== 自旋锁 vs 睡眠锁 ==========
+// 自旋：短临界区、多核、等待时间极短时可能划算
+// 睡眠：等待久时让出 CPU，由内核排队（futex 等）
+
+// ========== 常见陷阱 ==========
+// 死锁：互相等待对方持有的锁（见 205）
+// 优先级反转：低优先级持锁阻塞高优先级（需优先级继承等机制）</div>
+    </div>
+
+    <div class="card">
+        <h2>信号量 Semaphore</h2>
+        <p>计数器 + 两个原子操作：<strong>P(wait)</strong> 减 1，若 &lt;0 则阻塞；<strong>V(signal)</strong> 加 1，必要时唤醒等待者。</p>
+        <div class="code">// ========== 二进制信号量 ≈ 互斥锁 ==========
+// 计数信号量：限制同时访问资源的数量（如连接池槽位）
+
+// ========== 与条件变量 ==========
+// mutex 保护“数据”；condition variable 用于“等待某个条件成立”
+// 典型模式：加锁 → 检查条件 → while 不成立则 wait → 修改 → signal → 解锁</div>
+        <div class="note">📌 用户态编程优先使用语言/库提供的 mutex、RWLock、channel；理解信号量有助于读内核与经典教材。</div>
+    </div>
+</body>
+</html>

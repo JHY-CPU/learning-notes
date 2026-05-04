@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>操作系统角色与系统调用</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #3498db; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <div class="card"><h2>⚙️ 操作系统角色与系统调用</h2><p><strong>408：</strong>内核态/用户态、中断与异常、系统调用入口为选择题与简答高频点。Kernel vs User mode、系统调用（syscall）流程、常见 POSIX 调用分类。</p></div>
+
+    <div class="card">
+        <h2>内核态与用户态</h2>
+        <p>CPU 通过<strong>特权级</strong>区分：用户程序运行在较低特权级，内核运行在最高特权级。非法访问（如直接写设备寄存器）会触发异常，进入内核处理。</p>
+        <div class="code">// ========== 为什么要分态？==========
+// 安全：应用不能随意读写任意物理内存或端口
+// 稳定：非法操作由内核捕获，可终止进程而非整机崩溃
+// 抽象：应用只看到“文件描述符”“虚拟地址”，不直接碰硬件
+
+// ========== 典型切换时机 ==========
+// 1. 系统调用（int / syscall 指令，自愿进入内核）
+// 2. 中断（时钟、网卡、键盘中断）
+// 3. 异常（缺页、除零、非法指令）</div>
+    </div>
+
+    <div class="card">
+        <h2>系统调用 System Call</h2>
+        <p>用户程序请求内核服务的<strong>唯一正规入口</strong>（在类 Unix 上通过封装如 libc 的 read/write/fork 等）。</p>
+        <div class="code">// ========== 一次 write 的简化路径 ==========
+// 用户态: write(fd, buf, n)
+//   → libc 将参数放入寄存器/栈
+//   → 触发 syscall 指令（x86-64 常用 syscall）
+// 内核态: 根据系统调用号分发到 sys_write
+//   → 校验 fd、权限、拷贝用户缓冲区到内核（必要时）
+//   → 写入对应文件/套接字/管道
+//   → 返回写入字节数或错误码（errno）
+
+// ========== 常见分类（POSIX 风格）==========
+// 进程控制: fork, execve, exit, wait4
+// 文件与 I/O: open, read, write, close, mmap
+// 网络: socket, bind, listen, accept, connect
+// 信号: kill, sigaction
+// 时间与定时器: clock_gettime, nanosleep</div>
+        <div class="note">📥 strace / perf 可观察进程实际发出的 syscall，是排查“为什么慢”“权限问题”的利器。</div>
+    </div>
+
+    <div class="card">
+        <h2>与后续章节的关系</h2>
+        <div class="code">// fork/exec → 进程模型（见 202）
+// mmap/brk → 虚拟内存管理（见 206）
+// open/read → VFS 与页缓存（见 207）
+// futex → 用户态锁与内核协作（见 204）</div>
+    </div>
+</body>
+</html>
