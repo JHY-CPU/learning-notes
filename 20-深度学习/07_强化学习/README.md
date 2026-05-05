@@ -1,4 +1,4 @@
-# 07_Reinforcement_Learning — 强化学习
+# 07_强化学习
 
 > 从MDP到PPO，系统地覆盖强化学习的理论基础与算法实现。包括基于价值的方法（DQN系列）、基于策略的方法（Policy Gradient、PPO）、Actor-Critic框架以及前沿的多智能体与稀疏奖励问题。
 
@@ -6,8 +6,8 @@
 
 ## 基础知识
 
-- **前置知识**：03_NN_Core; 01_Math_Foundations（概率、优化）
-- **关联目录**：05_NLP_Sequence（RLHF应用）; 04_Computer_Vision（机器人视觉）
+- **前置知识**：03_神经网络核心; 01_数学基础（概率、优化）
+- **关联目录**：05_NLP与序列模型（RLHF应用）; 04_计算机视觉（机器人视觉）
 - **笔记数量**：共 30 篇
 
 ---
@@ -85,7 +85,7 @@ Policy Gradient定理、REINFORCE、Actor-Critic、A2C/A3C、PPO、TRPO、SAC、
 1. 按编号顺序阅读每个子主题内的笔记，因为内部存在递进关系
 2. 每个子主题完成后，尝试用「深度学习关联」部分串联知识点
 3. 代码示例可以直接复制运行（需要 PyTorch 和 transformers 库）
-4. 遇到数学推导不熟悉时，回到 01_Math_Foundations 查阅对应基础
+4. 遇到数学推导不熟悉时，回到 01_数学基础 查阅对应基础
 
 ---
 

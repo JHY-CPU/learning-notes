@@ -1,4 +1,4 @@
-# 08_Engineering_Deployment — 工程与部署
+# 08_工程与部署
 
 > 从PyTorch基础到生产级部署的全链路工程实践。覆盖数据加载、模块设计、模型保存/加载、分布式训练（DDP/FSDP/DeepSpeed）、混合精度、模型压缩（剪枝/量化/蒸馏）、推理优化（ONNX/TensorRT）与服务化部署（Triton/TorchServe）。
 
@@ -6,8 +6,8 @@
 
 ## 基础知识
 
-- **前置知识**：03_NN_Core; Python 工程经验; CUDA 基础概念
-- **关联目录**：05_NLP_Sequence（LLM 部署）; 04_Computer_Vision（CV 模型部署）
+- **前置知识**：03_神经网络核心; Python 工程经验; CUDA 基础概念
+- **关联目录**：05_NLP与序列模型（LLM 部署）; 04_计算机视觉（CV 模型部署）
 - **笔记数量**：共 20 篇
 
 ---
@@ -75,7 +75,7 @@ ONNX格式转换、TensorRT层融合、Triton Server、TorchServe
 1. 按编号顺序阅读每个子主题内的笔记，因为内部存在递进关系
 2. 每个子主题完成后，尝试用「深度学习关联」部分串联知识点
 3. 代码示例可以直接复制运行（需要 PyTorch 和 transformers 库）
-4. 遇到数学推导不熟悉时，回到 01_Math_Foundations 查阅对应基础
+4. 遇到数学推导不熟悉时，回到 01_数学基础 查阅对应基础
 
 ---
 

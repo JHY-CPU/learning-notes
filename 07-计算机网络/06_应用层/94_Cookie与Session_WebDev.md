@@ -1,0 +1,148 @@
+# Cookie与Session
+
+## 🍪 Cookie 与 Session
+
+Cookie 属性与安全、Session 原理、Cookie vs Session vs Token、SameSite 策略。
+
+## Cookie 机制
+
+Cookie 是服务器存储在用户浏览器中的小数据片段，每次请求自动发送到对应服务器。
+```
+// ========== Cookie 工作流程 ==========
+//
+// 1. 客户端 POST /api/login
+// 2. 服务器验证身份成功
+// 3. 服务器响应:
+//    Set-Cookie: session_id=abc123; HttpOnly; Secure
+// 4. 浏览器存储 Cookie
+// 5. 后续所有请求自动携带:
+//    Cookie: session_id=abc123
+// 6. 服务器解析 Cookie 识别用户
+//
+// ========== Cookie 属性 ==========
+// Set-Cookie: =; 属性1; 属性2
+//
+// 名称=值:
+//   session_id=abc123
+//   theme=dark
+//   language=zh-CN
+//
+// 关键属性:
+//   Expires/Max-Age:    过期时间
+//   Domain:             可发送 Cookie 的域名
+//   Path:               可发送 Cookie 的路径
+//   Secure:             仅 HTTPS 发送
+//   HttpOnly:           JavaScript 不可访问 (防 XSS)
+//   SameSite:           跨站请求策略
+//   Priority:           优先级 (低/中/高)
+
+// ========== Cookie 大小限制 ==========
+// 单个 Cookie 最大 4KB
+// 每个域名最多 50-150 个 Cookie (浏览器不同)
+// 总 Cookie 头部大小有限制 (通常 8KB)
+// 浏览器总 Cookie 存储限制 ~10MB
+```
+## SameSite 属性
+
+SameSite 控制 Cookie 在跨站请求中是否发送，是防止 CSRF 攻击的重要手段。
+```
+// ========== SameSite 取值 ==========
+//
+// SameSite=None:
+//   所有跨站请求都发送 Cookie
+//   需要同时设置 Secure (必须 HTTPS)
+//   兼容性最强,安全性最低
+//   必须配合 CSRF Token
+//
+// SameSite=Lax (默认值):
+//   GET 请求的跨站导航发送 Cookie
+//   POST/PUT/DELETE 跨站不发送
+//   安全性较好,兼容性也不错
+//   阻止 CSRF 登录/支付请求
+//
+// SameSite=Strict:
+//   任何跨站请求都不发送 Cookie
+//   安全性最高,体验最差
+//   从第三方链接过来也不带 Cookie
+
+// ========== CSRF (跨站请求伪造) ==========
+// 攻击方式:
+//   用户已登录 A 网站
+//   访问恶意网站 B
+//   B 伪造请求到 A 网站执行操作
+//   Cookie 自动发送,服务器以为是用户本人
+//
+// 防御:
+//   1. SameSite=Lax/Strict
+//   2. CSRF Token (表单中嵌入随机 token)
+//   3. 验证 Referer/Origin 头
+//   4. 双重 Cookie 验证
+```
+> **Note**: 🛡️ SameSite=Lax 是 2020 年后浏览器的默认行为,极大地提升了 Web 安全性。但这也意味着 OAuth/SSO 等跨站认证流程需要特别设计。
+
+## Session 机制
+```
+// ========== Session 工作流程 ==========
+// 服务器端存储用户状态, Cookie 只存 Session ID
+//
+// 服务器存储方式:
+//   内存:        简单,重启丢失
+//   Redis:       分布式共享,推荐
+//   数据库:      持久化,速度慢
+//
+// ========== Cookie vs Session vs Token ==========
+//
+//          Cookie           Session          JWT Token
+// ──────────────────────────────────────────────────────
+// 存储位置  浏览器            服务器            客户端
+// 状态      有状态            有状态            无状态
+// 扩展性    好 (客户端存储)   差 (服务器存储)   好 (无需存储)
+// 安全      XSS 风险         安全              签名防篡改
+// 跨域      受限              需共享存储        天然支持
+// 实时性    立即              立即              有有效期
+// 移动端    支持不佳          支持不佳          完美适配
+//
+// ========== Session 安全性 ==========
+// Session Fixation (会话固定):
+//   攻击者让用户使用已知的 Session ID
+//   防御: 登录后重新生成 Session ID
+//
+// Session Hijacking (会话劫持):
+//   攻击者窃取 Session Cookie
+//   防御: HTTPS + HttpOnly + Secure + 绑定 IP/UA
+
+// ========== 最佳实践 ==========
+// 传统 Web 应用: Session + Cookie
+// SPA 前端:      JWT Token (Bearer)
+// 移动端 API:    JWT Token (Bearer)
+// 微服务:        JWT Token (无状态认证)
+// 第三方 API:    API Key + Secret + JWT
+```
+## Cookie 安全设置
+```
+// ========== 安全 Cookie 配置 ==========
+// Set-Cookie: session_id=abc123;
+//   HttpOnly;      ← JS 无法读取,防 XSS
+//   Secure;        ← 仅 HTTPS 传输
+//   SameSite=Lax;  ← CSRF 防护
+//   Max-Age=86400; ← 1 天过期
+//   Path=/;        ← 全站可用
+//   Domain=.example.com ← 子域名共享
+
+// ========== 常见攻击与防御 ==========
+// XSS (跨站脚本):
+//   攻击者注入恶意 JS 读取 Cookie
+//   防御: HttpOnly + CSP + 输入过滤
+//
+// CSRF (跨站请求伪造):
+//   伪造请求利用用户身份
+//   防御: SameSite + CSRF Token
+//
+// 中间人攻击:
+//   网络层窃听 Cookie
+//   防御: HTTPS + Secure 标记
+//
+// Cookie 投毒:
+//   修改 Cookie 内容
+//   防御: 签名 + 加密 + HttpOnly
+```
