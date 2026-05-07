@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>马尔可夫链</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; font-size: 2em; margin-bottom: 10px; border-bottom: 3px solid #2b6cb0; padding-bottom: 10px; }
+        .subtitle { text-align: center; color: #718096; margin-bottom: 30px; }
+        h2 { color: #2c5282; font-size: 1.4em; margin: 25px 0 12px; padding-left: 12px; border-left: 4px solid #3182ce; }
+        h3 { color: #2d3748; font-size: 1.15em; margin: 18px 0 8px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px 25px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .formula { background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 6px; padding: 12px 18px; margin: 10px 0; font-size: 1.05em; text-align: center; font-family: 'Times New Roman', serif; }
+        .formula-inline { background: #ebf8ff; padding: 2px 8px; border-radius: 4px; font-family: 'Times New Roman', serif; }
+        .example { background: #f0fff4; border-left: 4px solid #48bb78; border-radius: 0 6px 6px 0; padding: 15px 18px; margin: 12px 0; }
+        .example-title { font-weight: bold; color: #276749; margin-bottom: 6px; }
+        .note { background: #fffff0; border-left: 4px solid #ecc94b; border-radius: 0 6px 6px 0; padding: 12px 18px; margin: 12px 0; }
+        .note-title { font-weight: bold; color: #975a16; }
+        .step { background: #faf5ff; border-left: 4px solid #805ad5; border-radius: 0 6px 6px 0; padding: 10px 18px; margin: 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 8px 12px; text-align: center; }
+        th { background: #bee3f8; color: #2a4365; }
+        tr:nth-child(even) { background: #f7fafc; }
+        ul, ol { margin-left: 25px; margin-bottom: 8px; }
+        li { margin-bottom: 4px; }
+        .matrix { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin: 10px 0; text-align: center; font-family: 'Times New Roman', serif; font-size: 1.05em; }
+        .summary-box { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; border-radius: 10px; padding: 20px 25px; margin-top: 30px; }
+        .summary-box h2 { color: #fff; border-left-color: #fff; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>马尔可夫链</h1>
+    <p class="subtitle">随机过程基础 · 无记忆性的随机演化</p>
+
+    <!-- ==================== 基本概念 ==================== -->
+    <h2>一、马尔可夫性质</h2>
+
+    <div class="card">
+        <h3>1. 定义</h3>
+        <p>随机过程 {Xₙ, n = 0, 1, 2, ...} 具有<strong>马尔可夫性质</strong>：未来状态只依赖于当前状态，与过去状态无关。</p>
+        <div class="formula">
+            P(Xₙ₊₁ = j | Xₙ = i, Xₙ₋₁ = iₙ₋₁, ..., X₀ = i₀) = P(Xₙ₊₁ = j | Xₙ = i)
+        </div>
+        <p style="margin-top:8px;">"给定现在，未来与过去独立"——这是马尔可夫链的核心特征。</p>
+    </div>
+
+    <div class="card">
+        <h3>2. 离散时间马尔可夫链</h3>
+        <ul>
+            <li><strong>状态空间</strong>：S = {0, 1, 2, ...}（有限或可数集）</li>
+            <li><strong>时间参数</strong>：n = 0, 1, 2, ...（离散）</li>
+            <li><strong>转移概率</strong>：pᵢⱼ = P(Xₙ₊₁ = j | Xₙ = i)</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 转移矩阵 ==================== -->
+    <h2>二、转移概率矩阵</h2>
+
+    <div class="card">
+        <h3>1. 一步转移矩阵</h3>
+        <p>将所有转移概率排列成矩阵 P = (pᵢⱼ)：</p>
+        <div class="matrix">
+            P = | p₀₀  p₀₁  p₀₂  ... |
+            &nbsp;&nbsp;&nbsp;| p₁₀  p₁₁  p₁₂  ... |
+            &nbsp;&nbsp;&nbsp;| p₂₀  p₂₁  p₂₂  ... |
+            &nbsp;&nbsp;&nbsp;| ...  ...  ...  ... |
+        </div>
+        <p style="margin-top:8px;">性质：每行之和为 1（pᵢⱼ ≥ 0，Σⱼ pᵢⱼ = 1），称为<strong>随机矩阵</strong>。</p>
+    </div>
+
+    <div class="card">
+        <h3>2. n 步转移矩阵</h3>
+        <div class="formula">
+            P⁽ⁿ⁾ = Pⁿ &nbsp;&nbsp;（n 步转移矩阵 = 一步转移矩阵的 n 次幂）
+        </div>
+        <p style="margin-top:8px;">切普曼-科尔莫戈罗夫方程：pᵢⱼ⁽ⁿ⁺ᵐ⁾ = Σₖ pᵢₖ⁽ⁿ⁾ · pₖⱼ⁽ᵐ⁾</p>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 1：天气模型</div>
+        <p>晴天后第二天晴天概率 0.7，雨天后第二天雨天概率 0.5。写出转移矩阵并求两天后的天气概率。</p>
+        <div class="step">
+            状态：S = {晴(0), 雨(1)}<br><br>
+            转移矩阵：<strong>P = | 0.7  0.3 |</strong><br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<strong>| 0.5  0.5 |</strong><br><br>
+            两步转移矩阵：<br>
+            P² = | 0.7×0.7+0.3×0.5 &nbsp; 0.7×0.3+0.3×0.5 |<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| 0.5×0.7+0.5×0.5 &nbsp; 0.5×0.3+0.5×0.5 |<br>
+            &nbsp;&nbsp; = | 0.64  0.36 |<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;| 0.60  0.40 |<br><br>
+            若今天晴天：P(两天后晴) = <strong>0.64</strong>，P(两天后雨) = 0.36
+        </div>
+    </div>
+
+    <!-- ==================== 平稳分布 ==================== -->
+    <h2>三、平稳分布（稳态分布）</h2>
+
+    <div class="card">
+        <h3>1. 定义</h3>
+        <p>概率向量 π = (π₀, π₁, ...) 满足：</p>
+        <div class="formula">
+            πP = π &nbsp;&nbsp; 且 &nbsp;&nbsp; Σ πᵢ = 1
+        </div>
+        <p style="margin-top:8px;">即 π 是矩阵 P 的左特征向量（特征值为 1）。经过足够多步转移后，状态分布趋于 π，与初始分布无关。</p>
+    </div>
+
+    <div class="card">
+        <h3>2. 存在唯一性条件</h3>
+        <p>有限状态马尔可夫链若<strong>不可约</strong>且<strong>非周期</strong>，则存在唯一的平稳分布，且 n→∞ 时 P⁽ⁿ⁾ 的每一行都趋于 π。</p>
+        <ul>
+            <li><strong>不可约</strong>：从任何状态可以到达任何其他状态</li>
+            <li><strong>非周期</strong>：返回某状态的时间步长的最大公约数为 1</li>
+        </ul>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 2：求平稳分布</div>
+        <p>求例题 1 中天气模型的平稳分布。</p>
+        <div class="step">
+            设 π = (π₁, π₂)<br>
+            πP = π → π₁ = 0.7π₁ + 0.5π₂<br>
+            π₂ = 0.3π₁ + 0.5π₂<br>
+            π₁ + π₂ = 1<br><br>
+            由第一式：0.3π₁ = 0.5π₂ → π₁ = (5/3)π₂<br>
+            (5/3)π₂ + π₂ = 1 → π₂ = 3/8<br><br>
+            <strong>平稳分布：π = (5/8, 3/8) ≈ (0.625, 0.375)</strong><br>
+            长期来看，约 62.5% 的天是晴天，37.5% 是雨天。
+        </div>
+    </div>
+
+    <!-- ==================== 应用 ==================== -->
+    <h2>四、马尔可夫链的应用</h2>
+
+    <div class="card">
+        <table>
+            <tr><th>领域</th><th>应用</th></tr>
+            <tr><td>自然语言处理</td><td>N-gram 语言模型、词性标注</td></tr>
+            <tr><td>搜索引擎</td><td>PageRank 算法（网页排名的平稳分布）</td></tr>
+            <tr><td>金融</td><td>信用评级迁移、市场状态模型</td></tr>
+            <tr><td>排队论</td><td>服务系统中的顾客数变化</td></tr>
+            <tr><td>生物学</td><td>基因序列分析、种群演化</td></tr>
+            <tr><td>强化学习</td><td>马尔可夫决策过程（MDP）</td></tr>
+        </table>
+    </div>
+
+    <div class="note">
+        <span class="note-title">马尔可夫链与 PageRank：</span>
+        Google 的 PageRank 算法将网页浏览建模为马尔可夫链：每个网页是一个状态，超链接决定了转移概率，PageRank 值就是这个马尔可夫链的平稳分布。
+    </div>
+
+    <div class="summary-box">
+        <h2>本节总结</h2>
+        <ul>
+            <li><strong>马尔可夫性质</strong>：无记忆性，未来只取决于现在</li>
+            <li><strong>转移矩阵 P</strong>：随机矩阵，行和为 1，pᵢⱼ 表示从 i 到 j 的概率</li>
+            <li><strong>n 步转移</strong>：P⁽ⁿ⁾ = Pⁿ</li>
+            <li><strong>平稳分布</strong>：πP = π，Σπᵢ = 1，长期状态分布</li>
+            <li>不可约 + 非周期 → 存在唯一平稳分布</li>
+            <li>广泛应用于 NLP、搜索引擎、金融、排队论等领域</li>
+        </ul>
+    </div>
+</div>
+</body>
+</html>
+<!-- 本文件涵盖：马尔可夫性质、转移概率矩阵、n步转移、切普曼-科尔莫戈罗夫方程、平稳分布、不可约与非周期、PageRank应用，共2道例题 -->

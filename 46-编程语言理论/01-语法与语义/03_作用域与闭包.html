@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>作用域与闭包 - 编程语言理论</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: #0a0a1a;
+            color: #e0e0e0;
+            line-height: 1.8;
+            padding: 2rem;
+        }
+        .container { max-width: 1000px; margin: 0 auto; }
+        h1 {
+            color: #00e5ff;
+            font-size: 2.2rem;
+            text-align: center;
+            margin-bottom: 2rem;
+            text-shadow: 0 0 20px rgba(0,229,255,0.3);
+        }
+        h2 {
+            color: #4fc3f7;
+            font-size: 1.5rem;
+            margin: 2rem 0 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 2px solid #1a3a5c;
+        }
+        h3 { color: #81d4fa; font-size: 1.2rem; margin: 1.5rem 0 0.8rem; }
+        .section {
+            background: #111128;
+            border: 1px solid #1e3a5f;
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            margin-bottom: 1.5rem;
+            transition: border-color 0.3s;
+        }
+        .section:hover { border-color: #00e5ff; }
+        p { margin: 0.8rem 0; }
+        code {
+            background: #1a1a3e;
+            color: #ff80ab;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'Consolas', monospace;
+            font-size: 0.95em;
+        }
+        pre {
+            background: #0d0d2b;
+            border: 1px solid #2a2a5a;
+            border-radius: 8px;
+            padding: 1.2rem;
+            overflow-x: auto;
+            margin: 1rem 0;
+        }
+        pre code {
+            background: none;
+            padding: 0;
+            color: #c8e6c9;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        .keyword { color: #ff80ab; }
+        .comment { color: #6a6a8a; font-style: italic; }
+        .string { color: #a5d6a7; }
+        .type { color: #82b1ff; }
+        .highlight { color: #ffeb3b; font-weight: bold; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+        th, td {
+            border: 1px solid #2a2a5a;
+            padding: 0.8rem 1rem;
+            text-align: left;
+        }
+        th { background: #1a1a3e; color: #4fc3f7; }
+        td { background: #111128; }
+        ul, ol { margin: 0.8rem 0 0.8rem 2rem; }
+        li { margin: 0.4rem 0; }
+        .tag {
+            display: inline-block;
+            background: #1a3a5c;
+            color: #4fc3f7;
+            padding: 0.2rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            margin: 0.2rem;
+        }
+        .diagram {
+            background: #0d0d2b;
+            border: 1px solid #2a2a5a;
+            border-radius: 8px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            text-align: center;
+            font-family: 'Consolas', monospace;
+            color: #81d4fa;
+            white-space: pre;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>作用域与闭包</h1>
+        <p style="text-align:center; color:#888; margin-bottom:2rem;">Scope & Closures — 词法作用域、动态作用域、闭包实现与环境模型</p>
+
+        <!-- 1. 作用域基础 -->
+        <div class="section">
+            <h2>1. 作用域基础</h2>
+            <p><span class="highlight">作用域 (Scope)</span> 决定了变量名在程序文本的哪些区域可见和可引用。</p>
+
+            <h3>绑定 (Binding) 与引用</h3>
+            <ul>
+                <li><span class="highlight">绑定</span> — 将名字与实体 (变量、函数、类型) 关联的过程</li>
+                <li><span class="highlight">绑定出现 (Binding Occurrence)</span> — 创建绑定的位置 (如声明)</li>
+                <li><span class="highlight">引用 (Reference)</span> — 使用已绑定名字的位置</li>
+                <li><span class="highlight">绑定域 (Scope of Binding)</span> — 绑定有效的程序区域</li>
+            </ul>
+        </div>
+
+        <!-- 2. 词法作用域 -->
+        <div class="section">
+            <h2>2. 词法作用域 (Lexical/Static Scope)</h2>
+            <p>变量的作用域由其<span class="highlight">在源代码中的位置</span>决定，与运行时调用无关。是大多数现代语言采用的方案。</p>
+
+            <div class="diagram">
+词法作用域 (嵌套函数):
+
+  全局作用域
+  ├── x = "global"
+  └── func outer()
+      ├── x = "outer"     ← outer的局部变量
+      └── func inner()
+          └── print(x)    ← 查找x: 先找inner, 再找outer, 最后全局
+                            "词法"决定了inner引用的是outer的x!
+
+  即使从外部调用inner, 它仍然引用定义时的outer的x
+            </div>
+
+            <pre><code><span class="comment">// JavaScript 词法作用域</span>
+<span class="keyword">let</span> x = <span class="string">"global"</span>;
+
+<span class="keyword">function</span> outer() {
+    <span class="keyword">let</span> x = <span class="string">"outer"</span>;
+    <span class="keyword">function</span> inner() {
+        console.log(x);  <span class="comment">// 引用outer的x, 不是global的x</span>
+    }
+    <span class="keyword">return</span> inner;
+}
+
+<span class="keyword">const</span> fn = outer();
+fn();  <span class="comment">// 输出 "outer" — 即使outer已返回!</span>
+<span class="comment">// inner记住了定义时的环境, 这就是闭包的基础</span>
+
+<span class="comment">// Python 词法作用域</span>
+x = <span class="string">"global"</span>
+<span class="keyword">def</span> outer():
+    x = <span class="string">"outer"</span>
+    <span class="keyword">def</span> inner():
+        <span class="keyword">print</span>(x)  <span class="comment"># 引用outer的x</span>
+    <span class="keyword">return</span> inner
+
+fn = outer()
+fn()  <span class="comment"># 输出 "outer"</span></code></pre>
+        </div>
+
+        <!-- 3. 动态作用域 -->
+        <div class="section">
+            <h2>3. 动态作用域 (Dynamic Scope)</h2>
+            <p>变量的作用域由<span class="highlight">运行时调用栈</span>决定。查找变量时沿着调用链向上找，而非定义时的嵌套关系。</p>
+
+            <div class="diagram">
+动态作用域 (调用栈):
+
+  调用栈: main → outer → inner
+                        print(x)
+
+  查找x: 先找inner的局部变量 → 无
+         再找调用者outer的局部变量 → 有! "outer"
+         (不是定义时的环境, 而是调用时的环境)
+            </div>
+
+            <pre><code><span class="comment">;; Common Lisp (动态作用域, 用 defvar/special)</span>
+(<span class="keyword">defvar</span> <span class="type">*x*</span> <span class="string">"global"</span>)
+
+(<span class="keyword">defun</span> inner ()
+  <span class="type">*x*</span>)                <span class="comment">;; 返回调用时 *x* 的值</span>
+
+(<span class="keyword">defun</span> outer ()
+  (<span class="keyword">let</span> ((<span class="type">*x*</span> <span class="string">"outer"</span>))  <span class="comment">;; 动态绑定</span>
+    (inner)))
+
+(inner)                <span class="comment">;; → "global"  (没有动态上下文)</span>
+(outer)                <span class="comment">;; → "outer"   (有动态上下文)</span>
+
+<span class="comment">;; Bash也是动态作用域</span>
+x=<span class="string">"global"</span>
+inner() { echo $x; }
+outer() {
+    local x=<span class="string">"outer"</span>
+    inner             <span class="comment"># → "outer" (动态作用域)</span>
+}
+outer                 <span class="comment"># inner在调用栈中找到outer的x</span></code></pre>
+
+            <h3>词法 vs 动态对比</h3>
+            <table>
+                <tr><th>特性</th><th>词法作用域</th><th>动态作用域</th></tr>
+                <tr><td>确定方式</td><td>源代码位置 (编译时)</td><td>调用栈 (运行时)</td></tr>
+                <tr><td>可预测性</td><td>高 (看代码即可确定)</td><td>低 (取决于调用路径)</td></tr>
+                <tr><td>优化能力</td><td>强 (编译时可分析)</td><td>弱 (需运行时查找)</td></tr>
+                <tr><td>典型语言</td><td>JS, Python, C, Java</td><td>Bash, Emacs Lisp, Perl(local)</td></tr>
+            </table>
+        </div>
+
+        <!-- 4. 闭包 -->
+        <div class="section">
+            <h2>4. 闭包 (Closure)</h2>
+            <p>闭包 = <span class="highlight">函数 + 定义时的词法环境</span>。函数"记住"了它被创建时的作用域，即使在那个作用域外执行。</p>
+
+            <div class="diagram">
+闭包的结构:
+
+  ┌─────────────────────────────────┐
+  │           闭包 (Closure)          │
+  │  ┌───────────────────────────┐  │
+  │  │   函数代码 (指令)           │  │
+  │  │   function() { return x; }│  │
+  │  └───────────────────────────┘  │
+  │  ┌───────────────────────────┐  │
+  │  │   环境指针 (自由变量绑定)    │  │
+  │  │   x = "outer"             │  │
+  │  └───────────────────────────┘  │
+  └─────────────────────────────────┘
+            </div>
+
+            <pre><code><span class="comment">// 闭包的经典示例: 计数器</span>
+<span class="keyword">function</span> makeCounter() {
+    <span class="keyword">let</span> count = 0;  <span class="comment">// 自由变量, 被闭包捕获</span>
+    <span class="keyword">return</span> <span class="keyword">function</span>() {
+        count++;    <span class="comment">// 引用外部的count</span>
+        <span class="keyword">return</span> count;
+    };
+}
+
+<span class="keyword">const</span> counter1 = makeCounter();
+counter1();  <span class="comment">// 1</span>
+counter1();  <span class="comment">// 2</span>
+
+<span class="keyword">const</span> counter2 = makeCounter();
+counter2();  <span class="comment">// 1 (独立的闭包环境!)</span>
+
+<span class="comment">// 闭包创建私有状态</span>
+<span class="keyword">function</span> createPerson(name) {
+    <span class="keyword">let</span> _age = 0;  <span class="comment">// 私有变量, 外部无法直接访问</span>
+    <span class="keyword">return</span> {
+        getName: () => name,
+        getAge: () => _age,
+        setAge: (a) => { _age = a; }
+    };
+}</code></pre>
+        </div>
+
+        <!-- 5. let vs var -->
+        <div class="section">
+            <h2>5. let vs var — 块作用域 vs 函数作用域</h2>
+            <p>JavaScript中 <code>var</code> 是函数作用域，<code>let</code>/<code>const</code> 是块作用域。</p>
+
+            <pre><code><span class="comment">// var — 函数作用域</span>
+<span class="keyword">for</span> (<span class="keyword">var</span> i = 0; i &lt; 3; i++) {
+    setTimeout(() => console.log(i), 100);
+}
+<span class="comment">// 输出: 3, 3, 3 — var没有块作用域!</span>
+<span class="comment">// 所有回调共享同一个 i</span>
+
+<span class="comment">// let — 块作用域 (每次循环创建新的绑定)</span>
+<span class="keyword">for</span> (<span class="keyword">let</span> i = 0; i &lt; 3; i++) {
+    setTimeout(() => console.log(i), 100);
+}
+<span class="comment">// 输出: 0, 1, 2 — 每次迭代有独立的 i</span>
+<span class="comment">// 原理: for循环的每次迭代都是隐式的块</span>
+
+<span class="comment">// 暂时性死区 (Temporal Dead Zone, TDZ)</span>
+console.log(x);  <span class="comment">// ReferenceError (let x声明前不可访问)</span>
+<span class="keyword">let</span> x = 10;
+<span class="comment">// var不会有TDZ, 会被提升(hoisting)但值为undefined</span>
+console.log(y);  <span class="comment">// undefined (var y被提升)</span>
+<span class="keyword">var</span> y = 20;</code></pre>
+
+            <h3>各语言作用域规则</h3>
+            <table>
+                <tr><th>语言</th><th>作用域类型</th><th>块作用域</th></tr>
+                <tr><td>C/C++</td><td>词法</td><td>有 (花括号)</td></tr>
+                <tr><td>Java</td><td>词法</td><td>有 (花括号)</td></tr>
+                <tr><td>JavaScript (var)</td><td>词法</td><td>无 (函数作用域)</td></tr>
+                <tr><td>JavaScript (let/const)</td><td>词法</td><td>有 (块作用域)</td></tr>
+                <tr><td>Python</td><td>词法</td><td>无 (函数/类/模块)</td></tr>
+                <tr><td>Rust</td><td>词法</td><td>有 (花括号)</td></tr>
+            </table>
+        </div>
+
+        <!-- 6. 环境模型 -->
+        <div class="section">
+            <h2>6. 环境模型 (Environment Model)</h2>
+            <p>环境是一个<span class="highlight">从变量名到值的映射链</span>。闭包通过保存环境指针来实现。</p>
+
+            <div class="diagram">
+环境链 (Environment Chain):
+
+  闭包调用时:
+  ┌─────────────────┐
+  │ 局部环境 (inner)  │ ──▶ { } (空)
+  └────────┬────────┘
+           │ parent
+  ┌────────▼────────┐
+  │ 外层环境 (outer)  │ ──▶ { x: "outer" }
+  └────────┬────────┘
+           │ parent
+  ┌────────▼────────┐
+  │ 全局环境          │ ──▶ { x: "global", outer: fn, ... }
+  └─────────────────┘
+
+  查找 x: inner → outer找到 → 返回 "outer"
+            </div>
+
+            <pre><code><span class="comment">// 环境模型的简化实现 (JavaScript)</span>
+<span class="keyword">class</span> <span class="type">Environment</span> {
+    <span class="keyword">constructor</span>(bindings = {}, parent = null) {
+        <span class="keyword">this</span>.bindings = bindings;
+        <span class="keyword">this</span>.parent = parent;
+    }
+
+    lookup(name) {
+        <span class="keyword">if</span> (name <span class="keyword">in</span> <span class="keyword">this</span>.bindings) {
+            <span class="keyword">return</span> <span class="keyword">this</span>.bindings[name];
+        }
+        <span class="keyword">if</span> (<span class="keyword">this</span>.parent) {
+            <span class="keyword">return</span> <span class="keyword">this</span>.parent.lookup(name);  <span class="comment">// 沿链向上查找</span>
+        }
+        <span class="keyword">throw new</span> <span class="type">Error</span>(<span class="string">`Undefined: ${name}`</span>);
+    }
+}
+
+<span class="comment">// 模拟闭包行为</span>
+<span class="keyword">const</span> globalEnv = <span class="keyword">new</span> <span class="type">Environment</span>({ x: <span class="string">"global"</span> });
+<span class="keyword">const</span> outerEnv = <span class="keyword">new</span> <span class="type">Environment</span>({ x: <span class="string">"outer"</span> }, globalEnv);
+<span class="comment">// 闭包保存了outerEnv的引用</span>
+outerEnv.lookup(<span class="string">"x"</span>);  <span class="comment">// "outer"</span>
+outerEnv.lookup(<span class="string">"y"</span>);  <span class="comment">// 沿链找到globalEnv</span></code></pre>
+        </div>
+
+        <!-- 7. 闭包的应用与陷阱 -->
+        <div class="section">
+            <h2>7. 闭包的应用与陷阱</h2>
+
+            <h3>常见应用</h3>
+            <ul>
+                <li><span class="highlight">数据封装</span> — 创建私有变量 (模块模式)</li>
+                <li><span class="highlight">柯里化 (Currying)</span> — 分步接受参数</li>
+                <li><span class="highlight">回调与事件处理</span> — 捕获上下文</li>
+                <li><span class="highlight">函数工厂</span> — 生成配置化的函数</li>
+            </ul>
+
+            <pre><code><span class="comment">// 柯里化 (Currying) 用闭包实现</span>
+<span class="keyword">function</span> add(a) {
+    <span class="keyword">return function</span>(b) {
+        <span class="keyword">return</span> a + b;  <span class="comment">// 闭包捕获a</span>
+    };
+}
+add(1)(2);  <span class="comment">// 3</span>
+<span class="keyword">const</span> add5 = add(5);
+add5(3);    <span class="comment">// 8</span>
+
+<span class="comment">// 模块模式 (Module Pattern)</span>
+<span class="keyword">const</span> myModule = (<span class="keyword">function</span>() {
+    <span class="keyword">let</span> privateVar = 0;  <span class="comment">// 私有状态</span>
+    <span class="keyword">return</span> {
+        increment() { privateVar++; },
+        getCount() { <span class="keyword">return</span> privateVar; }
+    };
+})();
+
+<span class="comment">// ⚠️ 经典陷阱: 循环中的闭包</span>
+<span class="comment">// 错误 (var)</span>
+<span class="keyword">var</span> funcs = [];
+<span class="keyword">for</span> (<span class="keyword">var</span> i = 0; i &lt; 3; i++) {
+    funcs.push(<span class="keyword">function</span>() { <span class="keyword">return</span> i; });
+}
+funcs[0]();  <span class="comment">// 3 (不是0!) — 所有闭包共享同一个i</span>
+
+<span class="comment">// 修复方案1: 用let</span>
+<span class="keyword">for</span> (<span class="keyword">let</span> i = 0; i &lt; 3; i++) { ... }
+
+<span class="comment">// 修复方案2: IIFE创建新作用域</span>
+<span class="keyword">for</span> (<span class="keyword">var</span> i = 0; i &lt; 3; i++) {
+    (<span class="keyword">function</span>(j) {
+        funcs.push(<span class="keyword">function</span>() { <span class="keyword">return</span> j; });
+    })(i);
+}
+funcs[0]();  <span class="comment">// 0 ✓</span></code></pre>
+            <p style="margin-top:1rem;">
+                <span class="tag">词法作用域</span>
+                <span class="tag">动态作用域</span>
+                <span class="tag">闭包</span>
+                <span class="tag">环境模型</span>
+                <span class="tag">let vs var</span>
+                <span class="tag">TDZ</span>
+                <span class="tag">柯里化</span>
+            </p>
+        </div>
+    </div>
+</body>
+</html>
+<!-- 作用域与闭包笔记完成：覆盖词法/动态作用域、闭包原理、环境模型、let vs var、TDZ -->

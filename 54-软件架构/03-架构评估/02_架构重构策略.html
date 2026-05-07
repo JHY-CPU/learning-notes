@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- 架构重构策略 - 软件架构笔记 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>架构重构策略</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f5f7fa; color: #2c3e50; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 40px; }
+        h1 { font-size: 28px; color: #1a5276; border-bottom: 3px solid #2980b9; padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 22px; color: #2980b9; margin: 28px 0 14px; border-left: 4px solid #2980b9; padding-left: 12px; }
+        h3 { font-size: 18px; color: #34495e; margin: 20px 0 10px; }
+        p { margin: 8px 0; text-indent: 2em; }
+        ul, ol { margin: 10px 0 10px 2em; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: left; }
+        th { background: #2980b9; color: #fff; }
+        tr:nth-child(even) { background: #f0f4f8; }
+        .note { background: #eaf2f8; border-left: 4px solid #2980b9; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .key-point { background: #fef9e7; border-left: 4px solid #f39c12; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        code { background: #ecf0f1; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; font-size: 14px; }
+        .tag { display: inline-block; background: #2980b9; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 12px; margin: 2px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>架构重构策略</h1>
+
+    <!-- 一、重构方法论 -->
+    <h2>一、架构演进方法论</h2>
+    <p>架构重构的目标是在保持系统持续交付能力的前提下，逐步改善架构质量。核心原则是"增量演进"而非"推倒重来"。</p>
+
+    <h3>1.1 架构腐化的信号</h3>
+    <table>
+        <tr><th>信号</th><th>表现</th><th>影响</th></tr>
+        <tr><td>变更蔓延</td><td>改一个功能需要改多个模块</td><td>开发效率下降，Bug增多</td></tr>
+        <tr><td>测试困难</td><td>无法独立测试，需要完整环境</td><td>测试周期长，质量下降</td></tr>
+        <tr><td>部署风险高</td><td>每次部署都是大爆炸</td><td>发布频率低，回滚困难</td></tr>
+        <tr><td>技术债务累积</td><td>临时方案越来越多</td><td>新人上手难，维护成本高</td></tr>
+        <tr><td>性能瓶颈</td><td>无法独立扩展热点模块</td><td>资源浪费，响应变慢</td></tr>
+    </table>
+
+    <h3>1.2 重构 vs 重写</h3>
+    <table>
+        <tr><th>维度</th><th>重构 (Refactoring)</th><th>重写 (Rewrite)</th></tr>
+        <tr><td>风险</td><td>低（持续小步调整）</td><td>高（大爆炸式变更）</td></tr>
+        <tr><td>业务连续性</td><td>持续交付</td><td>冻结期（无法交付新功能）</td></tr>
+        <tr><td>周期</td><td>渐进式，无明确终点</td><td>有明确目标，但常超期</td></tr>
+        <tr><td>知识保留</td><td>保留业务逻辑知识</td><td>可能丢失边界情况处理</td></tr>
+        <tr><td>适用场景</td><td>系统尚可运转，逐步改善</td><td>架构已无法支撑业务需求</td></tr>
+    </table>
+
+    <div class="key-point">
+        <strong>Joel Spolsky定律：</strong>"重写代码是你能做的最危险的事情之一。" 大多数成功的架构迁移采用的是增量策略，而非推倒重来。
+    </div>
+
+    <!-- 二、Strangler Fig Pattern -->
+    <h2>二、绞杀者模式 (Strangler Fig Pattern)</h2>
+    <p>绞杀者模式得名于热带绞杀榕树：新系统像榕树一样逐步包裹并替代旧系统，最终旧系统完全被替换。</p>
+
+    <h3>2.1 实施步骤</h3>
+    <ol>
+        <li><strong>识别边界：</strong>在旧系统前端添加路由层（API Gateway / Facade）</li>
+        <li><strong>选择切入点：</strong>选择变更频率高或痛点最大的模块开始迁移</li>
+        <li><strong>构建新实现：</strong>在新架构中实现选定模块</li>
+        <li><strong>流量切换：</strong>将路由层将请求导向新实现</li>
+        <li><strong>验证与回滚：</strong>确认新实现工作正常，保留回滚能力</li>
+        <li><strong>重复迭代：</strong>逐步迁移更多模块</li>
+        <li><strong>下线旧系统：</strong>所有模块迁移完成后，移除旧系统</li>
+    </ol>
+
+    <h3>2.2 路由层设计</h3>
+    <div class="note">
+        <strong>路由层方案：</strong><br><br>
+        方案A - API Gateway：<br>
+        客户端 → Nginx/Kong → 按URL路径路由 → 旧系统 或 新系统<br><br>
+        方案B - 反向代理：<br>
+        客户端 → 代理层 → 按Header/Header路由 → 旧系统 或 新系统<br><br>
+        方案C - 数据库共用（过渡期）：<br>
+        新系统和旧系统读写同一数据库，逐步迁移数据所有权
+    </div>
+
+    <h3>2.3 适用场景</h3>
+    <ul>
+        <li>单体应用向微服务迁移</li>
+        <li>老旧系统的技术栈升级</li>
+        <li>遗留系统的现代化改造</li>
+        <li>第三方系统的替换</li>
+    </ul>
+
+    <!-- 三、Branch by Abstraction -->
+    <h2>三、分支抽象模式 (Branch by Abstraction)</h2>
+    <p>通过引入抽象层，在不创建代码分支的情况下逐步替换实现。适合代码级别的架构重构。</p>
+
+    <h3>3.1 实施步骤</h3>
+    <ol>
+        <li><strong>创建抽象层：</strong>为要替换的模块创建接口/抽象类</li>
+        <li><strong>改造调用方：</strong>所有调用改为通过抽象层调用</li>
+        <li><strong>实现新版本：</strong>在抽象层下实现新的具体实现</li>
+        <li><strong>逐步切换：</strong>逐个功能切换到新实现（使用特性开关）</li>
+        <li><strong>移除旧实现：</strong>全部切换完成后，删除旧实现和特性开关</li>
+    </ol>
+
+    <h3>3.2 代码示例</h3>
+    <div class="note">
+        <strong>Branch by Abstraction 示例：</strong><br><br>
+        // 步骤1：创建抽象层<br>
+        interface PaymentGateway {<br>
+        &nbsp;&nbsp;PaymentResult charge(PaymentRequest request);<br>
+        }<br><br>
+        // 步骤2：旧实现包裹<br>
+        class LegacyPaymentGateway implements PaymentGateway {<br>
+        &nbsp;&nbsp;public PaymentResult charge(PaymentRequest request) {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;return legacyService.process(request);<br>
+        &nbsp;&nbsp;}<br>
+        }<br><br>
+        // 步骤3：新实现<br>
+        class StripePaymentGateway implements PaymentGateway {<br>
+        &nbsp;&nbsp;public PaymentResult charge(PaymentRequest request) {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;return stripeClient.charges().create(request);<br>
+        &nbsp;&nbsp;}<br>
+        }<br><br>
+        // 步骤4：特性开关切换<br>
+        @Bean<br>
+        public PaymentGateway paymentGateway() {<br>
+        &nbsp;&nbsp;if (featureFlags.isEnabled("stripe-payment")) {<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;return new StripePaymentGateway();<br>
+        &nbsp;&nbsp;}<br>
+        &nbsp;&nbsp;return new LegacyPaymentGateway();<br>
+        }
+    </div>
+
+    <!-- 四、Parallel Run -->
+    <h2>四、并行运行模式 (Parallel Run)</h2>
+    <p>新旧系统同时运行，比较两者的输出结果来验证新系统的正确性。这是降低迁移风险的最强保障。</p>
+
+    <h3>4.1 实施方式</h3>
+    <table>
+        <tr><th>方式</th><th>说明</th><th>特点</th></tr>
+        <tr><td>影子流量 (Shadow Traffic)</td><td>复制请求到新系统，但不影响用户</td><td>零风险，但只验证响应正确性</td></tr>
+        <tr><td>暗启动 (Dark Launch)</td><td>新系统处理请求但不返回结果</td><td>验证性能和稳定性</td></tr>
+        <tr><td>对比测试 (Comparison)</td><td>新旧系统同时响应，比较结果</td><td>最全面，但需处理差异</td></tr>
+        <tr><td>金丝雀发布 (Canary)</td><td>将少量流量导向新系统</td><td>真实验证，可控制爆炸半径</td></tr>
+    </table>
+
+    <h3>4.2 结果比较策略</h3>
+    <ul>
+        <li><strong>精确比较：</strong>响应体完全一致（适合确定性逻辑）</li>
+        <li><strong>模糊比较：</strong>关键字段一致，忽略格式差异</li>
+        <li><strong>指标比较：</strong>比较成功率、延迟、错误率</li>
+        <li><strong>人工审查：</strong>抽样人工验证（高风险场景）</li>
+    </ul>
+
+    <!-- 五、Architecture Fitness Functions -->
+    <h2>五、架构适应度函数 (Architecture Fitness Functions)</h2>
+    <p>适应度函数是从进化计算借用的概念，指通过自动化测试来持续验证架构属性是否得到保持。</p>
+
+    <h3>5.1 适应度函数类型</h3>
+    <table>
+        <tr><th>类型</th><th>验证内容</th><th>示例</th></tr>
+        <tr><td>耦合度</td><td>模块间依赖关系</td><td>ArchUnit: 层间依赖方向检查</td></tr>
+        <tr><td>性能</td><td>响应时间、吞吐量</td><td>CI中运行性能基准测试</td></tr>
+        <tr><td>安全</td><td>依赖漏洞、代码安全</td><td>Snyk/OWASP依赖扫描</td></tr>
+        <tr><td>可观测性</td><td>日志、追踪、指标覆盖</td><td>检查关键接口是否有埋点</td></tr>
+        <tr><td>弹性</td><td>故障恢复能力</td><td>Chaos Engineering实验</td></tr>
+    </table>
+
+    <h3>5.2 ArchUnit 示例</h3>
+    <div class="note">
+        <strong>Java架构约束测试（ArchUnit）：</strong><br><br>
+        @Test<br>
+        void layer_dependencies_should_be_respected() {<br>
+        &nbsp;&nbsp;ArchRule rule = layeredArchitecture()<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;.layer("Controller").definedBy("..controller..")<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;.layer("Service").definedBy("..service..")<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;.layer("Repository").definedBy("..repository..")<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;.whereLayer("Controller").mayNotBeAccessedByAnyLayer()<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;.whereLayer("Service").mayOnlyBeAccessedByLayers("Controller")<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;.whereLayer("Repository").mayOnlyBeAccessedByLayers("Service");<br><br>
+        &nbsp;&nbsp;rule.check(importedClasses);<br>
+        }<br><br>
+        @Test<br>
+        void services_should_not_depend_on_controllers() {<br>
+        &nbsp;&nbsp;noClasses()<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;.that().resideInAPackage("..service..")<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;.should().dependOnClassesThat()<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;.resideInAPackage("..controller..")<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;.check(importedClasses);<br>
+        }
+    </div>
+
+    <div class="key-point">
+        <strong>重构策略选择：</strong>代码级重构用Branch by Abstraction + 特性开关；系统级迁移用Strangler Fig + 路由层；高风险场景用Parallel Run验证。Architecture Fitness Functions确保重构不引入架构退化。
+    </div>
+
+</div>
+
+<!--
+========================================
+  文件总结
+========================================
+  主题：架构重构策略
+  内容概要：
+    1. Strangler Fig Pattern - 路由层逐步替换旧系统
+    2. Branch by Abstraction - 接口抽象+特性开关逐步切换
+    3. Parallel Run - 新旧系统并行验证（影子流量/金丝雀）
+    4. Architecture Fitness Functions - 自动化架构属性测试
+  重点知识：
+    - 重构 vs 重写的权衡（增量渐进 vs 大爆炸）
+    - Strangler Fig的7步实施流程
+    - Parallel Run的四种方式：影子流量/暗启动/对比测试/金丝雀
+    - ArchUnit实现架构约束的自动化验证
+========================================
+-->
+</body>
+</html>

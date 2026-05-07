@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>内存一致性模型 - 计算机体系结构</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.7;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.2em;
+            background: linear-gradient(90deg, #a18cd1, #fbc2eb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #a18cd1;
+        }
+        h2 {
+            color: #a18cd1;
+            font-size: 1.5em;
+            margin: 30px 0 15px;
+            padding-left: 10px;
+            border-left: 4px solid #fbc2eb;
+        }
+        h3 {
+            color: #d4b5f0;
+            font-size: 1.2em;
+            margin: 20px 0 10px;
+        }
+        .section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        .state-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .state-table th, .state-table td {
+            border: 1px solid #a18cd1;
+            padding: 10px 12px;
+            text-align: center;
+        }
+        .state-table th {
+            background: rgba(161, 140, 209, 0.3);
+            color: #fbc2eb;
+        }
+        .state-table tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.03);
+        }
+        .code-block {
+            background: #1a1a2e;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            border-left: 3px solid #a18cd1;
+            color: #d4b5f0;
+        }
+        .diagram {
+            text-align: center;
+            background: #0d1117;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            font-family: 'Consolas', monospace;
+            color: #a18cd1;
+            font-size: 0.85em;
+            line-height: 1.4;
+            white-space: pre;
+        }
+        .highlight {
+            color: #fbc2eb;
+            font-weight: bold;
+        }
+        .note {
+            background: rgba(161, 140, 209, 0.1);
+            border-left: 4px solid #a18cd1;
+            padding: 12px 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        ul, ol {
+            margin-left: 25px;
+            margin-bottom: 10px;
+        }
+        li {
+            margin-bottom: 6px;
+        }
+        .tag {
+            display: inline-block;
+            background: rgba(161, 140, 209, 0.3);
+            color: #d4b5f0;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            margin: 3px;
+        }
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .comparison-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .comparison-card h4 {
+            color: #a18cd1;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>内存一致性模型（Memory Consistency Models）</h1>
+
+        <!-- 第一部分：内存一致性 vs 缓存一致性 -->
+        <div class="section">
+            <h2>一、内存一致性与缓存一致性的区别</h2>
+            <p>这是两个经常混淆但完全不同的概念：</p>
+
+            <div class="comparison-grid">
+                <div class="comparison-card">
+                    <h4>缓存一致性（Cache Coherence）</h4>
+                    <ul>
+                        <li>解决：<strong>同一地址</strong>的多个副本值是否一致</li>
+                        <li>回答："所有处理器看到的 X 的值是否相同？"</li>
+                        <li>粒度：单个内存地址</li>
+                        <li>实现：MESI/MOESI 等协议</li>
+                    </ul>
+                </div>
+                <div class="comparison-card">
+                    <h4>内存一致性（Memory Consistency）</h4>
+                    <ul>
+                        <li>解决：<strong>不同地址</strong>的读写操作的全局可见顺序</li>
+                        <li>回答："处理器看到的多地址操作顺序是否正确？"</li>
+                        <li>粒度：操作序列（Program Order → Global Order）</li>
+                        <li>实现：由 ISA 定义的内存模型</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>1.1 一致性问题示例</h3>
+            <div class="diagram">
+经典的 MP（多处理器）测试：
+
+初始状态：A = 0, B = 0
+
+  处理器 P0              处理器 P1
+  ─────────              ─────────
+  STORE A = 1            STORE B = 1
+  LOAD  B                 LOAD  A
+
+问题：P0 读到 B=0 且 P1 读到 A=0 是否可能？
+
+在不同内存模型下，答案不同！</div>
+        </div>
+
+        <!-- 第二部分：顺序一致性 -->
+        <div class="section">
+            <h2>二、顺序一致性（Sequential Consistency, SC）</h2>
+            <p>由 Lamport（1979）提出的最强内存一致性模型。</p>
+
+            <h3>2.1 定义</h3>
+            <div class="note">
+                <strong>顺序一致性的两个条件：</strong>
+                <ol>
+                    <li>每个处理器的内存操作按照程序顺序（Program Order）执行</li>
+                    <li>所有处理器看到的内存操作顺序相同（全局单一顺序）</li>
+                </ol>
+                等价于：所有处理器的操作以某种方式交错执行，且每个处理器的操作在其交错位置保持程序顺序。
+            </div>
+
+            <h3>2.2 顺序一致性下的 MP 测试</h3>
+            <div class="diagram">
+在 SC 下，所有操作必须有一个全局的交错顺序：
+
+可能的交错（共 6 种）：
+
+顺序 1: St(A,1) → St(B,1) → Ld(B) → Ld(A)  → P0: B=1, P1: A=1 ✓
+顺序 2: St(A,1) → Ld(B) → St(B,1) → Ld(A)  → P0: B=0, P1: A=1 ✓
+顺序 3: St(A,1) → Ld(B) → Ld(A) → St(B,1)  → P0: B=0, P1: A=1 ✓
+顺序 4: Ld(B) → St(A,1) → St(B,1) → Ld(A)  → P0: B=0, P1: A=1 ✓
+顺序 5: Ld(B) → St(A,1) → Ld(A) → St(B,1)  → P0: B=0, P1: A=0 ✓
+顺序 6: Ld(B) → Ld(A) → St(A,1) → St(B,1)  → P0: B=0, P1: A=0 ✓
+
+结论：在 SC 下，P0 读到 B=0 且 P1 读到 A=0 是可能的！
+（通过交错 5 或 6 实现）</div>
+
+            <h3>2.3 SC 的硬件实现</h3>
+            <div class="code-block">
+// SC 的朴素实现：所有内存访问都经过一个全局有序的内存系统
+// 问题：性能极差，无法利用任何重排优化
+
+// 优化：使用写缓冲区（Store Buffer）
+// Store 操作先进入 FIFO 写缓冲区，再写入缓存
+// 但写缓冲区会破坏 SC！（后面会详细讨论）
+
+// 实际实现：SC 通常需要在 Load 操作前添加屏障（Fence）
+// 以确保写缓冲区中的数据对 Load 可见</div>
+        </div>
+
+        <!-- 第三部分：x86 TSO 模型 -->
+        <div class="section">
+            <h2>三、x86 TSO 模型（Total Store Order）</h2>
+            <p>x86/x64 架构使用的内存一致性模型，比 SC 略弱但性能更好。</p>
+
+            <h3>3.1 TSO 的核心规则</h3>
+            <table class="state-table">
+                <thead>
+                    <tr>
+                        <th>规则</th>
+                        <th>说明</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Load-Load 有序</td>
+                        <td>程序中先出现的 Load 一定先执行（不可重排）</td>
+                    </tr>
+                    <tr>
+                        <td>Store-Store 有序</td>
+                        <td>程序中先出现的 Store 一定先执行（不可重排）</td>
+                    </tr>
+                    <tr>
+                        <td>Load-Store 有序</td>
+                        <td>Load 不会推迟到后续 Store 之后</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Store-Load 无序</strong></td>
+                        <td>Store 可能延迟到写缓冲区，后续 Load 可能先完成！</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>3.2 TSO 下的 MP 测试（Store-Load 重排）</h3>
+            <div class="diagram">
+初始状态：A = 0, B = 0
+
+  处理器 P0              处理器 P1
+  ─────────              ─────────
+  STORE A = 1            STORE B = 1
+  LOAD  B                 LOAD  A
+
+TSO 下可能发生：
+  P0 的 Store A=1 → 写入 P0 的写缓冲区（尚未到达缓存）
+  P0 的 Load B → 直接从缓存读取 → B = 0 ✓
+  P1 的 Store B=1 → 写入 P1 的写缓冲区
+  P1 的 Load A → 直接从缓存读取 → A = 0 ✓
+
+结果：P0: B=0 且 P1: A=0
+这在 SC 下也可以发生（通过交错 5/6）
+所以 TSO 与 SC 的区别在于其他场景</div>
+
+            <h3>3.3 TSO 独有的"不可预测"行为</h3>
+            <div class="diagram">
+经典 TSO 测试（Store Buffer 导致的"自读取旧值"）：
+
+初始状态：A = 0
+
+  处理器 P0
+  ─────────
+  STORE A = 1
+  LOAD  A
+
+在 TSO 下可能读到 A = 0！（读到自己写之前旧值）
+原因：
+  1. Store A=1 进入写缓冲区
+  2. Load A 发出时，写缓冲区还未写入缓存
+  3. Load A 从缓存读取旧值 A = 0
+
+在 SC 下这是不可能的！（自己必须看到自己的写）
+
+x86 解决方案：写缓冲区转发（Store-to-Load Forwarding）
+  → 同一地址的 Load 可以从写缓冲区读取最新值
+  → 避免了"自读取旧值"的问题</div>
+
+            <h3>3.4 x86 内存屏障指令</h3>
+            <div class="code-block">
+// x86 内存屏障指令（MFENCE, SFENCE, LFENCE）
+
+// MFENCE: 完全内存屏障
+// 确保 MFENCE 前的所有内存操作完成后，才执行 MFENCE 后的操作
+// 等价于清空写缓冲区
+asm volatile("mfence" ::: "memory");
+
+// SFENCE: Store 屏障
+// 确保 SFENCE 前的所有 Store 完成后，才执行 SFENCE 后的 Store
+asm volatile("sfence" ::: "memory");
+
+// LFENCE: Load 屏障
+// 确保 LFENCE 前的所有 Load 完成后，才执行 LFENCE 后的 Load
+// 也用于序列化指令流（防止推测执行穿越）
+asm volatile("lfence" ::: "memory");
+
+// LOCK 前缀也隐含 MFENCE
+asm volatile("lock addl $0, 0(%%rsp)" ::: "memory");</div>
+        </div>
+
+        <!-- 第四部分：PSO 模型 -->
+        <div class="section">
+            <h2>四、PSO 模型（Partial Store Order）</h2>
+            <p>SPARC 架构使用的中间模型，比 TSO 更弱。</p>
+
+            <h3>4.1 PSO vs TSO</h3>
+            <table class="state-table">
+                <thead>
+                    <tr>
+                        <th>规则</th>
+                        <th>TSO</th>
+                        <th>PSO</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Load-Load 有序</td>
+                        <td>是</td>
+                        <td>是</td>
+                    </tr>
+                    <tr>
+                        <td>Store-Store 有序</td>
+                        <td>是</td>
+                        <td><strong>否（可重排）</strong></td>
+                    </tr>
+                    <tr>
+                        <td>Load-Store 有序</td>
+                        <td>是</td>
+                        <td>是</td>
+                    </tr>
+                    <tr>
+                        <td>Store-Load 有序</td>
+                        <td>否</td>
+                        <td>否</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>4.2 PSO 下的问题示例</h3>
+            <div class="diagram">
+初始状态：A = 0, B = 0, flag = 0
+
+  处理器 P0              处理器 P1
+  ─────────              ─────────
+  STORE A = 1            LOAD flag
+  STORE B = 1            if (flag == 1)
+  STORE flag = 1             LOAD A   ← 可能读到 A = 0！
+
+在 PSO 下：
+  Store A=1 和 Store B=1 可能被重排
+  即使 flag=1 已经对 P1 可见，A=1 可能还没到达
+
+解决方案：使用 STBAR（SPARC 的 Store 屏障）
+  STORE A = 1
+  STORE B = 1
+  STBAR                    ← 确保前面的 Store 都完成
+  STORE flag = 1</div>
+        </div>
+
+        <!-- 第五部分：弱一致性模型 -->
+        <div class="section">
+            <h2>五、弱一致性模型（Weak Ordering）</h2>
+            <p>弱一致性模型是 ARM、POWER 等 RISC 架构使用的最激进的内存模型，追求最高性能。</p>
+
+            <h3>5.1 弱一致性的核心思想</h3>
+            <div class="note">
+                <strong>核心理念：</strong>将内存操作分为两类：
+                <ul>
+                    <li><strong>数据操作（Data Operations）</strong>：普通的 Load/Store</li>
+                    <li><strong>同步操作（Synchronization Operations）</strong>：带屏障（Fence）的 Load/Store</li>
+                </ul>
+                只有同步操作之间需要保证顺序，数据操作之间可以任意重排。
+            </div>
+
+            <h3>5.2 弱一致性下的允许行为</h3>
+            <div class="diagram">
+在弱一致性下，以下所有重排都是允许的：
+
+Load-Load 重排:
+  LOAD A        LOAD B        LOAD B 可能先执行
+  LOAD B   →    LOAD A
+
+Store-Store 重排:
+  STORE A=1     STORE B=1     STORE B=1 可能先到达
+  STORE B=1  →  STORE A=1
+
+Load-Store 重排:
+  LOAD A        STORE B=1     STORE B=1 可能先执行
+  STORE B=1  →  LOAD A
+
+Store-Load 重排:
+  STORE A=1     LOAD B        LOAD B 可能先执行
+  LOAD B     →  STORE A=1
+
+所有四种重排都是允许的！</div>
+
+            <h3>5.3 弱一致性下的同步</h3>
+            <div class="code-block">
+// ARM 弱一致性模型的内存屏障
+
+// DMB（Data Memory Barrier）
+// 确保 DMB 前的内存操作在 DMB 后的操作之前完成
+asm volatile("dmb sy" ::: "memory");  // 完全屏障
+asm volatile("dmb st" ::: "memory");  // Store 屏障
+asm volatile("dmb ld" ::: "memory");  // Load 屏障
+
+// DSB（Data Synchronization Barrier）
+// 比 DMB 更强：等待所有内存操作真正完成（包括中断处理）
+asm volatile("dsb sy" ::: "memory");
+
+// ISB（Instruction Synchronization Barrier）
+// 刷新流水线，确保后续指令使用新的上下文
+asm volatile("isb" ::: "memory");
+
+// ARM 的 acquire/release 语义（ARMv8 引入）
+// LDAR：带有 acquire 语义的 Load
+// 确保此 Load 之后的内存操作不会被重排到此 Load 之前
+asm volatile("ldar %0, [%1]" : "=r"(val) : "r"(addr));
+
+// STLR：带有 release 语义的 Store
+// 确保此 Store 之前的内存操作不会被重排到此 Store 之后
+asm volatile("stlr %0, [%1]" :: "r"(val), "r"(addr));</div>
+        </div>
+
+        <!-- 第六部分：Acquire/Release 语义 -->
+        <div class="section">
+            <h2>六、Acquire/Release 语义</h2>
+            <p>Acquire/Release 是弱一致性模型中实现同步的常用模式，比全屏障更高效。</p>
+
+            <h3>6.1 定义</h3>
+            <table class="state-table">
+                <thead>
+                    <tr>
+                        <th>语义</th>
+                        <th>作用</th>
+                        <th>方向</th>
+                        <th>类比</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>Acquire</strong></td>
+                        <td>后续操作不会被重排到此操作之前</td>
+                        <td>向后保护</td>
+                        <td>锁的获取（lock）</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Release</strong></td>
+                        <td>之前的操作不会被重排到此操作之后</td>
+                        <td>向前保护</td>
+                        <td>锁的释放（unlock）</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>6.2 使用场景：自旋锁</h3>
+            <div class="code-block">
+// 使用 Acquire/Release 实现自旋锁
+
+typedef struct {
+    int lock;  // 0 = 未锁定, 1 = 锁定
+} spinlock_t;
+
+// 获取锁（Acquire 语义）
+void spin_lock(spinlock_t* s) {
+    // CAS（Compare-And-Swap）带 acquire 语义
+    while (__atomic_exchange_n(&s->lock, 1, __ATOMIC_ACQUIRE) == 1) {
+        // 自旋等待
+        while (__atomic_load_n(&s->lock, __ATOMIC_RELAXED) == 1)
+            ;  // 暂停指令或 NOP
+    }
+    // acquire 确保：锁之后的临界区操作不会被重排到锁获取之前
+}
+
+// 释放锁（Release 语义）
+void spin_unlock(spinlock_t* s) {
+    // store 带 release 语义
+    __atomic_store_n(&s->lock, 0, __ATOMIC_RELEASE);
+    // release 确保：临界区的所有操作在锁释放之前完成
+}
+
+// 对比：如果使用全屏障
+void spin_lock_full_fence(spinlock_t* s) {
+    while (__atomic_exchange_n(&s->lock, 1, __ATOMIC_SEQ_CST) == 1)
+        while (__atomic_load_n(&s->lock, __ATOMIC_RELAXED) == 1)
+            ;
+    // SEQ_CST 比 ACQUIRE 更强，但这里不需要
+}
+
+// 使用 C++11 原子操作（跨平台）
+#include &lt;atomic&gt;
+std::atomic&lt;int&gt; lock{0};
+
+void lock_acquire() {
+    int expected = 0;
+    while (!lock.compare_exchange_weak(
+        expected, 1,
+        std::memory_order_acquire,  // 成功时的顺序
+        std::memory_order_relaxed   // 失败时的顺序
+    )) {
+        expected = 0;
+    }
+}
+
+void lock_release() {
+    lock.store(0, std::memory_order_release);
+}</div>
+        </div>
+
+        <!-- 第七部分：C++ 内存序 -->
+        <div class="section">
+            <h2>七、C++11 内存序（Memory Order）</h2>
+            <p>C++11 引入的标准化内存模型，提供了可移植的多线程编程接口。</p>
+
+            <table class="state-table">
+                <thead>
+                    <tr>
+                        <th>内存序</th>
+                        <th>强度</th>
+                        <th>保证</th>
+                        <th>典型用法</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>memory_order_relaxed</td>
+                        <td>最弱</td>
+                        <td>仅保证原子性，无顺序保证</td>
+                        <td>引用计数器</td>
+                    </tr>
+                    <tr>
+                        <td>memory_order_consume</td>
+                        <td>弱</td>
+                        <td>数据依赖有序</td>
+                        <td>RCU（几乎不使用）</td>
+                    </tr>
+                    <tr>
+                        <td>memory_order_acquire</td>
+                        <td>中</td>
+                        <td>后续操作有序</td>
+                        <td>锁的获取</td>
+                    </tr>
+                    <tr>
+                        <td>memory_order_release</td>
+                        <td>中</td>
+                        <td>之前操作有序</td>
+                        <td>锁的释放</td>
+                    </tr>
+                    <tr>
+                        <td>memory_order_acq_rel</td>
+                        <td>强</td>
+                        <td>同时具有 acquire + release</td>
+                        <td>读-改-写操作</td>
+                    </tr>
+                    <tr>
+                        <td>memory_order_seq_cst</td>
+                        <td>最强</td>
+                        <td>全局单一顺序（SC）</td>
+                        <td>默认值、需要强保证时</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>7.1 强度对比</h3>
+            <div class="diagram">
+内存序强度排序（从弱到强）：
+
+relaxed &lt; consume &lt; acquire/release &lt; acq_rel &lt; seq_cst
+   │                                                   │
+   │  性能最好              ←─────→              最易理解  │
+   │  最难用正确                                最不容易出错 │
+   ▼                                                   ▼
+   ARM/POWER 优化                  x86 默认（几乎所有都是 seq_cst）
+
+x86 特点：x86 本身就是 TSO 模型，比弱一致性强
+  - relaxed/acquire/release 在 x86 上几乎无额外开销
+  - seq_cst 在 x86 上只需要一个 MFENCE（如果需要的话）
+
+ARM/POWER 特点：弱一致性模型，需要显式屏障
+  - 每个 acquire 需要一个 DMB/LWSYNC
+  - 每个 release 需要一个 DMB/LWSYNC
+  - 选择正确的内存序对性能影响很大</div>
+        </div>
+
+        <!-- 总结 -->
+        <div class="section">
+            <h2>总结</h2>
+            <p>内存一致性模型定义了多处理器系统中内存操作的全局可见顺序，与缓存一致性（解决单地址多副本问题）互补。从最强的 SC 到最弱的弱一致性，不同的模型在编程简易性和性能之间做出不同的权衡。现代处理器普遍使用 TSO（x86）或弱一致性（ARM/POWER），通过 Acquire/Release 语义和内存屏障实现高效同步。C++11 内存序提供了可移植的编程抽象。</p>
+            <div style="margin-top: 15px;">
+                <span class="tag">Sequential Consistency</span>
+                <span class="tag">TSO</span>
+                <span class="tag">PSO</span>
+                <span class="tag">Weak Ordering</span>
+                <span class="tag">Acquire/Release</span>
+                <span class="tag">Memory Barrier</span>
+                <span class="tag">C++11 Memory Order</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+<!--
+    文件：03_内存一致性模型.html
+    主题：内存一致性模型
+    内容概要：
+        1. 内存一致性 vs 缓存一致性 - 两个概念的区别
+        2. 顺序一致性（SC）- Lamport 定义、硬件实现
+        3. x86 TSO 模型 - Store-Load 重排、写缓冲区、MFENCE
+        4. PSO 模型 - SPARC 的部分存储序、Store-Store 重排
+        5. 弱一致性模型 - ARM/POWER 的激进重排策略
+        6. Acquire/Release 语义 - 用于同步的高效屏障模式
+        7. C++11 内存序 - 标准化的可移植内存模型
+    所属课程：48-计算机体系结构 / 04-多处理器系统
+-->

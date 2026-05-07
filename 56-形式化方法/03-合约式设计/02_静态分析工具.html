@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>静态分析工具</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", "Segoe UI", sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 30px 20px; }
+        header { background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%); color: white; padding: 40px 30px; border-radius: 16px; margin-bottom: 30px; text-align: center; }
+        header h1 { font-size: 2.2em; margin-bottom: 10px; }
+        header p { font-size: 1.1em; opacity: 0.9; }
+        .card { background: white; border-radius: 12px; padding: 28px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .card h2 { color: #2d3748; font-size: 1.5em; border-bottom: 3px solid #2d3748; padding-bottom: 10px; margin-bottom: 18px; }
+        .card h3 { color: #4a5568; font-size: 1.2em; margin: 16px 0 10px; }
+        pre { background: #1a1a2e; color: #a8dadc; padding: 18px; border-radius: 10px; overflow-x: auto; font-size: 0.92em; margin: 14px 0; line-height: 1.6; }
+        pre .comment { color: #7f8c8d; }
+        pre .keyword { color: #e74c3c; }
+        pre .type { color: #f39c12; }
+        pre .string { color: #2ecc71; }
+        .concept-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin: 18px 0; }
+        .concept-box { background: #f7fafc; border-left: 4px solid #2d3748; padding: 16px; border-radius: 0 8px 8px 0; }
+        .concept-box h4 { color: #2d3748; margin-bottom: 8px; font-size: 1.1em; }
+        .concept-box ul { padding-left: 18px; }
+        .concept-box li { margin-bottom: 4px; }
+        table { width: 100%; border-collapse: collapse; margin: 14px 0; }
+        th { background: #2d3748; color: white; padding: 12px; text-align: left; }
+        td { padding: 10px 12px; border-bottom: 1px solid #e2e8f0; }
+        tr:nth-child(even) { background: #f7fafc; }
+        .highlight { background: #fefcbf; border: 1px solid #f6e05e; border-radius: 8px; padding: 14px; margin: 14px 0; }
+        .highlight strong { color: #d69e2e; }
+        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+        .col-box { background: #f7fafc; padding: 16px; border-radius: 8px; }
+        .col-box h4 { margin-bottom: 10px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>静态分析工具 (Static Analysis)</h1>
+        <p>抽象解释、数据流分析、符号执行 — 不运行程序即可发现缺陷与安全漏洞</p>
+    </header>
+
+    <!-- 1. 抽象解释 -->
+    <div class="card">
+        <h2>1. 抽象解释 (Abstract Interpretation)</h2>
+        <div class="highlight">
+            <strong>核心思想（Patrick & Radhia Cousot, 1977）：</strong>用一个"抽象域"来近似地执行程序，获得程序行为的保守估计。如果在抽象域中没有发现错误，则真实程序也不会犯该类错误。
+        </div>
+
+        <div class="concept-grid">
+            <div class="concept-box">
+                <h4>具体域 vs 抽象域</h4>
+                <ul>
+                    <li><strong>具体域</strong>：所有可能的值（如所有整数）</li>
+                    <li><strong>抽象域</strong>：简化的值集合（如符号、区间）</li>
+                    <li>示例：x = 3 + 4 → 具体值 7</li>
+                    <li>抽象：x = 正 + 正 → 区间 [6, +∞)</li>
+                </ul>
+            </div>
+            <div class="concept-box">
+                <h4>常见抽象域</h4>
+                <ul>
+                    <li><strong>符号域</strong>：正(+)/负(-)/零(0)/未知(?#)</li>
+                    <li><strong>区间域</strong>：[a, b] 表示值的范围</li>
+                    <li><strong>八角形域</strong>：±x ± y ≤ c</li>
+                    <li><strong>多面体域</strong>：线性不等式组</li>
+                    <li><strong>同余域</strong>：x ≡ a (mod n)</li>
+                </ul>
+            </div>
+        </div>
+
+<pre><span class="comment">// 抽象解释示例：符号分析</span>
+<span class="keyword">int</span> x = input();      <span class="comment">// x: ? (未知)</span>
+<span class="keyword">if</span> (x > 0) {
+    <span class="comment">// x: + (正)</span>
+    <span class="keyword">int</span> y = x + 1;     <span class="comment">// y: + (正 + 正 = 正)</span>
+    <span class="keyword">int</span> z = x - 10;    <span class="comment">// z: ? (正 - 正 = 未知，可能是负)</span>
+    <span class="keyword">if</span> (z < 0) {
+        <span class="comment">// z: - (负)</span>
+        <span class="comment">// 此时 x < 10 且 x > 0，所以 x ∈ [1, 9]</span>
+    }
+}
+<span class="keyword">int</span> w = 1 / x;
+<span class="comment">// 抽象分析检查：x 是否可能为零？在本分支中 x > 0，所以安全。</span></pre>
+
+        <h3>Galois 连接</h3>
+        <div class="highlight">
+            <strong>形式化基础：</strong>抽象解释通过 Galois 连接 (α, γ) 建立具体域 C 和抽象域 A 之间的映射关系。α 是抽象函数（具体→抽象），γ 是具体化函数（抽象→具体）。保证：如果抽象域中无错误，具体域中也无错误（sound but incomplete）。
+        </div>
+    </div>
+
+    <!-- 2. 数据流分析 -->
+    <div class="card">
+        <h2>2. 数据流分析 (Data Flow Analysis)</h2>
+        <div class="highlight">
+            <strong>核心思想：</strong>通过分析程序中变量的定义和使用路径，发现潜在的编程错误。是编译器优化和静态检查的基础。
+        </div>
+
+        <h3>分析类型</h3>
+        <table>
+            <tr><th>分析类型</th><th>信息流动方向</th><th>问题</th><th>传播规则</th></tr>
+            <tr><td>到达定义 (Reaching Defs)</td><td>前向 (Forward)</td><td>变量在哪定义？</td><td>Gen ∪ (In - Kill)</td></tr>
+            <tr><td>活跃变量 (Live Variables)</td><td>后向 (Backward)</td><td>变量还会被使用吗？</td><td>Use ∪ (Out - Def)</td></tr>
+            <tr><td>可用表达式 (Available Expr)</td><td>前向</td><td>表达式已计算过吗？</td><td>Gen ∩ (In - Kill)</td></tr>
+            <tr><td>非常量表达式 (Very Busy)</td><td>后向</td><td>表达式一定会被计算吗？</td><td>Use ∩ (Out - Def)</td></tr>
+        </table>
+
+<pre><span class="comment">// 数据流分析示例：未初始化变量检测</span>
+<span class="keyword">void</span> foo(<span class="keyword">int</span> flag) {
+    <span class="keyword">int</span> x;              <span class="comment">// x: 未初始化</span>
+    <span class="keyword">if</span> (flag > 0) {
+        x = 10;          <span class="comment">// x: 已初始化（分支1）</span>
+    }
+    <span class="comment">// 控制流汇合点：x 可能已初始化（flag>0）或未初始化（flag≤0）</span>
+    print(x);            <span class="comment">// ⚠️ 警告：x 可能未初始化</span>
+}
+
+<span class="comment">// 数据流分析：构建控制流图 (CFG)，传播"已初始化"集合</span>
+<span class="comment">// 在汇合点取交集（必须在所有路径上都初始化才算安全）</span></pre>
+
+        <h3>流敏感 vs 流不敏感分析</h3>
+        <div class="concept-grid">
+            <div class="concept-box">
+                <h4>流敏感 (Flow-Sensitive)</h4>
+                <ul>
+                    <li>考虑语句执行顺序</li>
+                    <li>精度高，开销大</li>
+                    <li>示例：活跃变量分析</li>
+                </ul>
+            </div>
+            <div class="concept-box">
+                <h4>流不敏感 (Flow-Insensitive)</h4>
+                <ul>
+                    <li>忽略执行顺序，分析整个函数</li>
+                    <li>速度快，精度低</li>
+                    <li>示例：指针别名分析</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. 符号执行 -->
+    <div class="card">
+        <h2>3. 符号执行 (Symbolic Execution)</h2>
+        <div class="highlight">
+            <strong>核心思想：</strong>用符号值（而非具体值）执行程序，收集路径约束条件，然后用约束求解器 (SMT) 求解出触发各路径的具体输入。
+        </div>
+
+<pre><span class="comment">// 符号执行示例</span>
+<span class="keyword">int</span> mystery(<span class="keyword">int</span> x, <span class="keyword">int</span> y) {
+    <span class="keyword">int</span> z = x + y;        <span class="comment">// 符号: z = x + y</span>
+    <span class="keyword">if</span> (z == 42) {         <span class="comment">// 路径约束: x + y = 42</span>
+        <span class="keyword">if</span> (x > y) {       <span class="comment">// 路径约束: x + y = 42 ∧ x > y</span>
+            <span class="keyword">return</span> 1;
+        } <span class="keyword">else</span> {           <span class="comment">// 路径约束: x + y = 42 ∧ x ≤ y</span>
+            <span class="keyword">return</span> 2;
+        }
+    } <span class="keyword">else</span> {               <span class="comment">// 路径约束: x + y ≠ 42</span>
+        <span class="keyword">return</span> 0;
+    }
+}
+
+<span class="comment">// SMT 求解器求解：</span>
+<span class="comment">// 路径1: x=30, y=12 (30+12=42 ∧ 30>12) → return 1</span>
+<span class="comment">// 路径2: x=21, y=21 (21+21=42 ∧ 21≤21) → return 2</span>
+<span class="comment">// 路径3: x=0,  y=0  (0+0≠42)           → return 0</span></pre>
+
+        <h3>符号执行工具</h3>
+        <table>
+            <tr><th>工具</th><th>语言</th><th>特点</th></tr>
+            <tr><td>KLEE</td><td>LLVM bitcode (C/C++)</td><td>基于 LLVM，测试用例生成</td></tr>
+            <tr><td>angr</td><td>多架构二进制</td><td>二进制级别分析</td></tr>
+            <tr><td>Java PathFinder</td><td>Java 字节码</td><td>NASA 开发，模型检测结合</td></tr>
+            <tr><td>DART / CUTE</td><td>C</td><td>早期符号执行+随机测试</td></tr>
+            <tr><td>SAGE</td><td>x86 二进制</td><td>Microsoft 开发，模糊测试结合</td></tr>
+        </table>
+    </div>
+
+    <!-- 4. 工具对比 -->
+    <div class="card">
+        <h2>4. 主流静态分析工具对比</h2>
+        <table>
+            <tr><th>工具</th><th>开发商</th><th>语言</th><th>技术</th><th>特点</th></tr>
+            <tr><td>Coverity</td><td>Synopsys</td><td>C/C++/Java/C#...</td><td>路径敏感分析</td><td>工业级，精确率高，支持大规模项目</td></tr>
+            <tr><td>Infer</td><td>Meta (Facebook)</td><td>C/ObjC/Java/C++</td><td>分离逻辑 + 抽象解释</td><td>增量分析，CI 友好，开源</td></tr>
+            <tr><td>SonarQube</td><td>SonarSource</td><td>30+ 种语言</td><td>模式匹配 + 数据流</td><td>规则丰富，与 CI 集成方便</td></tr>
+            <tr><td>CodeQL</td><td>GitHub (Semmle)</td><td>多语言</td><td>语义查询</td><td>可编写自定义查询，安全分析</td></tr>
+            <tr><td>PVS-Studio</td><td>POuVS</td><td>C/C++/C#</td><td>模式 + 数据流</td><td>C++ 领域分析能力强</td></tr>
+            <tr><td>Clang Static Analyzer</td><td>LLVM</td><td>C/C++/ObjC</td><td>路径敏感符号执行</td><td>开源，集成在 Clang 中</td></tr>
+        </table>
+
+        <h3>CI 集成示例 (SonarQube)</h3>
+<pre><span class="comment">// Maven 集成 SonarQube</span>
+<span class="keyword">&lt;plugin&gt;</span>
+    &lt;groupId&gt;org.sonarsource.scanner.maven&lt;/groupId&gt;
+    &lt;artifactId&gt;sonar-maven-plugin&lt;/artifactId&gt;
+    &lt;configuration&gt;
+        &lt;sonar.host.url&gt;http://localhost:9000&lt;/sonar.host.url&gt;
+        &lt;sonar.qualitygate.wait&gt;true&lt;/sonar.qualitygate.wait&gt;
+    &lt;/configuration&gt;
+<span class="keyword">&lt;/plugin&gt;</span>
+
+<span class="comment">// 运行: mvn sonar:sonar</span></pre>
+
+        <h3>Infer 增量分析</h3>
+<pre><span class="comment"># Infer 增量分析 — 只分析变更的文件</span>
+infer run -- make -j4
+<span class="comment"># 输出: 在 infer-out/report.txt 中查看结果</span>
+<span class="comment"># 典型检测：空指针解引用、资源泄漏、并发问题</span></pre>
+    </div>
+
+    <!-- 5. 选择策略 -->
+    <div class="card">
+        <h2>5. 工具选择策略</h2>
+        <div class="concept-grid">
+            <div class="concept-box">
+                <h4>按项目需求选</h4>
+                <ul>
+                    <li>安全关键系统 → Coverity / PVS-Studio</li>
+                    <li>CI/CD 集成 → Infer / SonarQube</li>
+                    <li>开源安全审计 → CodeQL</li>
+                    <li>代码规范检查 → ESLint / Checkstyle</li>
+                </ul>
+            </div>
+            <div class="concept-box">
+                <h4>最佳实践</h4>
+                <ul>
+                    <li>组合使用：Lint + 深度分析 + 安全扫描</li>
+                    <li>CI 中集成快速规则，定期运行深度分析</li>
+                    <li>管理误报：逐步消除，记录抑制原因</li>
+                    <li>关注 True Positive 率而非工具发现数量</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="highlight">
+            <strong>Soundness vs Completeness：</strong>静态分析工具是 sound 的（不会漏报）但不是 complete 的（会有误报）。这是根本性的取舍——要保证不漏报，就必须接受一定误报。实践中通过调优规则和抑制策略来平衡。
+        </div>
+    </div>
+</div>
+
+<!--
+    文件总结：
+    主题：静态分析工具
+    内容要点：
+    - 抽象解释：具体域/抽象域、Galois 连接、符号/区间/八角形域
+    - 数据流分析：到达定义、活跃变量、流敏感/不敏感
+    - 符号执行：符号值 + SMT 求解器、路径探索
+    - 工具对比：Coverity、Infer、SonarQube、CodeQL、PVS-Studio
+    - 选择策略与 CI 集成
+    知识关联：与合约式设计、形式化验证、DevSecOps 紧密配合
+-->
+</body>
+</html>

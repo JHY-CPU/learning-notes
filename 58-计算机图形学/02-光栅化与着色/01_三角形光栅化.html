@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- 三角形光栅化 - 计算机图形学笔记 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>三角形光栅化</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f5f7fa; color: #2c3e50; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 40px; }
+        h1 { font-size: 28px; color: #1a5276; border-bottom: 3px solid #2980b9; padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 22px; color: #2980b9; margin: 28px 0 14px; border-left: 4px solid #2980b9; padding-left: 12px; }
+        h3 { font-size: 18px; color: #34495e; margin: 20px 0 10px; }
+        p { margin: 8px 0; text-indent: 2em; }
+        ul, ol { margin: 10px 0 10px 2em; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: left; }
+        th { background: #2980b9; color: #fff; }
+        tr:nth-child(even) { background: #f0f4f8; }
+        .note { background: #eaf2f8; border-left: 4px solid #2980b9; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .key-point { background: #fef9e7; border-left: 4px solid #f39c12; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        code { background: #ecf0f1; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>三角形光栅化</h1>
+
+    <!-- 一、光栅化概述 -->
+    <h2>一、光栅化概述</h2>
+    <p>光栅化是将几何图元（主要是三角形）转换为离散像素片段（Fragment）的过程，是实时渲染的核心步骤。</p>
+
+    <div class="note">
+        <strong>为什么使用三角形：</strong>三角形是最简单的多边形，总是平面的、凸的，任何多边形都可以剖分为三角形，且三点确定一个平面便于插值。
+    </div>
+
+    <!-- 二、扫描线算法 -->
+    <h2>二、扫描线算法（Scanline）</h2>
+    <p>扫描线算法从上到下逐行扫描，计算每行与三角形边的交点，填充交点之间的像素。</p>
+
+    <h3>2.1 算法步骤</h3>
+    <ol>
+        <li>按y坐标对三角形顶点排序</li>
+        <li>从最高顶点开始，逐行向下扫描</li>
+        <li>对每条扫描线，计算与三角形边的交点</li>
+        <li>填充交点之间的所有像素</li>
+    </ol>
+
+    <h3>2.2 优化：增量计算</h3>
+    <div class="key-point">
+        边的斜率倒数 m = dx/dy 在扫描过程中不变，因此可以用增量计算避免每行重复求交：<br>
+        <code>x_new = x_old + m</code>
+    </div>
+
+    <!-- 三、边方程法 -->
+    <h2>三、边方程法（Edge Equation）</h2>
+    <p>边方程法通过计算像素中心到每条边的位置关系来判断是否在三角形内部。</p>
+
+    <h3>3.1 边方程定义</h3>
+    <p>对于边从点A到点B，边方程为：</p>
+    <div class="key-point">
+        <code>E(x, y) = (x - xA)(yB - yA) - (y - yA)(xB - xA)</code><br><br>
+        E > 0：点在边的左侧<br>
+        E = 0：点在边上<br>
+        E < 0：点在边的右侧
+    </div>
+
+    <h3>3.2 三角形内外判断</h3>
+    <ul>
+        <li>如果三角形顶点是逆时针排列，则像素中心对三条边的E值都 ≥ 0时在三角形内</li>
+        <li>可以通过统一顶点顺序来处理任意排列</li>
+        <li>需要处理边界情况（像素在边上的归属规则）</li>
+    </ul>
+
+    <!-- 四、重心坐标 -->
+    <h2>四、重心坐标（Barycentric Coordinates）</h2>
+    <p>重心坐标是一种描述点在三角形内部位置的参数化方法，用于顶点属性的插值。</p>
+
+    <h3>4.1 定义</h3>
+    <p>三角形内任意点P可以表示为三个顶点的加权和：</p>
+    <div class="key-point">
+        <code>P = α·A + β·B + γ·C</code><br>
+        其中 α + β + γ = 1<br><br>
+        α = P对面三角形面积 / ABC面积<br>
+        β = P对面三角形面积 / ABC面积<br>
+        γ = P对面三角形面积 / ABC面积
+    </div>
+
+    <h3>4.2 计算方法</h3>
+    <p>利用叉积计算面积比：</p>
+    <code>α = E_BC(P) / E_BC(A)</code><br>
+    <code>β = E_CA(P) / E_CA(B)</code><br>
+    <code>γ = 1 - α - β</code>
+    </div>
+
+    <h3>4.3 属性插值</h3>
+    <p>重心坐标可用于插值任何顶点属性（颜色、纹理坐标、法线等）：</p>
+    <div class="key-point">
+        <code>V(P) = α·V(A) + β·V(B) + γ·V(C)</code><br><br>
+        注意：透视投影下，需要进行透视校正插值，不能直接使用屏幕空间重心坐标。
+    </div>
+
+    <h3>4.4 透视校正插值</h3>
+    <div class="note">
+        <strong>问题：</strong>屏幕空间的重心坐标与世界空间不同，直接插值会导致纹理扭曲。<br>
+        <strong>解决方案：</strong>对属性除以w进行插值，再乘以w恢复：<br>
+        <code>V(P) = (α·V_A/w_A + β·V_B/w_B + γ·V_C/w_C) / (α/w_A + β/w_B + γ/w_C)</code>
+    </div>
+
+    <!-- 五、Z-Buffer -->
+    <h2>五、Z-Buffer（深度缓冲）</h2>
+    <p>Z-Buffer算法通过比较像素的深度值来解决可见性问题，是最常用的隐藏面消除算法。</p>
+
+    <h3>5.1 算法原理</h3>
+    <ul>
+        <li>维护一个与屏幕同尺寸的深度缓冲区，初始值为最大深度</li>
+        <li>对每个像素，计算当前片段的深度值</li>
+        <li>如果深度 < Z-Buffer中的值，更新颜色和深度</li>
+        <li>否则丢弃该片段</li>
+    </ul>
+
+    <h3>5.2 优缺点</h3>
+    <table>
+        <tr><th>优点</th><th>缺点</th></tr>
+        <tr><td>简单高效，易于硬件实现</td><td>需要额外的深度缓冲内存</td></tr>
+        <tr><td>支持任意几何体</td><td>透明物体处理困难</td></tr>
+        <tr><td>逐像素处理</td><td>深度精度有限（z-fighting）</td></tr>
+    </table>
+
+    <div class="key-point">
+        <strong>Z-Fighting：</strong>当两个表面非常接近时，浮点精度不足导致深度值交替胜出，产生闪烁。<br>
+        <strong>解决方案：</strong>增大深度精度、减小far/near比、多边形偏移（polygon offset）。
+    </div>
+
+</div>
+
+<!--
+========================================
+  文件总结
+========================================
+  主题：三角形光栅化
+  内容概要：
+    1. 扫描线算法 - 逐行扫描，增量计算交点
+    2. 边方程法 - 判断像素中心与三角形边的位置关系
+    3. 重心坐标 - αA+βB+γC，用于属性插值
+    4. 透视校正插值 - 对属性/w插值后恢复
+    5. Z-Buffer - 深度比较解决可见性问题
+  重点知识：
+    - 重心坐标计算利用叉积面积比
+    - 属性插值：V(P) = α·V(A) + β·V(B) + γ·V(C)
+    - 透视校正需要对属性除以w后再插值
+    - Z-Buffer逐像素比较深度，更新最近的片段
+    - Z-Fighting由深度精度不足引起，可通过polygon offset解决
+========================================
+-->
+</body>
+</html>

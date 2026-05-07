@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互连网络 - 计算机体系结构笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", "SimSun", sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; border-bottom: 3px solid #2b6cb0; padding-bottom: 12px; margin-bottom: 30px; }
+        h2 { color: #2c5282; margin: 25px 0 12px; padding-left: 10px; border-left: 4px solid #2b6cb0; }
+        h3 { color: #2d3748; margin: 18px 0 8px; }
+        p, li { margin-bottom: 8px; }
+        ul, ol { padding-left: 25px; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 10px 14px; text-align: center; }
+        th { background: #2b6cb0; color: #fff; }
+        tr:nth-child(even) { background: #edf2f7; }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: "Consolas", monospace; color: #c53030; }
+        .diagram { background: #ebf8ff; border: 2px solid #3182ce; border-radius: 8px; padding: 20px; margin: 15px 0; text-align: center; font-family: monospace; white-space: pre; line-height: 1.6; }
+        .highlight { background: #fefcbf; border-left: 4px solid #d69e2e; padding: 12px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+        .example { background: #f0fff4; border: 1px solid #48bb78; border-radius: 6px; padding: 14px; margin: 12px 0; }
+        .tag { display: inline-block; background: #2b6cb0; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 0.85em; margin: 2px; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<!-- 互连网络 -->
+<!-- 本页面讨论多处理器系统中处理器与内存之间的互连网络 -->
+<h1>02 - 互连网络</h1>
+
+<!-- ====== 第一部分：互连网络概述 ====== -->
+<h2>一、互连网络概述</h2>
+<div class="card">
+    <p>互连网络（Interconnection Network）是多处理器系统中连接处理器、内存和I/O设备的<strong>通信基础设施</strong>，其性能直接影响系统的可扩展性和通信效率。</p>
+
+    <h3>1.1 互连网络的功能</h3>
+    <ul>
+        <li>处理器之间的<strong>数据传输</strong></li>
+        <li>处理器到共享内存的<strong>访问路由</strong></li>
+        <li>缓存一致性协议中的<strong>消息传递</strong></li>
+    </ul>
+
+    <h3>1.2 关键性能指标</h3>
+    <table>
+        <tr><th>指标</th><th>定义</th></tr>
+        <tr><td>带宽（Bandwidth）</td><td>单位时间内传输的数据量</td></tr>
+        <tr><td>延迟（Latency）</td><td>消息从源到目的地的时间</td></tr>
+        <tr><td>吞吐量（Throughput）</td><td>单位时间内成功传输的消息数</td></tr>
+        <tr><td>可扩展性（Scalability）</td><td>节点数增加时性能的变化</td></tr>
+    </table>
+</div>
+
+<!-- ====== 第二部分：总线架构 ====== -->
+<h2>二、总线架构（Bus Architecture）</h2>
+<div class="card">
+    <p>总线是最简单的互连方式，所有设备共享一组通信线路。</p>
+
+    <h3>2.1 总线结构</h3>
+    <div class="diagram">  ┌──────┐  ┌──────┐  ┌──────┐  ┌──────┐
+  │CPU 0 │  │CPU 1 │  │CPU 2 │  │CPU 3 │
+  └──┬───┘  └──┬───┘  └──┬───┘  └──┬───┘
+     │         │         │         │
+  ═══╪═════════╪═════════╪═════════╪═══  ← 共享总线
+     │         │         │         │
+  ┌──┴───┐  ┌──┴───┐
+  │ MEM 0│  │ MEM 1│
+  └──────┘  └──────┘</div>
+
+    <h3>2.2 总线仲裁</h3>
+    <ul>
+        <li><strong>集中式仲裁</strong>：由仲裁器统一分配总线使用权
+            <ul>
+                <li>固定优先级</li>
+                <li>轮询（Round Robin）</li>
+                <li>LRG（Least Recently Granted）</li>
+            </ul>
+        </li>
+        <li><strong>分布式仲裁</strong>：各设备自行竞争
+            <ul>
+                <li>自选择</li>
+                <li>冲突检测（CSMA/CD）</li>
+            </ul>
+        </li>
+    </ul>
+
+    <h3>2.3 总线的局限</h3>
+    <div class="highlight">
+        总线是<strong>共享介质</strong>，带宽固定，所有设备竞争同一资源。节点增多时，总线成为性能瓶颈。通常适用于不超过 8-16 个处理器的系统。
+    </div>
+</div>
+
+<!-- ====== 第三部分：交叉开关 ====== -->
+<h2>三、交叉开关（Crossbar Switch）</h2>
+<div class="card">
+    <p>交叉开关是一种<strong>非阻塞</strong>的互连网络，每个输入端口可以通过独立的开关连接到任意输出端口。</p>
+
+    <h3>3.1 4x4 交叉开关</h3>
+    <div class="diagram">         输出端口
+          M0   M1   M2   M3
+  P0 ──── ●────○────○────○
+          │
+  P1 ──── ○────●────○────○
+               │
+  P2 ──── ○────○────●────○
+                    │
+  P3 ──── ○────○────○────●
+
+  ● = 连接    ○ = 未连接
+
+  同一列只能有一个●（端口独占）
+  同一行可以有多个连接(若为多端口)</div>
+
+    <h3>3.2 交叉开关特点</h3>
+    <table>
+        <tr><th>优点</th><th>缺点</th></tr>
+        <tr><td>非阻塞：不同端口对可并行通信</td><td>开关点数为 N&sup2;，成本高</td></tr>
+        <tr><td>低延迟：无中间节点</td><td>仲裁复杂度高</td></tr>
+        <tr><td>高带宽</td><td>不易大规模扩展</td></tr>
+    </table>
+
+    <div class="example">
+        <p>AMD Zen 架构使用交叉开关连接 CCX（Core Complex）内的 4 个核心和共享 L3 缓存。</p>
+    </div>
+</div>
+
+<!-- ====== 第四部分：多级互连网络 ====== -->
+<h2>四、多级互连网络（MIN）</h2>
+<div class="card">
+    <p>多级互连网络通过多级开关单元连接输入和输出，平衡了总线和交叉开关的成本与性能。</p>
+
+    <h3>4.1 Omega 网络（8x8）</h3>
+    <div class="diagram">  输入: P0 P1 P2 P3 P4 P5 P6 P7
+
+  第1级:    第2级:    第3级:
+  [2x2]     [2x2]     [2x2]
+  0──┤├──0  0──┤├──0  0──┤├──0──M0
+  1──┤├──1  1──┤├──1  1──┤├──1──M1
+  2──┤├──2  2──┤├──2  2──┤├──2──M2
+  3──┤├──3  3──┤├──3  3──┤├──3──M3
+  4──┤├──4  4──┤├──4  4──┤├──4──M4
+  5──┤├──5  5──┤├──5  5──┤├──5──M5
+  6──┤├──6  6──┤├──6  6──┤├──6──M6
+  7──┤├──7  7──┤├──7  7──┤├──7──M7
+
+  每级使用完美混洗(perfect shuffle)置换
+  8个输入需要 log₂8 = 3 级, 每级4个2x2开关</div>
+
+    <h3>4.2 多级网络的阻塞特性</h3>
+    <p>Omega 网络是<strong>阻塞网络</strong> — 某些连接组合会产生内部冲突。</p>
+    <div class="example">
+        <p>若 P0→M0 且 P4→M4，它们在某级开关上可能冲突（取决于具体路径）。</p>
+        <p>解决方案：使用 Clos 网络（非阻塞）或多路径冗余。</p>
+    </div>
+</div>
+
+<!-- ====== 第五部分：片上网络 ====== -->
+<h2>五、片上网络（Network-on-Chip, NoC）</h2>
+<div class="card">
+    <p>随着芯片上核心数量增多（数十到数百个），传统的总线互连无法满足需求，NoC 应运而生。</p>
+
+    <h3>5.1 Mesh 拓扑</h3>
+    <div class="diagram">  4x4 Mesh 拓扑:
+
+  ┌───┐   ┌───┐   ┌───┐   ┌───┐
+  │0,3│───│1,3│───│2,3│───│3,3│
+  └─┬─┘   └─┬─┘   └─┬─┘   └─┬─┘
+    │       │       │       │
+  ┌─┴─┐   ┌─┴─┐   ┌─┴─┐   ┌─┴─┐
+  │0,2│───│1,2│───│2,2│───│3,2│
+  └─┬─┘   └─┬─┘   └─┬─┘   └─┬─┘
+    │       │       │       │
+  ┌─┴─┐   ┌─┴─┐   ┌─┴─┐   ┌─┴─┐
+  │0,1│───│1,1│───│2,1│───│3,1│
+  └─┬─┘   └─┬─┘   └─┬─┘   └─┬─┘
+    │       │       │       │
+  ┌─┴─┐   ┌─┴─┐   ┌─┴─┐   ┌─┴─┐
+  │0,0│───│1,0│───│2,0│───│3,0│
+  └───┘   └───┘   └───┘   └───┘
+
+  每个节点连接一个处理核心(PE)和路由器(Router)</div>
+
+    <h3>5.2 路由算法</h3>
+    <table>
+        <tr><th>算法</th><th>原理</th><th>特点</th></tr>
+        <tr><td><strong>XY 路由</strong></td><td>先沿X方向走，再沿Y方向走</td><td>无死锁，简单</td></tr>
+        <tr><td><strong>YX 路由</strong></td><td>先沿Y方向走，再沿X方向走</td><td>无死锁</td></tr>
+        <tr><td><strong>自适应路由</strong></td><td>根据网络拥塞动态选择路径</td><td>负载均衡好，可能死锁</td></tr>
+        <tr><td><strong>转弯模型</strong></td><td>禁止某些转弯以避免死锁</td><td>平衡适应性和无死锁</td></tr>
+    </table>
+
+    <h3>5.3 NoC 路由器结构</h3>
+    <div class="diagram">  每个路由器有5个端口:
+  ┌─────────────┐
+  │    北(N)     │
+  │      │      │
+  │ 西(W)─┼─东(E)│
+  │      │      │
+  │    南(S)     │
+  │      │      │
+  │    本地(PE)  │
+  └─────────────┘
+
+  路由器内部: 输入缓冲 → 路由计算 → 虚通道仲裁 → 交叉开关 → 输出</div>
+</div>
+
+<!-- ====== 第六部分：NUMA架构 ====== -->
+<h2>六、NUMA 架构</h2>
+<div class="card">
+    <p>NUMA（Non-Uniform Memory Access）架构中，每个处理器有本地内存，也可访问其他处理器的远程内存，但<strong>远程访问延迟更高</strong>。</p>
+
+    <h3>6.1 NUMA 拓扑示例</h3>
+    <div class="diagram">  ┌────────────────────────────────────────┐
+  │  NUMA 节点 0                            │
+  │  ┌──────┐  ┌──────┐                    │
+  │  │Core 0│  │Core 1│                    │
+  │  └──┬───┘  └──┬───┘                    │
+  │     └────┬────┘                        │
+  │     ┌────┴────┐                        │
+  │     │L3 Cache │                        │
+  │     └────┬────┘                        │
+  │     ┌────┴────┐                        │
+  │     │本地内存0 │   延迟: ~80ns          │
+  │     └─────────┘                        │
+  └──────────┬─────────────────────────────┘
+             │ 互连 (UPI/QPI)
+  ┌──────────┴─────────────────────────────┐
+  │  NUMA 节点 1                            │
+  │     ┌─────────┐                        │
+  │     │本地内存1 │   延迟: ~80ns          │
+  │     └─────────┘                        │
+  │  ┌──────┐  ┌──────┐                    │
+  │  │Core 2│  │Core 3│                    │
+  │  └──────┘  └──────┘                    │
+  └────────────────────────────────────────┘
+
+  Core 0 访问本地内存0: ~80ns
+  Core 0 访问远程内存1: ~140ns (1.75x延迟)</div>
+
+    <h3>6.2 NUMA 感知优化</h3>
+    <ul>
+        <li><strong>内存分配策略</strong>：优先分配本地内存（Linux 的 first-touch 策略）</li>
+        <li><strong>线程绑定</strong>：将线程绑定到特定 NUMA 节点，减少远程访问</li>
+        <li><strong>数据布局</strong>：将频繁访问的数据放在对应 NUMA 节点</li>
+        <li><strong>操作系统调度</strong>：NUMA 感知的进程调度器</li>
+    </ul>
+
+    <div class="highlight">
+        <strong>UMA vs NUMA</strong>：UMA（Uniform Memory Access）中所有处理器对内存的访问延迟相同（传统SMP）；NUMA 更具可扩展性但需要软件配合优化。
+    </div>
+</div>
+
+<!-- ====== 第七部分：互连网络对比 ====== -->
+<h2>七、互连网络方案对比</h2>
+<div class="card">
+    <table>
+        <tr><th>方案</th><th>带宽</th><th>延迟</th><th>成本</th><th>可扩展性</th><th>典型规模</th></tr>
+        <tr><td>总线</td><td>低（共享）</td><td>低</td><td>最低</td><td>差</td><td>2-16 节点</td></tr>
+        <tr><td>交叉开关</td><td>高</td><td>最低</td><td>高（N&sup2;）</td><td>中</td><td>4-32 节点</td></tr>
+        <tr><td>多级网络</td><td>中</td><td>中（多级）</td><td>中</td><td>较好</td><td>16-256 节点</td></tr>
+        <tr><td>Mesh/Torus NoC</td><td>高</td><td>中</td><td>适中</td><td>最好</td><td>数十-数千节点</td></tr>
+        <tr><td>胖树（Fat-Tree）</td><td>高</td><td>中</td><td>较高</td><td>好</td><td>超算系统</td></tr>
+    </table>
+</div>
+
+</div>
+<!-- ====== 总结 ====== -->
+<!--
+本笔记总结：
+1. 互连网络连接多处理器系统的处理器、内存和IO设备，是系统可扩展性的关键
+2. 总线架构简单但带宽共享，适用于小规模系统(2-16节点)
+3. 交叉开关是非阻塞网络，端口间可并行通信，但成本为N²
+4. 多级互连网络(如Omega)用log₂N级2x2开关构建，成本适中但可能阻塞
+5. 片上网络(NoC)采用Mesh/Torus拓扑+路由器，是大规模多核芯片的标准方案
+6. XY路由是NoC中最简单的无死锁路由算法
+7. NUMA架构中远程内存访问延迟高于本地访问，需要操作系统和应用层的NUMA感知优化
+-->
+</body>
+</html>

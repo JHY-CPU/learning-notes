@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>空间复杂性与其他</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.7; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; border-bottom: 3px solid #3182ce; padding-bottom: 12px; margin-bottom: 30px; }
+        h2 { color: #2c5282; margin: 25px 0 12px; padding-left: 10px; border-left: 4px solid #3182ce; }
+        h3 { color: #2d3748; margin: 15px 0 8px; }
+        p, li { margin-bottom: 8px; }
+        ul, ol { padding-left: 25px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: "Consolas", monospace; font-size: 0.95em; color: #c53030; }
+        pre { background: #1a202c; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; margin: 10px 0; font-size: 0.9em; }
+        pre code { background: none; color: inherit; padding: 0; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 10px 14px; text-align: center; }
+        th { background: #3182ce; color: #fff; }
+        tr:nth-child(even) { background: #f7fafc; }
+        .tag { display: inline-block; padding: 3px 10px; border-radius: 15px; font-size: 0.8em; font-weight: bold; margin: 2px; }
+        .tag-blue { background: #bee3f8; color: #2a4365; }
+        .tag-red { background: #fed7d7; color: #9b2c2c; }
+        .tag-green { background: #c6f6d5; color: #22543d; }
+        .tag-yellow { background: #fefcbf; color: #744210; }
+        .theorem { background: #f0fff4; border-left: 5px solid #38a169; padding: 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+        .example { background: #ebf8ff; border-radius: 8px; padding: 15px; margin: 12px 0; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <h1>空间复杂性与其他复杂性</h1>
+
+    <!-- ====== 空间复杂性类 ====== -->
+    <div class="card">
+        <h2>一、空间复杂性类</h2>
+        <p>空间复杂度衡量图灵机在计算过程中使用的<strong>纸带格子数</strong>。</p>
+
+        <table>
+            <thead><tr><th>复杂性类</th><th>定义</th><th>典型问题</th></tr></thead>
+            <tbody>
+                <tr><td><strong>L</strong> (LOGSPACE)</td><td>确定性 O(log n) 空间</td><td>图的连通性（有向/无向）</td></tr>
+                <tr><td><strong>NL</strong> (NLOGSPACE)</td><td>非确定性 O(log n) 空间</td><td>有向图可达性</td></tr>
+                <tr><td><strong>PSPACE</strong></td><td>确定性多项式空间</td><td>TQBF（真量化布尔公式）</td></tr>
+                <tr><td><strong>NPSPACE</strong></td><td>非确定性多项式空间</td><td>—</td></tr>
+            </tbody>
+        </table>
+
+        <div class="theorem">
+            <p><strong>Savitch定理：</strong>NPSPACE = PSPACE</p>
+            <p>即非确定性不节省空间！（对比：P vs NP 中不确定是否节省时间）</p>
+            <p>证明：用递归模拟非确定性选择，空间从 O(f(n)) 降到 O(f(n)²)。</p>
+        </div>
+    </div>
+
+    <!-- ====== L vs NL ====== -->
+    <div class="card">
+        <h2>二、L vs NL 问题</h2>
+        <p>类比P vs NP：L = NL ？这是空间复杂度中的核心问题。</p>
+
+        <h3>有向图可达性问题 (PATH)</h3>
+        <div class="example">
+            <p><strong>问题：</strong>给定有向图 G 和节点 s, t，是否存在从 s 到 t 的路径？</p>
+            <ul>
+                <li>在 <strong>NL</strong> 中：猜测路径上的每个节点，用 O(log n) 空间存储当前节点编号</li>
+                <li>在 <strong>P</strong> 中：BFS/DFS 可解（需要 O(n) 空间）</li>
+                <li>是否在 <strong>L</strong> 中？未知！（这是 L vs NL 的核心）</li>
+            </ul>
+        </div>
+
+        <div class="theorem">
+            <p><strong>Immerman-Szelepcsényi定理：</strong>NL = co-NL</p>
+            <p>在空间复杂度中，非确定性和其补集是等价的。这是令人惊讶的结果，因为 NP vs co-NP 仍是未解问题。</p>
+        </div>
+    </div>
+
+    <!-- ====== 层次定理 ====== -->
+    <div class="card">
+        <h2>三、层次定理 (Hierarchy Theorems)</h2>
+
+        <h3>时间层次定理</h3>
+        <div class="theorem">
+            <p>若 f(n) ≥ n log n，则存在语言在 DTIME(f(n)) 中但不在 DTIME(f(n)/log f(n)) 中。</p>
+            <p><strong>推论：</strong>P ⊊ EXPTIME（确定性指数时间）</p>
+        </div>
+
+        <h3>空间层次定理</h3>
+        <div class="theorem">
+            <p>若 f(n) ≥ log n，则存在语言在 DSPACE(f(n)) 中但不在 DSPACE(f(n)-1) 中。</p>
+            <p><strong>推论：</strong>L ⊊ PSPACE ⊊ EXPSPACE</p>
+        </div>
+
+        <h3>完整的关系图</h3>
+        <pre><code>  L ⊆ NL ⊆ P ⊆ NP ⊆ PSPACE ⊆ EXPTIME ⊆ NEXPTIME ⊆ ...
+
+  已证明的真包含关系：
+  ✓ P ⊊ EXPTIME        （时间层次定理）
+  ✓ PSPACE ⊊ EXPSPACE   （空间层次定理）
+  ✓ L ⊊ PSPACE
+
+  未解的关系：
+  ? L = NL?
+  ? P = NP?
+  ? NP = PSPACE?
+  ? P = PSPACE?</code></pre>
+    </div>
+
+    <!-- ====== Savitch定理证明 ====== -->
+    <div class="card">
+        <h2>四、Savitch定理详解</h2>
+        <p><strong>核心思想：</strong>用二分搜索 + 递归模拟非确定性选择。</p>
+
+        <h3>有向图可达性的递归判定</h3>
+        <pre><code>def reachable(G, s, t, n):
+    """判断G中是否存在长度≤n的s到t的路径"""
+    if n == 1:
+        return s == t or (s,t) in G.edges
+
+    for each node m in G:
+        # 二分：是否存在s到m的长度≤n/2路径，且m到t的长度≤n/2路径？
+        if reachable(G, s, m, n//2) and reachable(G, m, t, n//2):
+            return True
+    return False
+
+# 空间分析：递归深度 O(log n)，每层存节点编号 O(log n)
+# 总空间：O(log² n) — 多项式空间！</code></pre>
+        <p>这个算法证明了 NL ⊆ DSPACE(log² n) ⊆ PSPACE。</p>
+    </div>
+
+    <!-- ====== 完全问题 ====== -->
+    <div class="card">
+        <h2>五、各复杂性类的完全问题</h2>
+        <table>
+            <thead><tr><th>复杂性类</th><th>完全问题</th><th>描述</th></tr></thead>
+            <tbody>
+                <tr><td>NL-complete</td><td><strong>有向图可达性 (PATH)</strong></td><td>s到t是否有路径</td></tr>
+                <tr><td>P-complete</td><td><strong>电路值问题 (CVP)</strong></td><td>布尔电路在给定输入下是否输出1</td></tr>
+                <tr><td>NP-complete</td><td><strong>SAT, 3-SAT</strong></td><td>布尔公式可满足性</td></tr>
+                <tr><td>PSPACE-complete</td><td><strong>TQBF</strong></td><td>真量化布尔公式</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ====== 概率复杂性 ====== -->
+    <div class="card">
+        <h2>六、概率复杂性</h2>
+        <h3>随机化算法的复杂性类</h3>
+        <table>
+            <thead><tr><th>类</th><th>定义</th><th>关系</th></tr></thead>
+            <tbody>
+                <tr><td><strong>BPP</strong></td><td>有界误差多项式时间（误差 ≤ 1/3）</td><td>P ⊆ BPP ⊆ P/poly，实际中≈P</td></tr>
+                <tr><td><strong>RP</strong></td><td>单侧误差，NO永远正确</td><td>P ⊆ RP ⊆ BPP</td></tr>
+                <tr><td><strong>ZPP</strong></td><td>零误差期望多项式时间</td><td>ZPP = RP ∩ co-RP</td></tr>
+                <tr><td><strong>PP</strong></td><td>概率多项式时间（概率 > 1/2）</td><td>NP ⊆ PP</td></tr>
+            </tbody>
+        </table>
+
+        <h3>示例：Miller-Rabin素性测试</h3>
+        <div class="example">
+            <p>判断数字 n 是否为素数：</p>
+            <ul>
+                <li>随机选择 a ∈ [2, n-2]</li>
+                <li>检查费马小定理相关条件</li>
+                <li>重复 k 次，错误概率 ≤ 4<sup>-k</sup></li>
+                <li>属于 <strong>BPP</strong>，实际中被认为等同于 P（2002年AKS证明素性在P中）</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ====== 电路复杂性 ====== -->
+    <div class="card">
+        <h2>七、电路复杂性与P/poly</h2>
+        <p><strong>P/poly：</strong>可以用多项式大小布尔电路族判定的语言类。</p>
+        <ul>
+            <li>P ⊆ P/poly（任何多项式时间算法可编译为电路）</li>
+            <li>P/poly 包含不可判定的语言！（因此 P/poly ≠ P）</li>
+            <li>若 NP ⊆ P/poly，则多项式层次 (PH) 坍缩——广泛认为不可能</li>
+        </ul>
+
+        <h3>电路下界</h3>
+        <p>证明某个问题需要超多项式大小的电路，是证明 P ≠ NP 的一种可能途径，但至今进展甚微。</p>
+    </div>
+
+</div>
+
+<!--
+========================================
+  笔记总结
+========================================
+本文件涵盖空间复杂性和其他高级复杂性主题：
+
+1. 空间复杂性类：
+   - L (LOGSPACE)：对数空间
+   - NL (NLOGSPACE)：非确定性对数空间
+   - PSPACE：多项式空间
+   - Savitch定理：NPSPACE = PSPACE（非确定性不节省空间）
+
+2. L vs NL：
+   - 类比P vs NP的空间版本
+   - Immerman-Szelepcsényi定理：NL = co-NL
+
+3. 层次定理：
+   - 时间层次定理：P ⊊ EXPTIME
+   - 空间层次定理：L ⊊ PSPACE ⊊ EXPSPACE
+   - 这些是"真包含"关系（严格分离）
+
+4. 各类完全问题：
+   - NL完全：有向图可达性
+   - P完全：电路值问题
+   - NP完全：SAT
+   - PSPACE完全：TQBF
+
+5. 概率复杂性：
+   - BPP：有界误差随机多项式时间
+   - RP, ZPP, PP 等
+
+6. 电路复杂性：
+   - P/poly：多项式电路可计算
+   - 与P ≠ NP证明的联系
+========================================
+-->
+</body>
+</html>

@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>语义分析与符号表 - 编译原理笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", "SimSun", sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; border-bottom: 3px solid #2b6cb0; padding-bottom: 12px; margin-bottom: 30px; }
+        h2 { color: #2c5282; margin: 25px 0 12px; padding-left: 10px; border-left: 4px solid #2b6cb0; }
+        h3 { color: #2d3748; margin: 18px 0 8px; }
+        p, li { margin-bottom: 8px; }
+        ul, ol { padding-left: 25px; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 10px 14px; text-align: center; }
+        th { background: #2b6cb0; color: #fff; }
+        tr:nth-child(even) { background: #edf2f7; }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: "Consolas", monospace; color: #c53030; }
+        .diagram { background: #ebf8ff; border: 2px solid #3182ce; border-radius: 8px; padding: 20px; margin: 15px 0; text-align: center; font-family: monospace; white-space: pre; line-height: 1.6; }
+        .highlight { background: #fefcbf; border-left: 4px solid #d69e2e; padding: 12px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+        .example { background: #f0fff4; border: 1px solid #48bb78; border-radius: 6px; padding: 14px; margin: 12px 0; }
+        .tag { display: inline-block; background: #2b6cb0; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 0.85em; margin: 2px; }
+        .code-block { background: #1a202c; color: #e2e8f0; padding: 16px; border-radius: 6px; font-family: "Consolas", monospace; font-size: 0.9em; overflow-x: auto; margin: 12px 0; white-space: pre; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<!-- 语义分析与符号表 -->
+<!-- 本页面讨论语义分析的核心内容：类型检查、作用域分析和符号表管理 -->
+<h1>01 - 语义分析与符号表</h1>
+
+<!-- ====== 第一部分：语义分析概述 ====== -->
+<h2>一、语义分析概述</h2>
+<div class="card">
+    <p>语义分析（Semantic Analysis）是编译器在语法分析之后的阶段，负责检查程序的<strong>语义正确性</strong>，并收集类型信息用于后续的代码生成。</p>
+
+    <h3>1.1 语义分析的主要任务</h3>
+    <ul>
+        <li><strong>类型检查</strong>（Type Checking）：验证操作数类型是否匹配运算符要求</li>
+        <li><strong>作用域分析</strong>（Scope Analysis）：确定标识符的声明与引用关系</li>
+        <li><strong>控制流检查</strong>：break/continue/return 是否出现在合法位置</li>
+        <li><strong>唯一性检查</strong>：同一作用域内标号和枚举值是否唯一</li>
+        <li><strong>类型推导</strong>（Type Inference）：自动推断表达式的类型</li>
+    </ul>
+
+    <h3>1.2 属性文法（Attribute Grammar）</h3>
+    <p>属性文法在CFG基础上为每个文法符号关联<strong>属性</strong>，用<strong>语义规则</strong>计算属性值：</p>
+    <ul>
+        <li><strong>综合属性</strong>（Synthesized）：由子节点属性计算父节点属性（自底向上传递）</li>
+        <li><strong>继承属性</strong>（Inherited）：由父节点或兄弟节点属性计算子节点属性（自顶向下/侧向传递）</li>
+    </ul>
+</div>
+
+<!-- ====== 第二部分：类型检查 ====== -->
+<h2>二、类型检查</h2>
+<div class="card">
+    <h3>2.1 类型表达式</h3>
+    <p>类型检查涉及将类型表示为<strong>类型表达式</strong>：</p>
+    <table>
+        <tr><th>类型</th><th>表示方式</th><th>示例</th></tr>
+        <tr><td>基本类型</td><td>integer, float, boolean, char</td><td><code>int x;</code></td></tr>
+        <tr><td>数组类型</td><td>array(indexType, elementType)</td><td><code>int[10] a;</code></td></tr>
+        <tr><td>记录类型</td><td>record(field<sub>1</sub>:type<sub>1</sub>, ...)</td><td><code>struct { int x; float y; }</code></td></tr>
+        <tr><td>指针类型</td><td>pointer(type)</td><td><code>int* p;</code></td></tr>
+        <tr><td>函数类型</td><td>type<sub>1</sub> &times; ... &times; type<sub>n</sub> &rarr; returnType</td><td><code>int(int,int)</code></td></tr>
+    </table>
+
+    <h3>2.2 类型等价</h3>
+    <ul>
+        <li><strong>结构等价</strong>（Structural Equivalence）：类型表达式结构完全相同则等价</li>
+        <li><strong>名字等价</strong>（Name Equivalence）：同一类型声明的名字相同才等价</li>
+    </ul>
+
+    <h3>2.3 类型推导规则</h3>
+    <div class="example">
+        <p><span class="tag">算术运算</span> <code>e<sub>1</sub> + e<sub>2</sub></code>：若 e<sub>1</sub>:T, e<sub>2</sub>:T, T &isin; {integer, float}，则结果类型为 T</p>
+        <p><span class="tag">赋值</span> <code>x = e</code>：需 T(x) 与 T(e) 类型兼容（或可隐式转换）</p>
+        <p><span class="tag">数组访问</span> <code>a[i]</code>：需 a: array(T<sub>index</sub>, T<sub>elem</sub>), i: T<sub>index</sub>，结果类型 T<sub>elem</sub></p>
+        <p><span class="tag">函数调用</span> <code>f(a<sub>1</sub>,...,a<sub>n</sub>)</code>：需参数类型与函数声明的参数类型逐个匹配</p>
+    </div>
+</div>
+
+<!-- ====== 第三部分：作用域 ====== -->
+<h2>三、作用域分析</h2>
+<div class="card">
+    <h3>3.1 静态作用域 vs 动态作用域</h3>
+    <table>
+        <tr><th>特性</th><th>静态作用域（词法作用域）</th><th>动态作用域</th></tr>
+        <tr><td>绑定时机</td><td>编译时确定</td><td>运行时确定</td></tr>
+        <tr><td>查找规则</td><td>沿程序文本的嵌套结构查找</td><td>沿调用栈查找</td></tr>
+        <tr><td>典型语言</td><td>C, Java, Python, Go</td><td>早期LISP, Bash</td></tr>
+        <tr><td>可读性</td><td>更好，不依赖运行时行为</td><td>较差</td></tr>
+    </table>
+
+    <h3>3.2 作用域规则</h3>
+    <div class="diagram">  ┌─── 全局作用域 ────────────────────────┐
+│  int x = 10;                          │
+│  void foo() {                         │
+│  │  ┌─── foo 的作用域 ──────────────┐ │
+│  │  │  int y = 20;                  │ │
+│  │  │  x = x + y;  // x 来自外层   │ │
+│  │  │  void bar() {                 │ │
+│  │  │  │  ┌─── bar 的作用域 ─────┐ │ │
+│  │  │  │  │  int z = 30;         │ │ │
+│  │  │  │  │  y = y + z; // y来自foo│ │
+│  │  │  │  │  x = x + z; // x来自全局│ │
+│  │  │  │  └──────────────────────┘ │ │
+│  │  │  }                           │ │
+│  │  └──────────────────────────────┘ │
+│  }                                    │
+└──────────────────────────────────────┘</div>
+</div>
+
+<!-- ====== 第四部分：符号表 ====== -->
+<h2>四、符号表（Symbol Table）</h2>
+<div class="card">
+    <p>符号表是编译器中用于存储<strong>标识符及其属性信息</strong>的数据结构，是语义分析和代码生成的基础。</p>
+
+    <h3>4.1 符号表存储的信息</h3>
+    <table>
+        <tr><th>属性</th><th>说明</th><th>示例</th></tr>
+        <tr><td>名称（Name）</td><td>标识符字符串</td><td><code>count</code></td></tr>
+        <tr><td>类别（Kind）</td><td>变量/函数/类型/常量</td><td>variable</td></tr>
+        <tr><td>类型（Type）</td><td>类型表达式</td><td>int, float[10]</td></tr>
+        <tr><td>作用域（Scope）</td><td>声明所在作用域</td><td>global, local-2</td></tr>
+        <tr><td>存储类别</td><td>static/extern/register</td><td>auto</td></tr>
+        <tr><td>内存地址/偏移</td><td>运行时存储位置</td><td>offset=12</td></tr>
+        <tr><td>维度信息</td><td>数组的维度和大小</td><td>[3][4]</td></tr>
+        <tr><td>参数信息</td><td>函数参数类型列表</td><td>(int, float)</td></tr>
+    </table>
+
+    <h3>4.2 符号表的数据结构</h3>
+
+    <h3>4.2.1 哈希表（Hash Table）</h3>
+    <p>最常用的方式，支持 O(1) 平均查找。</p>
+    <div class="code-block">struct SymbolEntry {
+    string name;
+    SymbolKind kind;
+    Type* type;
+    int scope;
+    int offset;
+    SymbolEntry* next;  // 解决冲突的链表
+};
+
+// 哈希表实现
+SymbolEntry* hashTable[TABLE_SIZE];
+
+int hash(string name) {
+    int h = 0;
+    for (char c : name)
+        h = (h * 31 + c) % TABLE_SIZE;
+    return h;
+}</div>
+
+    <h3>4.2.2 树结构（Scope Tree）</h3>
+    <p>用树表示嵌套作用域，每个节点对应一个作用域。</p>
+    <div class="diagram">        [全局作用域]
+       /     |      \
+  [foo]   [bar]   [main]
+   /  \
+ [if]  [for]</div>
+
+    <h3>4.2.3 作用域栈 + 哈希表（实际常用方案）</h3>
+    <p>维护一个作用域栈，每个作用域对应一个哈希表。查找时从栈顶（当前作用域）向下搜索。</p>
+    <div class="code-block">// 作用域栈实现
+vector<unordered_map<string, SymbolEntry*>> scopeStack;
+
+void enterScope() {
+    scopeStack.push_back({});
+}
+
+void exitScope() {
+    scopeStack.pop_back();
+}
+
+SymbolEntry* lookup(string name) {
+    // 从内层向外层查找
+    for (int i = scopeStack.size()-1; i >= 0; i--) {
+        if (scopeStack[i].count(name))
+            return scopeStack[i][name];
+    }
+    return nullptr; // 未找到
+}
+
+void insert(string name, SymbolEntry* entry) {
+    scopeStack.back()[name] = entry; // 插入当前作用域
+}</div>
+</div>
+
+<!-- ====== 第五部分：类型转换 ====== -->
+<h2>五、隐式类型转换与类型强制</h2>
+<div class="card">
+    <h3>5.1 类型转换层次</h3>
+    <p>常见语言中的隐式类型转换规则（widening coercion）：</p>
+    <div class="diagram">  char → short → int → long → float → double
+  （窄类型自动向宽类型转换，不会丢失信息）</div>
+
+    <h3>5.2 类型强制（Coercion）</h3>
+    <p>编译器在表达式求值时自动插入类型转换指令：</p>
+    <div class="example">
+        <p><code>int i; float f;</code></p>
+        <p><code>f + i</code> → 编译器生成 <code>f + (float)i</code></p>
+    </div>
+
+    <div class="highlight">
+        <strong>注意</strong>：C语言中的隐式转换规则宽松容易出错，现代语言如Go、Rust要求显式转换。
+    </div>
+</div>
+
+</div>
+<!-- ====== 总结 ====== -->
+<!--
+本笔记总结：
+1. 语义分析检查类型匹配、作用域合法性、控制流正确性等语义层面的错误
+2. 属性文法通过综合属性和继承属性在语法树上传递语义信息
+3. 类型检查涉及类型表达式、类型等价（结构等价vs名字等价）和类型推导
+4. 静态作用域在编译时确定绑定，大多数现代语言采用静态作用域
+5. 符号表是编译器的核心数据结构，存储标识符的名称、类型、作用域、偏移等信息
+6. 哈希表+作用域栈的组合是实际编译器中最常用的符号表实现方式
+7. 隐式类型转换（widening coercion）简化编程但可能引入隐蔽bug
+-->
+</body>
+</html>

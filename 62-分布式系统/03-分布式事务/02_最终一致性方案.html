@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>最终一致性方案</title>
+    <!-- 分布式系统 - 最终一致性方案 笔记 -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        .tag { display: inline-block; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <!-- ====== 标题卡片 ====== -->
+    <div class="card">
+        <h2>最终一致性方案</h2>
+        <p><span class="tag">分布式系统</span><span class="tag">最终一致性</span><span class="tag">事务</span></p>
+        <p>最终一致性是在大规模分布式系统中平衡一致性和可用性的重要策略，适用于对实时一致性要求不高的场景。</p>
+    </div>
+
+    <!-- ====== 最终一致性概述 ====== -->
+    <div class="card">
+        <h2>最终一致性概述</h2>
+        <p>最终一致性放宽了一致性要求，在一定时间内数据最终会达到一致状态。</p>
+        <div class="code">
+一致性级别对比：
+┌──────────────┬──────────────────────────────────────┐
+│ 强一致性      │ 任何时刻读到的都是最新写入的数据        │
+│ 最终一致性    │ 经过一段时间后，所有副本数据最终一致    │
+│ 因果一致性    │ 有因果关系的操作保持顺序               │
+│ 会话一致性   │ 同一会话内保证读己之所写               │
+└──────────────┴──────────────────────────────────────┘
+
+最终一致性的适用场景：
+- 订单状态更新（待支付 → 已支付 → 已发货）
+- 用户积分变更
+- 库存扣减（可容忍短暂超卖后补偿）
+- 社交媒体点赞/评论
+- 日志和监控数据
+
+不适合的场景：
+- 银行转账（需要强一致性）
+- 库存精确扣减（零容忍超卖）
+- 竞价拍卖（实时出价）
+
+核心挑战：
+1. 如何保证操作至少执行一次？
+2. 如何处理重复执行（幂等性）？
+3. 如何进行失败补偿？
+        </div>
+    </div>
+
+    <!-- ====== 补偿机制 ====== -->
+    <div class="card">
+        <h2>补偿机制（Saga 模式）</h2>
+        <p>Saga 模式将长事务拆分为一系列本地事务，每个事务有对应的补偿操作。</p>
+        <div class="code">
+Saga 执行流程：
+正向操作链：T1 → T2 → T3 → T4
+补偿操作链：T4失败时：C3 → C2 → C1
+
+示例：订单创建 Saga
+┌─────────────────────────────────────────────────┐
+│  T1: 创建订单记录                                 │
+│  T2: 扣减库存                                     │
+│  T3: 扣减用户余额                                 │
+│  T4: 创建支付记录                                 │
+│                                                 │
+│  若 T3 失败：                                     │
+│  C2: 恢复库存                                     │
+│  C1: 取消订单                                     │
+└─────────────────────────────────────────────────┘
+
+Saga 协调模式：
+
+1. 编排式（Choreography）
+   各服务通过事件驱动自行协调
+   ┌──────┐  事件   ┌──────┐  事件   ┌──────┐
+   │ 订单  │ ─────→ │ 库存  │ ─────→ │ 支付  │
+   └──────┘         └──────┘         └──────┘
+   优点：无中心协调，松耦合
+   缺点：流程分散，难以追踪
+
+2. 编配式（Orchestration）
+   中央协调器统一调度
+   ┌──────────────────────────┐
+   │      Saga 协调器          │
+   │  调用 T1 → 调用 T2 → ... │
+   │  T2失败 → 调用 C1        │
+   └──────────────────────────┘
+   优点：流程集中，易于管理
+   缺点：协调器成为单点
+        </div>
+    </div>
+
+    <!-- ====== 幂等性 ====== -->
+    <div class="card">
+        <h2>幂等性设计</h2>
+        <p>幂等性保证同一操作执行多次的效果与执行一次相同，是最终一致性的基础。</p>
+        <div class="code">
+幂等性实现方案：
+
+1. 唯一请求 ID（幂等键）
+   ┌─────────────────────────────────────────────┐
+   │  Client                                    │
+   │  生成 idempotency_key = UUID()              │
+   │  发送请求：POST /pay {key: "xxx", ...}      │
+   │                                            │
+   │  Server                                    │
+   │  检查 key 是否已处理：                       │
+   │  - 已处理 → 返回上次结果                     │
+   │  - 未处理 → 执行业务，记录结果               │
+   │                                            │
+   │  幂等表设计：                                │
+   │  CREATE TABLE idempotency_record (          │
+   │    key VARCHAR(64) PRIMARY KEY,             │
+   │    request_hash VARCHAR(128),               │
+   │    response TEXT,                            │
+   │    status ENUM('processing','completed'),   │
+   │    created_at TIMESTAMP                     │
+   │  );                                        │
+   └─────────────────────────────────────────────┘
+
+2. 数据库唯一约束
+   - 利用唯一索引防重复插入
+   - INSERT IGNORE / ON DUPLICATE KEY UPDATE
+
+3. 状态机
+   - 限制状态流转方向：待支付 → 已支付
+   - 重复操作时状态不变，直接返回成功
+   - UPDATE SET status='已支付' WHERE status='待支付'
+
+4. Token 机制
+   - 先获取 token，提交时携带 token
+   - 服务端验证并消费 token
+   - 适用于表单防重复提交
+        </div>
+        <div class="note">幂等性是分布式系统中最重要的设计原则之一。任何远程调用都可能因网络超时而重试，必须保证重试的安全性。</div>
+    </div>
+
+    <!-- ====== Outbox模式 ====== -->
+    <div class="card">
+        <h2>Outbox 模式（发件箱模式）</h2>
+        <p>Outbox 模式解决本地数据库操作和消息发送的原子性问题。</p>
+        <div class="code">
+问题：业务操作和消息发送如何保证原子性？
+┌─────────────────────────────────────────────────┐
+│  ❌ 不可靠的方案：                                │
+│  BEGIN TRANSACTION                               │
+│    INSERT INTO orders (...)                      │
+│    发送 MQ 消息  ← 如果这里失败？事务已提交，消息丢失 │
+│  COMMIT                                          │
+│                                                 │
+│  ❌ 另一个不好的方案：                             │
+│  BEGIN TRANSACTION                               │
+│    发送 MQ 消息  ← 如果这里失败？                     │
+│    INSERT INTO orders (...)                      │
+│  COMMIT                                          │
+└─────────────────────────────────────────────────┘
+
+Outbox 模式解决方案：
+┌─────────────────────────────────────────────────┐
+│  BEGIN TRANSACTION                               │
+│    INSERT INTO orders (...)                      │
+│    INSERT INTO outbox (                          │
+│      aggregate_type, aggregate_id,              │
+│      event_type, payload, status                │
+│    ) VALUES ('order', '123', 'created', ...)     │
+│  COMMIT                                          │
+│  ↑ 同一个事务，天然原子！                          │
+│                                                 │
+│  后台任务（CDC 或定时轮询）：                       │
+│  读取 outbox 表 → 发送消息到 MQ → 标记已发送       │
+└─────────────────────────────────────────────────┘
+
+Outbox 消费方式：
+
+1. 定时轮询（Polling Publisher）
+   定时查询 outbox 表中未发送的记录
+   - 简单，无额外依赖
+   - 有延迟，数据库压力
+
+2. CDC（Change Data Capture）
+   通过数据库日志（binlog/WAL）捕获 outbox 表变更
+   - 实时性好，对数据库无额外查询压力
+   - 需要 CDC 工具（Debezium、Canal）
+        </div>
+    </div>
+
+    <!-- ====== CDC ====== -->
+    <div class="card">
+        <h2>CDC（Change Data Capture）</h2>
+        <p>CDC 通过监听数据库变更日志来捕获数据变化，是实现数据同步和事件驱动架构的核心技术。</p>
+        <div class="code">
+CDC 实现方式对比：
+┌──────────────┬──────────────┬──────────────────────┐
+│ 方式          │ 原理          │ 特点                  │
+├──────────────┼──────────────┼──────────────────────┤
+│ 触发器        │ DB 触发器     │ 侵入性强，性能差       │
+│ 时间戳        │ 轮询时间字段  │ 简单但有延迟和遗漏     │
+│ Binlog/WAL   │ 解析事务日志  │ 实时、无侵入、可靠     │
+│ Postgres     │ 逻辑解码      │ 原生支持，推荐方式     │
+│   Logical    │              │                      │
+└──────────────┴──────────────┴──────────────────────┘
+
+Debezium CDC 流程：
+┌────────┐  Binlog  ┌─────────┐  ┌────────┐  ┌──────────┐
+│ MySQL  │ ──────→ │Debezium │→ │Kafka   │→ │ 消费者    │
+└────────┘         │Connector│  │Topic   │  │ 服务      │
+                   └─────────┘  └────────┘  └──────────┘
+
+CDC 使用场景：
+- Outbox 模式的消息发布
+- 数据库间实时同步
+- 搜索索引更新（MySQL → ES）
+- 缓存一致性维护
+- 数据湖/数据仓库增量 ETL
+        </div>
+        <div class="note">Debezium 是最流行的开源 CDC 工具，支持 MySQL、PostgreSQL、MongoDB、SQL Server 等多种数据库。</div>
+    </div>
+
+    <!-- ====== 总结 ====== -->
+    <!--
+        本文件总结：
+        - 最终一致性放宽一致性要求以换取可用性，适用于大规模分布式场景
+        - Saga 模式通过正向操作+补偿操作实现长事务，有编排式和编配式两种协调方式
+        - 幂等性通过唯一请求ID、唯一约束、状态机等机制保证重复执行安全
+        - Outbox 模式在同一事务中写入业务数据和事件记录，保证原子性
+        - CDC 通过解析数据库日志实现数据变更的实时捕获
+        - 这些模式组合使用可构建可靠的最终一致性系统
+    -->
+</body>
+</html>

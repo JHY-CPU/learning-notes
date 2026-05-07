@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>流水线与冒险 - 计算机体系结构笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", "SimSun", sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; border-bottom: 3px solid #2b6cb0; padding-bottom: 12px; margin-bottom: 30px; }
+        h2 { color: #2c5282; margin: 25px 0 12px; padding-left: 10px; border-left: 4px solid #2b6cb0; }
+        h3 { color: #2d3748; margin: 18px 0 8px; }
+        p, li { margin-bottom: 8px; }
+        ul, ol { padding-left: 25px; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 10px 14px; text-align: center; }
+        th { background: #2b6cb0; color: #fff; }
+        tr:nth-child(even) { background: #edf2f7; }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: "Consolas", monospace; color: #c53030; }
+        .diagram { background: #ebf8ff; border: 2px solid #3182ce; border-radius: 8px; padding: 20px; margin: 15px 0; text-align: center; font-family: monospace; white-space: pre; line-height: 1.6; }
+        .highlight { background: #fefcbf; border-left: 4px solid #d69e2e; padding: 12px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+        .example { background: #f0fff4; border: 1px solid #48bb78; border-radius: 6px; padding: 14px; margin: 12px 0; }
+        .tag { display: inline-block; background: #2b6cb0; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 0.85em; margin: 2px; }
+        .stall { background: #fed7d7; }
+        .forward { background: #c6f6d5; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<!-- 流水线与冒险 -->
+<!-- 本页面讨论处理器流水线的基本原理和三大冒险问题 -->
+<h1>01 - 流水线与冒险</h1>
+
+<!-- ====== 第一部分：流水线基础 ====== -->
+<h2>一、流水线基本概念</h2>
+<div class="card">
+    <p>流水线（Pipelining）是一种将指令执行过程分解为多个阶段的技术，使得多条指令可以<strong>重叠执行</strong>，从而提高指令吞吐率。</p>
+
+    <h3>1.1 经典五级流水线</h3>
+    <table>
+        <tr><th>阶段</th><th>全称</th><th>主要操作</th></tr>
+        <tr><td><strong>IF</strong></td><td>Instruction Fetch</td><td>从指令存储器取指令</td></tr>
+        <tr><td><strong>ID</strong></td><td>Instruction Decode</td><td>译码，读寄存器</td></tr>
+        <tr><td><strong>EX</strong></td><td>Execute</td><td>ALU运算或地址计算</td></tr>
+        <tr><td><strong>MEM</strong></td><td>Memory Access</td><td>读写数据存储器</td></tr>
+        <tr><td><strong>WB</strong></td><td>Write Back</td><td>将结果写回寄存器</td></tr>
+    </table>
+
+    <h3>1.2 流水线时空图</h3>
+    <div class="diagram">  周期:    1    2    3    4    5    6    7    8    9
+  指令1:  IF   ID   EX  MEM  WB
+  指令2:       IF   ID   EX  MEM  WB
+  指令3:            IF   ID   EX  MEM  WB
+  指令4:                 IF   ID   EX  MEM  WB
+  指令5:                      IF   ID   EX  MEM  WB
+
+  非流水线: 5条指令 × 5周期 = 25周期
+  流水线:   5 + (5-1) = 9周期
+  加速比: 理想情况下接近5倍</div>
+
+    <h3>1.3 流水线性能指标</h3>
+    <table>
+        <tr><th>指标</th><th>定义</th><th>理想值</th></tr>
+        <tr><td>吞吐率（Throughput）</td><td>单位时间完成的指令数</td><td>1条/周期</td></tr>
+        <tr><td>加速比（Speedup）</td><td>非流水线时间/流水线时间</td><td>= 流水线级数</td></tr>
+        <tr><td>效率（Efficiency）</td><td>实际吞吐率/理想吞吐率</td><td>100%</td></tr>
+    </table>
+</div>
+
+<!-- ====== 第二部分：结构冒险 ====== -->
+<h2>二、结构冒险（Structural Hazard）</h2>
+<div class="card">
+    <p>结构冒险发生在<strong>硬件资源冲突</strong>时 — 多条指令在同一周期需要使用同一硬件资源。</p>
+
+    <h3>2.1 典型场景</h3>
+    <div class="diagram">  指令和数据共享同一存储器:
+
+  周期:   1    2    3    4    5
+  I1:    IF   ID   EX  MEM  WB
+  I2:         IF   ID   EX  MEM  WB
+  I3:              IF   ID   EX  MEM  WB
+                                     ↑
+  I3的IF阶段需要访问存储器,但I1的MEM阶段也在访问
+  → 结构冒险!</div>
+
+    <h3>2.2 解决方法</h3>
+    <ul>
+        <li><strong>分离指令和数据存储器</strong>（哈佛架构）— 现代处理器都采用此方案</li>
+        <li><strong>增加资源副本</strong>：多端口寄存器文件、分离的指令/数据Cache</li>
+        <li><strong>插入流水线气泡</strong>（Stall）：暂停后续指令一个周期</li>
+    </ul>
+</div>
+
+<!-- ====== 第三部分：数据冒险 ====== -->
+<h2>三、数据冒险（Data Hazard）</h2>
+<div class="card">
+    <p>数据冒险发生在指令之间存在<strong>数据依赖</strong>，而后续指令在前一条指令的结果产生之前就需要使用它。</p>
+
+    <h3>3.1 三种数据依赖</h3>
+    <table>
+        <tr><th>类型</th><th>名称</th><th>模式</th><th>是否必须顺序</th></tr>
+        <tr><td>RAW</td><td>真依赖（Read After Write）</td><td>先写后读</td><td>是</td></tr>
+        <tr><td>WAR</td><td>反依赖（Write After Read）</td><td>先读后写</td><td>否（重命名可解）</td></tr>
+        <tr><td>WAW</td><td>输出依赖（Write After Write）</td><td>先写后写</td><td>否（重命名可解）</td></tr>
+    </table>
+
+    <h3>3.2 RAW 冒险示例</h3>
+    <div class="example">
+        <p><code>ADD  R1, R2, R3   // R1 = R2 + R3</code></p>
+        <p><code>SUB  R4, R1, R5   // R4 = R1 - R5 （需要R1的新值）</code></p>
+        <br/>
+        <p>ADD 在 WB 阶段写回 R1，SUB 在 ID 阶段读取 R1 — 间隔2个周期，产生冒险。</p>
+    </div>
+</div>
+
+<!-- ====== 第四部分：数据前递 ====== -->
+<h2>四、数据前递（Forwarding / Bypassing）</h2>
+<div class="card">
+    <p>前递技术通过添加额外的数据通路，将计算结果<strong>提前转发</strong>给后续指令，避免不必要的暂停。</p>
+
+    <h3>4.1 前递通路</h3>
+    <div class="diagram">  ┌──────────┐
+  │  EX/MEM  │──── EX→EX 前递 ──→ EX阶段输入
+  │  寄存器   │
+  └──────────┘
+       │
+  ┌──────────┐
+  │  MEM/WB  │──── MEM→EX 前递 ──→ EX阶段输入
+  │  寄存器   │──── MEM→ID 前递 ──→ ID阶段输入
+  └──────────┘</div>
+
+    <h3>4.2 前递判断条件</h3>
+    <div class="code-block">// EX→EX 前递
+if (EX/MEM.RegWrite && EX/MEM.Rd != 0
+    && EX/MEM.Rd == ID/EX.Rs1) {
+    ALU_input_A = EX/MEM.ALU_result; // 前递
+}
+
+// MEM→EX 前递
+if (MEM/WB.RegWrite && MEM/WB.Rd != 0
+    && MEM/WB.Rd == ID/EX.Rs1
+    && !(EX/MEM冲突已处理)) {
+    ALU_input_A = MEM/WB.result; // 前递
+}</div>
+
+    <h3>4.3 Load-Use 冒险 — 前递无法解决的情况</h3>
+    <div class="diagram">  周期:    1    2    3    4    5    6
+  LW R1,  IF   ID   EX  MEM→R1  WB
+  0(R2):
+  ADD R3,       IF   ID    ?    EX   MEM  WB
+  R1, R4:
+
+  ADD在EX阶段需要R1，但LW在MEM阶段才读到数据
+  即使MEM→EX前递，也来不及!
+  → 必须插入1个气泡(Stall)</div>
+
+    <div class="highlight">
+        <strong>Load-Use Hazard</strong>是五级流水线中唯一无法完全通过前递消除的数据冒险。解决方案：编译器调度（将无关指令插入Load和Use之间）或硬件插入1个气泡。
+    </div>
+</div>
+
+<!-- ====== 第五部分：控制冒险 ====== -->
+<h2>五、控制冒险（Control Hazard）</h2>
+<div class="card">
+    <p>控制冒险由<strong>分支指令</strong>引起 — 在分支结果确定之前，处理器不知道下一条该取哪条指令。</p>
+
+    <h3>5.1 分支代价</h3>
+    <p>在五级流水线中，分支目标地址在 EX 阶段确定（若ALU计算分支目标），条件判断也在 EX 阶段完成。这意味着可能浪费 2 个周期。</p>
+
+    <h3>5.2 解决方法</h3>
+    <table>
+        <tr><th>方法</th><th>原理</th><th>代价</th></tr>
+        <tr><td>尽早计算分支</td><td>在ID阶段完成分支判断（增加硬件）</td><td>减少到1个气泡</td></tr>
+        <tr><td>预测不跳转</td><td>假设分支不执行，继续取后续指令</td><td>预测错误时清空2条指令</td></tr>
+        <tr><td>预测跳转</td><td>假设分支执行，预取目标地址的指令</td><td>预测错误时清空</td></tr>
+        <tr><td>延迟槽</td><td>分支后的指令无论是否跳转都执行</td><td>需要编译器配合</td></tr>
+        <tr><td>动态分支预测</td><td>根据历史记录预测（见下节）</td><td>高准确率，少量硬件</td></tr>
+    </table>
+</div>
+
+<!-- ====== 第六部分：流水线性能分析 ====== -->
+<h2>六、流水线性能分析</h2>
+<div class="card">
+    <h3>6.1 CPI（Cycles Per Instruction）计算</h3>
+    <div class="diagram">  理想CPI = 1.0
+  实际CPI = 1 + stall_per_instruction
+
+  stall_per_instruction =
+      结构冒险stall比例
+    + 数据冒险stall比例
+    + 控制冒险stall比例
+
+  示例:
+  - 分支指令占20%，预测错误率10%，代价2周期
+  - Load-Use冒险占15%，其中30%无法调度
+  - CPI = 1 + 0.2×0.1×2 + 0.15×0.3×1
+       = 1 + 0.04 + 0.045
+       = 1.085</div>
+</div>
+
+</div>
+<!-- ====== 总结 ====== -->
+<!--
+本笔记总结：
+1. 流水线将指令执行分为IF/ID/EX/MEM/WB五级，实现指令级并行，理想加速比等于级数
+2. 结构冒险由硬件资源冲突引起，通过哈佛架构(分离I-Cache和D-Cache)解决
+3. 数据冒险分RAW(真依赖)、WAR(反依赖)、WAW(输出依赖)，RAW是最本质的依赖
+4. 数据前递(EX→EX, MEM→EX)可消除大部分RAW冒险，但Load-Use冒险必须插入1个气泡
+5. 控制冒险由分支指令引起，通过尽早计算分支、分支预测、延迟槽等方法解决
+6. 流水线的实际CPI = 1 + 各类冒险导致的平均每指令stall数
+7. 编译器可以通过指令调度减少Load-Use冒险和控制冒险的影响
+-->
+</body>
+</html>

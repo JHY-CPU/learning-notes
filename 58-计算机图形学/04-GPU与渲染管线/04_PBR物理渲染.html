@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- PBR物理渲染 - 计算机图形学笔记 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PBR物理渲染</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f5f7fa; color: #2c3e50; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 40px; }
+        h1 { font-size: 28px; color: #1a5276; border-bottom: 3px solid #2980b9; padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 22px; color: #2980b9; margin: 28px 0 14px; border-left: 4px solid #2980b9; padding-left: 12px; }
+        h3 { font-size: 18px; color: #34495e; margin: 20px 0 10px; }
+        p { margin: 8px 0; text-indent: 2em; }
+        ul, ol { margin: 10px 0 10px 2em; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: left; }
+        th { background: #2980b9; color: #fff; }
+        tr:nth-child(even) { background: #f0f4f8; }
+        .note { background: #eaf2f8; border-left: 4px solid #2980b9; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .key-point { background: #fef9e7; border-left: 4px solid #f39c12; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        code { background: #ecf0f1; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>PBR物理渲染</h1>
+
+    <!-- 一、PBR概述 -->
+    <h2>一、PBR（物理渲染）概述</h2>
+    <p>PBR（Physically Based Rendering）是一种基于物理光学原理的渲染方法，通过精确模拟光线与材质的交互来产生真实感图像。它的核心目标是让材质在任何光照环境下都看起来正确。</p>
+
+    <h3>1.1 PBR核心原则</h3>
+    <ul>
+        <li><strong>能量守恒：</strong>表面反射的光总和不会超过入射光</li>
+        <li><strong>基于物理的BRDF：</strong>使用微表面模型描述表面反射</li>
+        <li><strong>Fresnel效应：</strong>掠射角反射率增加</li>
+        <li><strong>线性空间渲染：</strong>所有计算在线性颜色空间进行</li>
+        <li><strong>参数化材质：</strong>使用物理可解释的参数（金属度、粗糙度）</li>
+    </ul>
+
+    <!-- 二、微表面理论 -->
+    <h2>二、微表面理论（Microfacet Theory）</h2>
+    <p>微表面理论假设宏观光滑的表面在微观尺度上由大量微小平面组成，每个微表面是完美镜面反射。表面的粗糙度由微表面法线的分布决定。</p>
+
+    <h3>2.1 Cook-Torrance BRDF</h3>
+    <div class="key-point">
+        <strong>Cook-Torrance BRDF：</strong><br>
+        <code>f_r = k_d × (c/π) + k_s × (D × F × G) / (4 × cos(θ_i) × cos(θ_o))</code><br><br>
+        漫反射项：k_d × (c/π)（Lambert漫反射）<br>
+        镜面反射项：D × F × G / (4 × cosθ_i × cosθ_o)<br><br>
+        D = 法线分布函数（Normal Distribution Function）<br>
+        F = Fresnel方程<br>
+        G = 几何遮蔽函数（Geometry / Shadowing-Masking）<br>
+        k_d + k_s = 1（能量守恒）
+    </div>
+
+    <!-- 三、GGX法线分布 -->
+    <h2>三、GGX / Trowbridge-Reitz NDF</h2>
+    <p>GGX是目前最广泛使用的法线分布函数，由Walter等人推广，能产生更真实的高光衰减和长尾效果。</p>
+
+    <h3>3.1 GGX公式</h3>
+    <div class="key-point">
+        <strong>GGX NDF：</strong><br>
+        <code>D_GGX(h) = α² / (π × ((n·h)² × (α² - 1) + 1)²)</code><br><br>
+        α = roughness²（粗糙度参数需要平方变换）<br>
+        h = 半角向量 = normalize(lightDir + viewDir)<br>
+        n·h = 法线与半角向量的点积<br><br>
+        α越大（越粗糙）→ 分布越平坦（高光越大越模糊）<br>
+        α越小（越光滑）→ 分布越尖锐（高光越小越集中）
+    </div>
+
+    <h3>3.2 常见NDF对比</h3>
+    <table>
+        <tr><th>NDF</th><th>公式复杂度</th><th>效果特点</th><th>应用</th></tr>
+        <tr><td>Beckmann</td><td>指数函数</td><td>经典分布</td><td>早期PBR</td></tr>
+        <tr><td>GGX/TR</td><td>有理函数</td><td>长尾衰减，更真实</td><td>主流方案</td></tr>
+        <tr><td>GTR</td><td>广义形式</td><td>可调节尾部</td><td>Disney BRDF</td></tr>
+    </table>
+
+    <!-- 四、Fresnel方程 -->
+    <h2>四、Fresnel方程</h2>
+    <p>Fresnel效应描述了反射率随观察角度变化的现象：正对表面时反射率低，掠射角时反射率趋近100%。</p>
+
+    <h3>4.1 Schlick近似</h3>
+    <div class="key-point">
+        <strong>Fresnel-Schlick近似：</strong><br>
+        <code>F(θ) = F_0 + (1 - F_0) × (1 - cos(θ))⁵</code><br><br>
+        F_0 = 基础反射率（正对表面时的反射率）<br>
+        θ = 观察方向与半角向量的夹角<br><br>
+        非金属 F_0 ≈ 0.04（4%反射率）<br>
+        金属 F_0 = 漫反射颜色（60~100%反射率）
+    </div>
+
+    <h3>4.2 不同材质的F_0值</h3>
+    <table>
+        <tr><th>材质</th><th>F_0 (RGB)</th><th>说明</th></tr>
+        <tr><td>水</td><td>(0.02, 0.02, 0.02)</td><td>约2%反射率</td></tr>
+        <tr><td>玻璃</td><td>(0.04, 0.04, 0.04)</td><td>约4%反射率</td></tr>
+        <tr><td>塑料</td><td>(0.04, 0.04, 0.04)</td><td>非金属统一~4%</td></tr>
+        <tr><td>金</td><td>(1.0, 0.765, 0.336)</td><td>高反射率，有色</td></tr>
+        <tr><td>铜</td><td>(0.955, 0.638, 0.538)</td><td>高反射率，有色</td></tr>
+        <tr><td>铁</td><td>(0.560, 0.570, 0.580)</td><td>中等反射率</td></tr>
+        <tr><td>铝</td><td>(0.913, 0.922, 0.924)</td><td>高反射率，接近白色</td></tr>
+    </table>
+
+    <!-- 五、几何遮蔽函数 -->
+    <h2>五、几何遮蔽函数（G函数）</h2>
+    <p>G函数描述微表面之间的自遮挡效应：粗糙表面上，微表面会遮挡入射光或出射光，导致有效反射面积减小。</p>
+
+    <h3>5.1 Schlick-GGX</h3>
+    <div class="key-point">
+        <strong>Schlick-GGX遮蔽函数：</strong><br>
+        <code>G_SchlickGGX(n, v, k) = (n·v) / ((n·v) × (1 - k) + k)</code><br><br>
+        Smith方法将遮蔽和阴影分离：<br>
+        <code>G(n, v, l, k) = G_SchlickGGX(n, v, k) × G_SchlickGGX(n, l, k)</code><br><br>
+        k = (roughness + 1)² / 8（直接光照）<br>
+        k = roughness² / 2（IBL光照）
+    </div>
+
+    <!-- 六、金属-粗糙度工作流 -->
+    <h2>六、金属-粗糙度工作流</h2>
+    <p>金属-粗糙度（Metallic-Roughness）工作流是最流行的PBR材质参数化方案，由Disney提出，被glTF标准采用。</p>
+
+    <h3>6.1 贴图通道分配</h3>
+    <table>
+        <tr><th>贴图</th><th>通道</th><th>内容</th><th>范围</th></tr>
+        <tr><td>基础色（Albedo）</td><td>RGB</td><td>漫反射颜色 / 金属F_0</td><td>sRGB</td></tr>
+        <tr><td>金属粗糙度</td><td>R</td><td>—</td><td>—</td></tr>
+        <tr><td>金属粗糙度</td><td>G</td><td>粗糙度（Roughness）</td><td>线性 [0, 1]</td></tr>
+        <tr><td>金属粗糙度</td><td>B</td><td>金属度（Metallic）</td><td>线性 [0, 1]</td></tr>
+        <tr><td>法线贴图</td><td>RGB</td><td>切线空间法线</td><td>线性</td></tr>
+        <tr><td>环境光遮蔽</td><td>R</td><td>AO值</td><td>线性 [0, 1]</td></tr>
+    </table>
+
+    <div class="key-point">
+        <strong>金属/非金属区别：</strong><br>
+        metallic = 0（非金属）：<br>
+        - 漫反射 = albedo颜色<br>
+        - 镜面F_0 = 0.04（固定值）<br><br>
+        metallic = 1（金属）：<br>
+        - 漫反射 = 0（金属无漫反射）<br>
+        - 镜面F_0 = albedo颜色（金属的F_0是彩色的）
+    </div>
+
+    <!-- 七、IBL -->
+    <h2>七、基于图像的照明（IBL）</h2>
+    <p>IBL使用环境贴图（HDRI）代替点光源/面光源来照明场景，是PBR渲染中环境光照的标准方案。</p>
+
+    <h3>7.1 IBL漫反射</h3>
+    <p>对环境贴图进行卷积（模糊），预计算每个方向的平均辐射度，存储在辐照度贴图（Irradiance Map）中。采样时直接查表。</p>
+
+    <h3>7.2 IBL镜面反射</h3>
+    <div class="key-point">
+        <strong>Split-Sum近似：</strong><br>
+        镜面IBL被拆分为两个预计算贴图：<br>
+        1. <strong>预滤波环境贴图（Pre-filtered Env Map）：</strong><br>
+           按粗糙度级别模糊的环境贴图（mipmap级别）<br>
+           根据roughness选择mipmap级别采样<br><br>
+        2. <strong>BRDF积分贴图（BRDF LUT）：</strong><br>
+           2D查找表，输入(cosθ, roughness)，输出(scale, bias)<br>
+           最终镜面IBL = prefilteredColor * (F0 * scale + bias)
+    </div>
+
+    <h3>7.3 PBR片段着色器</h3>
+    <div class="key-point">
+        <pre>
+// PBR片段着色器 - IBL光照
+vec3 PBR_IBL(vec3 N, vec3 V, vec3 albedo, float metallic,
+             float roughness, float ao) {
+    vec3 F0 = mix(vec3(0.04), albedo, metallic);
+
+    // 漫反射IBL
+    vec3 irradiance = texture(irradianceMap, N).rgb;
+    vec3 diffuse = irradiance * albedo;
+
+    // 镜面IBL (Split-Sum)
+    vec3 R = reflect(-V, N);
+    vec3 prefilteredColor = textureLod(prefilterMap, R,
+        roughness * MAX_REFLECTION_LOD).rgb;
+    vec2 brdf = texture(brdfLUT, vec2(max(dot(N, V), 0.0),
+        roughness)).rg;
+    vec3 specular = prefilteredColor * (F0 * brdf.x + brdf.y);
+
+    // 合并
+    vec3 kS = F_Schlick(max(dot(N, V), 0.0), F0);
+    vec3 kD = (1.0 - kS) * (1.0 - metallic);
+
+    return (kD * diffuse + specular) * ao;
+}
+        </pre>
+    </div>
+
+</div>
+
+<!--
+========================================
+  文件总结
+========================================
+  主题：PBR物理渲染
+  内容概要：
+    1. 微表面理论 - D(法线分布) × F(Fresnel) × G(几何遮蔽) / (4cosθi×cosθo)
+    2. GGX NDF - α²/(π((n·h)²(α²-1)+1)²)，长尾衰减
+    3. Fresnel-Schlick - F=F0+(1-F0)(1-cosθ)⁵
+    4. 金属-粗糙度工作流 - metallic控制漫反射/镜面分配
+    5. IBL - Split-Sum近似：预滤波环境贴图 + BRDF LUT
+  重点知识：
+    - Cook-Torrance BRDF: fr = kd(c/π) + ks(D×F×G)/(4cosθi×cosθo)
+    - α = roughness²（粗糙度需要平方变换）
+    - 非金属F0≈0.04，金属F0=albedo颜色
+    - metallic=1时无漫反射，镜面=albedo
+    - IBL Split-Sum：预滤波贴图按roughness选mipmap级别
+========================================
+-->
+</body>
+</html>

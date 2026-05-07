@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>布尔化简与卡诺图</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f5f7fa; color: #333; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 15px; margin-bottom: 30px; }
+        h2 { color: #2980b9; margin: 25px 0 10px; border-left: 4px solid #3498db; padding-left: 12px; }
+        h3 { color: #8e44ad; margin: 15px 0 8px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: center; }
+        th { background: #3498db; color: #fff; }
+        tr:nth-child(even) { background: #ecf0f1; }
+        .formula { background: #f9f9f9; border-left: 4px solid #e67e22; padding: 10px 15px; margin: 10px 0; font-family: 'Consolas', monospace; }
+        .note { background: #fef9e7; border-left: 4px solid #f1c40f; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        .important { background: #fdedec; border-left: 4px solid #e74c3c; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        ul, ol { margin-left: 25px; margin-bottom: 10px; }
+        li { margin-bottom: 5px; }
+        .kmap { display: inline-grid; gap: 0; margin: 15px auto; }
+        .kmap-cell { width: 60px; height: 50px; display: flex; align-items: center; justify-content: center; border: 1px solid #7f8c8d; font-weight: bold; font-size: 1.1em; }
+        .kmap-header { background: #bdc3c7; font-weight: bold; }
+        .kmap-1 { background: #d5f5e3; }
+        .kmap-0 { background: #fadbd8; }
+        .kmap-group { background: #aed6f1; border: 2px solid #2980b9; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>布尔化简与卡诺图</h1>
+
+        <!-- 布尔表达式形式 -->
+        <div class="card">
+            <h2>一、布尔表达式的标准形式</h2>
+
+            <h3>1.1 最小项（Minterm）与最大项（Maxterm）</h3>
+            <table>
+                <tr><th>概念</th><th>定义</th><th>记号</th><th>特点</th></tr>
+                <tr>
+                    <td>最小项</td>
+                    <td>n个变量的乘积项，每个变量以原变量或反变量出现一次</td>
+                    <td>m<sub>i</sub></td>
+                    <td>使最小项为1的变量组合只有一个</td>
+                </tr>
+                <tr>
+                    <td>最大项</td>
+                    <td>n个变量的和项，每个变量以原变量或反变量出现一次</td>
+                    <td>M<sub>i</sub></td>
+                    <td>使最大项为0的变量组合只有一个</td>
+                </tr>
+            </table>
+
+            <h3>1.2 SOP与POS形式</h3>
+            <table>
+                <tr><th>形式</th><th>全称</th><th>结构</th><th>与最小项/最大项的关系</th></tr>
+                <tr>
+                    <td>SOP</td>
+                    <td>Sum of Products（与或式）</td>
+                    <td>若干乘积项相或</td>
+                    <td>标准SOP由最小项之和构成</td>
+                </tr>
+                <tr>
+                    <td>POS</td>
+                    <td>Product of Sums（或与式）</td>
+                    <td>若干和项相与</td>
+                    <td>标准POS由最大项之积构成</td>
+                </tr>
+            </table>
+
+            <div class="formula">
+                SOP示例：F = A̅B + AB̅ + ABC<br>
+                POS示例：F = (A+B)·(A̅+C)·(B+C̅)
+            </div>
+        </div>
+
+        <!-- 代数化简法 -->
+        <div class="card">
+            <h2>二、代数化简法</h2>
+            <p>利用布尔代数的基本定律对逻辑表达式进行化简，常用方法包括：</p>
+
+            <h3>2.1 常用化简技巧</h3>
+            <ol>
+                <li><strong>并项法</strong>：AB + AB̅ = A(B+B̅) = A</li>
+                <li><strong>吸收法</strong>：A + AB = A(1+B) = A</li>
+                <li><strong>消去法</strong>：A + A̅B = A + B</li>
+                <li><strong>配项法</strong>：添加多余项进行化简</li>
+            </ol>
+
+            <h3>2.2 化简示例</h3>
+            <div class="formula">
+                原式：F = ABC + ABC̅ + AB̅C + A̅BC<br>
+                = AB(C+C̅) + AB̅C + A̅BC    ——并项<br>
+                = AB + AB̅C + A̅BC<br>
+                = A(B+B̅C) + A̅BC<br>
+                = A(B+C) + A̅BC             ——消去<br>
+                = AB + AC + A̅BC<br>
+                = AB + C(A+A̅B)             ——消去<br>
+                = AB + C(A+B)<br>
+                = AB + AC + BC
+            </div>
+
+            <div class="note">
+                <strong>局限性：</strong>代数化简法依赖经验和技巧，难以判断是否已化到最简。卡诺图法可以系统地找到最简表达式。
+            </div>
+        </div>
+
+        <!-- 卡诺图 -->
+        <div class="card">
+            <h2>三、卡诺图（Karnaugh Map）</h2>
+            <p>卡诺图是一种图形化的化简工具，将真值表按格雷码排列，通过圈出相邻的"1"格来化简表达式。</p>
+
+            <h3>3.1 卡诺图的结构</h3>
+            <ul>
+                <li>n个变量需要 2<sup>n</sup> 个格子</li>
+                <li>变量按格雷码排列（相邻格只有一个变量不同）</li>
+                <li>相邻包括：上下相邻、左右相邻、首尾相邻</li>
+            </ul>
+
+            <h3>3.2 二变量卡诺图</h3>
+            <table style="width: auto; margin: 10px auto;">
+                <tr><th>A\B</th><th>0</th><th>1</th></tr>
+                <tr><th>0</th><td>A̅B̅ (m₀)</td><td>A̅B (m₁)</td></tr>
+                <tr><th>1</th><td>AB̅ (m₂)</td><td>AB (m₃)</td></tr>
+            </table>
+
+            <h3>3.3 三变量卡诺图</h3>
+            <table style="width: auto; margin: 10px auto;">
+                <tr><th>A\BC</th><th>00</th><th>01</th><th>11</th><th>10</th></tr>
+                <tr><th>0</th><td>m₀</td><td>m₁</td><td>m₃</td><td>m₂</td></tr>
+                <tr><th>1</th><td>m₄</td><td>m₅</td><td>m₇</td><td>m₆</td></tr>
+            </table>
+
+            <h3>3.4 四变量卡诺图</h3>
+            <table style="width: auto; margin: 10px auto;">
+                <tr><th>AB\CD</th><th>00</th><th>01</th><th>11</th><th>10</th></tr>
+                <tr><th>00</th><td>m₀</td><td>m₁</td><td>m₃</td><td>m₂</td></tr>
+                <tr><th>01</th><td>m₄</td><td>m₅</td><td>m₇</td><td>m₆</td></tr>
+                <tr><th>11</th><td>m₁₂</td><td>m₁₃</td><td>m₁₅</td><td>m₁₄</td></tr>
+                <tr><th>10</th><td>m₈</td><td>m₉</td><td>m₁₁</td><td>m₁₀</td></tr>
+            </table>
+        </div>
+
+        <!-- 卡诺图化简规则 -->
+        <div class="card">
+            <h2>四、卡诺图化简规则</h2>
+
+            <h3>4.1 圈"1"的规则</h3>
+            <ol>
+                <li>圈必须是矩形（包括正方形），大小为 2<sup>k</sup>（k=0,1,2,...）</li>
+                <li>圈越大越好，但圈内必须全是"1"</li>
+                <li>每个"1"至少被圈一次</li>
+                <li>圈的总数越少越好</li>
+                <li>可以重复圈（同一个"1"被多个圈包含）</li>
+                <li>卡诺图的上下、左右边缘是相邻的（首尾相邻）</li>
+            </ol>
+
+            <h3>4.2 圈的大小与化简结果</h3>
+            <table>
+                <tr><th>圈的大小</th><th>包含格数</th><th>化简后项数</th><th>消去变量数</th></tr>
+                <tr><td>1格</td><td>1</td><td>n个文字</td><td>0</td></tr>
+                <tr><td>2格</td><td>2</td><td>n-1个文字</td><td>1</td></tr>
+                <tr><td>4格</td><td>4</td><td>n-2个文字</td><td>2</td></tr>
+                <tr><td>8格</td><td>8</td><td>n-3个文字</td><td>3</td></tr>
+            </table>
+
+            <h3>4.3 化简示例</h3>
+            <div class="formula">
+                F(A,B,C,D) = Σm(0,2,5,7,8,10,13,15)<br><br>
+                四变量卡诺图填入1：<br>
+                AB\CD | 00  01  11  10<br>
+                00    |  1   0   0   1<br>
+                01    |  0   1   1   0<br>
+                11    |  0   1   1   0<br>
+                10    |  1   0   0   1<br><br>
+                圈1：m₀,m₂,m₈,m₁₀ → B̅D̅<br>
+                圈2：m₅,m₇,m₁₃,m₁₅ → BD<br><br>
+                最简表达式：F = B̅D̅ + BD = B⊙D（同或）
+            </div>
+        </div>
+
+        <!-- 无关项 -->
+        <div class="card">
+            <h2>五、无关项（Don't Care）</h2>
+            <p>某些输入组合在实际中不会出现，或者输出可以是任意值，这些项称为无关项，在卡诺图中标记为"×"或"d"。</p>
+
+            <h3>5.1 无关项的利用</h3>
+            <ul>
+                <li>无关项可以当作"1"来圈，也可以当作"0"忽略</li>
+                <li>目标是让圈更大、圈数更少</li>
+                <li>不能单独圈无关项</li>
+            </ul>
+
+            <h3>5.2 示例</h3>
+            <div class="formula">
+                F(A,B,C) = Σm(1,3,5) + d(6,7)<br>
+                即 m₁,m₃,m₅ 为1，m₆,m₇ 为无关项<br><br>
+                A\BC | 00  01  11  10<br>
+                0    |  0   1   1   0<br>
+                1    |  0   1   ×   ×<br><br>
+                圈1：m₁,m₃,m₅,m₇ → C<br><br>
+                最简表达式：F = C
+            </div>
+        </div>
+
+        <!-- 总结 -->
+        <div class="card">
+            <h2>六、知识要点总结</h2>
+            <ol>
+                <li>标准形式：SOP（最小项之和）和 POS（最大项之积）</li>
+                <li>代数化简法：并项法、吸收法、消去法、配项法</li>
+                <li>卡诺图是系统化简逻辑函数的图形方法</li>
+                <li>圈"1"规则：2<sup>k</sup>大小、全1、越大越好、越少越好</li>
+                <li>首尾相邻：卡诺图的边缘是连通的</li>
+                <li>无关项可当作0或1使用，以获得更简表达式</li>
+            </ol>
+        </div>
+
+        <!--
+            ========================================
+            文件总结：布尔化简与卡诺图
+            ========================================
+            本文件涵盖了布尔函数化简的核心内容：
+            1. SOP/POS标准形式与最小项/最大项
+            2. 代数化简法的四种常用技巧
+            3. 卡诺图的结构与格雷码排列
+            4. 卡诺图化简的规则与方法
+            5. 无关项的概念与利用
+
+            重点：卡诺图化简步骤、圈的规则
+            考点：四变量卡诺图化简、无关项处理
+            ========================================
+        -->
+    </div>
+</body>
+</html>

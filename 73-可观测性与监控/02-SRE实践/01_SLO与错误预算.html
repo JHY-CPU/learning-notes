@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SLO与错误预算</title>
+    <!-- 可观测性与监控 - SRE实践 笔记 -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        .tag { display: inline-block; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>SLO与错误预算</h2>
+        <p><span class="tag">SRE</span><span class="tag">SLO</span><span class="tag">混沌工程</span></p>
+        <p>SRE(站点可靠性工程)通过SLO和错误预算平衡可靠性和迭代速度。</p>
+    </div>
+
+    <div class="card">
+        <h2>SLI / SLO / SLA</h2>
+        <div class="code">
+SLI (Service Level Indicator) 服务水平指标：
+- 可用性 = 成功请求数 / 总请求数
+- 延迟 = p99响应时间 < 200ms
+- 吞吐量 = TPS
+- 错误率 = 5xx / 总请求
+- 正确性 = 返回正确结果的比例
+
+SLO (Service Level Objective) 服务水平目标：
+- 可用性 > 99.9%（每月停机43.2分钟）
+- p99延迟 < 200ms
+- 错误率 < 0.1%
+
+SLA (Service Level Agreement) 服务水平协议：
+- 与客户签订的正式合同
+- 违反SLA的经济赔偿
+- 通常SLO > SLA（留有余量）
+
+示例：
+┌─────────────────────────────────────────────┐
+│  SLI：API可用性 = 成功响应/总请求             │
+│  SLO：30天窗口内可用性 ≥ 99.9%               │
+│  SLA：低于99.9%退还10%月费                   │
+│                                             │
+│  可用性目标：                                 │
+│  99%   → 年停机3.65天                        │
+│  99.9% → 年停机8.76小时                      │
+│  99.95%→ 年停机4.38小时                      │
+│  99.99%→ 年停机52.6分钟                      │
+└─────────────────────────────────────────────┘
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>错误预算 (Error Budget)</h2>
+        <div class="code">
+错误预算 = 1 - SLO = 允许的不可靠程度
+
+示例：SLO = 99.9%可用性
+错误预算 = 0.1% × 30天 × 24小时 × 60分钟 = 43.2分钟/月
+
+错误预算的使用：
+┌─────────────────────────────────────────────┐
+│  预算充足（>50%剩余）                         │
+│  → 团队可以自由发布新功能                     │
+│  → 可以进行有风险的变更                       │
+│                                             │
+│  预算紧张（<50%剩余）                         │
+│  → 放慢发布节奏                               │
+│  → 增加变更审查                               │
+│                                             │
+│  预算耗尽（=0）                               │
+│  → 冻结发布（只允许紧急修复）                 │
+│  → 全力投入可靠性改进                         │
+│  → 直到预算恢复                               │
+└─────────────────────────────────────────────┘
+
+错误预算的优势：
+- 量化了"多可靠才算够可靠"
+- 给团队一个客观的发布信号
+- 平衡了创新速度和稳定性
+- 避免过度工程（99.999% vs 99.9%的成本差异）
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>事件管理与混沌工程</h2>
+        <div class="code">
+事件响应流程：
+1. 检测：告警触发
+2. 响应：On-call工程师接手
+3. 评估：影响范围和严重程度
+4. 缓解：临时措施恢复服务
+5. 根因分析：找到根本原因
+6. 修复：永久性修复
+7. 复盘：Blameless Postmortem
+
+严重等级 (Severity)：
+- SEV1：服务完全不可用，所有用户受影响
+- SEV2：核心功能严重降级，大部分用户受影响
+- SEV3：非核心功能异常，部分用户受影响
+- SEV4：轻微异常，极少数用户受影响
+
+无责复盘 (Blameless Postmortem)：
+- 聚焦系统改进而非个人责任
+- 记录：时间线、影响、根因、行动项
+- 分析：什么导致了事件？如何防止再发生？
+- 行动项：明确负责人和截止日期
+
+混沌工程 (Chaos Engineering)：
+主动注入故障，验证系统韧性
+- Netflix Chaos Monkey：随机杀进程
+- Litmus/Chaos Mesh：K8s混沌工程
+- 实验：假设系统能承受X故障 → 验证
+- 从生产环境的小规模实验开始
+        </div>
+        <div class="note">错误预算将可靠性从"越可靠越好"转变为"足够可靠即可"，解放了团队的创新速度。
+        无责复盘文化是SRE团队的核心价值观。</div>
+    </div>
+
+    <!-- 总结：SLI衡量服务水平，SLO设定目标，SLA是与客户的合同。
+    错误预算量化了可接受的不可靠程度，平衡了迭代速度和稳定性。
+    无责复盘和混沌工程是SRE文化的核心实践。 -->
+</body>
+</html>

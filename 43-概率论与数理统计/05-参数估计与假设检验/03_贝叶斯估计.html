@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>贝叶斯估计</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; font-size: 2em; margin-bottom: 10px; border-bottom: 3px solid #2b6cb0; padding-bottom: 10px; }
+        .subtitle { text-align: center; color: #718096; margin-bottom: 30px; }
+        h2 { color: #2c5282; font-size: 1.4em; margin: 25px 0 12px; padding-left: 12px; border-left: 4px solid #3182ce; }
+        h3 { color: #2d3748; font-size: 1.15em; margin: 18px 0 8px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px 25px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .formula { background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 6px; padding: 12px 18px; margin: 10px 0; font-size: 1.05em; text-align: center; font-family: 'Times New Roman', serif; }
+        .formula-inline { background: #ebf8ff; padding: 2px 8px; border-radius: 4px; font-family: 'Times New Roman', serif; }
+        .example { background: #f0fff4; border-left: 4px solid #48bb78; border-radius: 0 6px 6px 0; padding: 15px 18px; margin: 12px 0; }
+        .example-title { font-weight: bold; color: #276749; margin-bottom: 6px; }
+        .note { background: #fffff0; border-left: 4px solid #ecc94b; border-radius: 0 6px 6px 0; padding: 12px 18px; margin: 12px 0; }
+        .note-title { font-weight: bold; color: #975a16; }
+        .step { background: #faf5ff; border-left: 4px solid #805ad5; border-radius: 0 6px 6px 0; padding: 10px 18px; margin: 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 8px 12px; text-align: center; }
+        th { background: #bee3f8; color: #2a4365; }
+        tr:nth-child(even) { background: #f7fafc; }
+        ul, ol { margin-left: 25px; margin-bottom: 8px; }
+        li { margin-bottom: 4px; }
+        .tag { display: inline-block; background: #c3dafe; color: #3c366b; padding: 2px 10px; border-radius: 12px; font-size: 0.85em; margin: 3px; }
+        .summary-box { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; border-radius: 10px; padding: 20px 25px; margin-top: 30px; }
+        .summary-box h2 { color: #fff; border-left-color: #fff; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>贝叶斯估计</h1>
+    <p class="subtitle">参数估计与假设检验 · 贝叶斯推断</p>
+
+    <!-- ==================== 贝叶斯推断框架 ==================== -->
+    <h2>一、贝叶斯推断框架</h2>
+
+    <div class="card">
+        <h3>1. 核心思想</h3>
+        <p>经典频率学派将参数 θ 视为固定未知常数；贝叶斯学派将 θ 视为<strong>随机变量</strong>，具有先验分布 π(θ)。</p>
+        <p style="margin-top:8px;">贝叶斯推断的三要素：</p>
+        <ul>
+            <li><strong>先验分布</strong> π(θ)：在观测数据之前对参数的认知</li>
+            <li><strong>似然函数</strong> L(θ|x) = f(x|θ)：给定参数时数据的分布</li>
+            <li><strong>后验分布</strong> π(θ|x)：观测数据后对参数的更新认知</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>2. 贝叶斯公式（密度函数形式）</h3>
+        <div class="formula">
+            π(θ|x) = f(x|θ) · π(θ) / m(x)
+        </div>
+        <p style="margin-top:8px;">其中边际密度（归一化常数）：</p>
+        <div class="formula">
+            m(x) = ∫ f(x|θ) · π(θ) dθ&nbsp;&nbsp;（连续参数）<br>
+            m(x) = Σ f(x|θᵢ) · π(θᵢ)&nbsp;&nbsp;（离散参数）
+        </div>
+        <p style="margin-top:8px;">实用形式（去掉常数因子）：</p>
+        <div class="formula">
+            π(θ|x) ∝ L(θ|x) · π(θ)&nbsp;&nbsp;&nbsp;&nbsp;（后验 ∝ 似然 × 先验）
+        </div>
+    </div>
+
+    <!-- ==================== 先验分布 ==================== -->
+    <h2>二、先验分布的选择</h2>
+
+    <div class="card">
+        <h3>1. 先验分布的类型</h3>
+        <table>
+            <tr><th>类型</th><th>说明</th><th>示例</th></tr>
+            <tr><td>信息先验</td><td>基于历史数据或专家知识</td><td>以往试验数据拟合的分布</td></tr>
+            <tr><td>无信息先验</td><td>尽量不引入主观信息</td><td>均匀分布 π(θ)∝1；Jeffreys先验</td></tr>
+            <tr><td>共轭先验</td><td>后验与先验属于同一分布族</td><td>见下表</td></tr>
+            <tr><td>分层先验</td><td>先验的参数也赋予分布</td><td>超参数的先验</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>2. 共轭先验（Conjugate Prior）</h3>
+        <p>若后验 π(θ|x) 与先验 π(θ) 属于同一分布族，则称 π(θ) 为似然函数的<strong>共轭先验</strong>。</p>
+        <table>
+            <tr><th>似然（数据分布）</th><th>参数</th><th>共轭先验</th><th>后验参数更新</th></tr>
+            <tr><td>Bernoulli / Binomial</td><td>p（成功概率）</td><td>Beta(α,β)</td><td>Beta(α+Σxᵢ, β+n-Σxᵢ)</td></tr>
+            <tr><td>Poisson</td><td>λ</td><td>Gamma(a,b)</td><td>Gamma(a+Σxᵢ, b+n)</td></tr>
+            <tr><td>Normal（方差已知）</td><td>μ</td><td>N(μ₀, τ²)</td><td>N(μ₁, σ²₁)，见例题</td></tr>
+            <tr><td>Normal（均值已知）</td><td>σ²</td><td>InvGamma(a,b)</td><td>InvGamma(a+n/2, b+Σ(xᵢ-μ)²/2)</td></tr>
+            <tr><td>Exponential</td><td>λ</td><td>Gamma(a,b)</td><td>Gamma(a+n, b+Σxᵢ)</td></tr>
+        </table>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 1：Beta-Binomial 共轭</div>
+        <p>某产品次品率 p 的先验为 Beta(2,8)。抽取 20 件发现 3 件次品，求 p 的后验分布。</p>
+        <div class="step">
+            先验：π(p) ~ Beta(2, 8)，即 α₀=2, β₀=8<br>
+            似然：X|p ~ B(20, p)，观测 Σxᵢ=3<br><br>
+            后验：π(p|x) ~ Beta(2+3, 8+20-3) = <strong>Beta(5, 25)</strong><br><br>
+            后验均值：E(p|x) = 5/(5+25) = 1/6 ≈ 0.167<br>
+            （先验均值 2/10=0.2，观测频率 3/20=0.15，后验均值在两者之间！）
+        </div>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 2：Normal-Normal 共轭</div>
+        <p>已知 σ²=4，μ 的先验为 N(0,4)。观测数据 x̄=2（n=16），求 μ 的后验分布。</p>
+        <div class="step">
+            先验：μ ~ N(μ₀=0, τ₀²=4)<br>
+            数据：x̄|μ ~ N(μ, σ²/n=4/16=0.25)<br><br>
+            后验精度 = 先验精度 + 数据精度：<br>
+            1/τ₁² = 1/4 + 1/0.25 = 0.25 + 4 = 4.25 → τ₁² = 1/4.25 ≈ 0.235<br><br>
+            后验均值（精度加权平均）：<br>
+            μ₁ = (0/4 + 2/0.25) / 4.25 = 8/4.25 ≈ <strong>1.882</strong><br><br>
+            后验：<strong>μ|x̄ ~ N(1.882, 0.235)</strong>
+        </div>
+    </div>
+
+    <!-- ==================== 贝叶斯点估计 ==================== -->
+    <h2>三、贝叶斯点估计</h2>
+
+    <div class="card">
+        <h3>后验估计准则</h3>
+        <table>
+            <tr><th>估计量</th><th>定义</th><th>优化目标</th></tr>
+            <tr><td>后验均值（Posterior Mean）</td><td>E(θ|x) = ∫ θ·π(θ|x)dθ</td><td>最小化后验均方误差</td></tr>
+            <tr><td>后验中位数</td><td>后验分布的中位数</td><td>最小化后验绝对误差</td></tr>
+            <tr><td>MAP（最大后验估计）</td><td>argmax<sub>θ</sub> π(θ|x)</td><td>最大化后验密度</td></tr>
+        </table>
+        <p style="margin-top:8px;">常用准则为后验均值（贝叶斯估计通常指后验均值）。</p>
+    </div>
+
+    <!-- ==================== MAP vs MLE ==================== -->
+    <h2>四、MAP 与 MLE 的比较</h2>
+
+    <div class="card">
+        <h3>公式对比</h3>
+        <div class="formula">
+            MLE：θ̂ = argmax<sub>θ</sub> L(θ|x)&nbsp;&nbsp;&nbsp;&nbsp;（最大化似然）
+        </div>
+        <div class="formula">
+            MAP：θ̂ = argmax<sub>θ</sub> [L(θ|x) · π(θ)]&nbsp;&nbsp;&nbsp;&nbsp;（最大化 似然×先验）
+        </div>
+        <div class="formula">
+            取对数：MAP = argmax<sub>θ</sub> [log L(θ|x) + log π(θ)]
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>详细对比</h3>
+        <table>
+            <tr><th>方面</th><th>MLE（极大似然估计）</th><th>MAP（最大后验估计）</th></tr>
+            <tr><td>哲学</td><td>频率学派：参数是固定的</td><td>贝叶斯学派：参数是随机变量</td></tr>
+            <tr><td>目标</td><td>argmax L(θ|x)</td><td>argmax L(θ|x)π(θ)</td></tr>
+            <tr><td>先验</td><td>不使用先验信息</td><td>使用先验分布 π(θ)</td></tr>
+            <tr><td>小样本</td><td>可能不稳定</td><td>先验起正则化作用，更稳定</td></tr>
+            <tr><td>大样本</td><td>一致、渐近正态、渐近有效</td><td>随样本增大趋近 MLE（先验影响减弱）</td></tr>
+            <tr><td>关系</td><td colspan="2">先验为均匀分布时，MAP = MLE</td></tr>
+            <tr><td>正则化视角</td><td>—</td><td>MAP 等价于 MLE + 先验的正则项</td></tr>
+        </table>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 3：MAP vs MLE 对比</div>
+        <p>抛硬币 n 次，正面 x 次，参数 p 为正面概率。先验 p~Beta(a,b)，比较 MLE 和 MAP。</p>
+        <div class="step">
+            <strong>MLE：</strong><br>
+            L(p) = p<sup>x</sup>(1-p)<sup>n-x</sup><br>
+            log L = x log p + (n-x) log(1-p)<br>
+            d(log L)/dp = x/p - (n-x)/(1-p) = 0<br>
+            <strong>θ̂<sub>MLE</sub> = x/n</strong>（观测频率）<br><br>
+            <strong>MAP：</strong><br>
+            log[π(p|data)] ∝ x log p + (n-x) log(1-p) + (a-1) log p + (b-1) log(1-p)<br>
+            = (x+a-1) log p + (n-x+b-1) log(1-p)<br>
+            <strong>θ̂<sub>MAP</sub> = (x+a-1) / (n+a+b-2)</strong><br><br>
+            当 a=b=1（均匀先验=Beta(1,1)）时，MAP = x/n = MLE ✓
+        </div>
+    </div>
+
+    <div class="note">
+        <span class="note-title">贝叶斯方法的优势：</span>
+        <ul>
+            <li>自然处理小样本问题：先验信息补偿数据不足</li>
+            <li>提供完整的后验分布，而非单点估计</li>
+            <li>可直接计算参数的概率区间（可信区间）</li>
+            <li>适合序贯更新：新数据到来时，旧后验成为新先验</li>
+            <li>在机器学习中：MAP 对应 L2 正则化（高斯先验）或 L1 正则化（拉普拉斯先验）</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 贝叶斯区间估计 ==================== -->
+    <h2>五、贝叶斯可信区间</h2>
+
+    <div class="card">
+        <h3>可信区间（Credible Interval）</h3>
+        <p>基于后验分布 π(θ|x)，参数 θ 的 1-α 可信区间为满足：</p>
+        <div class="formula">
+            P(θ<sub>L</sub> ≤ θ ≤ θ<sub>U</sub> | x) = 1 - α
+        </div>
+        <p style="margin-top:8px;">常用类型：</p>
+        <ul>
+            <li><strong>等尾可信区间</strong>：取后验分布的 α/2 和 1-α/2 分位数</li>
+            <li><strong>最高后验密度区间（HPD）</strong>：区间内后验密度不低于区间外</li>
+        </ul>
+        <p style="margin-top:8px;">注意：贝叶斯可信区间 ≠ 频率学派的置信区间！可信区间给出的是参数落在该区间内的概率，置信区间的意义则基于重复抽样。</p>
+    </div>
+
+    <div class="summary-box">
+        <h2>本节总结</h2>
+        <ul>
+            <li><strong>贝叶斯公式</strong>：后验 ∝ 似然 × 先验，π(θ|x) ∝ L(θ|x)π(θ)</li>
+            <li><strong>共轭先验</strong>：Beta-Binomial、Gamma-Poisson、Normal-Normal 等，后验有解析形式</li>
+            <li><strong>贝叶斯点估计</strong>：后验均值（最小化MSE）、MAP（最大化后验密度）</li>
+            <li><strong>MAP vs MLE</strong>：MAP = MLE + 先验正则项；均匀先验时 MAP = MLE</li>
+            <li><strong>可信区间</strong>：基于后验分布的区间，直接给出参数概率</li>
+            <li><strong>核心优势</strong>：小样本、序贯更新、完整不确定性量化</li>
+        </ul>
+    </div>
+</div>
+</body>
+</html>
+<!-- 本文件涵盖：贝叶斯推断框架（先验/似然/后验）、先验分布类型、共轭先验表、Beta-Binomial和Normal-Normal共轭例题、贝叶斯点估计（后验均值/MAP）、MAP vs MLE 详细对比、贝叶斯可信区间，共3道例题 -->

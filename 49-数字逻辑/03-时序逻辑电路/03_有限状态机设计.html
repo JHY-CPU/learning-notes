@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>有限状态机设计 - 数字逻辑</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.7;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.2em;
+            background: linear-gradient(90deg, #11998e, #38ef7d);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #11998e;
+        }
+        h2 {
+            color: #38ef7d;
+            font-size: 1.5em;
+            margin: 30px 0 15px;
+            padding-left: 10px;
+            border-left: 4px solid #11998e;
+        }
+        h3 {
+            color: #7ee8a0;
+            font-size: 1.2em;
+            margin: 20px 0 10px;
+        }
+        .section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        .state-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .state-table th, .state-table td {
+            border: 1px solid #11998e;
+            padding: 10px 12px;
+            text-align: center;
+        }
+        .state-table th {
+            background: rgba(17, 153, 142, 0.3);
+            color: #38ef7d;
+        }
+        .state-table tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.03);
+        }
+        .code-block {
+            background: #1a1a2e;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            border-left: 3px solid #11998e;
+            color: #7ee8a0;
+        }
+        .diagram {
+            text-align: center;
+            background: #0d1117;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            font-family: 'Consolas', monospace;
+            color: #11998e;
+            font-size: 0.85em;
+            line-height: 1.4;
+            white-space: pre;
+        }
+        .highlight {
+            color: #38ef7d;
+            font-weight: bold;
+        }
+        .note {
+            background: rgba(17, 153, 142, 0.1);
+            border-left: 4px solid #11998e;
+            padding: 12px 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        ul, ol {
+            margin-left: 25px;
+            margin-bottom: 10px;
+        }
+        li {
+            margin-bottom: 6px;
+        }
+        .tag {
+            display: inline-block;
+            background: rgba(17, 153, 142, 0.3);
+            color: #7ee8a0;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            margin: 3px;
+        }
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .comparison-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .comparison-card h4 {
+            color: #11998e;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>有限状态机（FSM）设计</h1>
+
+        <!-- 第一部分：FSM 概述 -->
+        <div class="section">
+            <h2>一、有限状态机概述</h2>
+            <p>有限状态机（Finite State Machine, FSM）是一种计算模型，由有限个状态、状态之间的转换规则和输入/输出组成。它是时序逻辑电路设计的核心方法论。</p>
+
+            <h3>1.1 FSM 的五要素</h3>
+            <ol>
+                <li><strong>状态集合 S</strong>：有限个状态的集合</li>
+                <li><strong>输入集合 I</strong>：所有可能的输入值</li>
+                <li><strong>输出集合 O</strong>：所有可能的输出值</li>
+                <li><strong>状态转移函数</strong>：S x I → S（次态函数）</li>
+                <li><strong>输出函数</strong>：S → O（Moore）或 S x I → O（Mealy）</li>
+            </ol>
+
+            <h3>1.2 FSM 的硬件结构</h3>
+            <div class="diagram">
+        ┌──────────────────────────────────────────┐
+        │           有限状态机                      │
+        │                                          │
+输入 X ───▶│  ┌──────────┐    ┌──────────┐    ┌────┐ │───▶ 输出 Z
+        │  │ 次态     │    │ 状态     │    │输出│ │
+        │  │ 组合逻辑 │───▶│ 寄存器   │───▶│组合│ │
+        │  └──────────┘    └────┬─────┘    │逻辑│ │
+        │                      │          └────┘ │
+        │                      │                  │
+        │              ◀───────┘ 状态反馈          │
+        └──────────────────────────────────────────┘
+                      CLK ───▶│</div>
+        </div>
+
+        <!-- 第二部分：Mealy vs Moore -->
+        <div class="section">
+            <h2>二、Mealy 机与 Moore 机</h2>
+
+            <div class="comparison-grid">
+                <div class="comparison-card">
+                    <h4>Moore 机</h4>
+                    <ul>
+                        <li>输出仅取决于<strong>当前状态</strong></li>
+                        <li>输出与输入无关</li>
+                        <li>输出在时钟边沿后稳定</li>
+                        <li>状态数通常较多</li>
+                        <li>输出无毛刺</li>
+                    </ul>
+                </div>
+                <div class="comparison-card">
+                    <h4>Mealy 机</h4>
+                    <ul>
+                        <li>输出取决于<strong>当前状态和输入</strong></li>
+                        <li>输入变化立即影响输出</li>
+                        <li>输出可能提前一个周期</li>
+                        <li>状态数通常较少</li>
+                        <li>输出可能有毛刺</li>
+                    </ul>
+                </div>
+            </div>
+
+            <h3>2.1 结构对比图</h3>
+            <div class="diagram">
+Moore 机：                          Mealy 机：
+
+输入 ──▶ 次态逻辑 ──▶ 状态寄存器       输入 ──┬──▶ 次态逻辑 ──▶ 状态寄存器
+                │                  │           │              │
+                │                  ▼           │              ▼
+                │               输出逻辑 ◀─── 状态            │
+                │                  │                      │   │
+                └── 状态 ──────────┘                      │   │
+                                     输入 ───────────────▶│   │
+                                                        输出逻辑
+                                                           │
+                                                        输出 ◀──┘
+
+Moore: Z = f(Q)         Mealy: Z = f(Q, X)</div>
+        </div>
+
+        <!-- 第三部分：设计流程 -->
+        <div class="section">
+            <h2>三、FSM 设计方法论</h2>
+
+            <h3>3.1 设计步骤</h3>
+            <ol>
+                <li><strong>问题分析</strong>：确定输入、输出、需要几个状态</li>
+                <li><strong>状态定义</strong>：为每个状态命名，定义含义</li>
+                <li><strong>状态转移图/表</strong>：画出状态转换关系</li>
+                <li><strong>状态编码</strong>：为每个状态分配二进制编码</li>
+                <li><strong>状态转移方程</strong>：推导次态逻辑表达式</li>
+                <li><strong>输出方程</strong>：推导输出逻辑表达式</li>
+                <li><strong>电路实现</strong>：选择触发器类型，画出电路图</li>
+            </ol>
+
+            <h3>3.2 设计实例：序列检测器</h3>
+            <p>设计一个检测输入序列 "1101" 的 Moore 型 FSM，当检测到连续的 1101 时输出 1。</p>
+
+            <div class="diagram">
+状态转移图（Moore 型）：
+
+                    1           1           0           1
+  ┌────────┐ ───▶ ┌──────┐ ───▶ ┌──────┐ ───▶ ┌──────┐
+  │  S0    │      │  S1  │      │  S2  │      │  S3  │
+  │ (Z=0)  │      │(Z=0) │      │(Z=0) │      │(Z=0) │
+  └───┬────┘      └──┬───┘      └──┬───┘      └──┬───┘
+      │              │             │              │
+      │ 0            │ 0           │ 1            │ 0
+      ▼              ▼             │              ▼
+   S0 保持       S0 保持      ┌────┴────┐    S0 保持
+                              │  S4     │
+                              │  (Z=1)  │ ◀── 检测到 "1101"
+                              └────┬────┘
+                                   │ 0
+                                   ▼
+                                S0 保持
+                                   │ 1
+                                   ▼
+                                S1 保持（重叠检测）</div>
+
+            <h3>3.3 状态转移表</h3>
+            <table class="state-table">
+                <thead>
+                    <tr>
+                        <th>当前状态</th>
+                        <th>输入 X=0</th>
+                        <th>输入 X=1</th>
+                        <th>输出 Z</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>S0 (初始)</td>
+                        <td>S0</td>
+                        <td>S1</td>
+                        <td>0</td>
+                    </tr>
+                    <tr>
+                        <td>S1 (检测到 1)</td>
+                        <td>S0</td>
+                        <td>S2</td>
+                        <td>0</td>
+                    </tr>
+                    <tr>
+                        <td>S2 (检测到 11)</td>
+                        <td>S3</td>
+                        <td>S2</td>
+                        <td>0</td>
+                    </tr>
+                    <tr>
+                        <td>S3 (检测到 110)</td>
+                        <td>S0</td>
+                        <td>S4</td>
+                        <td>0</td>
+                    </tr>
+                    <tr>
+                        <td>S4 (检测到 1101)</td>
+                        <td>S0</td>
+                        <td>S1</td>
+                        <td>1</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 第四部分：状态编码 -->
+        <div class="section">
+            <h2>四、状态编码策略</h2>
+            <p>状态编码直接影响电路的复杂度、功耗和速度。不同的编码方式产生不同的次态逻辑和输出逻辑。</p>
+
+            <h3>4.1 常见编码方式</h3>
+            <table class="state-table">
+                <thead>
+                    <tr>
+                        <th>编码方式</th>
+                        <th>S0</th>
+                        <th>S1</th>
+                        <th>S2</th>
+                        <th>S3</th>
+                        <th>S4</th>
+                        <th>特点</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>二进制编码</strong></td>
+                        <td>000</td>
+                        <td>001</td>
+                        <td>010</td>
+                        <td>011</td>
+                        <td>100</td>
+                        <td>触发器最少，组合逻辑可能复杂</td>
+                    </tr>
+                    <tr>
+                        <td><strong>格雷码</strong></td>
+                        <td>000</td>
+                        <td>001</td>
+                        <td>011</td>
+                        <td>010</td>
+                        <td>110</td>
+                        <td>相邻状态只变 1 位，功耗低</td>
+                    </tr>
+                    <tr>
+                        <td><strong>独热码（One-Hot）</strong></td>
+                        <td>00001</td>
+                        <td>00010</td>
+                        <td>00100</td>
+                        <td>01000</td>
+                        <td>10000</td>
+                        <td>触发器多但组合逻辑简单，适合 FPGA</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Johnson 编码</strong></td>
+                        <td>0000</td>
+                        <td>0001</td>
+                        <td>0011</td>
+                        <td>0111</td>
+                        <td>1111</td>
+                        <td>折中方案</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="note">
+                <strong>选择建议：</strong>
+                <ul>
+                    <li>状态数 ≤ 4：二进制编码即可</li>
+                    <li>状态数 5-24 且使用 FPGA：独热码（FPGA 触发器资源丰富）</li>
+                    <li>状态数 5-24 且使用 ASIC：二进制或格雷码</li>
+                    <li>低功耗场景：格雷码（减少位翻转）</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 第五部分：HDL 实现 -->
+        <div class="section">
+            <h2>五、HDL 实现</h2>
+
+            <h3>5.1 Verilog 实现（序列检测器 1101）</h3>
+            <div class="code-block">
+// Moore 型 FSM - 序列检测器 "1101"
+// Verilog 实现
+
+module seq_detector_1101_moore (
+    input  wire clk,
+    input  wire rst_n,
+    input  wire din,
+    output reg  dout
+);
+
+    // 状态编码（二进制）
+    parameter S0 = 3'b000;  // 初始状态
+    parameter S1 = 3'b001;  // 检测到 1
+    parameter S2 = 3'b010;  // 检测到 11
+    parameter S3 = 3'b011;  // 检测到 110
+    parameter S4 = 3'b100;  // 检测到 1101（输出有效）
+
+    reg [2:0] state, next_state;
+
+    // 状态寄存器（时序逻辑）
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            state &lt;= S0;
+        else
+            state &lt;= next_state;
+    end
+
+    // 次态逻辑（组合逻辑）
+    always @(*) begin
+        case (state)
+            S0: next_state = din ? S1 : S0;
+            S1: next_state = din ? S2 : S0;
+            S2: next_state = din ? S2 : S3;
+            S3: next_state = din ? S4 : S0;
+            S4: next_state = din ? S1 : S0;
+            default: next_state = S0;
+        endcase
+    end
+
+    // 输出逻辑（Moore：仅取决于状态）
+    always @(*) begin
+        dout = (state == S4) ? 1'b1 : 1'b0;
+    end
+
+endmodule</div>
+
+            <h3>5.2 Verilog 实现（Mealy 型对比）</h3>
+            <div class="code-block">
+// Mealy 型 FSM - 同样的序列检测器
+// 输出取决于状态和输入
+
+module seq_detector_1101_mealy (
+    input  wire clk,
+    input  wire rst_n,
+    input  wire din,
+    output reg  dout
+);
+
+    parameter S0 = 2'b00;
+    parameter S1 = 2'b01;
+    parameter S2 = 2'b10;
+    parameter S3 = 2'b11;
+
+    reg [1:0] state, next_state;
+
+    // 状态寄存器
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n)
+            state &lt;= S0;
+        else
+            state &lt;= next_state;
+    end
+
+    // 次态逻辑 + 输出逻辑（合并，Mealy 特点）
+    always @(*) begin
+        dout = 1'b0;  // 默认无输出
+        case (state)
+            S0: next_state = din ? S1 : S0;
+            S1: next_state = din ? S2 : S0;
+            S2: next_state = din ? S2 : S3;
+            S3: begin
+                if (din) begin
+                    next_state = S1;
+                    dout = 1'b1;  // Mealy：在状态转换时输出
+                end else begin
+                    next_state = S0;
+                end
+            end
+            default: next_state = S0;
+        endcase
+    end
+
+endmodule</div>
+
+            <h3>5.3 VHDL 实现</h3>
+            <div class="code-block">
+-- VHDL 实现 Moore 型序列检测器
+library IEEE;
+use IEEE.STD_LOGIC_1164.ALL;
+
+entity seq_detector is
+    Port (
+        clk   : in  STD_LOGIC;
+        rst_n : in  STD_LOGIC;
+        din   : in  STD_LOGIC;
+        dout  : out STD_LOGIC
+    );
+end seq_detector;
+
+architecture Behavioral of seq_detector is
+    type state_type is (S0, S1, S2, S3, S4);
+    signal state, next_state : state_type;
+begin
+
+    -- 状态寄存器
+    process(clk, rst_n)
+    begin
+        if rst_n = '0' then
+            state &lt;= S0;
+        elsif rising_edge(clk) then
+            state &lt;= next_state;
+        end if;
+    end process;
+
+    -- 次态逻辑
+    process(state, din)
+    begin
+        case state is
+            when S0 =&gt;
+                if din = '1' then next_state &lt;= S1;
+                else next_state &lt;= S0; end if;
+            when S1 =&gt;
+                if din = '1' then next_state &lt;= S2;
+                else next_state &lt;= S0; end if;
+            when S2 =&gt;
+                if din = '1' then next_state &lt;= S2;
+                else next_state &lt;= S3; end if;
+            when S3 =&gt;
+                if din = '1' then next_state &lt;= S4;
+                else next_state &lt;= S0; end if;
+            when S4 =&gt;
+                if din = '1' then next_state &lt;= S1;
+                else next_state &lt;= S0; end if;
+        end case;
+    end process;
+
+    -- 输出逻辑（Moore）
+    dout &lt;= '1' when state = S4 else '0';
+
+end Behavioral;</div>
+        </div>
+
+        <!-- 第六部分：设计注意事项 -->
+        <div class="section">
+            <h2>六、FSM 设计注意事项</h2>
+
+            <h3>6.1 常见问题与解决方案</h3>
+            <table class="state-table">
+                <thead>
+                    <tr>
+                        <th>问题</th>
+                        <th>原因</th>
+                        <th>解决方案</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>无效状态</td>
+                        <td>未使用的编码值（如独热码中未使用的状态）</td>
+                        <td>添加 default 分支，将无效状态导向 S0</td>
+                    </tr>
+                    <tr>
+                        <td>输出毛刺</td>
+                        <td>Mealy 机的组合输出路径延迟不一致</td>
+                        <td>在输出端添加寄存器（Registered Output）</td>
+                    </tr>
+                    <tr>
+                        <td>亚稳态</td>
+                        <td>异步输入未同步</td>
+                        <td>两级同步器（双触发器）</td>
+                    </tr>
+                    <tr>
+                        <td>状态机死锁</td>
+                        <td>某些状态下无法转移</td>
+                        <td>确保所有状态都有完整的转移分支</td>
+                    </tr>
+                    <tr>
+                        <td>综合后不匹配</td>
+                        <td>不完整的 case/if 语句</td>
+                        <td>使用完整的 case 和 default 分支</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>6.2 设计最佳实践</h3>
+            <div class="note">
+                <strong>编码风格建议：</strong>
+                <ol>
+                    <li>将 FSM 拆分为 3 个 always 块：状态寄存器、次态逻辑、输出逻辑</li>
+                    <li>使用参数或枚举定义状态，避免魔法数字</li>
+                    <li>总是包含 default 分支处理无效状态</li>
+                    <li>使用非阻塞赋值（&lt;=）描述时序逻辑</li>
+                    <li>使用阻塞赋值（=）描述组合逻辑</li>
+                    <li>避免在多个 always 块中驱动同一信号</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- 总结 -->
+        <div class="section">
+            <h2>总结</h2>
+            <p>有限状态机是数字系统设计的核心工具。Mealy 机输出与输入相关，状态少但可能有毛刺；Moore 机输出仅取决于状态，更稳定但状态更多。设计时需关注状态编码、完整性和输出同步。HDL 实现应遵循三段式风格，确保综合结果与设计意图一致。</p>
+            <div style="margin-top: 15px;">
+                <span class="tag">FSM</span>
+                <span class="tag">Mealy</span>
+                <span class="tag">Moore</span>
+                <span class="tag">State Encoding</span>
+                <span class="tag">One-Hot</span>
+                <span class="tag">Verilog</span>
+                <span class="tag">VHDL</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+<!--
+    文件：03_有限状态机设计.html
+    主题：有限状态机设计
+    内容概要：
+        1. FSM 概述 - 五要素、硬件结构
+        2. Mealy vs Moore 机对比 - 输出机制、结构差异
+        3. 设计方法论 - 七步设计流程、序列检测器实例
+        4. 状态编码策略 - 二进制、格雷码、独热码、Johnson 编码对比
+        5. HDL 实现 - Verilog 和 VHDL 的 Mealy/Moore 实现
+        6. 设计注意事项 - 常见问题与最佳实践
+    所属课程：49-数字逻辑 / 03-时序逻辑电路
+-->

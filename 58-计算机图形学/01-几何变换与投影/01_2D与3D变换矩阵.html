@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- 2D与3D变换矩阵 - 计算机图形学笔记 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2D与3D变换矩阵</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f5f7fa; color: #2c3e50; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 40px; }
+        h1 { font-size: 28px; color: #1a5276; border-bottom: 3px solid #2980b9; padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 22px; color: #2980b9; margin: 28px 0 14px; border-left: 4px solid #2980b9; padding-left: 12px; }
+        h3 { font-size: 18px; color: #34495e; margin: 20px 0 10px; }
+        p { margin: 8px 0; text-indent: 2em; }
+        ul, ol { margin: 10px 0 10px 2em; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: left; }
+        th { background: #2980b9; color: #fff; }
+        tr:nth-child(even) { background: #f0f4f8; }
+        .note { background: #eaf2f8; border-left: 4px solid #2980b9; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .key-point { background: #fef9e7; border-left: 4px solid #f39c12; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        code { background: #ecf0f1; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; font-size: 14px; }
+        .matrix { font-family: 'Consolas', monospace; background: #f8f9fa; padding: 10px; margin: 10px 0; border-radius: 6px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>2D与3D几何变换矩阵</h1>
+
+    <!-- 一、齐次坐标 -->
+    <h2>一、齐次坐标（Homogeneous Coordinates）</h2>
+    <p>齐次坐标通过引入额外的维度，使平移变换可以与其他变换统一用矩阵乘法表示。</p>
+
+    <h3>1.1 定义</h3>
+    <ul>
+        <li><strong>2D齐次坐标：</strong>(x, y) → (x, y, 1)，即 (xw, yw, w)，w=1</li>
+        <li><strong>3D齐次坐标：</strong>(x, y, z) → (x, y, z, 1)</li>
+        <li>同一齐次坐标乘以非零常数k后，代表的点不变</li>
+    </ul>
+
+    <div class="note">
+        <strong>为什么需要齐次坐标：</strong>平移不是线性变换，不能用2×2或3×3矩阵表示。齐次坐标使所有仿射变换（平移、旋转、缩放、剪切）都能用统一的矩阵乘法表达。
+    </div>
+
+    <!-- 二、2D变换 -->
+    <h2>二、2D几何变换</h2>
+
+    <h3>2.1 平移（Translation）</h3>
+    <div class="matrix">
+        | x' |   | 1  0  tx | | x |
+        | y' | = | 0  1  ty | | y |
+        | 1  |   | 0  0  1  | | 1 |
+    </div>
+    <p>将点(x,y)平移到(x+tx, y+ty)。</p>
+
+    <h3>2.2 缩放（Scaling）</h3>
+    <div class="matrix">
+        | x' |   | sx  0   0 | | x |
+        | y' | = | 0   sy  0 | | y |
+        | 1  |   | 0   0   1 | | 1 |
+    </div>
+    <p>sx、sy为x和y方向的缩放因子。</p>
+
+    <h3>2.3 旋转（Rotation）</h3>
+    <div class="matrix">
+        | x' |   | cos(θ)  -sin(θ)  0 | | x |
+        | y' | = | sin(θ)   cos(θ)  0 | | y |
+        | 1  |   |   0        0     1 | | 1 |
+    </div>
+    <p>绕原点逆时针旋转θ角度。</p>
+
+    <h3>2.4 绕任意点旋转</h3>
+    <ol>
+        <li>平移使旋转中心到原点：T(-cx, -cy)</li>
+        <li>绕原点旋转：R(θ)</li>
+        <li>平移回去：T(cx, cy)</li>
+        <li><strong>组合矩阵：</strong>M = T(cx,cy) × R(θ) × T(-cx,-cy)</li>
+    </ol>
+
+    <div class="key-point">
+        <strong>变换组合规则：</strong>矩阵从右到左应用。M = M3 × M2 × M1 表示先应用M1，再M2，最后M3。
+    </div>
+
+    <!-- 三、3D变换 -->
+    <h2>三、3D几何变换</h2>
+
+    <h3>3.1 3D齐次矩阵（4×4）</h3>
+
+    <h4>平移</h4>
+    <div class="matrix">
+        | 1  0  0  tx |
+        | 0  1  0  ty |
+        | 0  0  1  tz |
+        | 0  0  0  1  |
+    </div>
+
+    <h4>缩放</h4>
+    <div class="matrix">
+        | sx  0   0   0 |
+        | 0   sy  0   0 |
+        | 0   0   sz  0 |
+        | 0   0   0   1 |
+    </div>
+
+    <h3>3.2 3D旋转</h3>
+    <table>
+        <tr><th>旋转轴</th><th>矩阵特点</th></tr>
+        <tr><td>绕X轴</td><td>第1行和第1列不变，其余为2D旋转</td></tr>
+        <tr><td>绕Y轴</td><td>第2行和第2列不变</td></tr>
+        <tr><td>绕Z轴</td><td>第3行和第3列不变</td></tr>
+    </table>
+
+    <h4>绕Z轴旋转</h4>
+    <div class="matrix">
+        | cos(θ)  -sin(θ)  0  0 |
+        | sin(θ)   cos(θ)  0  0 |
+        |   0        0     1  0 |
+        |   0        0     0  1 |
+    </div>
+
+    <h3>3.3 万向节锁死（Gimbal Lock）</h3>
+    <div class="note">
+        <strong>问题：</strong>使用欧拉角（X/Y/Z旋转）时，当中间轴旋转90度，会导致两个旋转轴重合，丢失一个自由度。<br>
+        <strong>解决方案：</strong>使用四元数（Quaternion）表示旋转。
+    </div>
+
+    <!-- 四、变换矩阵总结 -->
+    <h2>四、变换矩阵总结</h2>
+    <table>
+        <tr><th>变换</th><th>2D矩阵</th><th>3D矩阵</th><th>自由度</th></tr>
+        <tr><td>平移</td><td>3×3</td><td>4×4</td><td>2 / 3</td></tr>
+        <tr><td>旋转</td><td>3×3</td><td>4×4</td><td>1 / 3</td></tr>
+        <tr><td>缩放</td><td>3×3</td><td>4×4</td><td>2 / 3</td></tr>
+        <tr><td>剪切</td><td>3×3</td><td>4×4</td><td>1 / 3</td></tr>
+    </table>
+
+    <h3>4.1 仿射变换 vs 透视变换</h3>
+    <ul>
+        <li><strong>仿射变换：</strong>保持平行性，最后一行固定为(0,0,...,1)</li>
+        <li><strong>透视变换：</strong>不保持平行性，最后一行可任意（投影变换）</li>
+    </ul>
+
+    <!-- 五、MVP变换 -->
+    <h2>五、MVP变换管线</h2>
+    <p>图形渲染管线中的三个核心变换矩阵构成了MVP变换。</p>
+
+    <table>
+        <tr><th>矩阵</th><th>作用</th><th>坐标系转换</th></tr>
+        <tr><td>Model（M）</td><td>将物体从模型空间变换到世界空间</td><td>局部 → 世界</td></tr>
+        <tr><td>View（V）</td><td>将世界变换到相机视角</td><td>世界 → 观察</td></tr>
+        <tr><td>Projection（P）</td><td>投影到标准化设备坐标</td><td>观察 → NDC</td></tr>
+    </table>
+
+    <div class="key-point">
+        <strong>完整变换：</strong><code>P_clip = P × V × M × P_local</code><br>
+        从右到左依次应用：模型变换 → 观察变换 → 投影变换。
+    </div>
+
+</div>
+
+<!--
+========================================
+  文件总结
+========================================
+  主题：2D与3D几何变换矩阵
+  内容概要：
+    1. 齐次坐标 - 引入额外维度统一平移和线性变换
+    2. 2D变换 - 平移(T)、缩放(S)、旋转(R)，矩阵组合
+    3. 3D变换 - 4×4矩阵，绕X/Y/Z轴旋转，万向节锁死
+    4. MVP管线 - Model→View→Projection三阶段变换
+  重点知识：
+    - 齐次坐标：(x,y)→(x,y,1)，统一平移和线性变换
+    - 绕任意点旋转：T(center)×R(θ)×T(-center)
+    - 矩阵组合从右到左应用
+    - 万向节锁死用四元数解决
+    - MVP：P_clip = P × V × M × P_local
+========================================
+-->
+</body>
+</html>

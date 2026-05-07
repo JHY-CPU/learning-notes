@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>泊松过程</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; font-size: 2em; margin-bottom: 10px; border-bottom: 3px solid #2b6cb0; padding-bottom: 10px; }
+        .subtitle { text-align: center; color: #718096; margin-bottom: 30px; }
+        h2 { color: #2c5282; font-size: 1.4em; margin: 25px 0 12px; padding-left: 12px; border-left: 4px solid #3182ce; }
+        h3 { color: #2d3748; font-size: 1.15em; margin: 18px 0 8px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px 25px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .formula { background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 6px; padding: 12px 18px; margin: 10px 0; font-size: 1.05em; text-align: center; font-family: 'Times New Roman', serif; }
+        .formula-inline { background: #ebf8ff; padding: 2px 8px; border-radius: 4px; font-family: 'Times New Roman', serif; }
+        .example { background: #f0fff4; border-left: 4px solid #48bb78; border-radius: 0 6px 6px 0; padding: 15px 18px; margin: 12px 0; }
+        .example-title { font-weight: bold; color: #276749; margin-bottom: 6px; }
+        .note { background: #fffff0; border-left: 4px solid #ecc94b; border-radius: 0 6px 6px 0; padding: 12px 18px; margin: 12px 0; }
+        .note-title { font-weight: bold; color: #975a16; }
+        .step { background: #faf5ff; border-left: 4px solid #805ad5; border-radius: 0 6px 6px 0; padding: 10px 18px; margin: 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 8px 12px; text-align: center; }
+        th { background: #bee3f8; color: #2a4365; }
+        tr:nth-child(even) { background: #f7fafc; }
+        ul, ol { margin-left: 25px; margin-bottom: 8px; }
+        li { margin-bottom: 4px; }
+        .tag { display: inline-block; background: #c3dafe; color: #3c366b; padding: 2px 10px; border-radius: 12px; font-size: 0.85em; margin: 3px; }
+        .summary-box { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; border-radius: 10px; padding: 20px 25px; margin-top: 30px; }
+        .summary-box h2 { color: #fff; border-left-color: #fff; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>泊松过程</h1>
+    <p class="subtitle">随机过程基础 · Poisson Process</p>
+
+    <!-- ==================== 定义 ==================== -->
+    <h2>一、泊松过程的定义</h2>
+
+    <div class="card">
+        <h3>计数过程定义</h3>
+        <p>设 N(t) 表示 [0,t] 时间内事件发生的次数。若满足以下条件，则称 {N(t), t ≥ 0} 为参数 λ 的<strong>泊松过程</strong>：</p>
+        <ol>
+            <li><strong>N(0) = 0</strong></li>
+            <li><strong>独立增量</strong>：不相交时间段内的事件数相互独立</li>
+            <li><strong>平稳增量</strong>：在长度为 t 的任意区间内，事件数服从泊松分布 P(λt)：
+                <div class="formula">
+                    P(N(s+t) - N(s) = k) = (λt)ᵏ e<sup>-λt</sup> / k!, &nbsp; k = 0, 1, 2, ...
+                </div>
+            </li>
+        </ol>
+        <p style="margin-top:8px;">λ 称为<strong>到达率</strong>（或强度），表示单位时间内事件发生的平均次数。</p>
+    </div>
+
+    <div class="card">
+        <h3>等价定义（事件时间间隔）</h3>
+        <p>设 T₁, T₂, T₃, ... 为相邻事件之间的时间间隔。{N(t)} 是速率为 λ 的泊松过程 ⟺ T₁, T₂, T₃, ... 是独立同分布的 Exp(λ)。</p>
+        <div class="formula">
+            f<sub>T</sub>(t) = λe<sup>-λt</sup>, &nbsp; t > 0<br>
+            E(Tᵢ) = 1/λ, &nbsp; Var(Tᵢ) = 1/λ²
+        </div>
+    </div>
+
+    <!-- ==================== 基本性质 ==================== -->
+    <h2>二、基本性质</h2>
+
+    <div class="card">
+        <h3>1. 均值与方差</h3>
+        <div class="formula">
+            E[N(t)] = λt, &nbsp; Var[N(t)] = λt
+        </div>
+        <p>泊松分布的特征：均值 = 方差 = λt。</p>
+    </div>
+
+    <div class="card">
+        <h3>2. 到达时间分布</h3>
+        <p>第 k 个事件的到达时间 Sₖ = T₁+T₂+...+Tₖ 服从 Gamma 分布：</p>
+        <div class="formula">
+            Sₖ ~ Gamma(k, λ)&nbsp;&nbsp;（形状参数 k，速率参数 λ）
+        </div>
+        <div class="formula">
+            f<sub>Sₖ</sub>(s) = λᵏs<sup>k-1</sup>e<sup>-λs</sup> / (k-1)!, &nbsp; s > 0
+        </div>
+        <ul>
+            <li>E(Sₖ) = k/λ</li>
+            <li>Var(Sₖ) = k/λ²</li>
+            <li>特别地，S₁ ~ Exp(λ)（首次到达时间）</li>
+        </ul>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 1：到达概率</div>
+        <p>某路口平均 10 分钟来一辆车（λ=0.1 辆/分钟）。求 30 分钟内恰好来 2 辆车的概率，以及下一辆车在 5 分钟内到达的概率。</p>
+        <div class="step">
+            <strong>30分钟内恰好2辆：</strong><br>
+            N(30) ~ P(λt = 0.1×30 = 3)<br>
+            P(N(30)=2) = 3²e⁻³/2! = 9×0.0498/2 ≈ <strong>0.224</strong><br><br>
+            <strong>下一辆车在5分钟内到达：</strong><br>
+            T ~ Exp(0.1)<br>
+            P(T ≤ 5) = 1 - e<sup>-0.1×5</sup> = 1 - e⁻⁰·⁵ ≈ <strong>0.393</strong>
+        </div>
+    </div>
+
+    <!-- ==================== 泊松过程的条件与检验 ==================== -->
+    <h2>三、泊松过程的条件特性</h2>
+
+    <div class="card">
+        <h3>1. 给定 N(t)=n 的到达时间分布</h3>
+        <p>若在 [0,t] 内共发生了 n 个事件，则这 n 个到达时间 S₁,S₂,...,Sₙ 的联合分布等价于 [0,t] 上 n 个独立均匀分布随机变量的次序统计量。</p>
+        <div class="formula">
+            (S₁, S₂, ..., Sₙ) | N(t)=n 的分布 = U₁, U₂, ..., Uₙ 的次序统计量，其中 Uᵢ ~ U(0,t)
+        </div>
+        <p style="margin-top:8px;">直观理解：若已知 [0,t] 内来了 n 个事件，这 n 个事件的时间均匀分布在 [0,t] 中。</p>
+    </div>
+
+    <div class="card">
+        <h3>2. 到达时间与计数的对偶</h3>
+        <ul>
+            <li>N(t) ≥ k ⟺ Sₖ ≤ t（到 t 时刻至少 k 个事件发生，等价于第 k 个事件在 t 之前到达）</li>
+            <li>P(Sₖ ≤ t) = P(N(t) ≥ k) = Σⱼ₌ₖ∞ (λt)ʲe<sup>-λt</sup>/j!</li>
+            <li>Sₖ 的 CDF 可用伽马分布或泊松分布的尾概率计算</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 稀释与叠加 ==================== -->
+    <h2>四、稀释（Thinning）与叠加（Superposition）</h2>
+
+    <div class="card">
+        <h3>1. 稀释（Thinning）</h3>
+        <p>将泊松过程的每个事件独立地以概率 p 标记为"类型1"，以概率 1-p 标记为"类型2"：</p>
+        <div class="formula">
+            N(t) ~ P(λt) ⟹ N₁(t) ~ P(λpt), &nbsp; N₂(t) ~ P(λ(1-p)t)
+        </div>
+        <p style="margin-top:8px;">且 N₁(t) 与 N₂(t) <strong>相互独立</strong>。</p>
+        <p>实际应用：将顾客按类型分类、将邮件按是否为垃圾邮件分类等。</p>
+    </div>
+
+    <div class="card">
+        <h3>2. 叠加（Superposition）</h3>
+        <p>将 k 个独立的泊松过程（速率分别为 λ₁, λ₂, ..., λₖ）合并：</p>
+        <div class="formula">
+            N₁(t) ~ P(λ₁t), ..., Nₖ(t) ~ P(λₖt) ⟹ N(t) = ΣNᵢ(t) ~ P((λ₁+...+λₖ)t)
+        </div>
+        <p style="margin-top:8px;">合并后仍是泊松过程，速率 = 各过程速率之和。</p>
+        <p>特别地：每个到达事件来自第 i 个过程的概率 = λᵢ/(λ₁+...+λₖ)，且独立标记。</p>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 2：稀释的应用</div>
+        <p>某网站每分钟平均访问 100 次（λ=100），其中 30% 为新用户。求 1 分钟内新用户访问数的分布，以及恰好 35 次新用户访问的概率。</p>
+        <div class="step">
+            新用户访问数 N₁(1) ~ P(λp·t) = P(100×0.3×1) = P(30)<br><br>
+            P(N₁=35) = 30³⁵·e⁻³⁰/35! ≈ <strong>0.0453</strong><br><br>
+            老用户访问数 N₂(1) ~ P(70)，且 N₁ 与 N₂ 独立。
+        </div>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 3：叠加与均匀性</div>
+        <p>两个独立泊松过程：过程A（λ₁=3/小时），过程B（λ₂=5/小时）。求合并后 2 小时内发生 10 次事件的概率，以及第一个到达事件来自过程A的概率。</p>
+        <div class="step">
+            合并过程 N(t) ~ P((3+5)t) = P(8t)<br><br>
+            P(N(2)=10) = (16)¹⁰·e⁻¹⁶/10! ≈ <strong>0.0341</strong><br><br>
+            第一个事件来自过程A的概率 = λ₁/(λ₁+λ₂) = 3/8 = <strong>0.375</strong>
+        </div>
+    </div>
+
+    <!-- ==================== 非齐次泊松过程 ==================== -->
+    <h2>五、非齐次泊松过程</h2>
+
+    <div class="card">
+        <h3>定义</h3>
+        <p>当到达率随时间变化时，称为<strong>非齐次泊松过程</strong>（或非平稳泊松过程）：</p>
+        <div class="formula">
+            P(N(t+h) - N(t) = 1) = λ(t)h + o(h)
+        </div>
+        <div class="formula">
+            E[N(t)] = ∫₀ᵗ λ(s) ds = Λ(t)&nbsp;&nbsp;&nbsp;&nbsp;（累积强度函数）
+        </div>
+        <p style="margin-top:8px;">Λ(t) 称为累积速率函数（或均值函数），N(t) ~ P(Λ(t))。</p>
+    </div>
+
+    <div class="note">
+        <span class="note-title">泊松过程 vs 马尔可夫链：</span>
+        <ul>
+            <li>泊松过程是连续时间随机过程，事件间等待时间服从指数分布</li>
+            <li>泊松过程具有无记忆性（指数分布的无记忆性）</li>
+            <li>泊松过程是连续时间马尔可夫链的特例（只有两个状态或计数型）</li>
+            <li>事件发生的时间间隔相互独立</li>
+        </ul>
+    </div>
+
+    <div class="summary-box">
+        <h2>本节总结</h2>
+        <ul>
+            <li><strong>定义</strong>：N(0)=0，独立增量，N(t)~P(λt)</li>
+            <li><strong>到达间隔</strong>：Tᵢ ~ Exp(λ) 独立同分布，E(T)=1/λ</li>
+            <li><strong>到达时间</strong>：Sₖ ~ Gamma(k, λ)，E(Sₖ)=k/λ</li>
+            <li><strong>条件到达时间</strong>：给定 N(t)=n，到达时间等价于 [0,t] 上的均匀次序统计量</li>
+            <li><strong>稀释</strong>：独立以概率 p 标记，得到两个独立泊松过程 P(λp) 和 P(λ(1-p))</li>
+            <li><strong>叠加</strong>：独立泊松过程合并后仍为泊松过程，速率为各速率之和</li>
+            <li><strong>非齐次</strong>：速率 λ(t) 随时间变化，N(t)~P(Λ(t))</li>
+        </ul>
+    </div>
+</div>
+</body>
+</html>
+<!-- 本文件涵盖：泊松过程的两种定义（计数/间隔）、均值方差、到达时间Gamma分布、条件到达时间（均匀性）、稀释定理、叠加定理、非齐次泊松过程，共3道例题 -->

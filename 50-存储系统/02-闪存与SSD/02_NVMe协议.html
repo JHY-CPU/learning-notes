@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NVMe协议 - 存储系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.7;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.2em;
+            background: linear-gradient(90deg, #43e97b, #38f9d7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #43e97b;
+        }
+        h2 {
+            color: #43e97b;
+            font-size: 1.5em;
+            margin: 30px 0 15px;
+            padding-left: 10px;
+            border-left: 4px solid #38f9d7;
+        }
+        h3 {
+            color: #7ef5b5;
+            font-size: 1.2em;
+            margin: 20px 0 10px;
+        }
+        .section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        .state-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .state-table th, .state-table td {
+            border: 1px solid #43e97b;
+            padding: 10px 12px;
+            text-align: center;
+        }
+        .state-table th {
+            background: rgba(67, 233, 123, 0.3);
+            color: #38f9d7;
+        }
+        .state-table tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.03);
+        }
+        .code-block {
+            background: #1a1a2e;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            border-left: 3px solid #43e97b;
+            color: #7ef5b5;
+        }
+        .diagram {
+            text-align: center;
+            background: #0d1117;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            font-family: 'Consolas', monospace;
+            color: #43e97b;
+            font-size: 0.85em;
+            line-height: 1.4;
+            white-space: pre;
+        }
+        .highlight {
+            color: #38f9d7;
+            font-weight: bold;
+        }
+        .note {
+            background: rgba(67, 233, 123, 0.1);
+            border-left: 4px solid #43e97b;
+            padding: 12px 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        ul, ol {
+            margin-left: 25px;
+            margin-bottom: 10px;
+        }
+        li {
+            margin-bottom: 6px;
+        }
+        .tag {
+            display: inline-block;
+            background: rgba(67, 233, 123, 0.3);
+            color: #7ef5b5;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            margin: 3px;
+        }
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .comparison-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .comparison-card h4 {
+            color: #43e97b;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>NVMe 协议详解</h1>
+
+        <!-- 第一部分：NVMe 概述 -->
+        <div class="section">
+            <h2>一、NVMe 协议概述</h2>
+            <p><span class="highlight">NVMe（Non-Volatile Memory Express）</span>是专门为基于 PCIe 总线的固态存储设备设计的主机控制器接口规范和命令集协议。由 NVM Express 工作组于 2011 年发布。</p>
+
+            <h3>1.1 为什么需要 NVMe</h3>
+            <div class="diagram">
+SATA SSD 的瓶颈：
+
+CPU ──▶ SATA 控制器 ──▶ AHCI 驱动 ──▶ SATA SSD
+         │
+         └── SATA 3.0 最大 6 Gbps（约 600 MB/s）
+             AHCI 协议设计于 2004 年（为 HDD 优化）
+             仅支持 1 个命令队列，深度 32
+
+NVMe SSD 的优势：
+
+CPU ──▶ PCIe 总线 ──▶ NVMe 控制器 ──▶ NVMe SSD
+         │
+         └── PCIe 4.0 x4 最大 64 Gbps（约 8 GB/s）
+             PCIe 5.0 x4 最大 128 Gbps（约 16 GB/s）
+             65535 个队列，每队列 65536 个命令</div>
+
+            <h3>1.2 NVMe vs SATA vs SAS 对比</h3>
+            <table class="state-table">
+                <thead>
+                    <tr>
+                        <th>特性</th>
+                        <th>NVMe</th>
+                        <th>SATA</th>
+                        <th>SAS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>总线接口</td>
+                        <td>PCIe</td>
+                        <td>SATA</td>
+                        <td>SAS</td>
+                    </tr>
+                    <tr>
+                        <td>最大带宽</td>
+                        <td>~16 GB/s (PCIe 5.0 x4)</td>
+                        <td>~600 MB/s (SATA 3.0)</td>
+                        <td>~2.4 GB/s (SAS-4)</td>
+                    </tr>
+                    <tr>
+                        <td>命令队列数</td>
+                        <td>65535</td>
+                        <td>1</td>
+                        <td>254</td>
+                    </tr>
+                    <tr>
+                        <td>队列深度</td>
+                        <td>65536</td>
+                        <td>32</td>
+                        <td>254</td>
+                    </tr>
+                    <tr>
+                        <td>命令开销</td>
+                        <td>低（4KB 首命令）</td>
+                        <td>高</td>
+                        <td>中等</td>
+                    </tr>
+                    <tr>
+                        <td>延迟</td>
+                        <td>~10 us</td>
+                        <td>~100 us</td>
+                        <td>~50 us</td>
+                    </tr>
+                    <tr>
+                        <td>并行性</td>
+                        <td>多核并行提交</td>
+                        <td>串行</td>
+                        <td>有限并行</td>
+                    </tr>
+                    <tr>
+                        <td>功耗管理</td>
+                        <td>精细（多级电源状态）</td>
+                        <td>基本</td>
+                        <td>基本</td>
+                    </tr>
+                    <tr>
+                        <td>适用场景</td>
+                        <td>消费级/企业级 SSD</td>
+                        <td>HDD/入门 SSD</td>
+                        <td>企业级 HDD/SSD</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 第二部分：队列架构 -->
+        <div class="section">
+            <h2>二、NVMe 队列架构</h2>
+
+            <h3>2.1 队列模型</h3>
+            <div class="diagram">
+NVMe 队列结构：
+
+  ┌──────────────────────────────────────────────┐
+  │                  主机（Host）                  │
+  │                                               │
+  │  ┌──────────────┐  ┌──────────────┐          │
+  │  │ 提交队列 SQ1 │  │ 完成队列 CQ1 │          │
+  │  │ (Submission  │  │ (Completion  │          │
+  │  │  Queue)      │  │  Queue)      │          │
+  │  │ [cmd1,cmd2..]│  │ [cmp1,cmp2..]│          │
+  │  └──────┬───────┘  └──────▲───────┘          │
+  │         │                 │                  │
+  │  ┌──────┴───────┐  ┌──────┴───────┐          │
+  │  │  SQ 门铃寄存器│  │ CQ 门铃寄存器 │          │
+  │  │ Doorbell     │  │ Doorbell     │          │
+  │  └──────┬───────┘  └──────────────┘          │
+  └─────────┼────────────────────────────────────┘
+            │  写入 SQ 尾指针（Tail Pointer）
+            │
+  ┌─────────▼────────────────────────────────────┐
+  │              NVMe 控制器（SSD）               │
+  │                                              │
+  │  ┌──────────┐  ┌──────────┐  ┌──────────┐  │
+  │  │ 命令获取 │─▶│ 命令执行 │─▶│ 完成通知 │  │
+  │  │ Fetch    │  │ Execute  │  │ Complete │  │
+  │  └──────────┘  └──────────┘  └──────────┘  │
+  └──────────────────────────────────────────────┘</div>
+
+            <h3>2.2 提交队列（SQ）与完成队列（CQ）</h3>
+            <ul>
+                <li><strong>提交队列（SQ）</strong>：主机写入命令，控制器读取执行。环形缓冲区结构，主机写 Tail 指针。</li>
+                <li><strong>完成队列（CQ）</strong>：控制器写入完成状态，主机读取确认。环形缓冲区结构，控制器写 Tail 指针，主机更新 Head 指针。</li>
+                <li><strong>门铃寄存器（Doorbell）</strong>：通知对方有新命令/完成。SQ 门铃通知控制器"有新命令"，CQ 门铃通知主机"命令已完成"。</li>
+            </ul>
+
+            <h3>2.3 队列配置</h3>
+            <table class="state-table">
+                <thead>
+                    <tr>
+                        <th>参数</th>
+                        <th>最小值</th>
+                        <th>最大值</th>
+                        <th>典型值</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>I/O 提交队列数</td>
+                        <td>1</td>
+                        <td>65535</td>
+                        <td>CPU 核心数</td>
+                    </tr>
+                    <tr>
+                        <td>I/O 完成队列数</td>
+                        <td>1</td>
+                        <td>65535</td>
+                        <td>= SQ 数</td>
+                    </tr>
+                    <tr>
+                        <td>队列条目数</td>
+                        <td>2</td>
+                        <td>65536</td>
+                        <td>1024</td>
+                    </tr>
+                    <tr>
+                        <td>管理队列数</td>
+                        <td>1</td>
+                        <td>1</td>
+                        <td>1 SQ + 1 CQ</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="note">
+                <strong>多队列并行的优势：</strong>NVMe 支持为每个 CPU 核心分配独立的 SQ/CQ 队列对，避免了多核竞争锁的开销。每个核心直接操作自己的队列，实现了完美的横向扩展。这也是 NVMe 相对于 SATA（单队列）的性能飞跃的关键原因。
+            </div>
+        </div>
+
+        <!-- 第三部分：命令集 -->
+        <div class="section">
+            <h2>三、NVMe 命令集</h2>
+
+            <h3>3.1 管理命令（Admin Commands）</h3>
+            <table class="state-table">
+                <thead>
+                    <tr>
+                        <th>操作码</th>
+                        <th>命令</th>
+                        <th>功能</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>01h</td><td>Delete I/O SQ</td><td>删除 I/O 提交队列</td></tr>
+                    <tr><td>02h</td><td>Create I/O SQ</td><td>创建 I/O 提交队列</td></tr>
+                    <tr><td>04h</td><td>Delete I/O CQ</td><td>删除 I/O 完成队列</td></tr>
+                    <tr><td>05h</td><td>Create I/O CQ</td><td>创建 I/O 完成队列</td></tr>
+                    <tr><td>06h</td><td>Identify</td><td>获取控制器/命名空间信息</td></tr>
+                    <tr><td>08h</td><td>Get Features</td><td>获取特性参数</td></tr>
+                    <tr><td>09h</td><td>Set Features</td><td>设置特性参数</td></tr>
+                    <tr><td>0Ch</td><td>Get Log Page</td><td>获取日志页</td></tr>
+                    <tr><td>10h</td><td>Firmware Image Download</td><td>固件镜像下载</td></tr>
+                    <tr><td>11h</td><td>Firmware Image Activate</td><td>固件激活</td></tr>
+                </tbody>
+            </table>
+
+            <h3>3.2 I/O 命令</h3>
+            <table class="state-table">
+                <thead>
+                    <tr>
+                        <th>操作码</th>
+                        <th>命令</th>
+                        <th>功能</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>00h</td><td>Flush</td><td>将缓存数据写入介质</td></tr>
+                    <tr><td>01h</td><td>Write</td><td>写数据到 LBA</td></tr>
+                    <tr><td>02h</td><td>Read</td><td>从 LBA 读数据</td></tr>
+                    <tr><td>04h</td><td>Write Uncorrectable</td><td>标记 LBA 为不可纠正</td></tr>
+                    <tr><td>05h</td><td>Compare</td><td>比较 LBA 数据与主机数据</td></tr>
+                    <tr><td>08h</td><td>Write Zeroes</td><td>写零（无需数据传输）</td></tr>
+                    <tr><td>09h</td><td>Dataset Management</td><td>TRIM / 去重 / 资源分配</td></tr>
+                    <tr><td>0Dh</td><td>Reservation Register</td><td>注册预留</td></tr>
+                    <tr><td>11h</td><td>Reservation Acquire</td><td>获取预留</td></tr>
+                    <tr><td>15h</td><td>Reservation Release</td><td>释放预留</td></tr>
+                </tbody>
+            </table>
+
+            <h3>3.3 命令结构（64 字节）</h3>
+            <div class="diagram">
+NVMe 命令格式（16 DW × 4 字节 = 64 字节）：
+
+DW 0:    OPC (操作码) | FUSE | PSDT | CID (命令ID)
+DW 1:    NSID (命名空间ID)
+DW 2-3:  保留
+DW 4-5:  MPTR (元数据指针)
+DW 6-9:  DPTR (数据指针 - PRP 或 SGL)
+DW 10-15: 命令特定字段（如 SLBA, NLB 等）
+
+关键字段：
+  OPC:  操作码，指定操作类型
+  NSID: 目标命名空间
+  CID:  命令标识符，用于关联完成信息
+  DPTR: 数据传输指针（PRP 物理区域页 或 SGL 散列聚集列表）</div>
+        </div>
+
+        <!-- 第四部分：命名空间 -->
+        <div class="section">
+            <h2>四、命名空间（Namespaces）</h2>
+
+            <h3>4.1 命名空间概念</h3>
+            <div class="diagram">
+NVMe 控制器与命名空间的关系：
+
+┌──────────────────────────────────────┐
+│           NVMe 控制器                 │
+│  (一个控制器管理多个命名空间)          │
+│                                      │
+│  ┌────────┐ ┌────────┐ ┌────────┐  │
+│  │  NS 1  │ │  NS 2  │ │  NS 3  │  │
+│  │(100GB) │ │(200GB) │ │(700GB) │  │
+│  │  LBA  │ │  LBA  │ │  LBA  │  │
+│  │0-99GB │ │0-199GB │ │0-699GB │  │
+│  └───┬────┘ └───┬────┘ └───┬────┘  │
+│      │          │          │        │
+│      └──────────┼──────────┘        │
+│                 │                    │
+│          共享闪存介质                 │
+└──────────────────────────────────────┘
+
+每个命名空间有独立的：
+  - LBA 空间
+  - 安全设置（加密、访问控制）
+  - 精简配置（Thin Provisioning）
+  - 元数据/DIF 设置</div>
+
+            <h3>4.2 命名空间管理</h3>
+            <ul>
+                <li><strong>静态命名空间</strong>：在控制器制造时固定，不可创建/删除</li>
+                <li><strong>动态命名空间</strong>：可通过管理命令创建、格式化、附加/分离</li>
+                <li><strong>共享命名空间</strong>：可同时被多个控制器访问（NVMe over Fabric）</li>
+            </ul>
+        </div>
+
+        <!-- 第五部分：NVMe 版本演进 -->
+        <div class="section">
+            <h2>五、NVMe 版本演进</h2>
+
+            <table class="state-table">
+                <thead>
+                    <tr>
+                        <th>版本</th>
+                        <th>发布年份</th>
+                        <th>主要特性</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>NVMe 1.0</strong></td>
+                        <td>2011</td>
+                        <td>基础规范，PCIe SSD 支持</td>
+                    </tr>
+                    <tr>
+                        <td><strong>NVMe 1.1</strong></td>
+                        <td>2012</td>
+                        <td>多路径 I/O、命名空间共享</td>
+                    </tr>
+                    <tr>
+                        <td><strong>NVMe 1.2</strong></td>
+                        <td>2014</td>
+                        <td>电源管理增强、非操作电源状态</td>
+                    </tr>
+                    <tr>
+                        <td><strong>NVMe 1.3</strong></td>
+                        <td>2017</td>
+                        <td>引导分区、持久事件日志、主机引导支持</td>
+                    </tr>
+                    <tr>
+                        <td><strong>NVMe 1.4</strong></td>
+                        <td>2019</td>
+                        <td>可复位（NVMe Reset）、确定性区域、ZNS（分区命名空间）</td>
+                    </tr>
+                    <tr>
+                        <td><strong>NVMe 2.0</strong></td>
+                        <td>2021</td>
+                        <td>规范拆分（Base/Command Set/Transport）、键值（KV）、多路径增强</td>
+                    </tr>
+                    <tr>
+                        <td><strong>NVMe 2.1</strong></td>
+                        <td>2024</td>
+                        <td>计算存储支持、CMB 扩展、性能增强</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 第六部分：性能特征 -->
+        <div class="section">
+            <h2>六、NVMe 性能特征</h2>
+
+            <h3>6.1 典型性能数据</h3>
+            <table class="state-table">
+                <thead>
+                    <tr>
+                        <th>指标</th>
+                        <th>入门级 NVMe</th>
+                        <th>高端 NVMe</th>
+                        <th>企业级 NVMe</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>顺序读取</td>
+                        <td>~3 GB/s</td>
+                        <td>~7 GB/s</td>
+                        <td>~14 GB/s</td>
+                    </tr>
+                    <tr>
+                        <td>顺序写入</td>
+                        <td>~1.5 GB/s</td>
+                        <td>~5 GB/s</td>
+                        <td>~10 GB/s</td>
+                    </tr>
+                    <tr>
+                        <td>随机 4K 读 IOPS</td>
+                        <td>~200K</td>
+                        <td>~1M</td>
+                        <td>~2M+</td>
+                    </tr>
+                    <tr>
+                        <td>随机 4K 写 IOPS</td>
+                        <td>~200K</td>
+                        <td>~1M</td>
+                        <td>~1M+</td>
+                    </tr>
+                    <tr>
+                        <td>读延迟</td>
+                        <td>~20 us</td>
+                        <td>~10 us</td>
+                        <td>~5 us</td>
+                    </tr>
+                    <tr>
+                        <td>写延迟</td>
+                        <td>~30 us</td>
+                        <td>~15 us</td>
+                        <td>~8 us</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>6.2 性能优化技术</h3>
+            <ul>
+                <li><strong>多队列并行</strong>：按 CPU 核心数分配 SQ/CQ 队列对</li>
+                <li><strong>中断合并（Interrupt Coalescing）</strong>：减少中断次数，降低 CPU 开销</li>
+                <li><strong>I/O 合并（I/O Coalescing）</strong>：将多个小 I/O 合并为大 I/O</li>
+                <li><strong>延迟仲裁（Latency Arbitration）</strong>：优先处理低延迟命令</li>
+                <li><strong>直接内存访问（DMA）</strong>：减少数据拷贝</li>
+            </ul>
+        </div>
+
+        <!-- 总结 -->
+        <div class="section">
+            <h2>总结</h2>
+            <p>NVMe 是专为闪存和非易失性存储设计的高性能协议，通过 PCIe 总线、多队列架构和低开销命令集，实现了远超 SATA/SAS 的性能。其核心创新在于 65535 个队列、每队列 65536 命令的并行架构，完美匹配现代多核处理器。从 NVMe 1.0 到 2.1，协议不断扩展支持分区命名空间、键值存储和计算存储等新特性。</p>
+            <div style="margin-top: 15px;">
+                <span class="tag">NVMe</span>
+                <span class="tag">PCIe</span>
+                <span class="tag">Submission Queue</span>
+                <span class="tag">Completion Queue</span>
+                <span class="tag">Namespace</span>
+                <span class="tag">SSD</span>
+                <span class="tag">Queue Architecture</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+<!--
+    文件：02_NVMe协议.html
+    主题：NVMe 协议
+    内容概要：
+        1. NVMe 概述 - 为什么需要 NVMe，与 SATA/SAS 的对比
+        2. 队列架构 - SQ/CQ 模型、门铃寄存器、队列配置
+        3. 命令集 - 管理命令、I/O 命令、命令格式（64字节）
+        4. 命名空间 - 概念、静态/动态/共享命名空间
+        5. 版本演进 - NVMe 1.0 到 2.1 的特性变化
+        6. 性能特征 - 典型性能数据、优化技术
+    所属课程：50-存储系统 / 02-闪存与SSD
+-->

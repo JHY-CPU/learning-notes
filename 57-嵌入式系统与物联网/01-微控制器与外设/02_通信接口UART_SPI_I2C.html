@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- 通信接口UART_SPI_I2C - 嵌入式系统笔记 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>通信接口UART/SPI/I2C</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f5f7fa; color: #2c3e50; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 40px; }
+        h1 { font-size: 28px; color: #1a5276; border-bottom: 3px solid #2980b9; padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 22px; color: #2980b9; margin: 28px 0 14px; border-left: 4px solid #2980b9; padding-left: 12px; }
+        h3 { font-size: 18px; color: #34495e; margin: 20px 0 10px; }
+        p { margin: 8px 0; text-indent: 2em; }
+        ul, ol { margin: 10px 0 10px 2em; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: left; }
+        th { background: #2980b9; color: #fff; }
+        tr:nth-child(even) { background: #f0f4f8; }
+        .note { background: #eaf2f8; border-left: 4px solid #2980b9; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .key-point { background: #fef9e7; border-left: 4px solid #f39c12; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        code { background: #ecf0f1; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>通信接口UART/SPI/I2C</h1>
+
+    <!-- 一、通信接口概述 -->
+    <h2>一、嵌入式通信接口概述</h2>
+    <p>在嵌入式系统中，微控制器需要与各种外设进行数据交换。UART、SPI和I2C是最常用的三种串行通信接口，各有其特点和适用场景。</p>
+
+    <h3>1.1 三种接口总览</h3>
+    <table>
+        <tr><th>接口</th><th>通信方式</th><th>信号线数</th><th>速率范围</th><th>典型应用</th></tr>
+        <tr><td>UART</td><td>异步全双工</td><td>2（TX/RX）</td><td>960bps ~ 3Mbps</td><td>调试串口、GPS、蓝牙模块</td></tr>
+        <tr><td>SPI</td><td>同步全双工</td><td>3~4（MOSI/MISO/SCK/CS）</td><td>可达50Mbps+</td><td>Flash、屏幕、传感器</td></tr>
+        <tr><td>I2C</td><td>同步半双工</td><td>2（SDA/SCL）</td><td>100k~3.4Mbps</td><td>EEPROM、传感器、PMIC</td></tr>
+    </table>
+
+    <!-- 二、UART -->
+    <h2>二、UART（通用异步收发传输器）</h2>
+    <p>UART是一种异步串行通信协议，无需时钟信号线，通过约定的波特率实现数据同步。它是最简单的点对点通信方式。</p>
+
+    <h3>2.1 UART帧格式</h3>
+    <p>UART数据以帧为单位传输，每帧包含以下部分：</p>
+    <table>
+        <tr><th>位</th><th>名称</th><th>说明</th></tr>
+        <tr><td>起始位</td><td>Start Bit</td><td>1位低电平，标志帧开始</td></tr>
+        <tr><td>数据位</td><td>Data Bits</td><td>5~9位数据（通常8位），低位在前</td></tr>
+        <tr><td>校验位</td><td>Parity</td><td>可选，奇校验/偶校验/无校验</td></tr>
+        <tr><td>停止位</td><td>Stop Bit</td><td>1、1.5或2位高电平，标志帧结束</td></tr>
+    </table>
+
+    <h3>2.2 波特率（Baud Rate）</h3>
+    <p>波特率表示每秒传输的符号数。在UART中，每个符号对应1位数据，因此波特率等于比特率。</p>
+    <div class="key-point">
+        <strong>波特率计算：</strong><br>
+        波特率 = 时钟频率 / (16 × USARTDIV)<br><br>
+        例如：系统时钟72MHz，目标波特率115200<br>
+        USARTDIV = 72000000 / (16 × 115200) = 39.0625<br>
+        整数部分 = 39（0x27），小数部分 = 0.0625 × 16 = 1<br>
+        USART_BRR = 0x271
+    </div>
+
+    <h3>2.3 波特率容差</h3>
+    <p>收发双方的时钟存在偏差，累积误差会导致采样错误。一般要求总误差不超过±2%~±3%。</p>
+    <table>
+        <tr><th>波特率</th><th>常用时钟</th><th>实际波特率</th><th>误差</th></tr>
+        <tr><td>9600</td><td>72MHz</td><td>9600.38</td><td>0.004%</td></tr>
+        <tr><td>115200</td><td>72MHz</td><td>115211.5</td><td>0.01%</td></tr>
+        <tr><td>921600</td><td>72MHz</td><td>923076.9</td><td>0.16%</td></tr>
+    </table>
+
+    <h3>2.4 UART配置示例（STM32 HAL）</h3>
+    <div class="key-point">
+        <pre>
+// UART初始化配置
+UART_HandleTypeDef huart1;
+huart1.Instance = USART1;
+huart1.Init.BaudRate = 115200;           // 波特率115200
+huart1.Init.WordLength = UART_WORDLENGTH_8B; // 8位数据
+huart1.Init.StopBits = UART_STOPBITS_1;      // 1位停止位
+huart1.Init.Parity = UART_PARITY_NONE;       // 无校验
+huart1.Init.Mode = UART_MODE_TX_RX;          // 收发模式
+huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE; // 无硬件流控
+HAL_UART_Init(&huart1);
+
+// 发送数据
+uint8_t txData[] = "Hello UART!";
+HAL_UART_Transmit(&huart1, txData, sizeof(txData), 100);
+
+// 接收数据（阻塞方式）
+uint8_t rxData;
+HAL_UART_Receive(&huart1, &rxData, 1, 1000);
+
+// 接收数据（中断方式）
+HAL_UART_Receive_IT(&huart1, &rxData, 1);
+
+// 接收完成回调
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+    // 处理接收到的数据
+    HAL_UART_Receive_IT(huart, &rxData, 1); // 重新开启接收
+}
+        </pre>
+    </div>
+
+    <h3>2.5 硬件流控</h3>
+    <p>当数据速率较高或接收方处理能力有限时，可使用RTS/CTS硬件流控防止数据丢失。</p>
+    <ul>
+        <li><strong>RTS（Request To Send）：</strong>接收方拉低表示可以接收数据</li>
+        <li><strong>CTS（Clear To Send）：</strong>发送方检测CTS，低电平时才发送</li>
+        <li><strong>适用场景：</strong>高速传输、蓝牙/WiFi模块通信</li>
+    </ul>
+
+    <!-- 三、SPI -->
+    <h2>三、SPI（串行外设接口）</h2>
+    <p>SPI是Motorola开发的同步串行通信协议，采用主从架构，支持全双工通信，速率远高于UART和I2C。</p>
+
+    <h3>3.1 SPI信号线</h3>
+    <table>
+        <tr><th>信号</th><th>全称</th><th>方向</th><th>说明</th></tr>
+        <tr><td>SCLK</td><td>Serial Clock</td><td>Master → Slave</td><td>时钟信号，由主机产生</td></tr>
+        <tr><td>MOSI</td><td>Master Out Slave In</td><td>Master → Slave</td><td>主机发送数据线</td></tr>
+        <tr><td>MISO</td><td>Master In Slave Out</td><td>Slave → Master</td><td>从机发送数据线</td></tr>
+        <tr><td>CS/SS</td><td>Chip Select</td><td>Master → Slave</td><td>片选信号，低电平有效</td></tr>
+    </table>
+
+    <h3>3.2 SPI工作模式（CPOL/CPHA）</h3>
+    <p>SPI有四种工作模式，由时钟极性（CPOL）和时钟相位（CPHA）决定：</p>
+    <table>
+        <tr><th>模式</th><th>CPOL</th><th>CPHA</th><th>空闲时钟</th><th>数据采样边沿</th><th>数据移出边沿</th></tr>
+        <tr><td>Mode 0</td><td>0</td><td>0</td><td>低电平</td><td>上升沿</td><td>下降沿</td></tr>
+        <tr><td>Mode 1</td><td>0</td><td>1</td><td>低电平</td><td>下降沿</td><td>上升沿</td></tr>
+        <tr><td>Mode 2</td><td>1</td><td>0</td><td>高电平</td><td>下降沿</td><td>上升沿</td></tr>
+        <tr><td>Mode 3</td><td>1</td><td>1</td><td>高电平</td><td>上升沿</td><td>下降沿</td></tr>
+    </table>
+
+    <div class="note">
+        <strong>CPOL/CPHA含义：</strong><br>
+        CPOL = 0：时钟空闲时为低电平；CPOL = 1：时钟空闲时为高电平<br>
+        CPHA = 0：在第一个时钟边沿采样数据；CPHA = 1：在第二个时钟边沿采样数据
+    </div>
+
+    <h3>3.3 全双工通信</h3>
+    <p>SPI在每个时钟周期同时进行发送和接收：主机通过MOSI发送一位数据，从机通过MISO同时发送一位数据。因此读写操作是同时进行的。</p>
+    <div class="key-point">
+        <strong>SPI全双工特点：</strong><br>
+        - 发送和接收共享同一个时钟信号<br>
+        - 每次传输都是双向的：即使主机只想读取，也必须发送（可以是dummy数据）<br>
+        - 从机在接收到主机命令后，在后续时钟周期返回数据<br>
+        - 数据位宽通常为8位或16位
+    </div>
+
+    <h3>3.4 多从机连接</h3>
+    <p>SPI支持多从机配置，每增加一个从机只需增加一条CS线。</p>
+    <ul>
+        <li><strong>独立片选：</strong>每个从机一条CS线，最常用方式</li>
+        <li><strong>菊花链：</strong>从机的MISO连到下一个的MOSI，适合移位寄存器</li>
+        <li><strong>注意：</strong>未被选中的从机MISO应为高阻态，避免总线冲突</li>
+    </ul>
+
+    <h3>3.5 SPI配置示例（STM32 HAL）</h3>
+    <div class="key-point">
+        <pre>
+// SPI初始化
+SPI_HandleTypeDef hspi1;
+hspi1.Instance = SPI1;
+hspi1.Init.Mode = SPI_MODE_MASTER;            // 主机模式
+hspi1.Init.Direction = SPI_DIRECTION_2LINES;  // 全双工
+hspi1.Init.DataSize = SPI_DATASIZE_8BIT;      // 8位数据
+hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;    // CPOL=0
+hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;        // CPHA=0 (Mode 0)
+hspi1.Init.NSS = SPI_NSS_SOFT;                // 软件管理片选
+hspi1.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4; // 4分频
+hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;       // 高位在前
+HAL_SPI_Init(&hspi1);
+
+// SPI收发数据
+uint8_t txData = 0x80;  // 读取寄存器命令
+uint8_t rxData;
+HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_RESET); // CS拉低
+HAL_SPI_Transmit(&hspi1, &txData, 1, 100);    // 发送命令
+HAL_SPI_Receive(&hspi1, &rxData, 1, 100);     // 接收数据
+HAL_GPIO_WritePin(GPIOA, GPIO_PIN_4, GPIO_PIN_SET);   // CS拉高
+
+// 同时收发（全双工）
+HAL_SPI_TransmitReceive(&hspi1, txBuf, rxBuf, length, 100);
+        </pre>
+    </div>
+
+    <!-- 四、I2C -->
+    <h2>四、I2C（内部集成电路总线）</h2>
+    <p>I2C是Philips开发的两线式串行总线，只需SDA和SCL两条线即可连接多个器件，每个器件有唯一的7位或10位地址。</p>
+
+    <h3>4.1 I2C信号线</h3>
+    <table>
+        <tr><th>信号</th><th>全称</th><th>说明</th></tr>
+        <tr><td>SDA</td><td>Serial Data</td><td>双向数据线，开漏输出需外部上拉</td></tr>
+        <tr><td>SCL</td><td>Serial Clock</td><td>时钟线，由主机控制，开漏输出需外部上拉</td></tr>
+    </table>
+
+    <h3>4.2 I2C通信时序</h3>
+    <ol>
+        <li><strong>起始条件（START）：</strong>SCL为高时，SDA从高变低</li>
+        <li><strong>发送地址：</strong>7位从机地址 + 1位读写位（0写/1读）</li>
+        <li><strong>等待ACK：</strong>从机在第9个时钟脉冲拉低SDA应答</li>
+        <li><strong>数据传输：</strong>每次8位数据，高位在前，每字节后跟ACK/NACK</li>
+        <li><strong>停止条件（STOP）：</strong>SCL为高时，SDA从低变高</li>
+    </ol>
+
+    <div class="key-point">
+        <strong>I2C帧结构：</strong><br>
+        [START] [7位地址 + R/W] [ACK] [数据字节] [ACK] ... [STOP]<br><br>
+        写操作：S | Addr+W | A | Data | A | Data | A | P<br>
+        读操作：S | Addr+R | A | Data | A | Data | A̅ | P（最后一个NACK表示读完）
+    </div>
+
+    <h3>4.3 I2C地址机制</h3>
+    <p>I2C使用7位或10位寻址。7位地址可寻址128个设备（其中16个保留），实际可用112个。</p>
+    <table>
+        <tr><th>地址范围</th><th>用途</th></tr>
+        <tr><td>0x00</td><td>广播呼叫地址</td></tr>
+        <tr><td>0x01~0x07</td><td>保留</td></tr>
+        <tr><td>0x08~0x77</td><td>通用设备地址</td></tr>
+        <tr><td>0x78~0x7F</td><td>10位地址模式或保留</td></tr>
+    </table>
+
+    <h3>4.4 时钟拉伸（Clock Stretching）</h3>
+    <p>从机可以通过将SCL线拉低来"暂停"通信，迫使主机等待，直到从机准备好数据。</p>
+    <div class="note">
+        <strong>时钟拉伸原理：</strong><br>
+        I2C总线使用开漏输出，任何设备都可以拉低SCL。当从机需要更多时间处理数据时，它将SCL保持在低电平。主机在发送下一个时钟脉冲前会检测SCL是否已释放（变高）。这个机制对主机完全透明。
+    </div>
+
+    <h3>4.5 I2C配置示例（STM32 HAL）</h3>
+    <div class="key-point">
+        <pre>
+// I2C初始化
+I2C_HandleTypeDef hi2c1;
+hi2c1.Instance = I2C1;
+hi2c1.Init.ClockSpeed = 400000;        // 400kHz 快速模式
+hi2c1.Init.DutyCycle = I2C_DUTYCYCLE_2; // 标准占空比
+hi2c1.Init.OwnAddress1 = 0x00;         // 本机地址
+hi2c1.Init.AddressingMode = I2C_ADDRESSINGMODE_7BIT;
+hi2c1.Init.DualAddressMode = I2C_DUALADDRESS_DISABLE;
+hi2c1.Init.GeneralCallMode = I2C_GENERALCALL_DISABLE;
+hi2c1.Init.NoStretchMode = I2C_NOSTRETCH_DISABLE;
+HAL_I2C_Init(&hi2c1);
+
+// 写入数据到从机（寄存器操作）
+uint8_t regAddr = 0x75;  // 寄存器地址
+uint8_t data = 0x80;     // 写入值
+HAL_I2C_Mem_Write(&hi2c1, (0x68 &lt;&lt; 1), regAddr,
+    I2C_MEMADD_SIZE_8BIT, &data, 1, 100);
+
+// 从从机读取数据
+uint8_t rxData;
+HAL_I2C_Mem_Read(&hi2c1, (0x68 &lt;&lt; 1), regAddr,
+    I2C_MEMADD_SIZE_8BIT, &rxData, 1, 100);
+
+// 检测设备是否在线
+if (HAL_I2C_IsDeviceReady(&hi2c1, (0x68 &lt;&lt; 1), 3, 100) == HAL_OK) {
+    // 设备在线
+}
+        </pre>
+    </div>
+
+    <!-- 五、对比总结 -->
+    <h2>五、三种接口对比</h2>
+    <table>
+        <tr><th>特性</th><th>UART</th><th>SPI</th><th>I2C</th></tr>
+        <tr><td>信号线数</td><td>2（TX/RX）</td><td>3~4</td><td>2（SDA/SCL）</td></tr>
+        <tr><td>通信方式</td><td>异步全双工</td><td>同步全双工</td><td>同步半双工</td></tr>
+        <tr><td>最大速率</td><td>~3Mbps</td><td>~50Mbps+</td><td>~3.4Mbps（HS模式）</td></tr>
+        <tr><td>拓扑结构</td><td>点对点</td><td>一主多从</td><td>多主多从</td></tr>
+        <tr><td>寻址方式</td><td>无（点对点）</td><td>片选线</td><td>地址帧</td></tr>
+        <tr><td>硬件复杂度</td><td>最低</td><td>中等</td><td>低</td></tr>
+        <tr><td>协议开销</td><td>起始/停止/校验位</td><td>无额外开销</td><td>地址+ACK位</td></tr>
+        <tr><td>抗干扰能力</td><td>一般</td><td>好（短距离）</td><td>一般</td></tr>
+        <tr><td>线缆长度</td><td>可达15m</td><td>通常&lt;30cm</td><td>通常&lt;1m</td></tr>
+    </table>
+
+    <div class="key-point">
+        <strong>接口选择指南：</strong><br>
+        - 需要简单点对点通信（调试、GPS） → UART<br>
+        - 需要高速数据传输（Flash、屏幕） → SPI<br>
+        - 需要连接多个低速设备（传感器、EEPROM） → I2C<br>
+        - 距离较远 → UART（配合RS-232/RS-485）<br>
+        - 引脚资源紧张 → I2C（只需2根线）
+    </div>
+
+</div>
+
+<!--
+========================================
+  文件总结
+========================================
+  主题：通信接口UART/SPI/I2C
+  内容概要：
+    1. UART - 异步串行通信，波特率、帧格式、硬件流控
+    2. SPI - 同步全双工，CPOL/CPHA四种模式，多从机片选
+    3. I2C - 两线同步半双工，7位寻址，时钟拉伸，ACK机制
+    4. 接口对比 - 信号线、速率、拓扑、适用场景
+  重点知识：
+    - UART帧：起始位+数据位+校验位+停止位
+    - SPI四种模式由CPOL/CPHA决定
+    - I2C起始条件：SCL高时SDA由高变低；停止条件：SCL高时SDA由低变高
+    - I2C时钟拉伸允许从机暂停通信
+    - SPI全双工意味着每次传输同时收发
+========================================
+-->
+</body>
+</html>

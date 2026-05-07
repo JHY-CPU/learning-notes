@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>命令式与声明式范式</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.7; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #6b46c1; border-bottom: 3px solid #805ad5; padding-bottom: 12px; margin-bottom: 30px; }
+        h2 { color: #553c9a; margin: 25px 0 12px; padding-left: 10px; border-left: 4px solid #805ad5; }
+        h3 { color: #2d3748; margin: 15px 0 8px; }
+        p, li { margin-bottom: 8px; }
+        ul, ol { padding-left: 25px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        code { background: #f3e8ff; padding: 2px 6px; border-radius: 4px; font-family: "Consolas", monospace; font-size: 0.95em; color: #6b46c1; }
+        pre { background: #1a202c; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; margin: 10px 0; font-size: 0.9em; }
+        pre code { background: none; color: inherit; padding: 0; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 10px 14px; text-align: center; }
+        th { background: #805ad5; color: #fff; }
+        tr:nth-child(even) { background: #faf5ff; }
+        .tag { display: inline-block; padding: 3px 10px; border-radius: 15px; font-size: 0.8em; font-weight: bold; margin: 2px; }
+        .tag-purple { background: #e9d8fd; color: #553c9a; }
+        .tag-blue { background: #bee3f8; color: #2a4365; }
+        .tag-green { background: #c6f6d5; color: #22543d; }
+        .tag-yellow { background: #fefcbf; color: #744210; }
+        .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 15px 0; }
+        .compare-item { padding: 15px; border-radius: 8px; border: 2px solid; }
+        .compare-item.imperative { border-color: #3182ce; background: #ebf8ff; }
+        .compare-item.declarative { border-color: #38a169; background: #f0fff4; }
+        .theorem { background: #faf5ff; border-left: 5px solid #805ad5; padding: 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+        .example { background: #f3e8ff; border-radius: 8px; padding: 15px; margin: 12px 0; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <h1>命令式与声明式编程范式</h1>
+
+    <!-- ====== 范式概述 ====== -->
+    <div class="card">
+        <h2>一、编程范式概述</h2>
+        <p><strong>编程范式</strong>是一种编程的思维方式和方法论，决定了如何组织代码和表达计算。</p>
+
+        <table>
+            <thead><tr><th>范式</th><th>核心问题</th><th>代表语言</th></tr></thead>
+            <tbody>
+                <tr><td><strong>命令式</strong></td><td>"怎么做" (How)</td><td>C, Java, Python</td></tr>
+                <tr><td><strong>声明式</strong></td><td>"做什么" (What)</td><td>SQL, HTML, Prolog</td></tr>
+                <tr><td><strong>函数式</strong></td><td>"是什么" (What is)</td><td>Haskell, Lisp, ML</td></tr>
+                <tr><td><strong>逻辑式</strong></td><td>"什么是真的" (What is true)</td><td>Prolog</td></tr>
+                <tr><td><strong>面向对象</strong></td><td>"谁做什么" (Who does what)</td><td>Java, C++, Python</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ====== 命令式 vs 声明式 ====== -->
+    <div class="card">
+        <h2>二、命令式 vs 声明式</h2>
+        <div class="compare">
+            <div class="compare-item imperative">
+                <h3 style="color:#2b6cb0;">命令式 (Imperative)</h3>
+                <ul>
+                    <li>描述计算的<strong>步骤序列</strong></li>
+                    <li>修改<strong>可变状态</strong></li>
+                    <li>使用<strong>循环、赋值、副作用</strong></li>
+                    <li>接近底层硬件执行模型</li>
+                </ul>
+            </div>
+            <div class="compare-item declarative">
+                <h3 style="color:#276749;">声明式 (Declarative)</h3>
+                <ul>
+                    <li>描述计算的<strong>目标/结果</strong></li>
+                    <li>不描述执行步骤</li>
+                    <li>使用<strong>表达式、约束、关系</strong></li>
+                    <li>更接近人类思维方式</li>
+                </ul>
+            </div>
+        </div>
+
+        <h3>对比示例：求列表中偶数的平方和</h3>
+        <div class="example">
+            <p><strong>命令式 (Python)：</strong></p>
+            <pre><code>nums = [1, 2, 3, 4, 5, 6]
+result = 0
+for x in nums:
+    if x % 2 == 0:
+        result += x * x
+print(result)  # 56</code></pre>
+            <p><strong>声明式 (Haskell)：</strong></p>
+            <pre><code>nums = [1, 2, 3, 4, 5, 6]
+result = sum [x^2 | x <- nums, even x]
+-- 或者：result = sum . map (^2) . filter even $ nums</code></pre>
+            <p><strong>声明式 (SQL)：</strong></p>
+            <pre><code>SELECT SUM(value * value)
+FROM numbers
+WHERE value % 2 = 0;</code></pre>
+        </div>
+    </div>
+
+    <!-- ====== 函数式编程 ====== -->
+    <div class="card">
+        <h2>三、函数式编程范式</h2>
+        <p>函数式编程是声明式范式的重要分支。</p>
+
+        <h3>核心原则</h3>
+        <table>
+            <thead><tr><th>原则</th><th>含义</th><th>好处</th></tr></thead>
+            <tbody>
+                <tr><td><strong>纯函数</strong></td><td>相同输入始终产生相同输出，无副作用</td><td>可测试、可推理</td></tr>
+                <tr><td><strong>不可变性</strong></td><td>数据不可修改，只创建新数据</td><td>线程安全、无竞态</td></tr>
+                <tr><td><strong>一等函数</strong></td><td>函数可作为参数和返回值</td><td>高阶抽象</td></tr>
+                <tr><td><strong>高阶函数</strong></td><td>操作其他函数的函数</td><td>代码复用、组合</td></tr>
+            </tbody>
+        </table>
+
+        <h3>核心操作</h3>
+        <pre><code>-- map：对每个元素应用函数
+map (*2) [1,2,3] = [2,4,6]
+
+-- filter：筛选满足条件的元素
+filter even [1,2,3,4,5] = [2,4]
+
+-- fold/reduce：归约为单个值
+foldl (+) 0 [1,2,3,4] = 10
+
+-- 函数组合
+(f . g) x = f(g(x))
+-- 管道风格
+result = nums |> filter even |> map square |> sum</code></pre>
+    </div>
+
+    <!-- ====== 逻辑编程 ====== -->
+    <div class="card">
+        <h2>四、逻辑编程范式 (Prolog)</h2>
+        <p>逻辑编程是"告诉计算机什么是真的，让它自己推理"。</p>
+
+        <h3>Prolog示例</h3>
+        <div class="example">
+            <pre><code>% 事实 (Facts)
+parent(tom, bob).
+parent(tom, liz).
+parent(bob, ann).
+parent(bob, pat).
+
+% 规则 (Rules)
+grandparent(X, Z) :- parent(X, Y), parent(Y, Z).
+sibling(X, Y) :- parent(Z, X), parent(Z, Y), X \= Y.
+
+% 查询 (Queries)
+?- grandparent(tom, ann).    % true (Tom是Ann的祖父)
+?- grandparent(tom, Who).    % Who = ann ; Who = pat
+?- sibling(bob, liz).        % true (Bob和Liz是兄妹)</code></pre>
+        </div>
+        <p>程序员定义<strong>知识库</strong>（事实+规则），Prolog通过<strong>回溯搜索</strong>和<strong>合一</strong>自动求解。</p>
+    </div>
+
+    <!-- ====== 各范式对比 ====== -->
+    <div class="card">
+        <h2>五、范式对比总结</h2>
+        <table>
+            <thead><tr><th>特性</th><th>命令式</th><th>函数式</th><th>逻辑式</th></tr></thead>
+            <tbody>
+                <tr><td>计算模型</td><td>状态机</td><td>函数归约</td><td>逻辑推理</td></tr>
+                <tr><td>核心抽象</td><td>变量、赋值</td><td>函数、表达式</td><td>事实、规则</td></tr>
+                <tr><td>控制流</td><td>显式（循环、分支）</td><td>递归、高阶函数</td><td>回溯搜索</td></tr>
+                <tr><td>可变状态</td><td>核心特性</td><td>禁止/受限</td><td>受限</td></tr>
+                <tr><td>并行化</td><td>困难</td><td>天然并行</td><td>可并行搜索</td></tr>
+                <tr><td>可推理性</td><td>中等</td><td>高（等式推理）</td><td>高（逻辑推理）</td></tr>
+                <tr><td>适用领域</td><td>系统编程、通用</td><td>数据处理、DSL</td><td>AI、专家系统</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ====== 实际中的混合 ====== -->
+    <div class="card">
+        <h2>六、现代语言中的范式融合</h2>
+        <p>现代语言通常支持<strong>多范式</strong>：</p>
+        <pre><code>// Python - 命令式 + 函数式 + 面向对象
+# 命令式
+result = []
+for x in range(10):
+    if x % 2 == 0:
+        result.append(x ** 2)
+
+# 函数式
+result = [x**2 for x in range(10) if x % 2 == 0]
+result = list(map(lambda x: x**2, filter(lambda x: x % 2 == 0, range(10))))
+
+// Scala - OOP + FP
+val result = (1 to 10).filter(_ % 2 == 0).map(x => x * x).sum
+
+// Rust - 命令式 + 函数式
+let result: i32 = (1..=10)
+    .filter(|x| x % 2 == 0)
+    .map(|x| x * x)
+    .sum();</code></pre>
+
+        <div class="theorem">
+            <p><strong>趋势：</strong>即使传统命令式语言也在吸收函数式特性（Java 8+ Stream API, C# LINQ, Python comprehensions, JavaScript Array methods）。</p>
+        </div>
+    </div>
+
+</div>
+
+<!--
+========================================
+  笔记总结
+========================================
+本文件涵盖编程范式的核心对比：
+
+1. 命令式 vs 声明式：
+   - 命令式：描述"怎么做"（步骤、状态、副作用）
+   - 声明式：描述"做什么"（目标、约束、关系）
+   - SQL、HTML是纯声明式的代表
+
+2. 函数式编程：
+   - 纯函数、不可变性、一等函数、高阶函数
+   - 核心操作：map、filter、fold
+   - 函数组合和管道
+
+3. 逻辑编程 (Prolog)：
+   - 定义事实和规则，系统自动推理
+   - 回溯搜索 + 合一
+   - 适合AI、专家系统
+
+4. 范式对比：
+   - 命令式：灵活但复杂
+   - 函数式：简洁、可并行
+   - 逻辑式：表达力强但性能不可预测
+
+5. 多范式趋势：
+   - 现代语言融合多种范式
+   - 函数式特性被广泛采纳
+   - 没有"最好"的范式，只有"最适合"的
+========================================
+-->
+</body>
+</html>

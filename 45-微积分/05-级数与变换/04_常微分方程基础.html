@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>常微分方程基础 - 级数与变换</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #1abc9c;
+            --accent: #e74c3c;
+            --bg: #fdfdfd;
+            --card-bg: #ffffff;
+            --border: #dfe6e9;
+            --text: #2d3436;
+            --text-light: #636e72;
+            --success: #27ae60;
+            --info: #2980b9;
+            --warning: #f39c12;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--primary);
+            font-size: 2.2rem;
+            margin-bottom: 0.5rem;
+            border-bottom: 3px solid var(--secondary);
+            padding-bottom: 0.8rem;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--text-light);
+            margin-bottom: 2rem;
+        }
+
+        h2 {
+            color: var(--secondary);
+            font-size: 1.5rem;
+            margin: 2rem 0 1rem;
+            padding-left: 0.8rem;
+            border-left: 4px solid var(--secondary);
+        }
+
+        h3 {
+            color: var(--primary);
+            font-size: 1.2rem;
+            margin: 1.2rem 0 0.6rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .formula-box {
+            background: linear-gradient(135deg, #f8f9fa, #e8f8f5);
+            border-left: 4px solid var(--secondary);
+            padding: 1.2rem 1.5rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+            font-family: 'Cambria Math', 'Latin Modern Math', serif;
+        }
+
+        .formula {
+            font-size: 1.15rem;
+            text-align: center;
+            margin: 0.5rem 0;
+        }
+
+        .formula .highlight { color: var(--accent); font-weight: bold; }
+        .formula .big { font-size: 1.35rem; }
+
+        .definition {
+            background: linear-gradient(135deg, #e8f8f5, #d5f5e3);
+            border: 1px solid #82e0aa;
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin: 1rem 0;
+        }
+
+        .definition::before {
+            content: "定义";
+            background: var(--secondary);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .theorem {
+            background: linear-gradient(135deg, #fef9e7, #fdebd0);
+            border: 1px solid #f0c27a;
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin: 1rem 0;
+        }
+
+        .theorem::before {
+            content: "定理";
+            background: var(--warning);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .method {
+            background: linear-gradient(135deg, #d6eaf8, #aed6f1);
+            border: 1px solid #85c1e9;
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin: 1rem 0;
+        }
+
+        .method::before {
+            content: "方法";
+            background: var(--info);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .example {
+            background: linear-gradient(135deg, #eafaf1, #d5f5e3);
+            border: 1px solid #82e0aa;
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin: 1rem 0;
+        }
+
+        .example::before {
+            content: "例题";
+            background: var(--success);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .note {
+            background: linear-gradient(135deg, #f4ecf7, #ebdef0);
+            border: 1px solid #c39bd3;
+            border-radius: 8px;
+            padding: 1rem 1.2rem;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+
+        .note::before {
+            content: "注意";
+            background: #8e44ad;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        th {
+            background: var(--secondary);
+            color: white;
+            padding: 0.7rem 1rem;
+            text-align: left;
+        }
+
+        td {
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:nth-child(even) td { background: #f8f9fa; }
+
+        .step-list {
+            list-style: none;
+            counter-reset: step;
+            padding-left: 0;
+        }
+
+        .step-list li {
+            counter-increment: step;
+            padding: 0.6rem 0 0.6rem 2.5rem;
+            position: relative;
+        }
+
+        .step-list li::before {
+            content: counter(step);
+            position: absolute;
+            left: 0;
+            top: 0.6rem;
+            width: 1.8rem;
+            height: 1.8rem;
+            background: var(--secondary);
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 1.8rem;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        .summary {
+            background: var(--primary);
+            color: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .summary h2 { color: var(--warning); border-left-color: var(--warning); }
+        .summary ul { padding-left: 1.5rem; }
+        .summary li { margin: 0.3rem 0; }
+
+        @media (max-width: 600px) {
+            body { padding: 1rem; }
+            h1 { font-size: 1.6rem; }
+        }
+    </style>
+</head>
+<body>
+
+<h1>常微分方程基础</h1>
+<p class="subtitle">Ordinary Differential Equations &mdash; 级数与变换 · 第四节</p>
+
+<!-- ============ 一、基本概念 ============ -->
+<h2>一、基本概念</h2>
+
+<div class="definition">
+    <p><strong>常微分方程（ODE）</strong>：含有未知函数及其导数的方程。</p>
+    <ul style="padding-left:1.5rem; margin-top:0.5rem;">
+        <li><strong>阶</strong>：方程中出现的最高阶导数的阶数</li>
+        <li><strong>线性</strong>：未知函数及其各阶导数均为一次的</li>
+        <li><strong>通解</strong>：含 n 个独立任意常数的解（n = 阶数）</li>
+        <li><strong>特解</strong>：由初始条件确定常数后的解</li>
+    </ul>
+</div>
+
+<div class="card">
+    <h3>1.1 ODE 分类概览</h3>
+    <table>
+        <tr>
+            <th>类型</th>
+            <th>一般形式</th>
+            <th>解法</th>
+        </tr>
+        <tr>
+            <td>可分离变量</td>
+            <td>dy/dx = f(x)g(y)</td>
+            <td>分离积分</td>
+        </tr>
+        <tr>
+            <td>一阶线性</td>
+            <td>y′ + P(x)y = Q(x)</td>
+            <td>积分因子</td>
+        </tr>
+        <tr>
+            <td>恰当方程</td>
+            <td>M dx + N dy = 0, M<sub>y</sub>=N<sub>x</sub></td>
+            <td>求势函数</td>
+        </tr>
+        <tr>
+            <td>二阶常系数线性</td>
+            <td>ay″ + by′ + cy = f(x)</td>
+            <td>特征方程 + 特解</td>
+        </tr>
+    </table>
+</div>
+
+<!-- ============ 二、可分离变量方程 ============ -->
+<h2>二、可分离变量方程</h2>
+
+<div class="method">
+    <p>形如 <strong>dy/dx = f(x) · g(y)</strong> 的方程：</p>
+    <div class="formula-box">
+        <p class="formula">分离变量：<span class="highlight">dy/g(y) = f(x) dx</span></p>
+        <p class="formula">两边积分：∫ dy/g(y) = ∫ f(x) dx + C</p>
+    </div>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求解 dy/dx = 2xy</p>
+    <div class="formula-box">
+        <p class="formula">dy/y = 2x dx</p>
+        <p class="formula">ln|y| = x² + C₁</p>
+        <p class="formula"><span class="highlight">y = Ce<sup>x²</sup></span>（其中 C = ±e<sup>C₁</sup>，也包含 C = 0 的情况）</p>
+    </div>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求解 dy/dx = y² sin(x)</p>
+    <div class="formula-box">
+        <p class="formula">dy/y² = sin(x) dx</p>
+        <p class="formula">−1/y = −cos(x) + C</p>
+        <p class="formula"><span class="highlight">y = 1/(cos(x) − C)</span></p>
+    </div>
+</div>
+
+<!-- ============ 三、一阶线性方程 ============ -->
+<h2>三、一阶线性方程</h2>
+
+<div class="definition">
+    <p>标准形式：<strong>y′ + P(x)y = Q(x)</strong></p>
+    <p>若 Q(x) = 0，称为<strong>齐次</strong>；否则为<strong>非齐次</strong>。</p>
+</div>
+
+<div class="method">
+    <h3>3.1 积分因子法</h3>
+    <div class="formula-box">
+        <p class="formula">积分因子：<span class="highlight">μ(x) = e<sup>∫P(x)dx</sup></span></p>
+        <p class="formula">通解公式：</p>
+        <p class="formula big"><span class="highlight">y = (1/μ) [∫ μ(x) Q(x) dx + C]</span></p>
+    </div>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求解 y′ + (2/x)y = x</p>
+    <div class="formula-box">
+        <p class="formula">P(x) = 2/x, μ = e<sup>∫2/x dx</sup> = e<sup>2ln x</sup> = x²</p>
+        <p class="formula">y = (1/x²)[∫ x² · x dx + C] = (1/x²)[x⁴/4 + C]</p>
+        <p class="formula"><span class="highlight">y = x²/4 + C/x²</span></p>
+    </div>
+</div>
+
+<!-- ============ 四、恰当方程 ============ -->
+<h2>四、恰当方程（全微分方程）</h2>
+
+<div class="definition">
+    <p>方程 M(x,y)dx + N(x,y)dy = 0，若存在函数 Φ(x,y) 使得 ∂Φ/∂x = M, ∂Φ/∂y = N，则称为<strong>恰当方程</strong>。</p>
+    <div class="formula-box">
+        <p class="formula">判别条件：<span class="highlight">∂M/∂y = ∂N/∂x</span></p>
+        <p class="formula">通解：<strong>Φ(x, y) = C</strong></p>
+    </div>
+</div>
+
+<div class="method">
+    <h3>求解步骤</h3>
+    <ol class="step-list">
+        <li>验证 ∂M/∂y = ∂N/∂x</li>
+        <li>由 ∂Φ/∂x = M 对 x 积分：Φ = ∫M dx + h(y)</li>
+        <li>由 ∂Φ/∂y = N 确定 h(y)</li>
+        <li>写出通解 Φ(x, y) = C</li>
+    </ol>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求解 (2xy + 3)dx + (x² + 4y)dy = 0</p>
+    <div class="formula-box">
+        <p class="formula">M = 2xy + 3, N = x² + 4y</p>
+        <p class="formula">∂M/∂y = 2x, ∂N/∂x = 2x → 恰当方程 ✓</p>
+        <p class="formula">Φ = ∫(2xy + 3)dx = x²y + 3x + h(y)</p>
+        <p class="formula">∂Φ/∂y = x² + h′(y) = x² + 4y → h′(y) = 4y → h(y) = 2y²</p>
+        <p class="formula"><span class="highlight">通解：x²y + 3x + 2y² = C</span></p>
+    </div>
+</div>
+
+<div class="note">
+    <p><strong>非恰当方程的处理：</strong>若 ∂M/∂y ≠ ∂N/∂x，可寻找<strong>积分因子</strong> μ(x) 或 μ(y) 使方程变为恰当方程。</p>
+</div>
+
+<!-- ============ 五、二阶线性方程 ============ -->
+<h2>五、二阶线性常微分方程</h2>
+
+<div class="card">
+    <h3>5.1 一般形式</h3>
+    <div class="formula-box">
+        <p class="formula big">a(x)y″ + b(x)y′ + c(x)y = f(x)</p>
+    </div>
+    <p>f(x) = 0 为<strong>齐次</strong>，f(x) ≠ 0 为<strong>非齐次</strong>。</p>
+</div>
+
+<div class="theorem">
+    <h3>5.2 叠加原理</h3>
+    <p>若 y₁ 和 y₂ 是齐次方程的两个线性无关解，则通解为：</p>
+    <div class="formula-box">
+        <p class="formula big">y<sub>h</sub> = <span class="highlight">C₁y₁ + C₂y₂</span></p>
+    </div>
+    <p>非齐次方程的通解 = 齐次通解 + 一个特解：y = y<sub>h</sub> + y<sub>p</sub></p>
+</div>
+
+<!-- ============ 六、常系数齐次方程 ============ -->
+<h2>六、常系数齐次线性方程</h2>
+
+<div class="definition">
+    <p><strong>ay″ + by′ + cy = 0</strong>（a, b, c 为常数）</p>
+    <div class="formula-box">
+        <p class="formula">特征方程：<span class="highlight">ar² + br + c = 0</span></p>
+        <p class="formula">特征根：r = (−b ± √(b²−4ac)) / 2a</p>
+    </div>
+</div>
+
+<table>
+    <tr>
+        <th>特征根情况</th>
+        <th>判别式</th>
+        <th>通解形式</th>
+    </tr>
+    <tr>
+        <td>两个不等实根 r₁ ≠ r₂</td>
+        <td>Δ = b²−4ac > 0</td>
+        <td>y = C₁e<sup>r₁x</sup> + C₂e<sup>r₂x</sup></td>
+    </tr>
+    <tr>
+        <td>重根 r₁ = r₂ = r</td>
+        <td>Δ = 0</td>
+        <td>y = (C₁ + C₂x)e<sup>rx</sup></td>
+    </tr>
+    <tr>
+        <td>共轭复根 α ± βi</td>
+        <td>Δ < 0</td>
+        <td>y = e<sup>αx</sup>(C₁cos βx + C₂sin βx)</td>
+    </tr>
+</table>
+
+<div class="example">
+    <p><strong>例：</strong>求解 y″ − 5y′ + 6y = 0</p>
+    <div class="formula-box">
+        <p class="formula">特征方程：r² − 5r + 6 = 0 → (r−2)(r−3) = 0</p>
+        <p class="formula">r₁ = 2, r₂ = 3</p>
+        <p class="formula"><span class="highlight">y = C₁e<sup>2x</sup> + C₂e<sup>3x</sup></span></p>
+    </div>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求解 y″ + 4y′ + 4y = 0</p>
+    <div class="formula-box">
+        <p class="formula">r² + 4r + 4 = 0 → (r+2)² = 0, r = −2（重根）</p>
+        <p class="formula"><span class="highlight">y = (C₁ + C₂x)e<sup>−2x</sup></span></p>
+    </div>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求解 y″ + 2y′ + 5y = 0</p>
+    <div class="formula-box">
+        <p class="formula">r² + 2r + 5 = 0 → r = −1 ± 2i</p>
+        <p class="formula"><span class="highlight">y = e<sup>−x</sup>(C₁cos 2x + C₂sin 2x)</span></p>
+    </div>
+</div>
+
+<!-- ============ 七、非齐次方程 ============ -->
+<h2>七、非齐次方程——待定系数法</h2>
+
+<div class="card">
+    <h3>7.1 待定系数法（Method of Undetermined Coefficients）</h3>
+    <p>适用于 f(x) 为多项式、指数函数、三角函数及其组合。</p>
+    <table>
+        <tr>
+            <th>f(x) 的形式</th>
+            <th>特解 y<sub>p</sub> 的假设形式</th>
+        </tr>
+        <tr>
+            <td>P<sub>n</sub>(x)（n 次多项式）</td>
+            <td>x<sup>s</sup> · A<sub>n</sub>(x)（A<sub>n</sub> 为 n 次多项式）</td>
+        </tr>
+        <tr>
+            <td>e<sup>αx</sup></td>
+            <td>x<sup>s</sup> · A e<sup>αx</sup></td>
+        </tr>
+        <tr>
+            <td>cos βx 或 sin βx</td>
+            <td>x<sup>s</sup> · (A cos βx + B sin βx)</td>
+        </tr>
+        <tr>
+            <td>e<sup>αx</sup>(A cos βx + B sin βx)</td>
+            <td>x<sup>s</sup> · e<sup>αx</sup>(C cos βx + D sin βx)</td>
+        </tr>
+    </table>
+    <p style="margin-top:0.5rem;"><strong>s 的取值</strong>：若假设形式的最低次项是齐次方程的解，则乘以 x；若是 k 重根，则乘以 x<sup>k</sup>。否则 s = 0。</p>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求解 y″ − 3y′ + 2y = e<sup>3x</sup></p>
+    <div class="formula-box">
+        <p class="formula">齐次通解：r²−3r+2 = 0 → r = 1,2，y<sub>h</sub> = C₁e<sup>x</sup> + C₂e<sup>2x</sup></p>
+        <p class="formula">设 y<sub>p</sub> = Ae<sup>3x</sup>（3 不是特征根，s = 0）</p>
+        <p class="formula">代入：9A − 9A + 2A = 1 → A = 1/2</p>
+        <p class="formula"><span class="highlight">y = C₁e<sup>x</sup> + C₂e<sup>2x</sup> + (1/2)e<sup>3x</sup></span></p>
+    </div>
+</div>
+
+<!-- ============ 八、常数变易法 ============ -->
+<h2>八、常数变易法（Variation of Parameters）</h2>
+
+<div class="method">
+    <p>适用于任意 f(x)，比待定系数法更通用。</p>
+    <p>设齐次方程的两个线性无关解为 y₁, y₂，令：</p>
+    <div class="formula-box">
+        <p class="formula">y<sub>p</sub> = u₁(x) y₁(x) + u₂(x) y₂(x)</p>
+        <p class="formula">其中 u₁, u₂ 满足：</p>
+        <p class="formula"><span class="highlight">u₁′ y₁ + u₂′ y₂ = 0</span></p>
+        <p class="formula"><span class="highlight">u₁′ y₁′ + u₂′ y₂′ = f/a</span></p>
+    </div>
+    <p>解出 u₁′, u₂′ 后积分得到 u₁, u₂。</p>
+</div>
+
+<div class="card">
+    <h3>Wronskian 行列式</h3>
+    <div class="formula-box">
+        <p class="formula">W(y₁, y₂) = |y₁ &nbsp; y₂| = <span class="highlight">y₁y₂′ − y₂y₁′</span></p>
+        <p class="formula">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|y₁′ y₂′|</p>
+        <p class="formula" style="margin-top:0.5rem;">u₁′ = −y₂ f / (aW), &nbsp; u₂′ = y₁ f / (aW)</p>
+    </div>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求解 y″ + y = sec(x)（用常数变易法）</p>
+    <div class="formula-box">
+        <p class="formula">齐次通解：y<sub>h</sub> = C₁cos x + C₂sin x</p>
+        <p class="formula">y₁ = cos x, y₂ = sin x, W = cos²x + sin²x = 1</p>
+        <p class="formula">u₁′ = −sin x · sec x / 1 = −tan x</p>
+        <p class="formula">u₂′ = cos x · sec x / 1 = 1</p>
+        <p class="formula">u₁ = ln|cos x|,  u₂ = x</p>
+        <p class="formula"><span class="highlight">y = C₁cos x + C₂sin x + cos x · ln|cos x| + x sin x</span></p>
+    </div>
+</div>
+
+<!-- ============ 九、解题策略 ============ -->
+<h2>九、ODE 解题策略总结</h2>
+
+<div class="card">
+    <table>
+        <tr>
+            <th>方程类型</th>
+            <th>首选方法</th>
+            <th>备选方法</th>
+        </tr>
+        <tr>
+            <td>一阶可分离</td>
+            <td>分离变量</td>
+            <td>积分因子</td>
+        </tr>
+        <tr>
+            <td>一阶线性</td>
+            <td>积分因子</td>
+            <td>常数变易</td>
+        </tr>
+        <tr>
+            <td>恰当方程</td>
+            <td>求势函数</td>
+            <td>积分因子转化</td>
+        </tr>
+        <tr>
+            <td>二阶常系数齐次</td>
+            <td>特征方程</td>
+            <td>—</td>
+        </tr>
+        <tr>
+            <td>二阶常系数非齐次</td>
+            <td>待定系数</td>
+            <td>常数变易</td>
+        </tr>
+        <tr>
+            <td>二阶变系数</td>
+            <td>常数变易</td>
+            <td>幂级数法</td>
+        </tr>
+    </table>
+</div>
+
+<!-- ============ 汇总 ============ -->
+<div class="summary">
+    <h2>核心要点汇总</h2>
+    <ul>
+        <li><strong>可分离变量</strong>：dy/g(y) = f(x)dx，两边积分</li>
+        <li><strong>一阶线性</strong>：y′ + Py = Q，积分因子 μ = e<sup>∫Pdx</sup>，通解 y = (1/μ)[∫μQ dx + C]</li>
+        <li><strong>恰当方程</strong>：M<sub>y</sub> = N<sub>x</sub>，求势函数 Φ(x,y) = C</li>
+        <li><strong>二阶常系数齐次</strong>：ar² + br + c = 0，实根/重根/复根对应三种通解形式</li>
+        <li><strong>非齐次</strong>：通解 = 齐次通解 + 特解；待定系数法或常数变易法求特解</li>
+        <li><strong>常数变易法</strong>：用 Wronskian 求 u₁′, u₂′，适用于任意右端项</li>
+    </ul>
+</div>
+
+<!-- 总结：常微分方程基础涵盖一阶方程（可分离、线性、恰当）和二阶线性方程（特征方程、待定系数、常数变易），是物理和工程建模的数学基础 -->
+
+</body>
+</html>

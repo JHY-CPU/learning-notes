@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>图的遍历 - 离散数学笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.7; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; font-size: 2em; margin-bottom: 10px; border-bottom: 3px solid #2b6cb0; padding-bottom: 10px; }
+        h2 { color: #2c5282; margin: 25px 0 12px; padding-left: 12px; border-left: 4px solid #4299e1; }
+        h3 { color: #2d3748; margin: 15px 0 8px; }
+        p { margin: 8px 0; }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; color: #e53e3e; }
+        .concept { background: #fff; border-radius: 10px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid #4299e1; }
+        .concept.success { border-left-color: #48bb78; }
+        .concept.warning { border-left-color: #ed8936; }
+        .truth-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.95em; }
+        .truth-table th { background: #2b6cb0; color: #fff; padding: 10px 14px; text-align: center; }
+        .truth-table td { padding: 8px 14px; text-align: center; border: 1px solid #e2e8f0; }
+        .truth-table tr:nth-child(even) { background: #f7fafc; }
+        .demo-area { background: #1a202c; color: #e2e8f0; border-radius: 10px; padding: 20px; margin: 15px 0; font-family: 'Consolas', monospace; }
+        .demo-result { margin-top: 12px; padding: 12px; background: #2d3748; border-radius: 6px; }
+        button { padding: 6px 14px; border-radius: 6px; border: none; background: #4299e1; color: #fff; cursor: pointer; margin: 3px; font-size: 0.9em; }
+        button:hover { background: #3182ce; }
+        .step { padding: 4px 10px; margin: 3px; border-radius: 6px; display: inline-block; font-weight: bold; }
+        .step-current { background: #48bb78; color: #fff; }
+        .step-visited { background: #a0aec0; color: #fff; }
+        .step-queued { background: #ed8936; color: #fff; }
+        .step-unvisited { background: #4a5568; color: #e2e8f0; }
+
+        /* SVG */
+        .node-circle { stroke-width: 2; }
+        .node-text { fill: #fff; font-family: 'Microsoft YaHei', sans-serif; font-size: 13px; font-weight: bold; text-anchor: middle; dominant-baseline: central; }
+        .edge-line { stroke: #4a5568; stroke-width: 2; }
+
+        /* 可视化步骤 */
+        .vis-container { text-align: center; margin: 10px 0; }
+        .vis-step { display: inline-block; background: #fff; border-radius: 8px; padding: 10px; margin: 5px; box-shadow: 0 1px 4px rgba(0,0,0,0.1); min-width: 180px; vertical-align: top; }
+        .vis-step h4 { font-size: 0.85em; color: #718096; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<h1>02 - 图的遍历</h1>
+<p style="text-align:center; color:#718096; margin-bottom:25px;">离散数学 | 图论</p>
+
+<!-- ==================== 1. 遍历概述 ==================== -->
+<h2>1. 图的遍历概述</h2>
+
+<div class="concept">
+    <h3>什么是图的遍历？</h3>
+    <p><strong>图的遍历（Graph Traversal）</strong>是从图中的某个顶点出发，按照某种策略访问图中所有顶点恰好一次的过程。</p>
+    <p>两种基本策略：</p>
+    <ul>
+        <li><strong>BFS（广度优先搜索）：</strong>Breadth-First Search — 按层遍历，先近后远</li>
+        <li><strong>DFS（深度优先搜索）：</strong>Depth-First Search — 一路深入，回溯探索</li>
+    </ul>
+</div>
+
+<!-- ==================== 2. 示例图 ==================== -->
+<h2>2. 示例图（后续遍历使用）</h2>
+
+<div class="concept">
+    <p>G = (V, E)，V = {A, B, C, D, E, F, G}，从 A 出发遍历</p>
+    <div class="vis-container">
+        <svg width="450" height="280" viewBox="0 0 450 280" id="baseGraph">
+            <!-- 边 -->
+            <line x1="200" y1="40" x2="80" y2="120" class="edge-line"/>
+            <line x1="200" y1="40" x2="320" y2="120" class="edge-line"/>
+            <line x1="80" y1="120" x2="120" y2="220" class="edge-line"/>
+            <line x1="80" y1="120" x2="200" y2="120" class="edge-line"/>
+            <line x1="320" y1="120" x2="200" y2="120" class="edge-line"/>
+            <line x1="320" y1="120" x2="380" y2="220" class="edge-line"/>
+            <line x1="200" y1="120" x2="250" y2="220" class="edge-line"/>
+            <!-- 顶点 -->
+            <circle cx="200" cy="40" r="22" fill="#e53e3e" stroke="#c53030" class="node-circle"/>
+            <text x="200" y="40" class="node-text">A</text>
+            <circle cx="80" cy="120" r="22" fill="#4299e1" stroke="#2b6cb0" class="node-circle"/>
+            <text x="80" y="120" class="node-text">B</text>
+            <circle cx="200" cy="120" r="22" fill="#4299e1" stroke="#2b6cb0" class="node-circle"/>
+            <text x="200" y="120" class="node-text">C</text>
+            <circle cx="320" cy="120" r="22" fill="#4299e1" stroke="#2b6cb0" class="node-circle"/>
+            <text x="320" y="120" class="node-text">D</text>
+            <circle cx="120" cy="220" r="22" fill="#4299e1" stroke="#2b6cb0" class="node-circle"/>
+            <text x="120" y="220" class="node-text">E</text>
+            <circle cx="250" cy="220" r="22" fill="#4299e1" stroke="#2b6cb0" class="node-circle"/>
+            <text x="250" y="220" class="node-text">F</text>
+            <circle cx="380" cy="220" r="22" fill="#4299e1" stroke="#2b6cb0" class="node-circle"/>
+            <text x="380" y="220" class="node-text">G</text>
+        </svg>
+    </div>
+</div>
+
+<!-- ==================== 3. BFS ==================== -->
+<h2>3. 广度优先搜索（BFS）</h2>
+
+<div class="concept success">
+    <h3>BFS 算法思想</h3>
+    <p>从起始顶点出发，<strong>先访问所有距离为1的顶点，再访问距离为2的顶点</strong>，以此类推 — "逐层扩展"。</p>
+    <p><strong>数据结构：</strong>队列（Queue）— 先进先出</p>
+    <p><strong>特点：</strong></p>
+    <ul>
+        <li>找到的路径是最短路径（无权图中）</li>
+        <li>适合求最短路径、层序遍历</li>
+        <li>空间复杂度较高（需存储整层顶点）</li>
+    </ul>
+</div>
+
+<div class="concept">
+    <h3>BFS 伪代码</h3>
+    <pre style="background:#f7fafc; padding:12px; border-radius:6px; font-family:Consolas; font-size:0.9em; overflow-x:auto;">
+BFS(G, start):
+    创建队列 Q
+    将 start 加入 Q
+    标记 start 为已访问
+
+    while Q 不为空:
+        v = Q.dequeue()        // 取出队首
+        访问 v
+        for v 的每个邻居 w:
+            if w 未访问:
+                标记 w 为已访问
+                Q.enqueue(w)   // 加入队尾
+    </pre>
+</div>
+
+<h2>3.1 BFS 执行过程（从 A 出发）</h2>
+
+<div class="concept">
+    <table class="truth-table">
+        <tr><th>步骤</th><th>当前访问</th><th>队列状态</th><th>已访问集合</th><th>操作说明</th></tr>
+        <tr><td>初始化</td><td>-</td><td>[A]</td><td>{}</td><td>A 入队</td></tr>
+        <tr><td>1</td><td style="background:#c6f6d5;font-weight:bold;">A</td><td>[B, D]</td><td>{A}</td><td>访问A，邻居B、D入队</td></tr>
+        <tr><td>2</td><td style="background:#c6f6d5;font-weight:bold;">B</td><td>[D, E, C]</td><td>{A, B}</td><td>访问B，邻居E、C入队</td></tr>
+        <tr><td>3</td><td style="background:#c6f6d5;font-weight:bold;">D</td><td>[E, C, G]</td><td>{A, B, D}</td><td>访问D，邻居G入队</td></tr>
+        <tr><td>4</td><td style="background:#c6f6d5;font-weight:bold;">E</td><td>[C, G]</td><td>{A, B, D, E}</td><td>访问E，无新邻居</td></tr>
+        <tr><td>5</td><td style="background:#c6f6d5;font-weight:bold;">C</td><td>[G, F]</td><td>{A, B, D, E, C}</td><td>访问C，邻居F入队</td></tr>
+        <tr><td>6</td><td style="background:#c6f6d5;font-weight:bold;">G</td><td>[F]</td><td>{A, B, D, E, C, G}</td><td>访问G，无新邻居</td></tr>
+        <tr><td>7</td><td style="background:#c6f6d5;font-weight:bold;">F</td><td>[]（空）</td><td>{A, B, D, E, C, G, F}</td><td>访问F，队列空，结束</td></tr>
+    </table>
+    <p style="margin-top:10px;"><strong>BFS 序列（层序）：</strong>A &rarr; B &rarr; D &rarr; E &rarr; C &rarr; G &rarr; F</p>
+    <p><strong>BFS 树（按层）：</strong>第1层: {A}，第2层: {B, D}，第3层: {E, C, G}，第4层: {F}</p>
+</div>
+
+<!-- ==================== 4. DFS ==================== -->
+<h2>4. 深度优先搜索（DFS）</h2>
+
+<div class="concept success">
+    <h3>DFS 算法思想</h3>
+    <p>从起始顶点出发，<strong>沿着一条路径尽可能深入</strong>，直到无法继续时<strong>回溯</strong>到上一个分叉点，继续探索其他路径。</p>
+    <p><strong>数据结构：</strong>栈（Stack）或递归调用栈 — 后进先出</p>
+    <p><strong>特点：</strong></p>
+    <ul>
+        <li>适合判断连通性、检测环、拓扑排序</li>
+        <li>空间复杂度较低（只需存储当前路径）</li>
+        <li>找到的路径不一定是最短的</li>
+    </ul>
+</div>
+
+<div class="concept">
+    <h3>DFS 伪代码</h3>
+    <pre style="background:#f7fafc; padding:12px; border-radius:6px; font-family:Consolas; font-size:0.9em; overflow-x:auto;">
+DFS(G, v):
+    标记 v 为已访问
+    访问 v
+
+    for v 的每个邻居 w:
+        if w 未访问:
+            DFS(G, w)          // 递归深入
+    </pre>
+</div>
+
+<h2>4.1 DFS 执行过程（从 A 出发）</h2>
+
+<div class="concept">
+    <table class="truth-table">
+        <tr><th>步骤</th><th>当前访问</th><th>递归栈（底&rarr;顶）</th><th>已访问集合</th><th>操作说明</th></tr>
+        <tr><td>1</td><td style="background:#c6f6d5;font-weight:bold;">A</td><td>[A]</td><td>{A}</td><td>从A出发，探索邻居B</td></tr>
+        <tr><td>2</td><td style="background:#c6f6d5;font-weight:bold;">B</td><td>[A, B]</td><td>{A, B}</td><td>从B出发，探索邻居E</td></tr>
+        <tr><td>3</td><td style="background:#c6f6d5;font-weight:bold;">E</td><td>[A, B, E]</td><td>{A, B, E}</td><td>E无未访问邻居，回溯到B</td></tr>
+        <tr><td>4</td><td style="background:#c6f6d5;font-weight:bold;">C</td><td>[A, B, C]</td><td>{A, B, E, C}</td><td>从B继续，探索C</td></tr>
+        <tr><td>5</td><td style="background:#c6f6d5;font-weight:bold;">F</td><td>[A, B, C, F]</td><td>{A, B, E, C, F}</td><td>从C出发，探索F</td></tr>
+        <tr><td>6</td><td style="background:#fed7d7;">回溯</td><td>[A, B, C] &rarr; [A, B] &rarr; [A]</td><td>{A, B, E, C, F}</td><td>F/C/B无未访问邻居，回溯到A</td></tr>
+        <tr><td>7</td><td style="background:#c6f6d5;font-weight:bold;">D</td><td>[A, D]</td><td>{A, B, E, C, F, D}</td><td>从A继续，探索D</td></tr>
+        <tr><td>8</td><td style="background:#c6f6d5;font-weight:bold;">G</td><td>[A, D, G]</td><td>{A, B, E, C, F, D, G}</td><td>从D出发，探索G</td></tr>
+    </table>
+    <p style="margin-top:10px;"><strong>DFS 序列：</strong>A &rarr; B &rarr; E &rarr; C &rarr; F &rarr; D &rarr; G</p>
+    <p><strong>注意：</strong>DFS序列不唯一，取决于邻居的访问顺序。上面按字母序探索。</p>
+</div>
+
+<!-- ==================== 5. BFS vs DFS 对比 ==================== -->
+<h2>5. BFS vs DFS 对比</h2>
+
+<div class="concept">
+    <table class="truth-table">
+        <tr><th>特性</th><th>BFS（广度优先）</th><th>DFS（深度优先）</th></tr>
+        <tr><td>数据结构</td><td>队列（Queue）</td><td>栈（Stack）/ 递归</td></tr>
+        <tr><td>搜索方式</td><td>逐层扩展</td><td>一路深入再回溯</td></tr>
+        <tr><td>最短路径</td><td>保证（无权图）</td><td>不保证</td></tr>
+        <tr><td>空间复杂度</td><td>O(b<sup>d</sup>) — 较大</td><td>O(b&middot;m) — 较小</td></tr>
+        <tr><td>时间复杂度</td><td>O(V + E)</td><td>O(V + E)</td></tr>
+        <tr><td>适用场景</td><td>最短路径、层序</td><td>连通性、环检测、拓扑排序</td></tr>
+        <tr><td>完备性</td><td>完备（能找到解）</td><td>可能陷入深路径</td></tr>
+    </table>
+</div>
+
+<!-- ==================== 6. 交互式遍历演示 ==================== -->
+<h2>6. 交互式 BFS/DFS 遍历演示</h2>
+
+<div class="demo-area">
+    <p style="color:#a0aec0;">// 选择遍历方式，观察从 A 出发的遍历顺序</p>
+    <div style="margin:10px 0;">
+        <button onclick="runTraversal('bfs')" id="bfsBtn">运行 BFS</button>
+        <button onclick="runTraversal('dfs')" id="dfsBtn">运行 DFS</button>
+        <button onclick="resetTraversal()">重置</button>
+    </div>
+    <div class="demo-result" id="travResult">
+        <p>点击按钮开始遍历...</p>
+    </div>
+</div>
+
+<script>
+/* 遍历演示 */
+const graph = {
+    'A': ['B', 'D'],
+    'B': ['A', 'E', 'C'],
+    'C': ['B', 'F'],
+    'D': ['A', 'G'],
+    'E': ['B'],
+    'F': ['C'],
+    'G': ['D']
+};
+// 邻居按字母序排列
+for (const v in graph) graph[v].sort();
+
+function runTraversal(type) {
+    const visited = new Set();
+    const order = [];
+    const steps = [];
+
+    if (type === 'bfs') {
+        const queue = ['A'];
+        visited.add('A');
+        while (queue.length > 0) {
+            const v = queue.shift();
+            order.push(v);
+            for (const w of graph[v]) {
+                if (!visited.has(w)) {
+                    visited.add(w);
+                    queue.push(w);
+                }
+            }
+            steps.push({node: v, queue: [...queue], visited: [...visited]});
+        }
+    } else {
+        // DFS 使用栈（显式模拟）
+        const stack = ['A'];
+        visited.add('A');
+        while (stack.length > 0) {
+            const v = stack.pop();
+            order.push(v);
+            for (const w of graph[v].slice().reverse()) {
+                if (!visited.has(w)) {
+                    visited.add(w);
+                    stack.push(w);
+                }
+            }
+            steps.push({node: v, stack: [...stack], visited: [...visited]});
+        }
+    }
+
+    const typeName = type === 'bfs' ? 'BFS' : 'DFS';
+    const structName = type === 'bfs' ? '队列' : '栈';
+
+    let html = `<p><strong>${typeName} 遍历序列：</strong>${order.join(' → ')}</p>`;
+    html += `<p style="margin-top:10px;">执行过程：</p>`;
+    html += `<table class="truth-table"><tr><th>步骤</th><th>访问</th><th>${structName}</th><th>已访问</th></tr>`;
+    steps.forEach((s, i) => {
+        const struct = type === 'bfs' ? s.queue : s.stack;
+        html += `<tr><td>${i+1}</td><td style="background:#c6f6d5;font-weight:bold;">${s.node}</td>`;
+        html += `<td>[${struct.join(', ')}]</td>`;
+        html += `<td>{${s.visited.join(', ')}}</td></tr>`;
+    });
+    html += `</table>`;
+
+    document.getElementById('travResult').innerHTML = html;
+}
+
+function resetTraversal() {
+    document.getElementById('travResult').innerHTML = '<p>点击按钮开始遍历...</p>';
+}
+</script>
+
+</div><!-- /.container -->
+
+<!--
+    ==========================================
+    总结：
+    1. 图的遍历：从某顶点出发访问所有顶点恰好一次
+    2. BFS（广度优先）：队列实现，逐层扩展，保证最短路径，时间O(V+E)
+    3. DFS（深度优先）：栈/递归实现，一路深入再回溯，适合连通性和环检测
+    4. 两种遍历的时间复杂度都是 O(V+E)，区别在搜索策略和适用场景
+    5. BFS 序列和 DFS 序列都不唯一（取决于邻居访问顺序）
+    ==========================================
+-->
+</body>
+</html>

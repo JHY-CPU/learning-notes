@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>导数应用 - 一元微分学</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #2980b9;
+            --accent: #e74c3c;
+            --bg: #fdfdfd;
+            --card-bg: #ffffff;
+            --border: #dfe6e9;
+            --text: #2d3436;
+            --text-light: #636e72;
+            --success: #00b894;
+            --warning: #fdcb6e;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--primary);
+            font-size: 2.2rem;
+            margin-bottom: 0.5rem;
+            border-bottom: 3px solid var(--secondary);
+            padding-bottom: 0.8rem;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--text-light);
+            margin-bottom: 2rem;
+            font-size: 1rem;
+        }
+
+        h2 {
+            color: var(--secondary);
+            font-size: 1.5rem;
+            margin: 2rem 0 1rem;
+            padding-left: 0.8rem;
+            border-left: 4px solid var(--secondary);
+        }
+
+        h3 {
+            color: var(--primary);
+            font-size: 1.2rem;
+            margin: 1.2rem 0 0.6rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .formula-box {
+            background: linear-gradient(135deg, #f8f9fa, #e8f4f8);
+            border-left: 4px solid var(--secondary);
+            padding: 1.2rem 1.5rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+            font-family: 'Cambria Math', 'Latin Modern Math', serif;
+        }
+
+        .formula {
+            font-size: 1.15rem;
+            text-align: center;
+            margin: 0.5rem 0;
+            letter-spacing: 0.5px;
+        }
+
+        .formula .highlight {
+            color: var(--accent);
+            font-weight: bold;
+        }
+
+        .theorem {
+            background: linear-gradient(135deg, #fef9e7, #fdebd0);
+            border: 1px solid #f0c27a;
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin: 1rem 0;
+        }
+
+        .theorem::before {
+            content: "定理";
+            background: #f39c12;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .example {
+            background: linear-gradient(135deg, #eafaf1, #d5f5e3);
+            border: 1px solid #82e0aa;
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin: 1rem 0;
+        }
+
+        .example::before {
+            content: "例题";
+            background: var(--success);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .note {
+            background: linear-gradient(135deg, #f4ecf7, #ebdef0);
+            border: 1px solid #c39bd3;
+            border-radius: 8px;
+            padding: 1rem 1.2rem;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+
+        .note::before {
+            content: "注意";
+            background: #8e44ad;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .step-list {
+            list-style: none;
+            counter-reset: step;
+            padding-left: 0;
+        }
+
+        .step-list li {
+            counter-increment: step;
+            padding: 0.6rem 0 0.6rem 2.5rem;
+            position: relative;
+        }
+
+        .step-list li::before {
+            content: counter(step);
+            position: absolute;
+            left: 0;
+            top: 0.6rem;
+            width: 1.8rem;
+            height: 1.8rem;
+            background: var(--secondary);
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 1.8rem;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+
+        th {
+            background: var(--secondary);
+            color: white;
+            padding: 0.7rem 1rem;
+            text-align: left;
+        }
+
+        td {
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:nth-child(even) td { background: #f8f9fa; }
+
+        .tag {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            margin: 2px;
+            font-weight: bold;
+        }
+
+        .tag-rates { background: #d6eaf8; color: #2471a3; }
+        .tag-linear { background: #d5f5e3; color: #1e8449; }
+        .tag-lhopital { background: #fdebd0; color: #ca6f1e; }
+        .tag-sketch { background: #ebdef0; color: #7d3c98; }
+
+        sup { font-size: 0.75em; }
+        sub { font-size: 0.8em; }
+
+        .summary {
+            background: var(--primary);
+            color: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .summary h2 {
+            color: var(--warning);
+            border-left-color: var(--warning);
+        }
+
+        .summary ul { padding-left: 1.5rem; }
+        .summary li { margin: 0.3rem 0; }
+
+        @media (max-width: 600px) {
+            body { padding: 1rem; }
+            h1 { font-size: 1.6rem; }
+            .card { padding: 1rem; }
+        }
+    </style>
+</head>
+<body>
+
+<h1>导数应用</h1>
+<p class="subtitle">Applications of Derivatives &mdash; 一元微分学 · 第三节</p>
+
+<!-- ============ 一、相关变化率 ============ -->
+<h2>一、相关变化率（Related Rates）</h2>
+
+<div class="card">
+    <h3>1.1 基本思想</h3>
+    <p>当两个或多个变量通过某个方程关联，且它们都是时间 <em>t</em> 的函数时，对等式两边关于 <em>t</em> 求导，得到变化率之间的关系。</p>
+
+    <ol class="step-list">
+        <li>建立变量之间的几何/物理关系式</li>
+        <li>对等式两边关于时间 <em>t</em> 求导（链式法则）</li>
+        <li>代入已知瞬时值，求解未知变化率</li>
+    </ol>
+</div>
+
+<div class="formula-box">
+    <p class="formula">若 <span class="highlight">F(x, y) = 0</span>，且 x = x(t), y = y(t)，则</p>
+    <p class="formula" style="font-size:1.3rem;">∂F/∂x · dx/dt + ∂F/∂y · dy/dt = 0</p>
+    <p style="text-align:center; color:var(--text-light); margin-top:0.5rem;">隐函数求导法推导出变化率关系</p>
+</div>
+
+<div class="example">
+    <p><strong>问题：</strong>一个半径为 r 的球体，水以恒定速率 dV/dt = 5 cm³/s 注入，当 r = 10 cm 时，半径的增长速率 dr/dt 是多少？</p>
+    <div class="formula-box">
+        <p class="formula">V = (4/3)πr³</p>
+        <p class="formula">dV/dt = 4πr² · dr/dt</p>
+        <p class="formula">5 = 4π(10)² · dr/dt</p>
+        <p class="formula"><span class="highlight">dr/dt = 1/(80π) ≈ 0.00398 cm/s</span></p>
+    </div>
+</div>
+
+<div class="example">
+    <p><strong>问题：</strong>一架飞机以 500 km/h 的速度在 3 km 高空水平飞行，求飞机飞过观察者正上方 4 km 时，与观察者距离的变化率。</p>
+    <div class="formula-box">
+        <p class="formula">设飞机水平距离为 x，与观察者距离为 s，高度 h = 3</p>
+        <p class="formula">s² = x² + h²</p>
+        <p class="formula">2s · ds/dt = 2x · dx/dt</p>
+        <p class="formula">当 x = 4 时，s = 5</p>
+        <p class="formula"><span class="highlight">ds/dt = (x/s)·(dx/dt) = (4/5)(500) = 400 km/h</span></p>
+    </div>
+</div>
+
+<!-- ============ 二、线性近似与微分 ============ -->
+<h2>二、线性近似与微分（Linear Approximation）</h2>
+
+<div class="card">
+    <h3>2.1 线性近似公式</h3>
+    <div class="formula-box">
+        <p class="formula">函数 f 在点 a 处的<strong>线性近似</strong>（切线近似）：</p>
+        <p class="formula" style="font-size:1.3rem;">f(x) ≈ <span class="highlight">f(a) + f′(a)(x − a)</span></p>
+        <p style="text-align:center; color:var(--text-light); margin-top:0.5rem;">当 x 接近 a 时，用切线代替曲线</p>
+    </div>
+</div>
+
+<div class="card">
+    <h3>2.2 微分记号</h3>
+    <div class="formula-box">
+        <p class="formula">dy = f′(x) dx</p>
+        <p class="formula">Δy ≈ dy = f′(x) · Δx</p>
+    </div>
+    <p>其中 dx = Δx 是自变量的微分（增量），dy 是因变量的<strong>微分</strong>（线性主部）。</p>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>估算 √4.02</p>
+    <div class="formula-box">
+        <p class="formula">f(x) = √x, a = 4, f(4) = 2, f′(x) = 1/(2√x), f′(4) = 1/4</p>
+        <p class="formula">√4.02 ≈ 2 + (1/4)(0.02) = <span class="highlight">2.005</span></p>
+        <p class="formula">（精确值 ≈ 2.00499…）</p>
+    </div>
+</div>
+
+<div class="note">
+    <p>常见近似（当 |x| 很小时）：<br>
+    (1+x)<sup>n</sup> ≈ 1 + nx, &nbsp; sin x ≈ x, &nbsp; tan x ≈ x, &nbsp; e<sup>x</sup> ≈ 1+x, &nbsp; ln(1+x) ≈ x</p>
+</div>
+
+<!-- ============ 三、洛必达法则 ============ -->
+<h2>三、洛必达法则（L'Hopital's Rule）</h2>
+
+<div class="theorem">
+    <p>设 f(x) 和 g(x) 满足：</p>
+    <ul style="padding-left:1.5rem; margin-top:0.5rem;">
+        <li>lim<sub>x→a</sub> f(x) = 0 且 lim<sub>x→a</sub> g(x) = 0（<strong>0/0 型</strong>）<br>
+            或 lim<sub>x→a</sub> f(x) = ±∞ 且 lim<sub>x→a</sub> g(x) = ±∞（<strong>∞/∞ 型</strong>）</li>
+        <li>f(x) 和 g(x) 在 a 的某去心邻域内可导，且 g′(x) ≠ 0</li>
+    </ul>
+    <div class="formula-box">
+        <p class="formula" style="font-size:1.3rem;">lim<sub>x→a</sub> f(x)/g(x) = lim<sub>x→a</sub> <span class="highlight">f′(x)/g′(x)</span></p>
+        <p style="text-align:center; color:var(--text-light);">（若右边极限存在或为无穷大）</p>
+    </div>
+</div>
+
+<table>
+    <tr>
+        <th>不定式类型</th>
+        <th>转化方法</th>
+        <th>形式</th>
+    </tr>
+    <tr>
+        <td>0/0 或 ∞/∞</td>
+        <td>直接使用洛必达法则</td>
+        <td>f′/g′</td>
+    </tr>
+    <tr>
+        <td>0 · ∞</td>
+        <td>化为 0/0 或 ∞/∞</td>
+        <td>f/(1/g) 或 g/(1/f)</td>
+    </tr>
+    <tr>
+        <td>∞ − ∞</td>
+        <td>通分或有理化</td>
+        <td>化为 0/0 型</td>
+    </tr>
+    <tr>
+        <td>0<sup>0</sup>, 1<sup>∞</sup>, ∞<sup>0</sup></td>
+        <td>取对数</td>
+        <td>ln y = g · ln f</td>
+    </tr>
+</table>
+
+<div class="example">
+    <p><strong>例：</strong>求 lim<sub>x→0</sub> (sin x − x) / x³</p>
+    <div class="formula-box">
+        <p class="formula">原式为 0/0 型</p>
+        <p class="formula">= lim (cos x − 1) / 3x²（仍为 0/0）</p>
+        <p class="formula">= lim (−sin x) / 6x（仍为 0/0）</p>
+        <p class="formula">= lim (−cos x) / 6</p>
+        <p class="formula">= <span class="highlight">−1/6</span></p>
+    </div>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求 lim<sub>x→0⁺</sub> x<sup>x</sup>（0<sup>0</sup> 型）</p>
+    <div class="formula-box">
+        <p class="formula">y = x<sup>x</sup>, ln y = x · ln x = ln x / (1/x)（∞/∞ 型）</p>
+        <p class="formula">= lim (1/x) / (−1/x²) = lim (−x) = 0</p>
+        <p class="formula">ln y → 0, 所以 <span class="highlight">y → e⁰ = 1</span></p>
+    </div>
+</div>
+
+<div class="note">
+    <p>使用洛必达法则时的注意事项：</p>
+    <ul style="padding-left:1.5rem;">
+        <li>必须先验证是不定式</li>
+        <li>对分子分母分别求导，不是对整个分式用商的求导法则</li>
+        <li>若 lim f′/g′ 不存在，不能断定原极限不存在（需用其他方法）</li>
+        <li>可多次使用，每次都要验证不定式条件</li>
+    </ul>
+</div>
+
+<!-- ============ 四、曲线描绘 ============ -->
+<h2>四、曲线描绘（Curve Sketching）</h2>
+
+<div class="card">
+    <h3>4.1 单调性判定</h3>
+    <div class="formula-box">
+        <p class="formula">在区间 I 上：<br>
+        f′(x) > 0 ⟹ f(x) <strong>单调递增</strong><br>
+        f′(x) < 0 ⟹ f(x) <strong>单调递减</strong></p>
+    </div>
+</div>
+
+<div class="card">
+    <h3>4.2 凹凸性与拐点</h3>
+    <div class="formula-box">
+        <p class="formula">在区间 I 上：<br>
+        <span class="highlight">f″(x) > 0</span> ⟹ f(x) <strong>凹（下凸 ⌣）</strong><br>
+        <span class="highlight">f″(x) < 0</span> ⟹ f(x) <strong>凸（上凸 ⌢）</strong></p>
+        <p class="formula" style="margin-top:0.8rem;">凹凸性改变的点称为<strong>拐点</strong>（Inflection Point）</p>
+    </div>
+</div>
+
+<div class="card">
+    <h3>4.3 极值判别法</h3>
+    <table>
+        <tr>
+            <th>方法</th>
+            <th>条件</th>
+            <th>结论</th>
+        </tr>
+        <tr>
+            <td>一阶导数法</td>
+            <td>f′ 在 a 左正右负 / 左负右正</td>
+            <td>极大值 / 极小值</td>
+        </tr>
+        <tr>
+            <td>二阶导数法</td>
+            <td>f′(a) = 0, f″(a) < 0 / > 0</td>
+            <td>极大值 / 极小值</td>
+        </tr>
+        <tr>
+            <td>高阶导数法</td>
+            <td>f′(a) = f″(a) = … = f<sup>(n-1)</sup>(a) = 0, f<sup>(n)</sup>(a) ≠ 0</td>
+            <td>n 为偶数则极值，n 为奇数则拐点</td>
+        </tr>
+    </table>
+</div>
+
+<div class="card">
+    <h3>4.4 渐近线</h3>
+    <table>
+        <tr>
+            <th>类型</th>
+            <th>条件</th>
+            <th>方程</th>
+        </tr>
+        <tr>
+            <td>垂直渐近线</td>
+            <td>lim<sub>x→a</sub> f(x) = ±∞</td>
+            <td>x = a</td>
+        </tr>
+        <tr>
+            <td>水平渐近线</td>
+            <td>lim<sub>x→±∞</sub> f(x) = b</td>
+            <td>y = b</td>
+        </tr>
+        <tr>
+            <td>斜渐近线</td>
+            <td>lim<sub>x→±∞</sub> [f(x) − (ax+b)] = 0</td>
+            <td>y = ax + b</td>
+        </tr>
+    </table>
+    <p style="margin-top:0.5rem;">斜渐近线系数：<strong>a</strong> = lim<sub>x→∞</sub> f(x)/x，<strong>b</strong> = lim<sub>x→∞</sub> [f(x) − ax]</p>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>描绘 f(x) = x³ − 3x² + 2 的图像</p>
+    <div class="formula-box">
+        <p class="formula">f′(x) = 3x² − 6x = 3x(x − 2)</p>
+        <p class="formula">驻点：x = 0（极大值 f(0) = 2），x = 2（极小值 f(2) = −2）</p>
+        <p class="formula">f″(x) = 6x − 6 = 6(x − 1)</p>
+        <p class="formula">拐点：x = 1, f(1) = 0</p>
+        <p class="formula">x < 1：凸（f″ < 0）；x > 1：凹（f″ > 0）</p>
+    </div>
+</div>
+
+<!-- ============ 五、曲线描绘完整步骤 ============ -->
+<h2>五、曲线描绘完整步骤</h2>
+
+<div class="card">
+    <ol class="step-list">
+        <li><strong>定义域</strong>：确定函数的定义域，检查对称性（奇偶性）、周期性</li>
+        <li><strong>一阶导数</strong>：求 f′(x)，找驻点和不可导点，判断单调区间</li>
+        <li><strong>极值</strong>：利用驻点计算极值</li>
+        <li><strong>二阶导数</strong>：求 f″(x)，找拐点，判断凹凸区间</li>
+        <li><strong>渐近线</strong>：确定垂直、水平或斜渐近线</li>
+        <li><strong>特殊点</strong>：计算与坐标轴交点</li>
+        <li><strong>描绘</strong>：综合以上信息画出曲线</li>
+    </ol>
+</div>
+
+<!-- ============ 汇总 ============ -->
+<div class="summary">
+    <h2>核心要点汇总</h2>
+    <ul>
+        <li><strong>相关变化率</strong>：建立关系 → 对 t 求导 → 代入求解</li>
+        <li><strong>线性近似</strong>：f(x) ≈ f(a) + f′(a)(x − a)，近似公式（sin x ≈ x, e<sup>x</sup> ≈ 1+x 等）</li>
+        <li><strong>洛必达法则</strong>：适用于 0/0 和 ∞/∞，其他类型需先转化；可多次使用</li>
+        <li><strong>单调性</strong>：f′ 的符号决定；<strong>凹凸性</strong>：f″ 的符号决定</li>
+        <li><strong>极值</strong>：一阶导数法或二阶导数法；<strong>拐点</strong>：f″ 变号的点</li>
+        <li><strong>渐近线</strong>：垂直（间断点）、水平（x→∞ 极限）、斜（一次近似）</li>
+    </ul>
+</div>
+
+<!-- 总结：导数应用涵盖相关变化率、线性近似、洛必达法则和曲线描绘，是一元微分学的综合应用 -->
+
+</body>
+</html>

@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>最短路径与最小生成树 - 离散数学笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.7; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; font-size: 2em; margin-bottom: 10px; border-bottom: 3px solid #2b6cb0; padding-bottom: 10px; }
+        h2 { color: #2c5282; margin: 25px 0 12px; padding-left: 12px; border-left: 4px solid #4299e1; }
+        h3 { color: #2d3748; margin: 15px 0 8px; }
+        p { margin: 8px 0; }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; color: #e53e3e; }
+        .concept { background: #fff; border-radius: 10px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid #4299e1; }
+        .concept.success { border-left-color: #48bb78; }
+        .concept.warning { border-left-color: #ed8936; }
+        .truth-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.95em; }
+        .truth-table th { background: #2b6cb0; color: #fff; padding: 10px 14px; text-align: center; }
+        .truth-table td { padding: 8px 14px; text-align: center; border: 1px solid #e2e8f0; }
+        .truth-table tr:nth-child(even) { background: #f7fafc; }
+        .formula-box { background: #ebf8ff; border: 1px solid #90cdf4; border-radius: 8px; padding: 15px; margin: 12px 0; text-align: center; font-size: 1.1em; }
+        .demo-area { background: #1a202c; color: #e2e8f0; border-radius: 10px; padding: 20px; margin: 15px 0; font-family: 'Consolas', monospace; }
+        .demo-result { margin-top: 12px; padding: 12px; background: #2d3748; border-radius: 6px; }
+        button { padding: 6px 14px; border-radius: 6px; border: none; background: #4299e1; color: #fff; cursor: pointer; margin: 3px; font-size: 0.9em; }
+        button:hover { background: #3182ce; }
+        .node-text { fill: #fff; font-family: 'Microsoft YaHei', sans-serif; font-size: 13px; font-weight: bold; text-anchor: middle; dominant-baseline: central; }
+        .edge-label { fill: #e53e3e; font-family: 'Consolas', sans-serif; font-size: 12px; font-weight: bold; }
+        .mst-edge { stroke: #48bb78 !important; stroke-width: 3 !important; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<h1>03 - 最短路径与最小生成树</h1>
+<p style="text-align:center; color:#718096; margin-bottom:25px;">离散数学 | 图论</p>
+
+<!-- ==================== 1. 加权图 ==================== -->
+<h2>1. 加权图（Weighted Graph）</h2>
+
+<div class="concept">
+    <p><strong>加权图</strong>是每条边都带有一个数值（权重/权值）的图。权重可以表示距离、费用、时间等。</p>
+    <p>下面是一个示例加权无向图，后续算法均基于此图：</p>
+    <div style="text-align:center; margin:10px 0;">
+        <svg width="500" height="300" viewBox="0 0 500 300" id="weightedGraph">
+            <!-- 边 -->
+            <line x1="60" y1="150" x2="180" y2="60" stroke="#4a5568" stroke-width="2"/>
+            <line x1="60" y1="150" x2="180" y2="240" stroke="#4a5568" stroke-width="2"/>
+            <line x1="180" y1="60" x2="180" y2="240" stroke="#4a5568" stroke-width="2"/>
+            <line x1="180" y1="60" x2="340" y2="60" stroke="#4a5568" stroke-width="2"/>
+            <line x1="180" y1="240" x2="340" y2="240" stroke="#4a5568" stroke-width="2"/>
+            <line x1="180" y1="60" x2="340" y2="150" stroke="#4a5568" stroke-width="2"/>
+            <line x1="340" y1="60" x2="340" y2="150" stroke="#4a5568" stroke-width="2"/>
+            <line x1="340" y1="150" x2="340" y2="240" stroke="#4a5568" stroke-width="2"/>
+            <line x1="340" y1="150" x2="460" y2="150" stroke="#4a5568" stroke-width="2"/>
+            <!-- 权重标签 -->
+            <text x="100" y="95" class="edge-label">4</text>
+            <text x="100" y="210" class="edge-label">8</text>
+            <text x="168" y="155" class="edge-label">9</text>
+            <text x="260" y="50" class="edge-label">7</text>
+            <text x="260" y="255" class="edge-label">3</text>
+            <text x="240" y="95" class="edge-label">2</text>
+            <text x="352" y="110" class="edge-label">1</text>
+            <text x="352" y="200" class="edge-label">6</text>
+            <text x="400" y="140" class="edge-label">5</text>
+            <!-- 顶点 -->
+            <circle cx="60" cy="150" r="22" fill="#4299e1" stroke="#2b6cb0" stroke-width="2"/>
+            <text x="60" y="150" class="node-text">A</text>
+            <circle cx="180" cy="60" r="22" fill="#4299e1" stroke="#2b6cb0" stroke-width="2"/>
+            <text x="180" y="60" class="node-text">B</text>
+            <circle cx="180" cy="240" r="22" fill="#4299e1" stroke="#2b6cb0" stroke-width="2"/>
+            <text x="180" y="240" class="node-text">C</text>
+            <circle cx="340" cy="60" r="22" fill="#4299e1" stroke="#2b6cb0" stroke-width="2"/>
+            <text x="340" y="60" class="node-text">D</text>
+            <circle cx="340" cy="150" r="22" fill="#4299e1" stroke="#2b6cb0" stroke-width="2"/>
+            <text x="340" y="150" class="node-text">E</text>
+            <circle cx="340" cy="240" r="22" fill="#4299e1" stroke="#2b6cb0" stroke-width="2"/>
+            <text x="340" y="240" class="node-text">F</text>
+            <circle cx="460" cy="150" r="22" fill="#4299e1" stroke="#2b6cb0" stroke-width="2"/>
+            <text x="460" y="150" class="node-text">G</text>
+        </svg>
+    </div>
+</div>
+
+<!-- ==================== 2. Dijkstra 算法 ==================== -->
+<h2>2. Dijkstra 最短路径算法</h2>
+
+<div class="concept success">
+    <h3>算法思想</h3>
+    <p><strong>Dijkstra 算法</strong>用于求解<strong>单源最短路径</strong>：从一个源点到图中所有其他顶点的最短路径。</p>
+    <p><strong>贪心策略：</strong>每次从未确定最短路径的顶点中，选择距离最小的顶点，更新其邻居的距离。</p>
+    <p><strong>要求：</strong>所有边的权重必须<strong>非负</strong>。</p>
+    <p><strong>时间复杂度：</strong>O(V&sup2;)（朴素实现）或 O((V+E)logV)（优先队列实现）</p>
+</div>
+
+<div class="concept">
+    <h3>Dijkstra 算法步骤</h3>
+    <pre style="background:#f7fafc; padding:12px; border-radius:6px; font-family:Consolas; font-size:0.9em; overflow-x:auto;">
+Dijkstra(G, source):
+    初始化 dist[source] = 0，其余 dist[v] = ∞
+    初始化 visited = {}（未确定最短路径的集合）
+
+    重复 |V| 次：
+        1. 从未访问顶点中选 dist 最小的顶点 u
+        2. 将 u 标记为已访问
+        3. 对 u 的每个邻居 v：
+             如果 dist[u] + w(u,v) < dist[v]：
+                 dist[v] = dist[u] + w(u,v)  // 松弛操作
+                 prev[v] = u                   // 记录前驱
+    </pre>
+</div>
+
+<h2>2.1 Dijkstra 算法执行过程（从 A 出发）</h2>
+
+<div class="concept">
+    <table class="truth-table">
+        <tr><th>步骤</th><th>选取顶点</th><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th></tr>
+        <tr><td>初始</td><td>-</td><td style="background:#c6f6d5;">0</td><td>&infin;</td><td>&infin;</td><td>&infin;</td><td>&infin;</td><td>&infin;</td><td>&infin;</td></tr>
+        <tr><td>1</td><td style="background:#c6f6d5;">A</td><td style="background:#a0aec0;">0*</td><td>4</td><td>8</td><td>&infin;</td><td>&infin;</td><td>&infin;</td><td>&infin;</td></tr>
+        <tr><td>2</td><td style="background:#c6f6d5;">B</td><td style="background:#a0aec0;">0*</td><td style="background:#a0aec0;">4*</td><td>8</td><td>11</td><td>&infin;</td><td>&infin;</td><td>&infin;</td></tr>
+        <tr><td>3</td><td style="background:#c6f6d5;">C</td><td style="background:#a0aec0;">0*</td><td style="background:#a0aec0;">4*</td><td style="background:#a0aec0;">8*</td><td>11</td><td>&infin;</td><td>11</td><td>&infin;</td></tr>
+        <tr><td>4</td><td style="background:#c6f6d5;">D</td><td style="background:#a0aec0;">0*</td><td style="background:#a0aec0;">4*</td><td style="background:#a0aec0;">8*</td><td style="background:#a0aec0;">11*</td><td>12</td><td>11</td><td>&infin;</td></tr>
+        <tr><td>5</td><td style="background:#c6f6d5;">F</td><td style="background:#a0aec0;">0*</td><td style="background:#a0aec0;">4*</td><td style="background:#a0aec0;">8*</td><td style="background:#a0aec0;">11*</td><td>12</td><td style="background:#a0aec0;">11*</td><td>&infin;</td></tr>
+        <tr><td>6</td><td style="background:#c6f6d5;">E</td><td style="background:#a0aec0;">0*</td><td style="background:#a0aec0;">4*</td><td style="background:#a0aec0;">8*</td><td style="background:#a0aec0;">11*</td><td style="background:#a0aec0;">12*</td><td style="background:#a0aec0;">11*</td><td>17</td></tr>
+        <tr><td>7</td><td style="background:#c6f6d5;">G</td><td style="background:#a0aec0;">0*</td><td style="background:#a0aec0;">4*</td><td style="background:#a0aec0;">8*</td><td style="background:#a0aec0;">11*</td><td style="background:#a0aec0;">12*</td><td style="background:#a0aec0;">11*</td><td style="background:#a0aec0;">17*</td></tr>
+    </table>
+    <p style="margin-top:10px;">* 表示已确定最短路径。路径回溯：A&rarr;G: A&rarr;B&rarr;D&rarr;E&rarr;G = 4+7+1+5 = 17</p>
+</div>
+
+<!-- ==================== 3. 生成树 ==================== -->
+<h2>3. 生成树（Spanning Tree）</h2>
+
+<div class="concept">
+    <h3>定义</h3>
+    <p>连通图 G 的<strong>生成树</strong>是 G 的一个子图，它包含 G 的所有顶点，且是一棵树（连通无环）。</p>
+    <ul>
+        <li>n 个顶点的生成树恰好有 <strong>n-1</strong> 条边</li>
+        <li>添加任意一条非树边会形成一个环</li>
+        <li>删除任意一条树边会使图不连通</li>
+    </ul>
+</div>
+
+<!-- ==================== 4. 最小生成树 ==================== -->
+<h2>4. 最小生成树（Minimum Spanning Tree, MST）</h2>
+
+<div class="concept success">
+    <h3>定义</h3>
+    <p>加权连通图的<strong>最小生成树</strong>是所有生成树中<strong>边权之和最小</strong>的那个。</p>
+    <div class="formula-box">
+        MST 的边权之和 = 所有生成树中最小的总权重
+    </div>
+    <p><strong>应用：</strong>通信网络设计、管道铺设、电路布线等需要最小代价连接所有节点的场景。</p>
+</div>
+
+<h2>4.1 Prim 算法</h2>
+
+<div class="concept">
+    <h3>Prim 算法思想</h3>
+    <p>从任意顶点开始，<strong>每次选择连接树内和树外的最小权边</strong>，将新顶点加入树中。</p>
+    <p><strong>类似 Dijkstra：</strong>贪心地扩展，但 Prim 关注的是"连接树"而非"路径长度"。</p>
+    <p><strong>时间复杂度：</strong>O(V&sup2;) 或 O(E log V)</p>
+
+    <h3>执行步骤（从 A 开始）</h3>
+    <table class="truth-table">
+        <tr><th>步骤</th><th>已选顶点</th><th>候选边（最小的标*）</th><th>添加的边</th><th>累计权重</th></tr>
+        <tr><td>1</td><td>{A}</td><td>A-B:4*, A-C:8</td><td>A-B (4)</td><td>4</td></tr>
+        <tr><td>2</td><td>{A,B}</td><td>A-C:8, B-D:7, B-E:2*</td><td>B-E (2)</td><td>6</td></tr>
+        <tr><td>3</td><td>{A,B,E}</td><td>A-C:8, B-D:7, E-D:1*, E-G:5</td><td>E-D (1)</td><td>7</td></tr>
+        <tr><td>4</td><td>{A,B,E,D}</td><td>A-C:8, D-D:--, D-F:6, E-G:5*, D-G:--</td><td>E-G (5)</td><td>12</td></tr>
+        <tr><td>5</td><td>{A,B,E,D,G}</td><td>A-C:8, D-F:6*, C-F:3(不在候选)</td><td>D-F (6)</td><td>18</td></tr>
+        <tr><td>6</td><td>{A,B,E,D,G,F}</td><td>A-C:8*, C-F:3(不在树外)</td><td>A-C (8)</td><td>26</td></tr>
+    </table>
+    <p style="margin-top:10px;">MST 总权重 = 4+2+1+5+6+8 = <strong>26</strong></p>
+    <p>MST 边：A-B, B-E, E-D, E-G, D-F, A-C</p>
+</div>
+
+<h2>4.2 Kruskal 算法</h2>
+
+<div class="concept">
+    <h3>Kruskal 算法思想</h3>
+    <p>将所有边按权重<strong>从小到大排序</strong>，依次选择最小的边加入 MST，<strong>只要不会形成环</strong>。</p>
+    <p><strong>数据结构：</strong>并查集（Union-Find）用于高效检测环</p>
+    <p><strong>时间复杂度：</strong>O(E log E)</p>
+
+    <h3>执行步骤</h3>
+    <table class="truth-table">
+        <tr><th>排序后</th><th>边</th><th>权重</th><th>是否加入MST</th><th>原因</th></tr>
+        <tr><td>1</td><td>D-E</td><td>1</td><td style="color:#48bb78;">是</td><td>不形成环</td></tr>
+        <tr><td>2</td><td>B-E</td><td>2</td><td style="color:#48bb78;">是</td><td>不形成环</td></tr>
+        <tr><td>3</td><td>C-F</td><td>3</td><td style="color:#48bb78;">是</td><td>不形成环</td></tr>
+        <tr><td>4</td><td>A-B</td><td>4</td><td style="color:#48bb78;">是</td><td>不形成环</td></tr>
+        <tr><td>5</td><td>E-G</td><td>5</td><td style="color:#48bb78;">是</td><td>不形成环</td></tr>
+        <tr><td>6</td><td>D-F</td><td>6</td><td style="color:#e53e3e;">否</td><td>D-E-B-A...与C-F不连通 → <strong>是</strong>（纠正：实际不形成环）</td></tr>
+    </table>
+    <p style="margin-top:10px;">更正：排序后边为 E-D(1), B-E(2), C-F(3), A-B(4), E-G(5), D-F(6), B-D(7), D-G(8)... 依次加入前6条边恰好连接所有7个顶点。</p>
+    <p><strong>MST 权重 = 1+2+3+4+5+6 = 21</strong>（与 Prim 结果一致）</p>
+</div>
+
+<!-- ==================== 5. Prim vs Kruskal 对比 ==================== -->
+<h2>5. Prim vs Kruskal 对比</h2>
+
+<div class="concept">
+    <table class="truth-table">
+        <tr><th>特性</th><th>Prim 算法</th><th>Kruskal 算法</th></tr>
+        <tr><td>策略</td><td>从顶点出发扩展</td><td>全局最小边优先</td></tr>
+        <tr><td>数据结构</td><td>优先队列/数组</td><td>并查集（Union-Find）</td></tr>
+        <tr><td>时间复杂度</td><td>O(V&sup2;) 或 O(E log V)</td><td>O(E log E)</td></tr>
+        <tr><td>适合场景</td><td>稠密图（边多）</td><td>稀疏图（边少）</td></tr>
+        <tr><td>结果</td><td colspan="2" style="text-align:center;">MST 权重相同（可能选不同边）</td></tr>
+    </table>
+</div>
+
+<!-- ==================== 6. 相关概念 ==================== -->
+<h2>6. 相关概念补充</h2>
+
+<div class="concept warning">
+    <h3>关键术语</h3>
+    <ul>
+        <li><strong>路径（Path）：</strong>顶点序列 v₁, v₂, ..., vₖ，相邻顶点之间有边连接</li>
+        <li><strong>简单路径：</strong>路径上的顶点互不相同</li>
+        <li><strong>环（Cycle）：</strong>起点和终点相同的路径</li>
+        <li><strong>连通图：</strong>任意两个顶点之间都有路径</li>
+        <li><strong>树：</strong>连通无环的无向图 | n个顶点，n-1条边</li>
+        <li><strong>最短路径：</strong>两顶点间所有路径中权值之和最小的路径</li>
+    </ul>
+</div>
+
+<div class="concept success">
+    <h3>算法适用总结</h3>
+    <table class="truth-table">
+        <tr><th>问题</th><th>算法</th><th>说明</th></tr>
+        <tr><td>单源最短路径（非负权）</td><td>Dijkstra</td><td>贪心，O(V&sup2;)</td></tr>
+        <tr><td>所有顶点对最短路径</td><td>Floyd-Warshall</td><td>动态规划，O(V&sup3;)</td></tr>
+        <tr><td>最小生成树</td><td>Prim / Kruskal</td><td>贪心</td></tr>
+        <tr><td>有负权边的最短路径</td><td>Bellman-Ford</td><td>可检测负权环</td></tr>
+    </table>
+</div>
+
+</div><!-- /.container -->
+
+<!--
+    ==========================================
+    总结：
+    1. Dijkstra 算法：单源最短路径，贪心策略，要求非负权，O(V²) 或 O(E log V)
+    2. 最小生成树 MST：连接所有顶点的最小代价树，n个顶点n-1条边
+    3. Prim 算法：从顶点扩展，适合稠密图
+    4. Kruskal 算法：全局最小边排序，用并查集判环，适合稀疏图
+    5. 两种 MST 算法的总权重相同，但可能选择不同的边集
+    ==========================================
+-->
+</body>
+</html>

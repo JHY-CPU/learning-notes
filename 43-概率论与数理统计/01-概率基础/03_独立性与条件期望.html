@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>事件独立性与条件期望</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; font-size: 2em; margin-bottom: 10px; border-bottom: 3px solid #2b6cb0; padding-bottom: 10px; }
+        .subtitle { text-align: center; color: #718096; margin-bottom: 30px; }
+        h2 { color: #2c5282; font-size: 1.4em; margin: 25px 0 12px; padding-left: 12px; border-left: 4px solid #3182ce; }
+        h3 { color: #2d3748; font-size: 1.15em; margin: 18px 0 8px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px 25px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .formula { background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 6px; padding: 12px 18px; margin: 10px 0; font-size: 1.05em; text-align: center; font-family: 'Times New Roman', serif; }
+        .formula-inline { background: #ebf8ff; padding: 2px 8px; border-radius: 4px; font-family: 'Times New Roman', serif; }
+        .example { background: #f0fff4; border-left: 4px solid #48bb78; border-radius: 0 6px 6px 0; padding: 15px 18px; margin: 12px 0; }
+        .example-title { font-weight: bold; color: #276749; margin-bottom: 6px; }
+        .note { background: #fffff0; border-left: 4px solid #ecc94b; border-radius: 0 6px 6px 0; padding: 12px 18px; margin: 12px 0; }
+        .note-title { font-weight: bold; color: #975a16; }
+        .step { background: #faf5ff; border-left: 4px solid #805ad5; border-radius: 0 6px 6px 0; padding: 10px 18px; margin: 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 8px 12px; text-align: center; }
+        th { background: #bee3f8; color: #2a4365; }
+        tr:nth-child(even) { background: #f7fafc; }
+        ul, ol { margin-left: 25px; margin-bottom: 8px; }
+        li { margin-bottom: 4px; }
+        .tag { display: inline-block; background: #c3dafe; color: #3c366b; padding: 2px 10px; border-radius: 12px; font-size: 0.85em; margin: 3px; }
+        .summary-box { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; border-radius: 10px; padding: 20px 25px; margin-top: 30px; }
+        .summary-box h2 { color: #fff; border-left-color: #fff; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>事件独立性与条件期望</h1>
+    <p class="subtitle">概率基础 · 独立性判定与条件期望</p>
+
+    <!-- ==================== 事件独立性 ==================== -->
+    <h2>一、事件的独立性</h2>
+
+    <div class="card">
+        <h3>1. 两事件独立</h3>
+        <p>设 A、B 为两个事件，若满足以下等价条件之一，则称 A 与 B <strong>相互独立</strong>：</p>
+        <div class="formula">
+            P(AB) = P(A) · P(B)
+        </div>
+        <p style="margin-top:8px;">等价表述：</p>
+        <ul>
+            <li>P(A|B) = P(A)，即 B 的发生不改变 A 的概率</li>
+            <li>P(B|A) = P(B)，即 A 的发生不改变 B 的概率</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>2. 独立性的重要推论</h3>
+        <p>若 A 与 B 相互独立，则以下各对事件也相互独立：</p>
+        <table>
+            <tr><th>事件对</th><th>证明思路</th></tr>
+            <tr><td>A 与 B&#772;（B的对立事件）</td><td>P(AB&#772;) = P(A) - P(AB) = P(A) - P(A)P(B) = P(A)[1-P(B)] = P(A)P(B&#772;)</td></tr>
+            <tr><td>A&#772; 与 B</td><td>由对称性</td></tr>
+            <tr><td>A&#772; 与 B&#772;</td><td>P(A&#772;B&#772;) = 1 - P(A∪B) = 1 - P(A) - P(B) + P(AB) = [1-P(A)][1-P(B)] = P(A&#772;)P(B&#772;)</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>3. 独立 vs 互斥（易混淆辨析）</h3>
+        <table>
+            <tr><th>概念</th><th>定义</th><th>条件</th><th>能否同时成立</th></tr>
+            <tr><td>互斥</td><td>A∩B = ∅</td><td>P(AB) = 0</td><td>一般不能同时成立（除非 P(A)=0 或 P(B)=0）</td></tr>
+            <tr><td>独立</td><td>发生互不影响</td><td>P(AB) = P(A)P(B)</td><td>—</td></tr>
+        </table>
+        <div class="note">
+            <span class="note-title">关键区分：</span> 互斥事件"不能同时发生"，因此一个发生就决定了另一个不发生（互相影响），故<strong>互斥事件一定不独立</strong>（概率均非零时）。独立事件"可以同时发生但互不影响"。
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>4. 多事件独立</h3>
+        <h3>（1）两两独立</h3>
+        <p>对任意 i ≠ j，有 P(AᵢAⱼ) = P(Aᵢ)P(Aⱼ)</p>
+        <h3>（2）相互独立（全局独立）</h3>
+        <p>对任意子集 {i₁, i₂, ..., iₖ}，有：</p>
+        <div class="formula">
+            P(Aᵢ₁Aᵢ₂...Aᵢₖ) = P(Aᵢ₁)·P(Aᵢ₂)·...·P(Aᵢₖ)
+        </div>
+        <p style="margin-top:8px;">两两独立 ≠ 相互独立！两两独立是必要条件，但不是充分条件。</p>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 1：两两独立但不相互独立</div>
+        <p>掷两枚均匀硬币，定义事件 A={第一枚正面}，B={第二枚正面}，C={两枚结果相同}。验证 A,B,C 两两独立但不相互独立。</p>
+        <div class="step">
+            样本空间：{正正, 正反, 反正, 反反}，各概率 1/4<br>
+            P(A)=1/2, P(B)=1/2, P(C)=1/2<br><br>
+            两两独立验证：<br>
+            P(AB) = 1/4 = P(A)P(B) &nbsp; ✓<br>
+            P(AC) = 1/4 = P(A)P(C) &nbsp; ✓<br>
+            P(BC) = 1/4 = P(B)P(C) &nbsp; ✓<br><br>
+            相互独立验证：<br>
+            P(ABC) = P({正正}) = 1/4<br>
+            P(A)P(B)P(C) = 1/2 × 1/2 × 1/2 = 1/8<br>
+            <strong>P(ABC) ≠ P(A)P(B)P(C)，故不相互独立</strong>
+        </div>
+    </div>
+
+    <!-- ==================== 条件期望 ==================== -->
+    <h2>二、条件期望（数学期望的条件版本）</h2>
+
+    <div class="card">
+        <h3>1. 条件期望的定义</h3>
+        <p>给定事件 B（P(B)>0），随机变量 X 关于 B 的条件期望定义为：</p>
+        <div class="formula">
+            E(X|B) = Σ xₖ · P(X = xₖ | B)&nbsp;&nbsp;（离散型）<br><br>
+            E(X|B) = ∫₋∞⁺∞ x · f(x|B) dx&nbsp;&nbsp;（连续型）
+        </div>
+        <p style="margin-top:8px;">其中 P(X=xₖ|B) = P(X=xₖ, B)/P(B)，f(x|B) 为条件密度函数。</p>
+    </div>
+
+    <div class="card">
+        <h3>2. 条件期望的基本性质</h3>
+        <ul>
+            <li>E(aX + b | B) = aE(X|B) + b</li>
+            <li>E(X + Y | B) = E(X|B) + E(Y|B)</li>
+            <li>若 X 与 B 独立，则 E(X|B) = E(X)</li>
+            <li>E(E(X|B)) = E(X)（需推广形式）</li>
+        </ul>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 2：条件期望计算</div>
+        <p>掷一颗均匀骰子，设事件 A = {点数为偶数}，求 X（骰子点数）关于 A 的条件期望。</p>
+        <div class="step">
+            A = {2, 4, 6}，P(A) = 3/6 = 1/2<br>
+            P(X=2|A) = P(X=2, A)/P(A) = (1/6)/(1/2) = 1/3<br>
+            P(X=4|A) = 1/3，P(X=6|A) = 1/3<br><br>
+            E(X|A) = 2×(1/3) + 4×(1/3) + 6×(1/3) = <strong>4</strong><br>
+            （对比无条件期望 E(X) = 3.5）
+        </div>
+    </div>
+
+    <!-- ==================== 全期望公式 ==================== -->
+    <h2>三、全期望公式（Law of Total Expectation）</h2>
+
+    <div class="card">
+        <h3>1. 离散版本</h3>
+        <p>设 B₁, B₂, ..., Bₙ 是样本空间的一个划分（互斥且穷尽），则：</p>
+        <div class="formula">
+            E(X) = Σ E(X|Bᵢ) · P(Bᵢ)
+        </div>
+        <p style="margin-top:8px;">这是全概率公式在期望层面的推广。</p>
+    </div>
+
+    <div class="card">
+        <h3>2. 随机变量版本（重期望公式）</h3>
+        <p>设 Y 为随机变量，则以 Y 为条件：</p>
+        <div class="formula">
+            E(X) = E[E(X|Y)]
+        </div>
+        <p style="margin-top:8px;">含义：X 的无条件期望 = X 在每个 Y 值下条件期望的加权平均（权重为 Y 的分布）。</p>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 3：全期望公式应用</div>
+        <p>某公司有两个部门，A部门有300人（平均工资6000元），B部门有200人（平均工资8000元）。随机选一人，求其工资期望。</p>
+        <div class="step">
+            设 Y 为部门（0=A, 1=B），X 为工资<br>
+            P(Y=0) = 300/500 = 0.6，P(Y=1) = 200/500 = 0.4<br>
+            E(X|Y=0) = 6000，E(X|Y=1) = 8000<br><br>
+            E(X) = E(X|Y=0)·P(Y=0) + E(X|Y=1)·P(Y=1)<br>
+            = 6000 × 0.6 + 8000 × 0.4 = 3600 + 3200 = <strong>6800元</strong>
+        </div>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 4：随机个数之和的期望</div>
+        <p>某商店每天顾客数 N 服从参数 λ=10 的泊松分布，每个顾客消费金额 Xᵢ 服从均值 200 元的分布且相互独立。求总营业额 S = X₁+X₂+...+Xₙ 的期望。</p>
+        <div class="step">
+            利用重期望公式：E(S) = E[E(S|N)]<br>
+            E(S|N=n) = E(X₁+...+Xₙ) = n·E(X₁) = 200n<br>
+            E(S|N) = 200N<br>
+            E(S) = E(200N) = 200·E(N) = 200 × 10 = <strong>2000元</strong><br><br>
+            推广：若 N 与 Xᵢ 独立，则 E(S) = E(N)·E(X₁)（Wald等式）
+        </div>
+    </div>
+
+    <div class="note">
+        <span class="note-title">全期望公式的应用场景：</span>
+        <ul>
+            <li>混合分布问题：总体期望 = 各层条件期望的加权平均</li>
+            <li>随机个数随机变量之和：E(S) = E(N)·E(X₁)</li>
+            <li>递推问题：利用条件期望建立递推关系</li>
+            <li>优化决策：在不同情境下的期望收益加权</li>
+        </ul>
+    </div>
+
+    <div class="summary-box">
+        <h2>本节总结</h2>
+        <ul>
+            <li><strong>事件独立</strong>：P(AB) = P(A)P(B)，对立事件也独立</li>
+            <li><strong>独立 vs 互斥</strong>：互斥（不能同时发生）≠ 独立（互不影响），互斥且概率非零则一定不独立</li>
+            <li><strong>两两独立 ≠ 相互独立</strong>：相互独立要求所有子集的联合概率 = 各概率乘积</li>
+            <li><strong>条件期望</strong>：E(X|B) 在缩减样本空间中计算 X 的期望</li>
+            <li><strong>全期望公式</strong>：E(X) = Σ E(X|Bᵢ)P(Bᵢ) = E[E(X|Y)]</li>
+            <li><strong>Wald等式</strong>：随机个数独立同分布之和的期望 = E(N)·E(X₁)</li>
+        </ul>
+    </div>
+</div>
+</body>
+</html>
+<!-- 本文件涵盖：事件独立性定义与推论、独立vs互斥辨析、两两独立vs相互独立、条件期望定义与性质、全期望公式（离散版与随机变量版）、Wald等式，共4道例题 -->

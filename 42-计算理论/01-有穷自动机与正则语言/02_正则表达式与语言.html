@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>正则表达式与正则语言</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            background: #f0f4f8; color: #2d3748;
+            line-height: 1.7; padding: 20px;
+        }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; border-bottom: 3px solid #3182ce; padding-bottom: 12px; margin-bottom: 30px; }
+        h2 { color: #2c5282; margin: 25px 0 12px; padding-left: 10px; border-left: 4px solid #3182ce; }
+        h3 { color: #2d3748; margin: 15px 0 8px; }
+        p, li { margin-bottom: 8px; }
+        ul, ol { padding-left: 25px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: "Consolas", monospace; font-size: 0.95em; color: #c53030; }
+        pre { background: #1a202c; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; margin: 10px 0; font-size: 0.9em; }
+        pre code { background: none; color: inherit; padding: 0; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 10px 14px; text-align: center; }
+        th { background: #3182ce; color: #fff; }
+        tr:nth-child(even) { background: #f7fafc; }
+        .tag { display: inline-block; padding: 3px 10px; border-radius: 15px; font-size: 0.8em; font-weight: bold; margin: 2px; }
+        .tag-blue { background: #bee3f8; color: #2a4365; }
+        .tag-red { background: #fed7d7; color: #9b2c2c; }
+        .tag-green { background: #c6f6d5; color: #22543d; }
+        .pumping-box {
+            background: #fffff0; border: 2px solid #d69e2e;
+            border-radius: 10px; padding: 20px; margin: 15px 0;
+        }
+        .pumping-box h3 { color: #b7791f; }
+        .theorem {
+            background: #f0fff4; border-left: 5px solid #38a169;
+            padding: 15px; margin: 15px 0; border-radius: 0 8px 8px 0;
+        }
+        .example { background: #ebf8ff; border-radius: 8px; padding: 15px; margin: 12px 0; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <h1>正则表达式与正则语言</h1>
+
+    <!-- ====== 正则表达式定义 ====== -->
+    <div class="card">
+        <h2>一、正则表达式的定义</h2>
+        <p>正则表达式是描述<strong>正则语言</strong>的代数记法，递归定义如下：</p>
+        <ol>
+            <li><strong>基础情况：</strong>
+                <ul>
+                    <li>空集 <code>∅</code> 是正则表达式（表示空语言）</li>
+                    <li>空串 <code>ε</code> 是正则表达式（表示 {ε}）</li>
+                    <li>字母表中每个符号 <code>a</code> 是正则表达式（表示 {a}）</li>
+                </ul>
+            </li>
+            <li><strong>归纳步骤：</strong>若 R 和 S 是正则表达式，则以下也是：
+                <ul>
+                    <li><code>(R|S)</code> — 并集（选择）</li>
+                    <li><code>(RS)</code> — 连接（concatenation）</li>
+                    <li><code>(R*)</code> — 克林闭包（零次或多次重复）</li>
+                </ul>
+            </li>
+        </ol>
+    </div>
+
+    <!-- ====== 运算优先级与示例 ====== -->
+    <div class="card">
+        <h2>二、运算优先级与常见模式</h2>
+        <table>
+            <thead><tr><th>运算符</th><th>含义</th><th>优先级</th><th>示例</th></tr></thead>
+            <tbody>
+                <tr><td><code>*</code></td><td>克林闭包</td><td>最高 (3)</td><td><code>a*</code> = {ε, a, aa, aaa, ...}</td></tr>
+                <tr><td>连接</td><td>拼接</td><td>中 (2)</td><td><code>ab</code> = {ab}</td></tr>
+                <tr><td><code>|</code></td><td>选择（或）</td><td>最低 (1)</td><td><code>a|b</code> = {a, b}</td></tr>
+            </tbody>
+        </table>
+
+        <h3>常见正则表达式模式</h3>
+        <div class="example">
+            <table>
+                <thead><tr><th>模式</th><th>描述</th><th>匹配示例</th></tr></thead>
+                <tbody>
+                    <tr><td><code>(0|1)*</code></td><td>所有二进制串</td><td>ε, 0, 101, 1110</td></tr>
+                    <tr><td><code>0(0|1)*1</code></td><td>以0开头以1结尾的串</td><td>01, 001, 01011</td></tr>
+                    <tr><td><code>(0|1)*01(0|1)*</code></td><td>包含子串"01"</td><td>01, 1010, 0011</td></tr>
+                    <tr><td><code>(00|11)*</code></td><td>偶数长度的相同对</td><td>ε, 00, 1100, 0011</td></tr>
+                    <tr><td><code>1(0|1)*0</code></td><td>以1开头0结尾</td><td>10, 110, 1010</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ====== 正则语言的运算封闭性 ====== -->
+    <div class="card">
+        <h2>三、正则语言的封闭性</h2>
+        <p>正则语言在以下运算下<strong>封闭</strong>（即运算结果仍是正则语言）：</p>
+        <table>
+            <thead><tr><th>运算</th><th>说明</th><th>方法</th></tr></thead>
+            <tbody>
+                <tr><td><strong>并集</strong> ∪</td><td>L₁ ∪ L₂</td><td>NFA添加新初始状态，ε转移到两个旧初始状态</td></tr>
+                <tr><td><strong>连接</strong> ∘</td><td>L₁ ∘ L₂</td><td>NFA将L₁接受状态ε转移到L₂初始状态</td></tr>
+                <tr><td><strong>克林闭包</strong> *</td><td>L*</td><td>NFA添加新初始/接受状态，旧接受状态ε回旧初始</td></tr>
+                <tr><td><strong>交集</strong> ∩</td><td>L₁ ∩ L₂</td><td>乘积构造（两个DFA同步运行）</td></tr>
+                <tr><td><strong>补集</strong> </td><td>¬L</td><td>DFA交换接受与非接受状态</td></tr>
+                <tr><td><strong>反转</strong></td><td>Lᴿ</td><td>NFA反转所有转移箭头，初始/接受状态互换</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ====== 泵引理 ====== -->
+    <div class="pumping-box">
+        <h2>四、正则语言的泵引理 (Pumping Lemma)</h2>
+        <div class="theorem">
+            <h3>泵引理定理</h3>
+            <p>若 L 是正则语言，则存在<strong>泵长度 p > 0</strong>，使得对任意 w ∈ L 且 |w| ≥ p，可将 w 分解为 <code>w = xyz</code>，满足：</p>
+            <ol>
+                <li><code>|xy| ≤ p</code></li>
+                <li><code>|y| > 0</code>（即 y 非空）</li>
+                <li>对所有 i ≥ 0，<code>xy<sup>i</sup>z ∈ L</code></li>
+            </ol>
+        </div>
+        <p><strong>重要理解：</strong>泵引理是<strong>必要条件</strong>，不是充分条件。可以用来<strong>证明某个语言不是正则语言</strong>。</p>
+
+        <h3>证明示例：L = {0ⁿ1ⁿ | n ≥ 0} 不是正则语言</h3>
+        <div class="example">
+            <p><strong>反证法：</strong></p>
+            <ol>
+                <li>假设 L 是正则语言，泵长度为 p</li>
+                <li>取 w = 0ᵖ1ᵖ ∈ L，则 |w| = 2p ≥ p ✓</li>
+                <li>由泵引理，w = xyz，|xy| ≤ p，|y| > 0</li>
+                <li>因为 |xy| ≤ p，所以 xy 全由 0 组成，即 y = 0ᵏ（k > 0）</li>
+                <li>取 i = 2，泵出 xy²z = 0^(p+k)1ᵖ</li>
+                <li>因为 k > 0，0的个数 > 1的个数，所以 xy²z ∉ L</li>
+                <li><strong>矛盾！</strong>故 L 不是正则语言 ∎</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- ====== 正则语言与自动机的等价性 ====== -->
+    <div class="card">
+        <h2>五、正则语言、DFA、NFA的等价性</h2>
+        <p>以下三个定义描述了<strong>完全相同的语言类</strong>：</p>
+        <ul>
+            <li><strong>DFA</strong> 识别的语言</li>
+            <li><strong>NFA</strong> 识别的语言</li>
+            <li><strong>正则表达式</strong> 描述的语言</li>
+        </ul>
+
+        <h3>转换关系</h3>
+        <pre><code>        正则表达式                DFA               NFA
+    ┌──────────────┐   Thompson   ┌─────┐ 子集构造  ┌─────┐
+    │  R ───────────────────────►│ NFA │────────►│ DFA │
+    │  (直接递归构造)│   构造法     └─────┘  法      └─────┘
+    └──────────────┘                 ▲                 │
+         ▲                           │                 │ 最小化
+         │ 状态标记法                 │                 ▼
+         │                      ┌────┴────┐      ┌─────────┐
+         └──────────────────────│  DFA    │◄─────│最小 DFA │
+                                └─────────┘      └─────────┘</code></pre>
+        <p><span class="tag tag-blue">Thompson构造法</span> 将正则表达式转为NFA；<span class="tag tag-green">子集构造法</span> 将NFA转为DFA；<span class="tag tag-red">Hopcroft算法</span> 最小化DFA。</p>
+    </div>
+
+    <!-- ====== Myhill-Nerode定理 ====== -->
+    <div class="card">
+        <h2>六、Myhill-Nerode定理</h2>
+        <p>语言 L 的<strong>等价关系</strong> ~<sub>L</sub>：x ~<sub>L</sub> y 当且仅当对所有串 z，xz ∈ L ⇔ yz ∈ L。</p>
+        <div class="theorem">
+            <p><strong>定理：</strong>L 是正则语言，当且仅当 ~<sub>L</sub> 的等价类数目有穷。</p>
+            <p>等价类数目 = 识别 L 的最小DFA的状态数。</p>
+        </div>
+        <h3>应用示例</h3>
+        <div class="example">
+            <p>证明 L = {0ⁿ1ⁿ | n ≥ 0} 不是正则语言：</p>
+            <p>考虑串 0<sup>i</sup> 和 0<sup>j</sup>（i ≠ j），取 z = 1<sup>i</sup>，则 0<sup>i</sup>1<sup>i</sup> ∈ L 但 0<sup>j</sup>1<sup>i</sup> ∉ L（j ≠ i）。</p>
+            <p>因此所有 0<sup>i</sup> 形式的串属于不同等价类，等价类无穷多，L 非正则。∎</p>
+        </div>
+    </div>
+
+    <!-- ====== 代码示例 ====== -->
+    <div class="card">
+        <h2>七、正则表达式转NFA (Python示例)</h2>
+        <pre><code># 简化的正则表达式引擎框架
+class NFA:
+    """用Thompson构造法构建NFA"""
+    def __init__(self, start, accept, transitions):
+        self.start = start       # 初始状态
+        self.accept = accept     # 接受状态
+        self.delta = transitions # dict: (state, char) -> set of states
+
+    def epsilon_closure(self, states):
+        """计算 ε-闭包"""
+        stack = list(states)
+        closure = set(states)
+        while stack:
+            s = stack.pop()
+            for nxt in self.delta.get((s, ''), set()):
+                if nxt not in closure:
+                    closure.add(nxt)
+                    stack.append(nxt)
+        return closure
+
+    def accepts(self, input_str):
+        """判断NFA是否接受输入串"""
+        current = self.epsilon_closure({self.start})
+        for ch in input_str:
+            next_states = set()
+            for s in current:
+                next_states |= self.delta.get((s, ch), set())
+            current = self.epsilon_closure(next_states)
+        return bool(current & self.accept)
+
+# 例：正则表达式 0(0|1)*1
+# 对应NFA可接受 "01", "001", "01011" 等
+# 不接受 "10", "00", "111"</code></pre>
+    </div>
+
+</div>
+
+<!--
+========================================
+  笔记总结
+========================================
+本文件涵盖正则表达式与正则语言的核心知识：
+
+1. 正则表达式定义：
+   - 三种基本运算：并集(|)、连接、克林闭包(*)
+   - 递归定义，基础为∅、ε、单字符
+   - 优先级：* > 连接 > |
+
+2. 正则语言的封闭性：
+   - 对并、连接、克林闭包封闭（直接构造）
+   - 对交集、补集封闭（乘积构造/交换状态）
+   - 对反转封闭（反转箭头）
+
+3. 泵引理：
+   - 证明语言不是正则语言的利器
+   - 三个条件：|xy|≤p, |y|>0, xy^i z ∈ L
+   - 经典例子：证明 {0^n 1^n} 不是正则语言
+
+4. 正则表达式 ⟺ NFA ⟺ DFA 的等价性：
+   - Thompson构造法：正则 → NFA
+   - 子集构造法：NFA → DFA
+   - Hopcroft算法：DFA最小化
+
+5. Myhill-Nerode定理：
+   - 提供了判断正则性的另一个工具
+   - 等价类数目 = 最小DFA状态数
+
+6. 应用：grep/awk/sed模式匹配、词法分析器、文本搜索
+========================================
+-->
+</body>
+</html>

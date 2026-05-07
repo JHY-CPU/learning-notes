@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- 着色器编程GLSL - 计算机图形学笔记 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>着色器编程GLSL</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f5f7fa; color: #2c3e50; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 40px; }
+        h1 { font-size: 28px; color: #1a5276; border-bottom: 3px solid #2980b9; padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 22px; color: #2980b9; margin: 28px 0 14px; border-left: 4px solid #2980b9; padding-left: 12px; }
+        h3 { font-size: 18px; color: #34495e; margin: 20px 0 10px; }
+        p { margin: 8px 0; text-indent: 2em; }
+        ul, ol { margin: 10px 0 10px 2em; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: left; }
+        th { background: #2980b9; color: #fff; }
+        tr:nth-child(even) { background: #f0f4f8; }
+        .note { background: #eaf2f8; border-left: 4px solid #2980b9; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .key-point { background: #fef9e7; border-left: 4px solid #f39c12; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        code { background: #ecf0f1; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>着色器编程GLSL</h1>
+
+    <!-- 一、GLSL概述 -->
+    <h2>一、GLSL概述</h2>
+    <p>GLSL（OpenGL Shading Language）是OpenGL的着色器编程语言，语法类似C语言，在GPU上并行执行。现代图形渲染管线的每个可编程阶段都由对应的着色器控制。</p>
+
+    <h3>1.1 可编程着色器阶段</h3>
+    <table>
+        <tr><th>着色器</th><th>管线阶段</th><th>执行频率</th><th>主要职责</th></tr>
+        <tr><td>顶点着色器（Vertex）</td><td>顶点处理</td><td>每个顶点</td><td>坐标变换、属性传递</td></tr>
+        <tr><td>细分控制着色器（TCS）</td><td>细分</td><td>每个控制点</td><td>控制细分程度</td></tr>
+        <tr><td>细分评估着色器（TES）</td><td>细分</td><td>每个细分顶点</td><td>计算细分后顶点位置</td></tr>
+        <tr><td>几何着色器（Geometry）</td><td>图元处理</td><td>每个图元</td><td>增删改图元</td></tr>
+        <tr><td>片段着色器（Fragment）</td><td>光栅化后</td><td>每个像素</td><td>颜色计算、光照</td></tr>
+        <tr><td>计算着色器（Compute）</td><td>独立</td><td>每个线程</td><td>通用GPU计算</td></tr>
+    </table>
+
+    <!-- 二、GLSL语言基础 -->
+    <h2>二、GLSL语言基础</h2>
+
+    <h3>2.1 数据类型</h3>
+    <table>
+        <tr><th>类型</th><th>说明</th><th>示例</th></tr>
+        <tr><td>float</td><td>32位浮点</td><td><code>float a = 1.0;</code></td></tr>
+        <tr><td>vec2/vec3/vec4</td><td>2/3/4维浮点向量</td><td><code>vec3 color = vec3(1.0, 0.5, 0.0);</code></td></tr>
+        <tr><td>ivec2/ivec3/ivec4</td><td>整数向量</td><td><code>ivec2 pos = ivec2(10, 20);</code></td></tr>
+        <tr><td>mat2/mat3/mat4</td><td>2×2/3×3/4×4矩阵</td><td><code>mat4 mvp = proj * view * model;</code></td></tr>
+        <tr><td>sampler2D</td><td>2D纹理采样器</td><td><code>sampler2D tex;</code></td></tr>
+        <tr><td>bool</td><td>布尔值</td><td><code>bool flag = true;</code></td></tr>
+    </table>
+
+    <h3>2.2 向量分量访问</h3>
+    <div class="key-point">
+        <code>vec4 v = vec4(1.0, 2.0, 3.0, 4.0);</code><br>
+        <code>v.x / v.r / v.s</code> → 1.0（第一个分量）<br>
+        <code>v.y / v.g / v.t</code> → 2.0（第二个分量）<br>
+        <code>v.z / v.b / v.p</code> → 3.0（第三个分量）<br>
+        <code>v.w / v.a / v.q</code> → 4.0（第四个分量）<br><br>
+        支持swizzle：<code>v.rgb</code> = vec3(1,2,3), <code>v.xy</code> = vec2(1,2)
+    </div>
+
+    <h3>2.3 类型限定符</h3>
+    <table>
+        <tr><th>限定符</th><th>说明</th><th>示例</th></tr>
+        <tr><td>in</td><td>输入变量</td><td><code>in vec3 position;</code></td></tr>
+        <tr><td>out</td><td>输出变量</td><td><code>out vec4 fragColor;</code></td></tr>
+        <tr><td>uniform</td><td>全局一致的常量</td><td><code>uniform mat4 mvp;</code></td></tr>
+        <tr><td>varying（旧版）</td><td>顶点→片段插值</td><td>已被in/out替代</td></tr>
+        <tr><td>const</td><td>编译时常量</td><td><code>const float PI = 3.14159;</code></td></tr>
+    </table>
+
+    <!-- 三、顶点着色器 -->
+    <h2>三、顶点着色器（Vertex Shader）</h2>
+    <p>顶点着色器处理每个顶点，主要负责将顶点位置从模型空间变换到裁剪空间，同时传递顶点属性到后续阶段。</p>
+
+    <h3>3.1 基本顶点着色器</h3>
+    <div class="key-point">
+        <pre>
+#version 330 core
+
+// 输入属性
+layout (location = 0) in vec3 aPos;       // 顶点位置
+layout (location = 1) in vec3 aNormal;    // 顶点法线
+layout (location = 2) in vec2 aTexCoord;  // 纹理坐标
+
+// Uniform变量
+uniform mat4 model;
+uniform mat4 view;
+uniform mat4 projection;
+
+// 输出到片段着色器
+out vec3 FragPos;
+out vec3 Normal;
+out vec2 TexCoord;
+
+void main() {
+    // 计算世界空间位置
+    FragPos = vec3(model * vec4(aPos, 1.0));
+
+    // 法线变换（使用法线矩阵处理非均匀缩放）
+    Normal = mat3(transpose(inverse(model))) * aNormal;
+
+    // 传递纹理坐标
+    TexCoord = aTexCoord;
+
+    // 裁剪空间位置
+    gl_Position = projection * view * vec4(FragPos, 1.0);
+}
+        </pre>
+    </div>
+
+    <!-- 四、片段着色器 -->
+    <h2>四、片段着色器（Fragment Shader）</h2>
+    <p>片段着色器处理每个像素片段，计算最终输出颜色。光照、纹理采样、后处理效果等都在这里实现。</p>
+
+    <h3>4.1 Phong光照片段着色器</h3>
+    <div class="key-point">
+        <pre>
+#version 330 core
+
+in vec3 FragPos;
+in vec3 Normal;
+in vec2 TexCoord;
+
+out vec4 FragColor;
+
+// 材质
+uniform sampler2D diffuseTex;
+uniform sampler2D specularTex;
+uniform float shininess;
+
+// 光源
+uniform vec3 lightPos;
+uniform vec3 lightColor;
+uniform vec3 viewPos;
+
+void main() {
+    vec3 norm = normalize(Normal);
+    vec3 lightDir = normalize(lightPos - FragPos);
+    vec3 viewDir = normalize(viewPos - FragPos);
+    vec3 halfDir = normalize(lightDir + viewDir);
+
+    // 环境光
+    float ambientStrength = 0.1;
+    vec3 ambient = ambientStrength * lightColor;
+
+    // 漫反射
+    float diff = max(dot(norm, lightDir), 0.0);
+    vec3 diffuse = diff * lightColor * texture(diffuseTex, TexCoord).rgb;
+
+    // 镜面反射
+    float spec = pow(max(dot(norm, halfDir), 0.0), shininess);
+    vec3 specular = spec * lightColor * texture(specularTex, TexCoord).rgb;
+
+    vec3 result = ambient + diffuse + specular;
+    FragColor = vec4(result, 1.0);
+}
+        </pre>
+    </div>
+
+    <!-- 五、ShaderToy -->
+    <h2>五、ShaderToy示例</h2>
+    <p>ShaderToy是一个在线着色器编写和分享平台，只需编写片段着色器，通过内置uniform变量获取输入。</p>
+
+    <h3>5.1 ShaderToy内置变量</h3>
+    <table>
+        <tr><th>变量</th><th>类型</th><th>说明</th></tr>
+        <tr><td>iResolution</td><td>vec3</td><td>视口分辨率（x, y, 1）</td></tr>
+        <tr><td>iTime</td><td>float</td><td>程序运行时间（秒）</td></tr>
+        <tr><td>iMouse</td><td>vec4</td><td>鼠标位置（x, y, 点击x, 点击y）</td></tr>
+        <tr><td>iChannel0~3</td><td>sampler2D</td><td>输入纹理</td></tr>
+        <tr><td>fragCoord</td><td>vec4</td><td>片段像素坐标（输入）</td></tr>
+        <tr><td>fragColor</td><td>vec4</td><td>输出颜色</td></tr>
+    </table>
+
+    <h3>5.2 经典ShaderToy示例</h3>
+    <div class="key-point">
+        <pre>
+// 渐变背景 + 动态圆
+void mainImage(out vec4 fragColor, in vec2 fragCoord) {
+    // 归一化坐标到[-1, 1]
+    vec2 uv = (fragCoord - 0.5 * iResolution.xy) / iResolution.y;
+
+    // 动态背景渐变
+    vec3 col = vec3(0.5 + 0.5 * cos(iTime + uv.xyx + vec3(0,2,4)));
+
+    // 中心圆
+    float d = length(uv);
+    float circle = smoothstep(0.31, 0.3, d);
+    col = mix(col, vec3(1.0, 0.3, 0.1), circle);
+
+    // 围绕中心运动的小球
+    for (int i = 0; i &lt; 5; i++) {
+        float angle = iTime + float(i) * 6.28318 / 5.0;
+        vec2 pos = 0.5 * vec2(cos(angle), sin(angle));
+        float dist = length(uv - pos);
+        float ball = smoothstep(0.06, 0.05, dist);
+        col = mix(col, vec3(1.0), ball);
+    }
+
+    fragColor = vec4(col, 1.0);
+}
+        </pre>
+    </div>
+
+    <!-- 六、常用GLSL函数 -->
+    <h2>六、常用GLSL内置函数</h2>
+    <table>
+        <tr><th>函数</th><th>说明</th><th>示例</th></tr>
+        <tr><td>mix(a, b, t)</td><td>线性插值 a*(1-t) + b*t</td><td>颜色混合</td></tr>
+        <tr><td>smoothstep(e0, e1, x)</td><td>平滑阶跃（Hermite插值）</td><td>平滑边缘</td></tr>
+        <tr><td>step(edge, x)</td><td>阶跃函数 x&lt;edge→0, else→1</td><td>阈值判断</td></tr>
+        <tr><td>clamp(x, min, max)</td><td>钳制到[min,max]</td><td>限制范围</td></tr>
+        <tr><td>dot(a, b)</td><td>点积</td><td>光照计算</td></tr>
+        <tr><td>cross(a, b)</td><td>叉积</td><td>法线计算</td></tr>
+        <tr><td>normalize(v)</td><td>归一化</td><td>方向向量</td></tr>
+        <tr><td>length(v)</td><td>向量长度</td><td>距离计算</td></tr>
+        <tr><td>texture(sampler, uv)</td><td>纹理采样</td><td>读取纹理颜色</td></tr>
+        <tr><td>fract(x)</td><td>取小数部分</td><td>重复纹理</td></tr>
+        <tr><td>sin/cos/tan</td><td>三角函数</td><td>动画、波形</td></tr>
+        <tr><td>pow(x, y)</td><td>x的y次方</td><td>高光计算</td></tr>
+    </table>
+
+</div>
+
+<!--
+========================================
+  文件总结
+========================================
+  主题：着色器编程GLSL
+  内容概要：
+    1. GLSL概述 - 管线各阶段着色器：顶点/细分/几何/片段/计算
+    2. 语言基础 - 数据类型(vec/mat/sampler)、类型限定符(in/out/uniform)
+    3. 顶点着色器 - 坐标变换(MVP)，传递属性
+    4. 片段着色器 - Phong光照模型实现
+    5. ShaderToy - iResolution/iTime等内置变量
+    6. 常用函数 - mix/smoothstep/dot/texture等
+  重点知识：
+    - gl_Position在顶点着色器中设置裁剪空间位置
+    - 法线矩阵 = mat3(transpose(inverse(model)))处理非均匀缩放
+    - smoothstep(edge0, edge1, x)产生平滑过渡
+    - ShaderToy只需片段着色器，mainImage(out color, in coord)
+    - uniform变量在CPU端设置，所有顶点/片段共享同一值
+========================================
+-->
+</body>
+</html>

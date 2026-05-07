@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>布朗运动</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; font-size: 2em; margin-bottom: 10px; border-bottom: 3px solid #2b6cb0; padding-bottom: 10px; }
+        .subtitle { text-align: center; color: #718096; margin-bottom: 30px; }
+        h2 { color: #2c5282; font-size: 1.4em; margin: 25px 0 12px; padding-left: 12px; border-left: 4px solid #3182ce; }
+        h3 { color: #2d3748; font-size: 1.15em; margin: 18px 0 8px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px 25px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .formula { background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 6px; padding: 12px 18px; margin: 10px 0; font-size: 1.05em; text-align: center; font-family: 'Times New Roman', serif; }
+        .formula-inline { background: #ebf8ff; padding: 2px 8px; border-radius: 4px; font-family: 'Times New Roman', serif; }
+        .example { background: #f0fff4; border-left: 4px solid #48bb78; border-radius: 0 6px 6px 0; padding: 15px 18px; margin: 12px 0; }
+        .example-title { font-weight: bold; color: #276749; margin-bottom: 6px; }
+        .note { background: #fffff0; border-left: 4px solid #ecc94b; border-radius: 0 6px 6px 0; padding: 12px 18px; margin: 12px 0; }
+        .note-title { font-weight: bold; color: #975a16; }
+        .step { background: #faf5ff; border-left: 4px solid #805ad5; border-radius: 0 6px 6px 0; padding: 10px 18px; margin: 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 8px 12px; text-align: center; }
+        th { background: #bee3f8; color: #2a4365; }
+        tr:nth-child(even) { background: #f7fafc; }
+        ul, ol { margin-left: 25px; margin-bottom: 8px; }
+        li { margin-bottom: 4px; }
+        .tag { display: inline-block; background: #c3dafe; color: #3c366b; padding: 2px 10px; border-radius: 12px; font-size: 0.85em; margin: 3px; }
+        .summary-box { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; border-radius: 10px; padding: 20px 25px; margin-top: 30px; }
+        .summary-box h2 { color: #fff; border-left-color: #fff; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>布朗运动与几何布朗运动</h1>
+    <p class="subtitle">随机过程基础 · Wiener Process 与金融建模</p>
+
+    <!-- ==================== 标准布朗运动 ==================== -->
+    <h2>一、标准布朗运动（Wiener 过程）</h2>
+
+    <div class="card">
+        <h3>定义</h3>
+        <p>随机过程 {B(t), t ≥ 0} 若满足以下条件，则称为<strong>标准布朗运动</strong>（或 Wiener 过程）：</p>
+        <ol>
+            <li><strong>B(0) = 0</strong></li>
+            <li><strong>独立增量</strong>：对任意 0 ≤ t₁ < t₂ < ... < tₙ，增量 B(t₂)-B(t₁), ..., B(tₙ)-B(tₙ₋₁) 相互独立</li>
+            <li><strong>平稳增量</strong>：对任意 0 ≤ s < t，增量 B(t)-B(s) ~ N(0, t-s)</li>
+            <li><strong>连续路径</strong>：B(t) 是 t 的连续函数（概率为 1）</li>
+        </ol>
+    </div>
+
+    <div class="card">
+        <h3>基本统计量</h3>
+        <div class="formula">
+            E[B(t)] = 0, &nbsp; Var[B(t)] = t
+        </div>
+        <div class="formula">
+            Cov[B(s), B(t)] = min(s, t)&nbsp;&nbsp;&nbsp;&nbsp;（s, t ≥ 0）
+        </div>
+        <p style="margin-top:8px;">特别地，Corr[B(s), B(t)] = √(min(s,t)/max(s,t)) = √(s/t)（若 s ≤ t）。</p>
+    </div>
+
+    <!-- ==================== 布朗运动的性质 ==================== -->
+    <h2>二、布朗运动的重要性质</h2>
+
+    <div class="card">
+        <h3>1. 马尔可夫性</h3>
+        <p>布朗运动是连续时间马尔可夫过程：未来行为只依赖当前状态，与过去无关。</p>
+        <div class="formula">
+            P(B(t) ≤ x | B(s) = y, 历史) = P(B(t) ≤ x | B(s) = y)
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>2. 鞅性（Martingale）</h3>
+        <p>布朗运动是鞅：在当前信息下，未来值的条件期望等于当前值。</p>
+        <div class="formula">
+            E[B(t) | F<sub>s</sub>] = B(s), &nbsp; 对任意 t > s
+        </div>
+        <p style="margin-top:8px;">这意味着布朗运动"没有趋势"——向上和向下的机会均等。</p>
+    </div>
+
+    <div class="card">
+        <h3>3. 自相似性</h3>
+        <p>对任意 c > 0：</p>
+        <div class="formula">
+            {B(ct), t ≥ 0} 的分布 = {√c · B(t), t ≥ 0}
+        </div>
+        <p style="margin-top:8px;">放大时间尺度 c 倍等价于放大空间尺度 √c 倍。</p>
+    </div>
+
+    <div class="card">
+        <h3>4. 路径性质</h3>
+        <ul>
+            <li><strong>连续但处处不可微</strong>：布朗运动的路径以概率 1 处处连续但处处不可微</li>
+            <li><strong>无限变差</strong>：在任意区间 [0,t] 上，路径的总变差以概率 1 为无穷大</li>
+            <li><strong>二次变差</strong>：在 [0,t] 上的二次变差 = t（即 Σ[B(tᵢ₊₁)-B(tᵢ)]² → t）</li>
+            <li><strong>零点集</strong>：布朗运动在任意区间内有无穷多个零点</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 带漂移的布朗运动 ==================== -->
+    <h2>三、带漂移的布朗运动</h2>
+
+    <div class="card">
+        <h3>定义与统计量</h3>
+        <div class="formula">
+            X(t) = μt + σB(t)
+        </div>
+        <ul>
+            <li>μ：漂移率（drift），表示趋势方向</li>
+            <li>σ：扩散系数（volatility），表示波动幅度</li>
+            <li>E[X(t)] = μt</li>
+            <li>Var[X(t)] = σ²t</li>
+            <li>X(t) ~ N(μt, σ²t)</li>
+        </ul>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 1：带漂移布朗运动</div>
+        <p>X(t) = 2t + 3B(t)，求 P(X(4) > 10)。</p>
+        <div class="step">
+            X(4) ~ N(μt, σ²t) = N(2×4, 9×4) = N(8, 36)<br><br>
+            P(X(4) > 10) = P(Z > (10-8)/√36) = P(Z > 2/6) = P(Z > 0.333)<br>
+            = 1 - Φ(0.333) ≈ 1 - 0.6306 = <strong>0.3694</strong>
+        </div>
+    </div>
+
+    <!-- ==================== 几何布朗运动 ==================== -->
+    <h2>四、几何布朗运动（GBM）</h2>
+
+    <div class="card">
+        <h3>1. 定义</h3>
+        <p><strong>几何布朗运动</strong>（Geometric Brownian Motion）定义为：</p>
+        <div class="formula">
+            S(t) = S(0) · exp{(μ - σ²/2)t + σB(t)}
+        </div>
+        <p style="margin-top:8px;">等价的随机微分方程（SDE）形式：</p>
+        <div class="formula">
+            dS(t) = μS(t)dt + σS(t)dB(t)
+        </div>
+        <ul>
+            <li>μ：漂移率（drift），表示平均收益率</li>
+            <li>σ：波动率（volatility），表示价格波动幅度</li>
+            <li>S(t) > 0 始终成立（价格非负）</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>2. 统计性质</h3>
+        <div class="formula">
+            E[S(t)] = S(0) · e<sup>μt</sup>
+        </div>
+        <div class="formula">
+            Var[S(t)] = S(0)² · e<sup>2μt</sup> · (e<sup>σ²t</sup> - 1)
+        </div>
+        <div class="formula">
+            对数收益：ln(S(t)/S(0)) ~ N((μ-σ²/2)t, σ²t)
+        </div>
+        <p style="margin-top:8px;">关键性质：对数收益服从正态分布（即收益服从对数正态分布）。</p>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 2：几何布朗运动计算</div>
+        <p>股票现价 S(0)=100，年化收益率 μ=0.08，波动率 σ=0.2。求 1 年后期望价格和价格标准差。</p>
+        <div class="step">
+            E[S(1)] = 100 × e<sup>0.08</sup> ≈ 100 × 1.0833 = <strong>108.33</strong><br><br>
+            Var[S(1)] = 100² × e<sup>0.16</sup> × (e<sup>0.04</sup>-1)<br>
+            = 10000 × 1.1735 × 0.0408 ≈ 4788<br>
+            SD[S(1)] ≈ <strong>69.19</strong><br><br>
+            对数收益 ~ N((0.08-0.02)×1, 0.04) = N(0.06, 0.04)<br>
+            P(S(1) > 120) = P(ln(S(1)/100) > ln(1.2)) = P(Z > (0.182-0.06)/0.2) = P(Z > 0.61) ≈ <strong>0.2709</strong>
+        </div>
+    </div>
+
+    <!-- ==================== Black-Scholes ==================== -->
+    <h2>五、Black-Scholes 模型简介</h2>
+
+    <div class="card">
+        <h3>1. 基本假设</h3>
+        <ul>
+            <li>股票价格服从几何布朗运动：dS = μSdt + σSdB</li>
+            <li>无交易成本、无税收</li>
+            <li>可以无限制地卖空</li>
+            <li>无风险利率 r 恒定</li>
+            <li>股票不支付股息（基本版）</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>2. Black-Scholes 公式</h3>
+        <p>欧式看涨期权价格（不支付股息）：</p>
+        <div class="formula">
+            C = S₀·N(d₁) - K·e<sup>-rT</sup>·N(d₂)
+        </div>
+        <div class="formula">
+            d₁ = [ln(S₀/K) + (r + σ²/2)T] / (σ√T)
+        </div>
+        <div class="formula">
+            d₂ = d₁ - σ√T
+        </div>
+        <ul>
+            <li>S₀：股票现价</li>
+            <li>K：执行价格（strike price）</li>
+            <li>T：到期时间（年为单位）</li>
+            <li>r：无风险利率</li>
+            <li>σ：波动率</li>
+            <li>N(·)：标准正态分布 CDF</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>3. 欧式看跌期权（Put-Call Parity）</h3>
+        <div class="formula">
+            P = K·e<sup>-rT</sup>·N(-d₂) - S₀·N(-d₁)
+        </div>
+        <p style="margin-top:8px;">或由看涨-看跌平价关系：P = C - S₀ + K·e<sup>-rT</sup></p>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 3：Black-Scholes 定价</div>
+        <p>S₀=100, K=105, T=0.5年, r=5%, σ=20%。求欧式看涨期权价格。</p>
+        <div class="step">
+            d₁ = [ln(100/105) + (0.05+0.02)×0.5] / (0.2×√0.5)<br>
+            = [-0.0488 + 0.035] / 0.1414 = -0.0138/0.1414 ≈ <strong>-0.0976</strong><br><br>
+            d₂ = -0.0976 - 0.1414 ≈ <strong>-0.2390</strong><br><br>
+            N(d₁) = N(-0.0976) ≈ 0.4611<br>
+            N(d₂) = N(-0.2390) ≈ 0.4056<br><br>
+            C = 100×0.4611 - 105×e⁻⁰·⁰²⁵×0.4056<br>
+            = 46.11 - 105×0.9753×0.4056<br>
+            = 46.11 - 41.49 = <strong>4.62</strong>
+        </div>
+    </div>
+
+    <div class="note">
+        <span class="note-title">金融中的布朗运动：</span>
+        <ul>
+            <li>标准布朗运动 B(t)：数学抽象，"纯粹的随机波动"</li>
+            <li>带漂移布朗运动：加入趋势项，用于建模有方向性的过程</li>
+            <li>几何布朗运动：确保价格非负，对数收益正态——股票价格的标准模型</li>
+            <li>Black-Scholes：基于 GBM 的期权定价公式，1973年提出，金融工程的里程碑</li>
+            <li>局限性：假设波动率恒定、收益正态，实际中存在波动率微笑、厚尾等现象</li>
+        </ul>
+    </div>
+
+    <div class="summary-box">
+        <h2>本节总结</h2>
+        <ul>
+            <li><strong>标准布朗运动</strong>：B(0)=0，独立增量，B(t)-B(s)~N(0,t-s)，连续但不可微</li>
+            <li><strong>核心性质</strong>：马尔可夫性、鞅性、自相似性、二次变差=t</li>
+            <li><strong>带漂移布朗运动</strong>：X(t)=μt+σB(t)，X(t)~N(μt,σ²t)</li>
+            <li><strong>几何布朗运动</strong>：S(t)=S(0)exp{(μ-σ²/2)t+σB(t)}，对数收益正态</li>
+            <li><strong>Black-Scholes</strong>：C = S₀N(d₁) - Ke⁻ʳᵀN(d₂)，欧式期权定价的基石</li>
+            <li><strong>应用</strong>：股票价格建模、期权定价、利率模型、风险管理</li>
+        </ul>
+    </div>
+</div>
+</body>
+</html>
+<!-- 本文件涵盖：标准布朗运动定义与4条性质、独立增量/平稳增量/马尔可夫性/鞅性/自相似性/路径性质、带漂移布朗运动、几何布朗运动定义与统计性质、Black-Scholes公式（看涨/看跌/平价关系），共3道例题 -->

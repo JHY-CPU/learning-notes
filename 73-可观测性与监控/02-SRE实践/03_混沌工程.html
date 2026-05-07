@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>混沌工程</title>
+    <!-- 可观测性与监控 - 混沌工程 笔记 -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        .tag { display: inline-block; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>混沌工程</h2>
+        <p><span class="tag">SRE</span><span class="tag">混沌工程</span><span class="tag">韧性</span></p>
+        <p>混沌工程通过主动注入故障来发现系统弱点，是构建高可用系统的关键实践。</p>
+    </div>
+
+    <div class="card">
+        <h2>混沌工程原则</h2>
+        <div class="code">
+Principles of Chaos Engineering（混沌工程五大原则）：
+
+1. 建立稳态假说 (Steady State Hypothesis)
+   - 定义系统的"正常"行为
+   - 用可度量的指标定义稳态
+   - 例：99.9%的请求在200ms内响应
+
+2. 多样化真实事件 (Vary Real-world Events)
+   - 模拟真实世界的故障场景
+   - 不只是杀死进程，还要模拟网络分区、磁盘慢、时钟偏移
+   - 按频率排序：硬件故障 > 网络问题 > 依赖服务不可用
+
+3. 在生产环境运行 (Run in Production)
+   - 测试环境无法完全模拟生产
+   - 但需从测试环境开始，逐步推进
+   - 生产环境实验需有快速回滚能力
+
+4. 持续自动化运行 (Run Continuously)
+   - 混沌实验不是一次性活动
+   - 集成到CI/CD流水线
+   - 定期执行，持续验证
+
+5. 最小化爆炸半径 (Minimize Blast Radius)
+   - 从小范围实验开始
+   - 逐步扩大影响范围
+   - 随信心增长而扩大
+
+实验演进路径：
+单个Pod → 单个服务 → 多个服务 → 可用区 → 区域
+（每一步都验证稳态假设，通过后才扩大范围）
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>故障注入类型</h2>
+        <div class="code">
+故障注入分类：
+
+1. 基础设施层：
+┌────────────────┬───────────────────────────────────┐
+│ 故障类型        │ 说明                               │
+├────────────────┼───────────────────────────────────┤
+│ 进程终止        │ Kill Pod/Container/Process        │
+│ 节点故障        │ 关闭节点、耗尽CPU/内存              │
+│ 磁盘故障        │ 填满磁盘、IO延迟注入                │
+│ 时钟偏移        │ 模拟NTP故障导致的时间跳变           │
+│ 内核故障        │ 系统调用延迟、panic注入             │
+└────────────────┴───────────────────────────────────┘
+
+2. 网络层：
+┌────────────────┬───────────────────────────────────┐
+│ 故障类型        │ 说明                               │
+├────────────────┼───────────────────────────────────┤
+│ 网络延迟        │ 在服务间添加固定/随机延迟           │
+│ 丢包            │ 模拟网络拥塞                       │
+│ DNS故障         │ DNS解析失败或返回错误IP             │
+│ 网络分区        │ 模拟脑裂场景                       │
+│ 带宽限制        │ 限制网络吞吐量                     │
+└────────────────┴───────────────────────────────────┘
+
+3. 应用层：
+┌────────────────┬───────────────────────────────────┐
+│ 故障类型        │ 说明                               │
+├────────────────┼───────────────────────────────────┤
+│ 异常抛出        │ 在特定代码路径抛出异常              │
+│ 延迟注入        │ 在方法调用中添加延迟                │
+│ 返回值篡改      │ 修改方法返回值                     │
+│ 依赖服务故障    │ Mock第三方服务返回错误              │
+│ 限流触发        │ 模拟API限流响应                    │
+└────────────────┴───────────────────────────────────┘
+
+常用工具对比：
+┌──────────────┬──────────────┬──────────────────────┐
+│ 工具           │ 类型          │ 特点                  │
+├──────────────┼──────────────┼──────────────────────┤
+│ Chaos Monkey │ 进程终止      │ Netflix首创，随机杀进程│
+│ Litmus       │ K8s混沌      │ CNCF项目，声明式实验   │
+│ ChaosBlade   │ 全平台        │ 阿里开源，支持多语言   │
+│ Chaos Mesh   │ K8s混沌      │ PingCAP开源，UI友好   │
+│ Gremlin      │ 商业SaaS     │ 全托管，企业级功能     │
+│ Toxiproxy    │ 网络故障      │ Shopify开源，TCP代理   │
+│ tc (Linux)   │ 网络故障      │ 系统命令，底层网络控制  │
+└──────────────┴──────────────┴──────────────────────┘
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Game Day与实战</h2>
+        <div class="code">
+Game Day（演练日）：
+- 定义：有计划的大规模故障演练
+- 目的：验证团队应急响应能力 + 系统韧性
+- 频率：每季度一次（核心系统）
+
+Game Day准备清单：
+□ 定义演练场景和目标
+□ 确定参与人员和角色
+□ 准备故障注入脚本
+□ 确认监控和告警就绪
+□ 制定回滚方案
+□ 准备War Room（作战室）
+□ 通知相关方（管理层签批）
+
+Game Day执行流程：
+1. 开场 (30min)
+   - 介绍场景和规则
+   - 确认各角色就位
+   - 检查监控面板
+
+2. 故障注入 (2-4h)
+   - 按剧本注入故障
+   - 观察系统行为
+   - 记录响应过程
+   - 必要时人工干预
+
+3. 恢复验证 (30min)
+   - 停止故障注入
+   - 验证系统恢复
+   - 确认数据完整性
+
+4. 复盘 (1h)
+   - 时间线回顾
+   - 发现的问题清单
+   - 改进措施和owner
+   - 更新Runbook
+
+Litmus Chaos 实验示例：
+apiVersion: litmuschaos.io/v1alpha1
+kind: ChaosEngine
+metadata:
+  name: pod-delete-chaos
+spec:
+  appinfo:
+    appns: default
+    applabel: app=order-service
+    appkind: deployment
+  chaosServiceAccount: litmus-admin
+  experiments:
+    - name: pod-delete
+      spec:
+        components:
+          env:
+            - name: TOTAL_CHAOS_DURATION
+              value: "60"
+            - name: CHAOS_INTERVAL
+              value: "15"
+            - name: FORCE
+              value: "false"
+
+爆炸半径控制策略：
+Level 1：单个Pod（开发环境）
+Level 2：单个Pod（测试环境）
+Level 3：单个服务的少量实例（预发布）
+Level 4：单个服务（预发布）
+Level 5：单个Pod（生产环境非高峰）
+Level 6：单个服务的部分实例（生产环境）
+Level 7：跨服务故障链（生产环境）
+
+验证指标：
+- 服务降级是否优雅（而非雪崩）
+- 告警是否及时触发
+- 自动恢复机制是否生效
+- 故障转移是否成功
+- 数据一致性是否保持
+        </div>
+        <div class="note">混沌工程的核心是"稳态假说"：先定义什么是正常，再注入故障观察偏离。从最小爆炸半径开始，随信心增长扩大。Game Day不仅是技术演练，更是团队应急响应能力的训练。工具推荐：K8s环境用Chaos Mesh或Litmus。</div>
+    </div>
+
+    <!-- 总结：混沌工程五大原则：稳态假说、多样化事件、生产环境运行、持续自动化、最小爆炸半径。
+    故障注入分三层：基础设施(进程/节点/磁盘)、网络(延迟/丢包/分区)、应用(异常/延迟/Mock)。
+    Game Day是有计划的故障演练，验证系统韧性和团队应急能力。
+    主流工具：Chaos Mesh(K8s)、Litmus(CNCF)、ChaosBlade(多平台)、Gremlin(商业)。 -->
+</body>
+</html>

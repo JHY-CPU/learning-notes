@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RAID级别</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f5f7fa; color: #333; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 15px; margin-bottom: 30px; }
+        h2 { color: #2980b9; margin: 25px 0 10px; border-left: 4px solid #3498db; padding-left: 12px; }
+        h3 { color: #8e44ad; margin: 15px 0 8px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: center; }
+        th { background: #3498db; color: #fff; }
+        tr:nth-child(even) { background: #ecf0f1; }
+        .formula { background: #f9f9f9; border-left: 4px solid #e67e22; padding: 10px 15px; margin: 10px 0; font-family: 'Consolas', monospace; }
+        .note { background: #fef9e7; border-left: 4px solid #f1c40f; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        .important { background: #fdedec; border-left: 4px solid #e74c3c; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        ul, ol { margin-left: 25px; margin-bottom: 10px; }
+        li { margin-bottom: 5px; }
+        .raid-visual { display: flex; gap: 5px; margin: 10px 0; flex-wrap: wrap; }
+        .disk-block { width: 60px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 4px; font-size: 0.8em; font-weight: bold; }
+        .data { background: #aed6f1; border: 1px solid #2980b9; }
+        .parity { background: #f5b7b1; border: 1px solid #e74c3c; }
+        .mirror { background: #abebc6; border: 1px solid #27ae60; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>RAID级别</h1>
+
+        <!-- RAID概述 -->
+        <div class="card">
+            <h2>一、RAID概述</h2>
+            <p>RAID（Redundant Array of Independent Disks，独立磁盘冗余阵列）是将多个物理磁盘组合成一个逻辑磁盘的技术，旨在提高性能和/或可靠性。</p>
+
+            <h3>1.1 核心技术</h3>
+            <table>
+                <tr><th>技术</th><th>原理</th><th>效果</th></tr>
+                <tr><td>条带化（Striping）</td><td>数据分块并行写入多个磁盘</td><td>提高读写速度</td></tr>
+                <tr><td>镜像（Mirroring）</td><td>数据完整复制到多个磁盘</td><td>提高可靠性</td></tr>
+                <tr><td>奇偶校验（Parity）</td><td>计算校验信息，允许单盘故障恢复</td><td>兼顾性能和可靠性</td></tr>
+            </table>
+        </div>
+
+        <!-- RAID 0 -->
+        <div class="card">
+            <h2>二、RAID 0（条带化）</h2>
+            <p>数据被分成条带（Stripe）分布到所有磁盘上，无冗余。</p>
+
+            <div class="raid-visual">
+                <div class="disk-block data">A0</div>
+                <div class="disk-block data">A1</div>
+                <div class="disk-block data">A2</div>
+                <div class="disk-block data">A3</div>
+                <div class="disk-block data">B0</div>
+                <div class="disk-block data">B1</div>
+                <div class="disk-block data">B2</div>
+                <div class="disk-block data">B3</div>
+            </div>
+
+            <table>
+                <tr><th>特性</th><th>说明</th></tr>
+                <tr><td>最少磁盘数</td><td>2</td></tr>
+                <tr><td>有效容量</td><td>N × 单盘容量（100%利用率）</td></tr>
+                <tr><td>读写性能</td><td>N倍提升（并行访问）</td></tr>
+                <tr><td>可靠性</td><td>降低（任一磁盘故障，所有数据丢失）</td></tr>
+                <tr><td>容错能力</td><td>无</td></tr>
+            </table>
+
+            <div class="important">
+                <strong>RAID 0不提供任何冗余，一块盘坏则全部数据丢失。适用于对速度要求高、数据不重要的场景（如视频编辑临时文件）。</strong>
+            </div>
+        </div>
+
+        <!-- RAID 1 -->
+        <div class="card">
+            <h2>三、RAID 1（镜像）</h2>
+            <p>所有数据完全复制到每个磁盘上，提供最高的可靠性。</p>
+
+            <div class="raid-visual">
+                <div class="disk-block data">A0</div>
+                <div class="disk-block data">A1</div>
+                <div class="disk-block data">A2</div>
+                <div class="disk-block mirror">A0'</div>
+                <div class="disk-block mirror">A1'</div>
+                <div class="disk-block mirror">A2'</div>
+            </div>
+
+            <table>
+                <tr><th>特性</th><th>说明</th></tr>
+                <tr><td>最少磁盘数</td><td>2</td></tr>
+                <tr><td>有效容量</td><td>N/2 × 单盘容量（50%利用率）</td></tr>
+                <tr><td>读性能</td><td>可从任意镜像读，略有提升</td></tr>
+                <tr><td>写性能</td><td>无提升（每份数据写两次）</td></tr>
+                <tr><td>可靠性</td><td>高（可容忍N-1块盘故障）</td></tr>
+            </table>
+        </div>
+
+        <!-- RAID 5 -->
+        <div class="card">
+            <h2>四、RAID 5（分布式奇偶校验）</h2>
+            <p>数据和奇偶校验信息条带化分布在所有磁盘上，校验块均匀分布（旋转奇偶校验）。</p>
+
+            <div class="raid-visual">
+                <div class="disk-block data">D0</div>
+                <div class="disk-block data">D1</div>
+                <div class="disk-block data">D2</div>
+                <div class="disk-block parity">P0</div>
+                <div class="disk-block data">D3</div>
+                <div class="disk-block data">D4</div>
+                <div class="disk-block parity">P1</div>
+                <div class="disk-block data">D5</div>
+                <div class="disk-block data">D6</div>
+                <div class="disk-block parity">P2</div>
+                <div class="disk-block data">D7</div>
+                <div class="disk-block data">D8</div>
+                <div class="disk-block parity">P3</div>
+                <div class="disk-block data">D9</div>
+                <div class="disk-block data">D10</div>
+            </div>
+
+            <table>
+                <tr><th>特性</th><th>说明</th></tr>
+                <tr><td>最少磁盘数</td><td>3</td></tr>
+                <tr><td>有效容量</td><td>(N-1) × 单盘容量</td></tr>
+                <tr><td>读性能</td><td>(N-1)倍提升</td></tr>
+                <tr><td>写性能</td><td>略低于(N-1)倍（需计算校验）</td></tr>
+                <tr><td>容错能力</td><td>容忍1块盘故障</td></tr>
+            </table>
+
+            <h3>4.1 奇偶校验原理</h3>
+            <div class="formula">
+                P = D0 ⊕ D1 ⊕ D2（异或运算）<br>
+                如果D1盘故障：D1 = D0 ⊕ D2 ⊕ P（用剩余数据和校验恢复）
+            </div>
+
+            <div class="note">
+                <strong>RAID 5写惩罚：</strong>每次写数据需要读旧数据、读旧校验、写新数据、写新校验（4次I/O），随机写性能较差。
+            </div>
+        </div>
+
+        <!-- RAID 6 -->
+        <div class="card">
+            <h2>五、RAID 6（双分布式奇偶校验）</h2>
+            <p>使用两组独立的奇偶校验，可以容忍任意2块磁盘同时故障。</p>
+
+            <table>
+                <tr><th>特性</th><th>说明</th></tr>
+                <tr><td>最少磁盘数</td><td>4</td></tr>
+                <tr><td>有效容量</td><td>(N-2) × 单盘容量</td></tr>
+                <tr><td>容错能力</td><td>容忍2块盘故障</td></tr>
+                <tr><td>写惩罚</td><td>更大（6次I/O）</td></tr>
+            </table>
+        </div>
+
+        <!-- RAID 10 -->
+        <div class="card">
+            <h2>六、RAID 10（RAID 1+0）</h2>
+            <p>先镜像（RAID 1）再条带化（RAID 0），兼顾性能和可靠性。</p>
+
+            <div class="raid-visual">
+                <span style="font-size:0.9em; color:#2980b9">镜像组1:</span>
+                <div class="disk-block data">A0</div>
+                <div class="disk-block mirror">A0'</div>
+                <span style="font-size:0.9em; color:#2980b9">镜像组2:</span>
+                <div class="disk-block data">A1</div>
+                <div class="disk-block mirror">A1'</div>
+            </div>
+
+            <table>
+                <tr><th>特性</th><th>说明</th></tr>
+                <tr><td>最少磁盘数</td><td>4</td></tr>
+                <tr><td>有效容量</td><td>N/2 × 单盘容量</td></tr>
+                <tr><td>读性能</td><td>很好</td></tr>
+                <tr><td>写性能</td><td>好（无校验计算开销）</td></tr>
+                <tr><td>容错能力</td><td>每组可坏1块盘（不同组）</td></tr>
+            </table>
+        </div>
+
+        <!-- 级别对比 -->
+        <div class="card">
+            <h2>七、RAID级别对比</h2>
+            <table>
+                <tr><th>级别</th><th>最少盘数</th><th>利用率</th><th>读性能</th><th>写性能</th><th>容错</th><th>适用场景</th></tr>
+                <tr><td>RAID 0</td><td>2</td><td>100%</td><td>最高</td><td>最高</td><td>无</td><td>高速缓存/临时数据</td></tr>
+                <tr><td>RAID 1</td><td>2</td><td>50%</td><td>较好</td><td>一般</td><td>N-1</td><td>操作系统/关键数据</td></tr>
+                <tr><td>RAID 5</td><td>3</td><td>(N-1)/N</td><td>好</td><td>随机写差</td><td>1</td><td>文件服务器</td></tr>
+                <tr><td>RAID 6</td><td>4</td><td>(N-2)/N</td><td>好</td><td>更差</td><td>2</td><td>大容量归档</td></tr>
+                <tr><td>RAID 10</td><td>4</td><td>50%</td><td>很好</td><td>好</td><td>每组1</td><td>数据库</td></tr>
+            </table>
+
+            <div class="important">
+                <strong>考试重点：</strong><br>
+                RAID 0：最快但无冗余<br>
+                RAID 1：最安全但容量浪费<br>
+                RAID 5：性价比最高，至少3盘<br>
+                RAID 10：性能和安全的折中，至少4盘
+            </div>
+        </div>
+
+        <!-- 总结 -->
+        <div class="card">
+            <h2>八、知识要点总结</h2>
+            <ol>
+                <li>RAID三大技术：条带化、镜像、奇偶校验</li>
+                <li>RAID 0：纯条带化，最快，无容错</li>
+                <li>RAID 1：纯镜像，最安全，容量利用率50%</li>
+                <li>RAID 5：分布式校验，容1错，性价比高</li>
+                <li>RAID 6：双校验，容2错，写惩罚更大</li>
+                <li>RAID 10：先镜像后条带，适合数据库</li>
+            </ol>
+        </div>
+
+        <!--
+            ========================================
+            文件总结：RAID级别
+            ========================================
+            本文件涵盖了磁盘阵列技术的核心内容：
+            1. RAID基本概念：条带化、镜像、奇偶校验
+            2. RAID 0/1/5/6/10的原理和特点
+            3. 奇偶校验的异或运算原理
+            4. 写惩罚的概念
+            5. 各RAID级别的对比与适用场景
+
+            重点：RAID 5原理、各级别最少盘数和容错能力
+            考点：RAID级别选择、容量计算、奇偶校验
+            ========================================
+        -->
+    </div>
+</body>
+</html>

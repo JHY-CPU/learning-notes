@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JVM性能调优 - 性能工程笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; line-height: 1.8; }
+        .container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
+        h1 { color: #58a6ff; font-size: 2em; border-bottom: 2px solid #30363d; padding-bottom: 12px; margin-bottom: 28px; }
+        h2 { color: #79c0ff; font-size: 1.5em; margin: 32px 0 16px; border-left: 4px solid #58a6ff; padding-left: 12px; }
+        h3 { color: #d2a8ff; font-size: 1.2em; margin: 24px 0 12px; }
+        p { margin: 10px 0; }
+        ul, ol { margin: 10px 0 10px 24px; }
+        li { margin: 6px 0; }
+        code { background: #161b22; color: #ff7b72; padding: 2px 8px; border-radius: 4px; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.9em; }
+        pre { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; overflow-x: auto; margin: 16px 0; }
+        pre code { background: none; color: #c9d1d9; padding: 0; }
+        .note { background: #161b22; border-left: 4px solid #58a6ff; padding: 16px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .warning { background: #161b22; border-left: 4px solid #f0883e; padding: 16px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #30363d; padding: 10px 14px; text-align: left; }
+        th { background: #161b22; color: #58a6ff; }
+        tr:nth-child(even) { background: #161b22; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>JVM 性能调优</h1>
+
+    <h2>一、JVM 内存模型</h2>
+    <pre><code>JVM 内存结构（JDK 17+）：
+┌─────────────────────────────────────────────┐
+│                  堆 (Heap)                    │
+│  ┌───────────────┐  ┌──────────────────────┐ │
+│  │  Young Gen    │  │    Old Gen           │ │
+│  │ ┌────┬────┬──┐│  │                      │ │
+│  │ │Eden│S0  │S1││  │                      │ │
+│  │ └────┴────┴──┘│  │                      │ │
+│  └───────────────┘  └──────────────────────┘ │
+├─────────────────────────────────────────────┤
+│  元空间 (Metaspace)   ← 类元数据（不在堆中）   │
+│  线程栈 (Thread Stack) ← 每线程独立           │
+│  代码缓存 (Code Cache) ← JIT 编译后的代码     │
+│  直接内存 (Direct Memory) ← NIO Buffer      │
+└─────────────────────────────────────────────┘</code></pre>
+
+    <h2>二、GC 算法与调优</h2>
+
+    <h3>1. GC 算法对比</h3>
+    <table>
+        <tr><th>GC</th><th>目标延迟</th><th>适用堆大小</th><th>特点</th></tr>
+        <tr><td>Serial</td><td>&gt;100ms</td><td>&lt;512MB</td><td>单线程，简单</td></tr>
+        <tr><td>Parallel</td><td>&gt;50ms</td><td>&lt;8GB</td><td>多线程吞吐优先</td></tr>
+        <tr><td>G1</td><td>&lt;200ms</td><td>4GB-64GB</td><td>区域化分代，平衡延迟和吞吐</td></tr>
+        <tr><td>ZGC</td><td>&lt;1ms</td><td>任意大小</td><td>低延迟，染色指针</td></tr>
+        <tr><td>Shenandoah</td><td>&lt;10ms</td><td>任意大小</td><td>并发压缩</td></tr>
+    </table>
+
+    <h3>2. G1 调优参数</h3>
+    <pre><code># G1 核心参数
+-Xms4g -Xmx4g                    # 堆大小（建议相等，避免动态调整）
+-XX:+UseG1GC                      # 启用 G1
+-XX:MaxGCPauseMillis=200          # 目标最大停顿时间（默认200ms）
+-XX:G1HeapRegionSize=16m          # Region 大小（1-32MB，2的幂）
+-XX:InitiatingHeapOccupancyPercent=45 # 触发并发标记的堆占用阈值
+-XX:G1ReservePercent=10           # 预留空间防 to-space exhausted
+-XX:ConcGCThreads=4               # 并发 GC 线程数
+-XX:ParallelGCThreads=8           # STW 阶段线程数
+
+# G1 调优思路：
+# 1. 如果 GC 频繁 → 增大堆或降低 IHOP
+# 2. 如果停顿时间长 → 降低 MaxGCPauseMillis（但会增加 GC 频率）
+# 3. 如果 Humongous 对象多 → 调大 RegionSize
+# 4. 如果 Mixed GC 后老年代仍满 → 降低 IHOP 触发更早的并发标记</code></pre>
+
+    <h3>3. ZGC 调优参数</h3>
+    <pre><code># ZGC 参数（JDK 17+）
+-Xms8g -Xmx8g
+-XX:+UseZGC                       # 启用 ZGC
+-XX:+ZGenerational                # JDK 21+ 分代 ZGC（大幅提升吞吐）
+-Xlog:gc*:file=gc.log:time,uptime # GC 日志
+
+# ZGC 特点：
+# - 染色指针：GC 元数据存在指针中而非对象头
+# - 读屏障：并发转移/重定位时自动修正引用
+# - 停顿时间与堆大小无关，通常 < 1ms
+# - 代价：更高的内存开销和 CPU 开销</code></pre>
+
+    <h2>三、堆大小调优</h2>
+
+    <h3>1. 堆大小计算</h3>
+    <pre><code>堆大小公式：
+Xmx = 总物理内存 - (Metaspace + 线程栈 × 线程数 + 直接内存 + GC本身开销)
+
+示例：8GB 物理内存的服务器
+- 系统预留: 1GB
+- 线程栈: 1MB × 500线程 = 500MB
+- Metaspace: 256MB
+- 直接内存: 512MB
+- GC 开销: ~5%
+→ Xmx ≈ 8 - 1 - 0.5 - 0.25 - 0.5 = 5.75GB，取 5g 留余量</code></pre>
+
+    <h3>2. 新生代与老年代比例</h3>
+    <pre><code># G1 不需要手动设置比例（自动管理）
+# Parallel GC 旧版调优：
+-XX:NewRatio=2          # 老年代:新生代 = 2:1
+-XX:NewSize=1g          # 新生代初始大小
+-XX:MaxNewSize=2g       # 新生代最大大小
+
+# 新生代大小影响：
+# - 新生代大 → Minor GC 频率低，但每次时间长
+# - 新生代小 → Minor GC 频率高，但每次时间短
+# - 对象晋升需要 Survivor 空间足够（避免直接晋升老年代）</code></pre>
+
+    <h2>四、JIT 编译优化</h2>
+
+    <h3>1. JIT 分层编译</h3>
+    <pre><code>Level 0: 解释执行
+Level 1: C1 编译（无 profiling）
+Level 2: C1 编译（基本 profiling）
+Level 3: C1 编译（完全 profiling）
+Level 4: C2 编译（激进优化）
+
+热点阈值：
+-XX:CompileThreshold=10000   # 方法调用 10000 次后编译
+-XX:Tier3InvocationThreshold=200
+-XX:Tier4InvocationThreshold=5000</code></pre>
+
+    <h3>2. 常见 JIT 优化</h3>
+    <ul>
+        <li><strong>方法内联（Inlining）：</strong>将小方法体直接嵌入调用处，消除方法调用开销</li>
+        <li><strong>逃逸分析：</strong>对象不逃出方法时，栈上分配或标量替换</li>
+        <li><strong>锁消除：</strong>逃逸分析后发现锁对象不逃出方法，消除锁</li>
+        <li><strong>循环展开：</strong>减少循环判断次数</li>
+        <li><strong>死代码消除：</strong>移除永远不会执行的代码</li>
+    </ul>
+
+    <h2>五、GC 日志分析</h2>
+
+    <h3>1. 开启 GC 日志</h3>
+    <pre><code># JDK 11+ 统一日志
+-Xlog:gc*:file=/var/log/gc.log:time,uptime,level,tags:filecount=5,filesize=100m
+
+# JDK 8
+-XX:+PrintGCDetails
+-XX:+PrintGCDateStamps
+-XX:+PrintGCTimeStamps
+-XX:+PrintHeapAtGC
+-Xloggc:/var/log/gc.log
+-XX:+UseGCLogFileRotation
+-XX:NumberOfGCLogFiles=5
+-XX:GCLogFileSize=100m</code></pre>
+
+    <h3>2. 关键 GC 指标</h3>
+    <pre><code>监控指标：
+- GC 频率：Young GC < 5/min, Full GC ≈ 0
+- GC 停顿：Young GC < 50ms, Full GC < 1s
+- 堆使用率：Old Gen 70% 以下健康
+- 晋升速率：对象从 Young → Old 的速度
+- 分配速率：新对象创建速度
+
+工具：
+- jstat -gcutil $(pgrep java) 1000  → 实时 GC 统计
+- GCViewer / gceasy.io → GC 日志可视化分析
+- JFR → 低开销全面剖析</code></pre>
+
+    <h2>六、线程池调优</h2>
+
+    <pre><code>// 线程池参数
+new ThreadPoolExecutor(
+    corePoolSize,    // 核心线程数
+    maxPoolSize,     // 最大线程数
+    keepAliveTime,   // 空闲线程存活时间
+    TimeUnit.SECONDS,
+    new LinkedBlockingQueue(queueCapacity),  // 队列容量
+    new ThreadPoolExecutor.CallerRunsPolicy() // 拒绝策略
+);
+
+// CPU 密集型：线程数 = CPU核数 + 1
+int cpuThreads = Runtime.getRuntime().availableProcessors() + 1;
+
+// IO 密集型：线程数 = CPU核数 × (1 + IO等待时间/CPU计算时间)
+// 简化：2 × CPU核数 或更高
+int ioThreads = Runtime.getRuntime().availableProcessors() * 2;
+
+// 拒绝策略选择：
+// AbortPolicy     → 抛异常（默认，适合不能丢的请求）
+// CallerRunsPolicy → 调用者线程执行（适合能接受延迟的场景）
+// DiscardPolicy   → 静默丢弃（适合可丢失的监控数据）
+// DiscardOldestPolicy → 丢弃最老任务（适合只关心最新数据）</code></pre>
+
+    <h2>七、常见问题排查清单</h2>
+    <table>
+        <tr><th>症状</th><th>可能原因</th><th>排查工具</th></tr>
+        <tr><td>频繁 Full GC</td><td>内存泄漏；老年代太小</td><td>jmap -histo; MAT</td></tr>
+        <tr><td>GC 停顿长</td><td>堆太大；对象过多</td><td>GC 日志; async-profiler</td></tr>
+        <tr><td>CPU 飙高</td><td>热点代码；频繁 GC；锁竞争</td><td>perf; arthas profiler</td></tr>
+        <tr><td>OOM</td><td>堆/Metaspace/直接内存不足</td><td>jmap dump; MAT 分析</td></tr>
+        <tr><td>响应慢</td><td>线程阻塞；锁竞争；IO 等待</td><td>jstack; arthas thread</td></tr>
+    </table>
+
+    <div class="note">
+        <strong>面试要点：</strong>G1 是 JDK 9+ 默认 GC，适合 4-64GB 堆，通过 MaxGCPauseMillis 控制停顿目标。ZGC 用染色指针实现亚毫秒停顿，JDK 21 的分代 ZGC 大幅提升吞吐。JIT 方法内联和逃逸分析是关键优化。线程池核心参数：核心线程数、最大线程数、队列容量、拒绝策略。CPU 密集型线程数 = N+1，IO 密集型 = 2N。
+    </div>
+
+    <!-- 总结：JVM调优涵盖GC选择（G1/ZGC）、堆大小、JIT编译和线程池；G1适合中等堆，ZGC适合低延迟场景（JDK21分代ZGC是重大改进）；堆大小需扣除系统、线程栈、元空间、直接内存的开销；GC日志是核心诊断手段；线程池参数需根据CPU/IO密集型区分；常用诊断工具：jstat/jstack/jmap/arths/JFR/async-profiler -->
+</div>
+</body>
+</html>

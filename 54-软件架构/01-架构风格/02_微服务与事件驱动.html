@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- 微服务与事件驱动架构 - 软件架构笔记 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>微服务与事件驱动架构</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f5f7fa; color: #2c3e50; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 40px; }
+        h1 { font-size: 28px; color: #1a5276; border-bottom: 3px solid #2980b9; padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 22px; color: #2980b9; margin: 28px 0 14px; border-left: 4px solid #2980b9; padding-left: 12px; }
+        h3 { font-size: 18px; color: #34495e; margin: 20px 0 10px; }
+        p { margin: 8px 0; text-indent: 2em; }
+        ul, ol { margin: 10px 0 10px 2em; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: left; }
+        th { background: #2980b9; color: #fff; }
+        tr:nth-child(even) { background: #f0f4f8; }
+        .note { background: #eaf2f8; border-left: 4px solid #2980b9; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .key-point { background: #fef9e7; border-left: 4px solid #f39c12; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        code { background: #ecf0f1; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>微服务与事件驱动架构</h1>
+
+    <!-- 一、微服务架构 -->
+    <h2>一、微服务架构（Microservices）</h2>
+    <p>微服务架构将应用构建为一组小型、自治的服务，每个服务围绕业务能力构建，独立部署、独立扩展。</p>
+
+    <h3>1.1 核心特征</h3>
+    <ul>
+        <li><strong>单一职责：</strong>每个服务聚焦于一个业务能力</li>
+        <li><strong>独立部署：</strong>服务可独立发布，不影响其他服务</li>
+        <li><strong>去中心化治理：</strong>各服务可选择不同的技术栈</li>
+        <li><strong>去中心化数据管理：</strong>每个服务管理自己的数据库</li>
+        <li><strong>容错设计：</strong>单个服务故障不应导致系统整体不可用</li>
+        <li><strong>演进式设计：</strong>服务可以独立演进和替换</li>
+    </ul>
+
+    <h3>1.2 服务间通信</h3>
+    <table>
+        <tr><th>方式</th><th>协议/技术</th><th>特点</th></tr>
+        <tr><td>同步通信</td><td>REST/gRPC/GraphQL</td><td>实时响应，简单直接</td></tr>
+        <tr><td>异步通信</td><td>消息队列（Kafka/RabbitMQ）</td><td>解耦、削峰、可靠</td></tr>
+        <tr><td>事件驱动</td><td>Event Bus/Event Streaming</td><td>松耦合、可扩展</td></tr>
+    </table>
+
+    <h3>1.3 微服务基础设施</h3>
+    <ul>
+        <li><strong>API网关：</strong>统一入口，路由、认证、限流（如Kong、Zuul）</li>
+        <li><strong>服务注册与发现：</strong>服务自动注册和发现（如Consul、Eureka）</li>
+        <li><strong>配置中心：</strong>集中管理配置（如Spring Cloud Config、Nacos）</li>
+        <li><strong>熔断器：</strong>故障隔离和降级（如Hystrix、Resilience4j）</li>
+        <li><strong>链路追踪：</strong>分布式调用链追踪（如Zipkin、Jaeger）</li>
+    </ul>
+
+    <h3>1.4 微服务 vs 单体架构</h3>
+    <table>
+        <tr><th>维度</th><th>单体架构</th><th>微服务架构</th></tr>
+        <tr><td>部署</td><td>整体部署</td><td>独立部署</td></tr>
+        <tr><td>扩展</td><td>整体扩展</td><td>按需扩展单个服务</td></tr>
+        <tr><td>技术栈</td><td>统一</td><td>可异构</td></tr>
+        <tr><td>数据管理</td><td>共享数据库</td><td>每个服务独立数据库</td></tr>
+        <tr><td>团队组织</td><td>按技术层分工</td><td>按业务能力组建全功能团队</td></tr>
+        <tr><td>复杂度</td><td>开发简单，运维复杂</td><td>开发复杂，需完善的基础设施</td></tr>
+    </table>
+
+    <!-- 二、事件驱动架构 -->
+    <h2>二、事件驱动架构（Event-Driven Architecture）</h2>
+    <p>事件驱动架构以事件的产生、检测和消费为核心，组件之间通过事件进行异步通信。</p>
+
+    <h3>2.1 核心概念</h3>
+    <ul>
+        <li><strong>事件（Event）：</strong>系统状态变化的通知，包含事件类型、数据和元信息</li>
+        <li><strong>事件生产者（Producer）：</strong>检测状态变化并发布事件</li>
+        <li><strong>事件消费者（Consumer）：</strong>订阅并处理感兴趣的事件</li>
+        <li><strong>事件通道（Channel）：</strong>事件传输的中间件（消息队列/事件总线）</li>
+    </ul>
+
+    <h3>2.2 拓扑模式</h3>
+    <table>
+        <tr><th>模式</th><th>说明</th><th>适用场景</th></tr>
+        <tr><td>Mediator模式</td><td>事件经过中央协调器处理后分发</td><td>需要编排的复杂事件处理</td></tr>
+        <tr><td>Broker模式</td><td>事件直接分发到订阅者，无中央协调</td><td>高度解耦的响应式系统</td></tr>
+    </table>
+
+    <!-- 三、Serverless架构 -->
+    <h2>三、Serverless架构</h2>
+    <p>Serverless架构将计算资源管理完全交给云平台，开发者只关注业务逻辑代码。</p>
+
+    <h3>3.1 核心组件</h3>
+    <ul>
+        <li><strong>FaaS（Function as a Service）：</strong>按需运行函数（如AWS Lambda、Azure Functions）</li>
+        <li><strong>BaaS（Backend as a Service）：</strong>使用托管服务替代自建后端（如数据库、认证、存储）</li>
+    </ul>
+
+    <h3>3.2 特点</h3>
+    <div class="key-point">
+        <strong>优势：</strong>零运维、自动扩缩容、按使用付费、快速开发<br>
+        <strong>限制：</strong>冷启动延迟、执行时间限制、厂商锁定、调试困难
+    </div>
+
+    <!-- 四、Service Mesh -->
+    <h2>四、服务网格（Service Mesh）</h2>
+    <p>服务网格是处理服务间通信的专用基础设施层，通过Sidecar代理实现流量管理、安全和可观测性。</p>
+
+    <h3>4.1 架构组件</h3>
+    <ul>
+        <li><strong>数据平面（Data Plane）：</strong>Sidecar代理（如Envoy），拦截和处理网络流量</li>
+        <li><strong>控制平面（Control Plane）：</strong>管理和配置代理（如Istio、Linkerd）</li>
+    </ul>
+
+    <h3>4.2 核心功能</h3>
+    <table>
+        <tr><th>功能</th><th>说明</th></tr>
+        <tr><td>流量管理</td><td>负载均衡、熔断、重试、灰度发布</td></tr>
+        <tr><td>安全</td><td>mTLS、认证授权、加密通信</td></tr>
+        <tr><td>可观测性</td><td>指标收集、分布式追踪、访问日志</td></tr>
+    </table>
+
+</div>
+
+<!--
+========================================
+  文件总结
+========================================
+  主题：微服务与事件驱动架构
+  内容概要：
+    1. 微服务架构 - 单一职责、独立部署、去中心化、通信方式（REST/gRPC/消息队列）
+    2. 事件驱动架构 - Event/Producer/Consumer/Channel，Mediator vs Broker模式
+    3. Serverless架构 - FaaS+BaaS，零运维自动扩缩容
+    4. 服务网格 - Sidecar代理，数据平面+控制平面
+  重点知识：
+    - 微服务核心特征：单一职责、独立部署、去中心化治理、容错设计
+    - 服务间通信的三种方式：同步、异步、事件驱动
+    - 微服务基础设施：API网关、服务发现、配置中心、熔断器、链路追踪
+    - 服务网格的数据平面和控制平面分离
+========================================
+-->
+</body>
+</html>

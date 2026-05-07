@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>排列组合 - 离散数学笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.7; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; font-size: 2em; margin-bottom: 10px; border-bottom: 3px solid #2b6cb0; padding-bottom: 10px; }
+        h2 { color: #2c5282; margin: 25px 0 12px; padding-left: 12px; border-left: 4px solid #4299e1; }
+        h3 { color: #2d3748; margin: 15px 0 8px; }
+        p { margin: 8px 0; }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; color: #e53e3e; }
+        .concept { background: #fff; border-radius: 10px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid #4299e1; }
+        .concept.success { border-left-color: #48bb78; }
+        .concept.warning { border-left-color: #ed8936; }
+        .truth-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.95em; }
+        .truth-table th { background: #2b6cb0; color: #fff; padding: 10px 14px; text-align: center; }
+        .truth-table td { padding: 8px 14px; text-align: center; border: 1px solid #e2e8f0; }
+        .truth-table tr:nth-child(even) { background: #f7fafc; }
+        .formula-box { background: #ebf8ff; border: 1px solid #90cdf4; border-radius: 8px; padding: 15px; margin: 12px 0; text-align: center; font-size: 1.1em; }
+        .demo-area { background: #1a202c; color: #e2e8f0; border-radius: 10px; padding: 20px; margin: 15px 0; font-family: 'Consolas', monospace; }
+        .demo-result { margin-top: 12px; padding: 12px; background: #2d3748; border-radius: 6px; }
+        button { padding: 6px 14px; border-radius: 6px; border: none; background: #4299e1; color: #fff; cursor: pointer; margin: 3px; font-size: 0.9em; }
+        button:hover { background: #3182ce; }
+        input[type="number"] { padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e0; width: 70px; font-size: 0.9em; }
+
+        /* Pascal 三角形 */
+        .pascal { text-align: center; margin: 15px 0; }
+        .pascal-row { display: flex; justify-content: center; gap: 4px; margin: 2px 0; }
+        .pascal-cell { width: 44px; height: 30px; display: flex; align-items: center; justify-content: center; border-radius: 6px; font-size: 0.85em; font-weight: bold; font-family: 'Consolas', monospace; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<h1>01 - 排列组合</h1>
+<p style="text-align:center; color:#718096; margin-bottom:25px;">离散数学 | 组合数学</p>
+
+<!-- ==================== 1. 基本计数原理 ==================== -->
+<h2>1. 基本计数原理</h2>
+
+<h2>1.1 加法原理（分类计数）</h2>
+<div class="concept success">
+    <p>做一件事有 k 类方法，第 i 类有 n<sub>i</sub> 种方法，则总共有 <strong>n₁ + n₂ + ... + nₖ</strong> 种方法。</p>
+    <div class="formula-box">N = n₁ + n₂ + ... + nₖ（分类 — "或"的关系）</div>
+    <p><strong>示例：</strong>从北京到上海可以坐飞机(3班)或高铁(5班)，共 3+5 = 8 种选择。</p>
+</div>
+
+<h2>1.2 乘法原理（分步计数）</h2>
+<div class="concept success">
+    <p>做一件事需要 k 个步骤，第 i 步有 n<sub>i</sub> 种方法，则总共有 <strong>n₁ &times; n₂ &times; ... &times; nₖ</strong> 种方法。</p>
+    <div class="formula-box">N = n₁ &times; n₂ &times; ... &times; nₖ（分步 — "且"的关系）</div>
+    <p><strong>示例：</strong>选一件上衣(4种)和一条裤子(3种)搭配，共 4&times;3 = 12 种搭配。</p>
+</div>
+
+<!-- ==================== 2. 排列 ==================== -->
+<h2>2. 排列（Permutation）</h2>
+
+<div class="concept">
+    <h3>定义</h3>
+    <p>从 n 个<strong>不同</strong>元素中取出 r 个（0 &le; r &le; n），<strong>按一定顺序</strong>排成一列，称为从 n 中取 r 的<strong>排列</strong>。</p>
+    <div class="formula-box">
+        P(n, r) = A(n, r) = n! / (n-r)! = n &times; (n-1) &times; ... &times; (n-r+1)
+    </div>
+    <p><strong>关键：</strong>顺序重要 — (A,B) 和 (B,A) 是不同的排列。</p>
+</div>
+
+<div class="concept">
+    <h3>推导</h3>
+    <p>第1个位置有 n 种选择，第2个位置有 n-1 种选择，...，第 r 个位置有 n-r+1 种选择。</p>
+    <p>由乘法原理：P(n,r) = n(n-1)...(n-r+1) = n!/(n-r)!</p>
+</div>
+
+<div class="concept warning">
+    <h3>特殊排列</h3>
+    <table class="truth-table">
+        <tr><th>类型</th><th>公式</th><th>说明</th></tr>
+        <tr><td>全排列</td><td>P(n, n) = n!</td><td>n个元素的全部排列方式</td></tr>
+        <tr><td>圆排列</td><td>P(n, n) / n = (n-1)!</td><td>首尾相接的环形排列</td></tr>
+        <tr><td>含重复的排列</td><td>n! / (n₁! n₂! ... nₖ!)</td><td>n₁个相同，n₂个相同，...</td></tr>
+    </table>
+</div>
+
+<!-- ==================== 3. 组合 ==================== -->
+<h2>3. 组合（Combination）</h2>
+
+<div class="concept">
+    <h3>定义</h3>
+    <p>从 n 个<strong>不同</strong>元素中取出 r 个（0 &le; r &le; n），<strong>不考虑顺序</strong>组成一组，称为从 n 中取 r 的<strong>组合</strong>。</p>
+    <div class="formula-box">
+        C(n, r) = n! / (r! &times; (n-r)!) = P(n, r) / r!
+    </div>
+    <p><strong>关键：</strong>顺序不重要 — {A,B} 和 {B,A} 是同一个组合。</p>
+    <p><strong>关系：</strong>C(n,r) = P(n,r) / r!（排列数除以 r! 去除顺序因素）</p>
+</div>
+
+<div class="concept success">
+    <h3>组合的重要性质</h3>
+    <table class="truth-table">
+        <tr><th>性质</th><th>公式</th><th>说明</th></tr>
+        <tr><td>对称性</td><td>C(n, r) = C(n, n-r)</td><td>选r个等价于不选n-r个</td></tr>
+        <tr><td>递推（Pascal恒等式）</td><td>C(n, r) = C(n-1, r-1) + C(n-1, r)</td><td>包含某元素 + 不包含</td></tr>
+        <tr><td>边界</td><td>C(n, 0) = C(n, n) = 1</td><td>选0个或选n个各只有1种</td></tr>
+        <tr><td>求和</td><td>&Sigma; C(n, r) = 2<sup>n</sup></td><td>所有组合数之和等于幂集大小</td></tr>
+    </table>
+</div>
+
+<!-- ==================== 4. 排列 vs 组合对比 ==================== -->
+<h2>4. 排列与组合对比</h2>
+
+<div class="concept">
+    <table class="truth-table">
+        <tr><th>特性</th><th>排列 P(n,r)</th><th>组合 C(n,r)</th></tr>
+        <tr><td>顺序</td><td>重要</td><td>不重要</td></tr>
+        <tr><td>公式</td><td>n!/(n-r)!</td><td>n!/(r!(n-r)!)</td></tr>
+        <tr><td>关系</td><td>P(n,r) = C(n,r) &times; r!</td><td>C(n,r) = P(n,r) / r!</td></tr>
+        <tr><td>示例</td><td>选班长、副班长</td><td>选两个代表</td></tr>
+        <tr><td>大小关系</td><td>P(n,r) &ge; C(n,r)</td><td>等号当 r=0 或 r=n 时成立</td></tr>
+    </table>
+</div>
+
+<h2>4.1 经典例题</h2>
+
+<div class="concept">
+    <h3>例1：5个人站一排照相有多少种排法？</h3>
+    <p><strong>全排列：</strong>P(5,5) = 5! = 120 种</p>
+
+    <h3>例2：5个人选3个人当班长、副班长、学习委员？</h3>
+    <p><strong>排列（有顺序）：</strong>P(5,3) = 5!/(5-3)! = 5&times;4&times;3 = 60 种</p>
+
+    <h3>例3：5个人选3个人参加比赛？</h3>
+    <p><strong>组合（无顺序）：</strong>C(5,3) = 5!/(3!&times;2!) = 10 种</p>
+</div>
+
+<!-- ==================== 5. Pascal 三角形 ==================== -->
+<h2>5. Pascal 三角形（杨辉三角）</h2>
+
+<div class="concept">
+    <p>Pascal 三角形的第 n 行、第 r 个数 = C(n, r)。每行两端为1，每个数等于上一行相邻两数之和。</p>
+    <div class="pascal" id="pascalTri"></div>
+</div>
+
+<script>
+/* 生成 Pascal 三角形 */
+function genPascal(rows) {
+    const tri = [];
+    for (let i = 0; i < rows; i++) {
+        tri[i] = [1];
+        for (let j = 1; j < i; j++) {
+            tri[i][j] = tri[i-1][j-1] + tri[i-1][j];
+        }
+        if (i > 0) tri[i].push(1);
+    }
+
+    const colors = ['#ebf8ff', '#bee3f8', '#90cdf4', '#63b3ed', '#4299e1', '#3182ce', '#2b6cb0', '#2c5282', '#1a365d'];
+    let html = '';
+    for (let i = 0; i < rows; i++) {
+        html += '<div class="pascal-row">';
+        // 前置空白（对齐）
+        for (let s = 0; s < rows - i - 1; s++) html += '<div style="width:44px;"></div>';
+        for (const val of tri[i]) {
+            const bg = colors[Math.min(i, colors.length - 1)];
+            html += `<div class="pascal-cell" style="background:${bg};color:${i > 4 ? '#fff' : '#2d3748'};">${val}</div>`;
+        }
+        html += '</div>';
+    }
+    document.getElementById('pascalTri').innerHTML = html;
+}
+genPascal(9);
+</script>
+
+<!-- ==================== 6. 二项式定理 ==================== -->
+<h2>6. 二项式定理（Binomial Theorem）</h2>
+
+<div class="concept success">
+    <div class="formula-box">
+        (a + b)<sup>n</sup> = &Sigma;<sub>k=0</sub><sup>n</sup> C(n, k) &middot; a<sup>n-k</sup> &middot; b<sup>k</sup>
+    </div>
+    <p>展开式中 a<sup>n-k</sup>b<sup>k</sup> 的系数恰好是 C(n, k)，对应 Pascal 三角形第 n 行的第 k 个数。</p>
+    <p><strong>示例：</strong>(a+b)&sup3; = C(3,0)a&sup3; + C(3,1)a&sup2;b + C(3,2)ab&sup2; + C(3,3)b&sup3;</p>
+    <p>= a&sup3; + 3a&sup2;b + 3ab&sup2; + b&sup3;</p>
+</div>
+
+<!-- ==================== 7. 交互式计算器 ==================== -->
+<h2>7. 交互式排列组合计算器</h2>
+
+<div class="demo-area">
+    <p style="color:#a0aec0;">// 输入 n 和 r，计算排列数和组合数</p>
+    <div style="margin:10px 0;">
+        <label>n = <input type="number" id="calcN" value="10" min="0" max="20"></label>
+        <label style="margin-left:15px;">r = <input type="number" id="calcR" value="3" min="0" max="20"></label>
+        <button onclick="calcPermComb()">计算</button>
+    </div>
+    <div class="demo-result" id="calcResult"></div>
+</div>
+
+<script>
+/* 排列组合计算器 */
+function factorial(n) {
+    if (n <= 1) return 1n;
+    let r = 1n;
+    for (let i = 2n; i <= BigInt(n); i++) r *= i;
+    return r;
+}
+
+function calcPermComb() {
+    const n = parseInt(document.getElementById('calcN').value);
+    const r = parseInt(document.getElementById('calcR').value);
+
+    if (r > n) {
+        document.getElementById('calcResult').innerHTML = '<p style="color:#fc8181;">r 不能大于 n！</p>';
+        return;
+    }
+
+    const perm = Number(factorial(n) / factorial(n - r));
+    const comb = Number(factorial(n) / (factorial(r) * factorial(n - r)));
+
+    let html = `<p>P(${n}, ${r}) = ${n}! / (${n}-${r})! = <strong style="color:#48bb78;">${perm.toLocaleString()}</strong></p>`;
+    html += `<p>C(${n}, ${r}) = ${n}! / (${r}! &times; (${n}-${r})!) = <strong style="color:#48bb78;">${comb.toLocaleString()}</strong></p>`;
+    html += `<p style="color:#a0aec0;">验证: C(${n},${r}) = P(${n},${r}) / ${r}! = ${perm} / ${factorial(r).toString()} = ${comb}</p>`;
+    html += `<p style="color:#a0aec0;">对称性: C(${n},${r}) = C(${n},${n-r}) = ${comb}</p>`;
+
+    // 展示前几行组合
+    if (n <= 20) {
+        html += `<p style="margin-top:8px;">C(${n}, k) 序列: `;
+        const vals = [];
+        for (let k = 0; k <= n; k++) vals.push(Number(factorial(n) / (factorial(k) * factorial(n - k))));
+        html += vals.join(', ');
+        html += `</p>`;
+    }
+
+    document.getElementById('calcResult').innerHTML = html;
+}
+</script>
+
+</div><!-- /.container -->
+
+<!--
+    ==========================================
+    总结：
+    1. 加法原理（分类）：N = n₁+n₂+...+nₖ
+    2. 乘法原理（分步）：N = n₁×n₂×...×nₖ
+    3. 排列 P(n,r) = n!/(n-r)!：顺序重要
+    4. 组合 C(n,r) = n!/(r!(n-r)!)：顺序不重要
+    5. C(n,r) = C(n,n-r)（对称性），C(n,r) = C(n-1,r-1) + C(n-1,r)（Pascal恒等式）
+    6. Pascal三角形的第n行对应C(n,0)到C(n,n)
+    7. 二项式定理：(a+b)^n 的展开系数为 C(n,k)
+    ==========================================
+-->
+</body>
+</html>

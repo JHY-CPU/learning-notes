@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Y组合子与递归</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.7; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #6b46c1; border-bottom: 3px solid #805ad5; padding-bottom: 12px; margin-bottom: 30px; }
+        h2 { color: #553c9a; margin: 25px 0 12px; padding-left: 10px; border-left: 4px solid #805ad5; }
+        h3 { color: #2d3748; margin: 15px 0 8px; }
+        p, li { margin-bottom: 8px; }
+        ul, ol { padding-left: 25px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        code { background: #f3e8ff; padding: 2px 6px; border-radius: 4px; font-family: "Consolas", monospace; font-size: 0.95em; color: #6b46c1; }
+        pre { background: #1a202c; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; margin: 10px 0; font-size: 0.9em; }
+        pre code { background: none; color: inherit; padding: 0; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 10px 14px; text-align: center; }
+        th { background: #805ad5; color: #fff; }
+        tr:nth-child(even) { background: #faf5ff; }
+        .tag { display: inline-block; padding: 3px 10px; border-radius: 15px; font-size: 0.8em; font-weight: bold; margin: 2px; }
+        .tag-purple { background: #e9d8fd; color: #553c9a; }
+        .tag-blue { background: #bee3f8; color: #2a4365; }
+        .tag-green { background: #c6f6d5; color: #22543d; }
+        .tag-yellow { background: #fefcbf; color: #744210; }
+        .theorem { background: #faf5ff; border-left: 5px solid #805ad5; padding: 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+        .example { background: #f3e8ff; border-radius: 8px; padding: 15px; margin: 12px 0; }
+        .reduction { font-family: monospace; font-size: 1em; line-height: 2; }
+        .reduction .arrow { color: #805ad5; font-weight: bold; }
+        .highlight { background: #fefcbf; padding: 2px 6px; border-radius: 4px; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <h1>Y组合子与递归</h1>
+
+    <!-- ====== 递归的问题 ====== -->
+    <div class="card">
+        <h2>一、λ演算中的递归困境</h2>
+        <p>在λ演算中，函数是<strong>匿名</strong>的——函数体内无法引用自己的名字。如何实现递归？</p>
+
+        <div class="example">
+            <h3>问题：如何在λ演算中定义阶乘？</h3>
+            <pre><code>-- 普通递归定义（需要名字引用自己）：
+fact(n) = if n==0 then 1 else n * fact(n-1)
+
+-- λ演算不能这样写！
+-- λn. if (iszero n) 1 (mult n (???))   -- ??? 处没有名字可用！</code></pre>
+        </div>
+
+        <p><strong>解决方案：</strong>不动点组合子 (Fixed-Point Combinator)。</p>
+    </div>
+
+    <!-- ====== 不动点 ====== -->
+    <div class="card">
+        <h2>二、不动点 (Fixed Point)</h2>
+        <p>函数 f 的<strong>不动点</strong>是满足 <code>f(x) = x</code> 的 x。</p>
+
+        <h3>数学例子</h3>
+        <ul>
+            <li>cos(x) 的不动点 ≈ 0.739（cos(0.739) ≈ 0.739）</li>
+            <li>f(x) = x² 的不动点：0 和 1</li>
+        </ul>
+
+        <div class="theorem">
+            <p><strong>关键洞察：</strong>阶乘函数 fact 是某个"泛函" F 的不动点：</p>
+            <pre><code>F = λf. λn. if (iszero n) 1 (mult n (f (pred n)))
+
+-- F 的不动点就是阶乘函数！
+-- fact = F(fact)
+-- 即 fact n = if n==0 then 1 else n * fact(n-1)</code></pre>
+            <p>问题转化为：<strong>如何找到任意函数的不动点？</strong></p>
+        </div>
+    </div>
+
+    <!-- ====== Y组合子 ====== -->
+    <div class="card">
+        <h2>三、Y组合子</h2>
+        <p>Y组合子是高阶函数，使得对任意 f，有 <code>Y f = f (Y f)</code>（即 Y f 是 f 的不动点）。</p>
+
+        <h3>标准Y组合子（正则序）</h3>
+        <pre><code>Y = λf. (λx. f (x x)) (λx. f (x x))</code></pre>
+
+        <h3>验证：Y f → f (Y f)</h3>
+        <div class="reduction">
+            <p>Y f</p>
+            <p><span class="arrow">=</span> (λf. (λx. f (x x)) (λx. f (x x))) f</p>
+            <p><span class="arrow">→<sub>β</sub></span> (λx. f (x x)) (λx. f (x x))</p>
+            <p><span class="arrow">→<sub>β</sub></span> f ((λx. f (x x)) (λx. f (x x)))</p>
+            <p><span class="arrow">=</span> f (Y f) <span style="color:#38a169;">— 正是 f 的不动点！</span></p>
+        </div>
+
+        <h3>用Y定义阶乘</h3>
+        <pre><code>-- F 是阶乘泛函
+F = λf. λn. if (iszero n) 1 (mult n (f (pred n)))
+
+-- fact = Y F 是不动点
+-- fact = F(fact) = F(F(fact)) = ...
+
+-- 展开 fact 3：
+fact 3 = F(fact) 3
+       = if (iszero 3) 1 (mult 3 (fact (pred 3)))
+       = mult 3 (fact 2)
+       = mult 3 (mult 2 (fact 1))
+       = mult 3 (mult 2 (mult 1 (fact 0)))
+       = mult 3 (mult 2 (mult 1 1))
+       = mult 3 (mult 2 1)
+       = mult 3 2
+       = 6</code></pre>
+    </div>
+
+    <!-- ====== Z组合子 ====== -->
+    <div class="card">
+        <h2>四、Z组合子（应用序版本）</h2>
+        <p>标准Y组合子在<strong>应用序</strong>（传值）语言中会死循环，因为 <code>(λx. f (x x)) (λx. f (x x))</code> 会无限展开。</p>
+        <p><strong>Z组合子</strong>通过添加一层 λ 延迟求值：</p>
+
+        <pre><code>Z = λf. (λx. f (λv. x x v)) (λx. f (λv. x x v))</code></pre>
+
+        <h3>Z vs Y</h3>
+        <table>
+            <thead><tr><th>组合子</th><th>定义</th><th>适用求值策略</th></tr></thead>
+            <tbody>
+                <tr><td>Y</td><td>λf. (λx. f(x x))(λx. f(x x))</td><td>正则序（传名）</td></tr>
+                <tr><td>Z</td><td>λf. (λx. f(λv. x x v))(λx. f(λv. x x v))</td><td>应用序（传值）</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ====== 其他不动点组合子 ====== -->
+    <div class="card">
+        <h2>五、其他不动点组合子</h2>
+        <table>
+            <thead><tr><th>名称</th><th>定义</th><th>发现者</th></tr></thead>
+            <tbody>
+                <tr><td>Y</td><td>λf. (λx. f(x x))(λx. f(x x))</td><td>Curry</td></tr>
+                <tr><td>Z</td><td>λf. (λx. f(λv. x x v))(λx. f(λv. x x v))</td><td>—</td></tr>
+                <tr><td>Turing</td><td>(λx. λy. y (x x y)) (λx. λy. y (x x y))</td><td>Turing</td></tr>
+                <tr><td>Θ (Theta)</td><td>(λx. λy. y (x x y)) (λx. λy. y (x x y))</td><td>Turing</td></tr>
+            </tbody>
+        </table>
+
+        <h3>编程语言中的对应</h3>
+        <pre><code>-- Haskell: 用 let 或 fix
+fact = fix (\f n -> if n == 0 then 1 else n * f (n-1))
+  where fix f = let x = f x in x
+
+-- Python: 用 Z 组合子
+Z = lambda f: (lambda x: f(lambda v: x(x)(v)))(lambda x: f(lambda v: x(x)(v)))
+fact = Z(lambda f: lambda n: 1 if n == 0 else n * f(n-1))
+print(fact(5))  # 120
+
+-- JavaScript: 箭头函数实现
+const Z = f => (x => f(v => x(x)(v)))(x => f(v => x(x)(v)));
+const fact = Z(f => n => n === 0 ? 1 : n * f(n - 1));</code></pre>
+    </div>
+
+    <!-- ====== 深层意义 ====== -->
+    <div class="card">
+        <h2>六、深层意义</h2>
+
+        <h3>自引用的本质</h3>
+        <p>Y组合子的核心技巧是 <code>λx. x x</code> ——将函数应用于自身。这在λ演算中合法，因为函数就是值。</p>
+
+        <div class="example">
+            <pre><code>ω = λx. x x           -- 自应用函数
+ω ω → (λx. x x) (λx. x x) → (λx. x x) (λx. x x) → ...  -- 死循环！
+
+Ω = ω ω               -- 最简单的不终止项
+-- Y的展开过程也涉及 ω，但 f 外层包装让它变得有用了</code></pre>
+        </div>
+
+        <h3>与编程语言的关系</h3>
+        <ul>
+            <li><strong>Haskell：</strong>惰性求值允许直接使用 Y，<code>let x = f x in x</code> 就是不动点</li>
+            <li><strong>OCaml/ML：</strong>使用 <code>let rec</code>（编译器内部处理递归）</li>
+            <li><strong>Scheme：</strong><code>(letrec ((fact (lambda (n) ...))) ...)</code></li>
+            <li><strong>理论意义：</strong>证明了纯λ演算可以表达一切可计算函数——包括递归</li>
+        </ul>
+    </div>
+
+</div>
+
+<!--
+========================================
+  笔记总结
+========================================
+本文件涵盖Y组合子与递归的核心知识：
+
+1. 递归困境：
+   - λ演算中函数是匿名的，无法自引用
+   - 需要某种机制在不命名的情况下实现递归
+
+2. 不动点：
+   - f的不动点：满足 f(x) = x 的x
+   - 递归函数是"泛函"的不动点
+   - fact = F(fact)，其中F = λf. λn. ...
+
+3. Y组合子：
+   - Y = λf. (λx. f(x x))(λx. f(x x))
+   - Y f = f (Y f) — 对任意f成立
+   - 核心技巧：自应用 λx. x x
+
+4. Z组合子：
+   - 应用序（传值）语言适用
+   - 通过λv延迟求值避免死循环
+   - Python、JavaScript中可直接使用
+
+5. 深层意义：
+   - ω = λx.x x（自应用）和 Ω = ω ω（最小不终止项）
+   - Y组合子证明纯λ演算是图灵完备的
+   - 现代语言的递归机制（let rec, fix）是Y组合子的语法糖
+========================================
+-->
+</body>
+</html>

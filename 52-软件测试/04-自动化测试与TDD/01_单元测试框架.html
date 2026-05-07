@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>单元测试框架</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f5f7fa; color: #333; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 15px; margin-bottom: 30px; }
+        h2 { color: #2980b9; margin: 25px 0 10px; border-left: 4px solid #3498db; padding-left: 12px; }
+        h3 { color: #8e44ad; margin: 15px 0 8px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: center; }
+        th { background: #3498db; color: #fff; }
+        tr:nth-child(even) { background: #ecf0f1; }
+        .note { background: #fef9e7; border-left: 4px solid #f1c40f; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        .important { background: #fdedec; border-left: 4px solid #e74c3c; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        ul, ol { margin-left: 25px; margin-bottom: 10px; }
+        li { margin-bottom: 5px; }
+        pre { background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 8px; overflow-x: auto; font-size: 0.9em; margin: 10px 0; }
+        pre .comment { color: #7f8c8d; }
+        pre .keyword { color: #e74c3c; }
+        pre .string { color: #f39c12; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>单元测试框架</h1>
+
+        <!-- Jest -->
+        <div class="card">
+            <h2>一、Jest（JavaScript测试框架）</h2>
+            <p>Jest是Facebook开发的JavaScript测试框架，零配置、内置断言、Mock和覆盖率，是前端测试的主流选择。</p>
+
+            <h3>1.1 基本结构</h3>
+<pre><span class="comment">// math.js - 被测模块</span>
+<span class="keyword">function</span> add(a, b) { <span class="keyword">return</span> a + b; }
+<span class="keyword">function</span> divide(a, b) {
+    <span class="keyword">if</span> (b === <span class="keyword">0</span>) <span class="keyword">throw new</span> Error(<span class="string">'除数不能为零'</span>);
+    <span class="keyword">return</span> a / b;
+}
+module.exports = { add, divide };
+
+<span class="comment">// math.test.js - 测试文件</span>
+<span class="keyword">const</span> { add, divide } = require(<span class="string">'./math'</span>);
+
+describe(<span class="string">'数学函数测试'</span>, () => {
+    <span class="comment">// 测试套件（test suite）</span>
+    describe(<span class="string">'add'</span>, () => {
+        test(<span class="string">'两个正数相加'</span>, () => {
+            expect(add(<span class="keyword">1</span>, <span class="keyword">2</span>)).toBe(<span class="keyword">3</span>);
+        });
+        test(<span class="string">'负数相加'</span>, () => {
+            expect(add(-<span class="keyword">1</span>, -<span class="keyword">2</span>)).toBe(-<span class="keyword">3</span>);
+        });
+    });
+
+    describe(<span class="string">'divide'</span>, () => {
+        test(<span class="string">'正常除法'</span>, () => {
+            expect(divide(<span class="keyword">6</span>, <span class="keyword">2</span>)).toBe(<span class="keyword">3</span>);
+        });
+        test(<span class="string">'除以零抛出异常'</span>, () => {
+            expect(() => divide(<span class="keyword">1</span>, <span class="keyword">0</span>)).toThrow(<span class="string">'除数不能为零'</span>);
+        });
+    });
+});</pre>
+
+            <h3>1.2 常用断言（Matchers）</h3>
+            <table>
+                <tr><th>断言</th><th>说明</th><th>示例</th></tr>
+                <tr><td>toBe(value)</td><td>严格相等（===）</td><td>expect(1+1).toBe(2)</td></tr>
+                <tr><td>toEqual(value)</td><td>深度相等（对象/数组）</td><td>expect({a:1}).toEqual({a:1})</td></tr>
+                <tr><td>toBeTruthy()</td><td>真值</td><td>expect(1).toBeTruthy()</td></tr>
+                <tr><td>toBeFalsy()</td><td>假值</td><td>expect(0).toBeFalsy()</td></tr>
+                <tr><td>toContain(item)</td><td>数组/字符串包含</td><td>expect([1,2]).toContain(2)</td></tr>
+                <tr><td>toThrow(error)</td><td>抛出异常</td><td>expect(fn).toThrow('msg')</td></tr>
+                <tr><td>toBeGreaterThan(n)</td><td>大于</td><td>expect(5).toBeGreaterThan(3)</td></tr>
+                <tr><td>toMatch(regexp)</td><td>正则匹配</td><td>expect('abc').toMatch(/a/)</td></tr>
+                <tr><td>toBeNull()</td><td>为null</td><td>expect(null).toBeNull()</td></tr>
+                <tr><td>toHaveLength(n)</td><td>长度为n</td><td>expect([1,2]).toHaveLength(2)</td></tr>
+            </table>
+        </div>
+
+        <!-- Mock -->
+        <div class="card">
+            <h2>二、Mock（模拟）</h2>
+            <p>Mock用于隔离被测代码的依赖，模拟外部函数/模块的行为。</p>
+
+            <h3>2.1 Jest Mock示例</h3>
+<pre><span class="comment">// 被测函数：依赖API调用</span>
+<span class="keyword">async function</span> fetchUser(id) {
+    <span class="keyword">const</span> response = <span class="keyword">await</span> fetch(`/api/users/${id}`);
+    <span class="keyword">return</span> response.json();
+}
+
+<span class="comment">// user.test.js</span>
+<span class="comment">// 模拟全局fetch</span>
+global.fetch = jest.fn();
+
+describe(<span class="string">'fetchUser'</span>, () => {
+    beforeEach(() => {
+        fetch.mockClear(); <span class="comment">// 每次测试前清除mock</span>
+    });
+
+    test(<span class="string">'获取用户成功'</span>, <span class="keyword">async</span> () => {
+        <span class="comment">// 设置mock返回值</span>
+        fetch.mockResolvedValueOnce({
+            json: () => Promise.resolve({ id: <span class="keyword">1</span>, name: <span class="string">'张三'</span> })
+        });
+
+        <span class="keyword">const</span> user = <span class="keyword">await</span> fetchUser(<span class="keyword">1</span>);
+
+        expect(user.name).toBe(<span class="string">'张三'</span>);
+        expect(fetch).toHaveBeenCalledWith(<span class="string">'/api/users/1'</span>);
+        expect(fetch).toHaveBeenCalledTimes(<span class="keyword">1</span>);
+    });
+
+    test(<span class="string">'获取用户失败'</span>, <span class="keyword">async</span> () => {
+        fetch.mockRejectedValueOnce(<span class="keyword">new</span> Error(<span class="string">'网络错误'</span>));
+        <span class="keyword">await</span> expect(fetchUser(<span class="keyword">999</span>)).rejects.toThrow(<span class="string">'网络错误'</span>);
+    });
+});</pre>
+
+            <h3>2.2 Mock类型</h3>
+            <table>
+                <tr><th>类型</th><th>说明</th><th>Jest方法</th></tr>
+                <tr><td>Mock Function</td><td>模拟函数调用</td><td>jest.fn()</td></tr>
+                <tr><td>Spy</td><td>监视但不替换原函数</td><td>jest.spyOn()</td></tr>
+                <tr><td>Module Mock</td><td>模拟整个模块</td><td>jest.mock()</td></tr>
+                <tr><td>Timer Mock</td><td>模拟定时器</td><td>jest.useFakeTimers()</td></tr>
+            </table>
+        </div>
+
+        <!-- 其他框架 -->
+        <div class="card">
+            <h2>三、其他测试框架简介</h2>
+
+            <h3>3.1 JUnit（Java）</h3>
+<pre><span class="comment">// JUnit 5 示例</span>
+<span class="keyword">import</span> org.junit.jupiter.api.*;
+<span class="keyword">import static</span> org.junit.jupiter.api.Assertions.*;
+
+<span class="keyword">class</span> CalculatorTest {
+    <span class="keyword">private</span> Calculator calc;
+
+    @BeforeEach
+    <span class="keyword">void</span> setUp() {
+        calc = <span class="keyword">new</span> Calculator();
+    }
+
+    @Test
+    @DisplayName(<span class="string">"测试加法"</span>)
+    <span class="keyword">void</span> testAdd() {
+        assertEquals(<span class="keyword">5</span>, calc.add(<span class="keyword">2</span>, <span class="keyword">3</span>));
+    }
+
+    @Test
+    <span class="keyword">void</span> testDivideByZero() {
+        assertThrows(ArithmeticException.<span class="keyword">class</span>, () -> {
+            calc.divide(<span class="keyword">1</span>, <span class="keyword">0</span>);
+        });
+    }
+
+    @ParameterizedTest
+    @ValueSource(ints = {<span class="keyword">1</span>, <span class="keyword">2</span>, <span class="keyword">3</span>})
+    <span class="keyword">void</span> testPositive(<span class="keyword">int</span> num) {
+        assertTrue(num > <span class="keyword">0</span>);
+    }
+}</pre>
+
+            <h3>3.2 pytest（Python）</h3>
+<pre><span class="comment"># pytest 示例</span>
+<span class="keyword">import</span> pytest
+
+<span class="keyword">def</span> add(a, b):
+    <span class="keyword">return</span> a + b
+
+<span class="keyword">def</span> divide(a, b):
+    <span class="keyword">if</span> b == <span class="keyword">0</span>:
+        <span class="keyword">raise</span> ValueError(<span class="string">"除数不能为零"</span>)
+    <span class="keyword">return</span> a / b
+
+<span class="keyword">class</span> TestMath:
+    <span class="keyword">def</span> test_add(self):
+        <span class="keyword">assert</span> add(<span class="keyword">1</span>, <span class="keyword">2</span>) == <span class="keyword">3</span>
+
+    <span class="keyword">def</span> test_divide(self):
+        <span class="keyword">assert</span> divide(<span class="keyword">6</span>, <span class="keyword">2</span>) == <span class="keyword">3</span>
+
+    <span class="keyword">def</span> test_divide_zero(self):
+        <span class="keyword">with</span> pytest.raises(ValueError):
+            divide(<span class="keyword">1</span>, <span class="keyword">0</span>)
+
+    @pytest.mark.parametrize(<span class="string">"a,b,expected"</span>, [
+        (<span class="keyword">1</span>, <span class="keyword">2</span>, <span class="keyword">3</span>), (<span class="keyword">-1</span>, <span class="keyword">1</span>, <span class="keyword">0</span>), (<span class="keyword">0</span>, <span class="keyword">0</span>, <span class="keyword">0</span>)
+    ])
+    <span class="keyword">def</span> test_add_param(self, a, b, expected):
+        <span class="keyword">assert</span> add(a, b) == expected</pre>
+
+            <h3>3.3 框架对比</h3>
+            <table>
+                <tr><th>框架</th><th>语言</th><th>特点</th></tr>
+                <tr><td>Jest</td><td>JavaScript</td><td>零配置、内置Mock、快照测试</td></tr>
+                <tr><td>JUnit</td><td>Java</td><td>注解驱动、参数化测试</td></tr>
+                <tr><td>pytest</td><td>Python</td><td>简洁语法、fixture、参数化</td></tr>
+                <tr><td>Mocha</td><td>JavaScript</td><td>灵活、需配合断言库(Chai)</td></tr>
+            </table>
+        </div>
+
+        <!-- 测试最佳实践 -->
+        <div class="card">
+            <h2>四、单元测试最佳实践（FIRST原则）</h2>
+            <table>
+                <tr><th>原则</th><th>说明</th></tr>
+                <tr><td><strong>F</strong>ast（快）</td><td>测试应快速执行，毫秒级别</td></tr>
+                <tr><td><strong>I</strong>solated（隔离）</td><td>测试之间相互独立，不依赖执行顺序</td></tr>
+                <tr><td><strong>R</strong>epeatable（可重复）</td><td>每次运行结果一致</td></tr>
+                <tr><td><strong>S</strong>elf-validating（自验证）</td><td>测试自动判断通过/失败</td></tr>
+                <tr><td><strong>T</strong>imely（及时）</td><td>与代码同步编写，不拖延</td></tr>
+            </table>
+
+            <div class="important">
+                <strong>AAA模式：</strong><br>
+                Arrange（准备）：设置测试数据和环境<br>
+                Act（执行）：调用被测函数<br>
+                Assert（断言）：验证结果
+            </div>
+        </div>
+
+        <!-- 总结 -->
+        <div class="card">
+            <h2>五、知识要点总结</h2>
+            <ol>
+                <li>Jest：describe/test/expect，内置Mock和覆盖率</li>
+                <li>Mock：jest.fn()、jest.spyOn()、jest.mock()</li>
+                <li>JUnit：@Test注解、参数化测试</li>
+                <li>pytest：简洁assert语法、fixture、参数化装饰器</li>
+                <li>FIRST原则：Fast/Isolated/Repeatable/Self-validating/Timely</li>
+                <li>AAA模式：Arrange/Act/Assert</li>
+            </ol>
+        </div>
+
+        <!--
+            ========================================
+            文件总结：单元测试框架
+            ========================================
+            本文件涵盖了主流单元测试框架：
+            1. Jest：断言、Mock、测试结构
+            2. Mock技术：函数Mock、Spy、模块Mock
+            3. JUnit 5：注解、断言、参数化测试
+            4. pytest：简洁语法、fixture
+            5. FIRST原则和AAA模式
+
+            重点：Jest用法、Mock技术、FIRST原则
+            考点：测试框架对比、Mock使用
+            ========================================
+        -->
+    </div>
+</body>
+</html>

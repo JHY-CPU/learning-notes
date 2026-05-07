@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>日志指标追踪</title>
+    <!-- 可观测性与监控 - 三大支柱 笔记 -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        .tag { display: inline-block; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>日志、指标、追踪 - 可观测性三大支柱</h2>
+        <p><span class="tag">可观测性</span><span class="tag">监控</span><span class="tag">OpenTelemetry</span></p>
+        <p>可观测性通过日志、指标和追踪三个维度理解系统内部状态。</p>
+    </div>
+
+    <div class="card">
+        <h2>三大支柱对比</h2>
+        <div class="code">
+┌──────────┬────────────────┬────────────────┬────────────────┐
+│          │ 日志(Logs)      │ 指标(Metrics)  │ 追踪(Traces)   │
+├──────────┼────────────────┼────────────────┼────────────────┤
+│ 是什么    │ 离散事件记录    │ 聚合数值指标    │ 请求生命周期   │
+│ 回答      │ 发生了什么      │ 系统状态如何    │ 请求经过哪些服务│
+│ 格式      │ 非结构化/JSON   │ 数值+标签       │ Span链         │
+│ 存储      │ Elasticsearch  │ Prometheus     │ Jaeger/Zipkin  │
+│ 可视化    │ Kibana         │ Grafana        │ Jaeger UI      │
+│ 适用      │ 调试/审计      │ 告警/趋势       │ 性能分析/排障  │
+└──────────┴────────────────┴────────────────┴────────────────┘
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>结构化日志</h2>
+        <div class="code">
+结构化日志 vs 非结构化日志：
+// 非结构化
+"User 123 logged in from 192.168.1.1"
+
+// 结构化 (JSON)
+{
+  "timestamp": "2024-01-15T10:30:00Z",
+  "level": "INFO",
+  "service": "auth-service",
+  "trace_id": "abc123",
+  "user_id": "123",
+  "action": "login",
+  "ip": "192.168.1.1",
+  "duration_ms": 45
+}
+
+日志最佳实践：
+- 使用结构化格式(JSON)
+- 包含trace_id关联请求
+- 合理的日志级别：DEBUG/INFO/WARN/ERROR
+- 避免记录敏感信息(密码/Token)
+- 日志采样减少存储成本
+- 集中化管理(ELK/Loki)
+
+ELK Stack：
+Elasticsearch：存储和搜索
+Logstash：日志收集和处理
+Kibana：可视化和查询
+
+Loki (Grafana生态)：
+- 只索引标签，不索引内容
+- 比ELK成本更低
+- 与Grafana无缝集成
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Prometheus指标</h2>
+        <div class="code">
+Prometheus指标类型：
+┌─────────────────────────────────────────────┐
+│  Counter：只增不减的计数器                    │
+│  http_requests_total{method="GET",status="200"}│
+│  → 计算速率：rate(http_requests_total[5m])  │
+│                                             │
+│  Gauge：可增可减的瞬时值                      │
+│  memory_usage_bytes{instance="node1"}       │
+│  → 当前内存使用量                             │
+│                                             │
+│  Histogram：分布统计                          │
+│  http_request_duration_seconds_bucket{le="0.1"}│
+│  → p50/p95/p99延迟计算                       │
+│  histogram_quantile(0.99, rate(...))         │
+│                                             │
+│  Summary：预计算分位数                        │
+│  直接输出分位数值，不需要Prometheus计算        │
+└─────────────────────────────────────────────┘
+
+告警规则 (AlertManager)：
+groups:
+  - name: service_alerts
+    rules:
+      - alert: HighErrorRate
+        expr: rate(http_errors_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "错误率超过5%"
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>分布式追踪</h2>
+        <div class="code">
+Trace = 多个Span的树状结构
+Span = 单个工作单元
+
+┌─────────────────────────────────────────────┐
+│  Trace ID: abc123                           │
+│  ├── Span 1: API Gateway (50ms)             │
+│  │   ├── Span 2: Auth Service (10ms)        │
+│  │   └── Span 3: Order Service (35ms)       │
+│  │       ├── Span 4: DB Query (20ms)        │
+│  │       └── Span 5: Cache Lookup (5ms)     │
+│  └── Span 6: Response (5ms)                 │
+└─────────────────────────────────────────────┘
+
+OpenTelemetry (OTel)：
+- 统一的日志/指标/追踪标准
+- 供应商无关的SDK
+- 自动注入(Auto-instrumentation)
+- OTLP协议传输
+
+OTel架构：
+Instrumented App → OTel SDK → OTel Collector → Backend
+                                     ├── Jaeger (Traces)
+                                     ├── Prometheus (Metrics)
+                                     └── Loki (Logs)
+
+W3C Trace Context：
+traceparent: 00-abc123-span456-01
+- 版本-TraceID-ParentID-采样标志
+- 跨服务传播追踪上下文
+        </div>
+        <div class="note">OpenTelemetry正在统一可观测性标准。建议新项目直接采用OTel，
+        避免被特定厂商绑定。</div>
+    </div>
+
+    <!-- 总结：可观测性三大支柱：日志（发生了什么）、指标（系统状态）、追踪（请求链路）。
+    Prometheus是指标事实标准，OpenTelemetry正在统一日志/指标/追踪的标准。
+    结构化日志和分布式追踪是微服务排障的关键工具。 -->
+</body>
+</html>

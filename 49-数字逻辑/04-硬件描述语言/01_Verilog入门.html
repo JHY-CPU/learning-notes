@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verilog入门</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f5f7fa; color: #333; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 15px; margin-bottom: 30px; }
+        h2 { color: #2980b9; margin: 25px 0 10px; border-left: 4px solid #3498db; padding-left: 12px; }
+        h3 { color: #8e44ad; margin: 15px 0 8px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: center; }
+        th { background: #3498db; color: #fff; }
+        tr:nth-child(even) { background: #ecf0f1; }
+        .formula { background: #f9f9f9; border-left: 4px solid #e67e22; padding: 10px 15px; margin: 10px 0; font-family: 'Consolas', monospace; }
+        .note { background: #fef9e7; border-left: 4px solid #f1c40f; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        .important { background: #fdedec; border-left: 4px solid #e74c3c; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        ul, ol { margin-left: 25px; margin-bottom: 10px; }
+        li { margin-bottom: 5px; }
+        pre { background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 8px; overflow-x: auto; font-size: 0.9em; margin: 10px 0; }
+        pre .comment { color: #7f8c8d; }
+        pre .keyword { color: #e74c3c; }
+        pre .type { color: #3498db; }
+        pre .number { color: #2ecc71; }
+        pre .string { color: #f39c12; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Verilog入门</h1>
+
+        <!-- 模块定义 -->
+        <div class="card">
+            <h2>一、模块定义（Module）</h2>
+            <p>Verilog程序的基本单元是模块（module），每个模块描述一个电路功能。</p>
+
+            <h3>1.1 模块基本结构</h3>
+<pre><span class="comment">// 模块定义的基本格式</span>
+<span class="keyword">module</span> 模块名(
+    <span class="keyword">input</span>  端口列表,
+    <span class="keyword">output</span> 端口列表,
+    <span class="keyword">inout</span>  双向端口列表
+);
+    <span class="comment">// 内部信号声明</span>
+    <span class="type">wire</span>  线网型信号;
+    <span class="type">reg</span>   寄存器型信号;
+
+    <span class="comment">// 功能描述</span>
+    ...
+
+<span class="keyword">endmodule</span></pre>
+
+            <h3>1.2 示例：与门模块</h3>
+<pre><span class="comment">// 2输入与门</span>
+<span class="keyword">module</span> and_gate(
+    <span class="keyword">input</span>  a,
+    <span class="keyword">input</span>  b,
+    <span class="keyword">output</span> y
+);
+    <span class="keyword">assign</span> y = a & b;  <span class="comment">// 连续赋值语句</span>
+<span class="keyword">endmodule</span></pre>
+        </div>
+
+        <!-- 数据类型 -->
+        <div class="card">
+            <h2>二、数据类型</h2>
+
+            <h3>2.1 线网型（Net）</h3>
+            <table>
+                <tr><th>类型</th><th>说明</th><th>默认值</th></tr>
+                <tr><td>wire</td><td>单根连线</td><td>高阻 z</td></tr>
+                <tr><td>tri</td><td>三态线（多驱动源）</td><td>高阻 z</td></tr>
+            </table>
+
+            <h3>2.2 寄存器型（Reg）</h3>
+            <ul>
+                <li><code>reg</code>：存储数据，不一定是硬件寄存器</li>
+                <li>在 always 块中赋值的信号必须声明为 reg</li>
+                <li>默认值为 x（未知）</li>
+            </ul>
+
+            <h3>2.3 参数定义</h3>
+<pre><span class="comment">// 参数常量</span>
+<span class="keyword">parameter</span> WIDTH = <span class="number">8</span>;
+<span class="keyword">parameter</span> IDLE = <span class="number">2'b00</span>, RUN = <span class="number">2'b01</span>, STOP = <span class="number">2'b10</span>;
+
+<span class="comment">// 数值表示</span>
+<span class="number">8'b1010_0101</span>   <span class="comment">// 8位二进制</span>
+<span class="number">8'd165</span>         <span class="comment">// 8位十进制</span>
+<span class="number">8'hA5</span>          <span class="comment">// 8位十六进制</span>
+<span class="number">8'o245</span>         <span class="comment">// 8位八进制</span></pre>
+        </div>
+
+        <!-- 运算符 -->
+        <div class="card">
+            <h2>三、运算符</h2>
+
+            <table>
+                <tr><th>类别</th><th>运算符</th><th>说明</th><th>优先级</th></tr>
+                <tr><td>算术</td><td>+ - * / %</td><td>加减乘除取模</td><td>高</td></tr>
+                <tr><td>位运算</td><td>~ & | ^ ^~</td><td>按位非与或异或同或</td><td>↓</td></tr>
+                <tr><td>逻辑</td><td>! && ||</td><td>逻辑非与或</td><td>↓</td></tr>
+                <tr><td>关系</td><td>> < >= <=</td><td>大小比较</td><td>↓</td></tr>
+                <tr><td>等式</td><td>== != === !==</td><td>等于/不等于/case等式</td><td>↓</td></tr>
+                <tr><td>移位</td><td><< >></td><td>左移/右移</td><td>↓</td></tr>
+                <tr><td>缩减</td><td>& ~& | ~| ^ ^~</td><td>单目运算，对向量逐位</td><td>低</td></tr>
+            </table>
+
+            <div class="note">
+                <strong>区分 === 和 ==：</strong><br>
+                <code>==</code> 比较时，x和z视为"不确定"，结果可能是x<br>
+                <code>===</code> 严格比较，x和z作为确定值参与比较（testbench常用）
+            </div>
+        </div>
+
+        <!-- 赋值语句 -->
+        <div class="card">
+            <h2>四、赋值语句</h2>
+
+            <h3>4.1 连续赋值（assign）</h3>
+<pre><span class="comment">// 组合逻辑，右值变化立即更新左值</span>
+<span class="keyword">assign</span> y = a & b;         <span class="comment">// 与门</span>
+<span class="keyword">assign</span> {cout, sum} = a + b + cin;  <span class="comment">// 全加器</span></pre>
+
+            <h3>4.2 过程赋值</h3>
+<pre><span class="comment">// 阻塞赋值 = （组合逻辑用）</span>
+<span class="keyword">always</span> @(*) <span class="keyword">begin</span>
+    temp = a & b;
+    y = temp | c;
+<span class="keyword">end</span>
+
+<span class="comment">// 非阻塞赋值 <= （时序逻辑用）</span>
+<span class="keyword">always</span> @(posedge clk) <span class="keyword">begin</span>
+    q1 <= d;
+    q2 <= q1;  <span class="comment">// q1和q2同时更新</span>
+<span class="keyword">end</span></pre>
+
+            <div class="important">
+                <strong>黄金法则：</strong><br>
+                组合逻辑 always 块用阻塞赋值（=）<br>
+                时序逻辑 always 块用非阻塞赋值（<=）<br>
+                永远不要在同一个 always 块中混用两种赋值！
+            </div>
+        </div>
+
+        <!-- always块 -->
+        <div class="card">
+            <h2>五、always块</h2>
+
+            <h3>5.1 组合逻辑 always 块</h3>
+<pre><span class="comment">// 敏感列表用 *，表示所有输入信号</span>
+<span class="keyword">always</span> @(*) <span class="keyword">begin</span>
+    <span class="keyword">case</span>(sel)
+        <span class="number">2'b00</span>: y = a;
+        <span class="number">2'b01</span>: y = b;
+        <span class="number">2'b10</span>: y = c;
+        <span class="keyword">default</span>: y = d;
+    <span class="keyword">endcase</span>
+<span class="keyword">end</span></pre>
+
+            <h3>5.2 时序逻辑 always 块</h3>
+<pre><span class="comment">// 上升沿触发的D触发器</span>
+<span class="keyword">always</span> @(posedge clk) <span class="keyword">begin</span>
+    <span class="keyword">if</span> (rst)
+        q <= <span class="number">1'b0</span>;
+    <span class="keyword">else</span>
+        q <= d;
+<span class="keyword">end</span>
+
+<span class="comment">// 下降沿触发</span>
+<span class="keyword">always</span> @(negedge clk) <span class="keyword">begin</span>
+    ...
+<span class="keyword">end</span></pre>
+        </div>
+
+        <!-- 常用电路描述 -->
+        <div class="card">
+            <h2>六、常用电路描述</h2>
+
+            <h3>6.1 多路选择器</h3>
+<pre><span class="comment">// 4选1 MUX</span>
+<span class="keyword">module</span> mux4to1(
+    <span class="keyword">input</span>  [<span class="number">1</span>:<span class="number">0</span>] sel,
+    <span class="keyword">input</span>  [<span class="number">3</span>:<span class="number">0</span>] d,
+    <span class="keyword">output reg</span> y
+);
+    <span class="keyword">always</span> @(*) <span class="keyword">begin</span>
+        <span class="keyword">case</span>(sel)
+            <span class="number">2'd0</span>: y = d[<span class="number">0</span>];
+            <span class="number">2'd1</span>: y = d[<span class="number">1</span>];
+            <span class="number">2'd2</span>: y = d[<span class="number">2</span>];
+            <span class="number">2'd3</span>: y = d[<span class="number">3</span>];
+        <span class="keyword">endcase</span>
+    <span class="keyword">end</span>
+<span class="keyword">endmodule</span></pre>
+
+            <h3>6.2 译码器</h3>
+<pre><span class="comment">// 3-8译码器</span>
+<span class="keyword">module</span> decoder3to8(
+    <span class="keyword">input</span>  [<span class="number">2</span>:<span class="number">0</span>] in,
+    <span class="keyword">input</span>       en,
+    <span class="keyword">output reg</span> [<span class="number">7</span>:<span class="number">0</span>] out
+);
+    <span class="keyword">always</span> @(*) <span class="keyword">begin</span>
+        <span class="keyword">if</span> (en)
+            out = <span class="number">8'b0000_0001</span> << in;
+        <span class="keyword">else</span>
+            out = <span class="number">8'b0000_0000</span>;
+    <span class="keyword">end</span>
+<span class="keyword">endmodule</span></pre>
+
+            <h3>6.3 计数器</h3>
+<pre><span class="comment">// 模10计数器</span>
+<span class="keyword">module</span> counter_mod10(
+    <span class="keyword">input</span>       clk,
+    <span class="keyword">input</span>       rst,
+    <span class="keyword">output reg</span> [<span class="number">3</span>:<span class="number">0</span>] count
+);
+    <span class="keyword">always</span> @(posedge clk) <span class="keyword">begin</span>
+        <span class="keyword">if</span> (rst)
+            count <= <span class="number">4'd0</span>;
+        <span class="keyword">else if</span> (count == <span class="number">4'd9</span>)
+            count <= <span class="number">4'd0</span>;
+        <span class="keyword">else</span>
+            count <= count + <span class="number">1</span>;
+    <span class="keyword">end</span>
+<span class="keyword">endmodule</span></pre>
+
+            <h3>6.4 移位寄存器</h3>
+<pre><span class="comment">// 4位右移寄存器</span>
+<span class="keyword">module</span> shift_reg(
+    <span class="keyword">input</span>       clk,
+    <span class="keyword">input</span>       din,    <span class="comment">// 串行输入</span>
+    <span class="keyword">output reg</span> [<span class="number">3</span>:<span class="number">0</span>] q
+);
+    <span class="keyword">always</span> @(posedge clk) <span class="keyword">begin</span>
+        q <= {din, q[<span class="number">3</span>:<span class="number">1</span>]};  <span class="comment">// 右移，高位补din</span>
+    <span class="keyword">end</span>
+<span class="keyword">endmodule</span></pre>
+        </div>
+
+        <!-- Testbench -->
+        <div class="card">
+            <h2>七、Testbench编写</h2>
+            <p>Testbench是用于仿真的测试模块，不需要输入输出端口。</p>
+
+<pre><span class="comment">// 测试与门模块</span>
+<span class="keyword">module</span> tb_and_gate;
+    <span class="type">reg</span>  a, b;
+    <span class="type">wire</span> y;
+
+    <span class="comment">// 实例化被测模块</span>
+    and_gate uut(
+        .a(a),
+        .b(b),
+        .y(y)
+    );
+
+    <span class="comment">// 产生激励信号</span>
+    <span class="keyword">initial</span> <span class="keyword">begin</span>
+        $dumpfile("wave.vcd");   <span class="comment">// 波形输出文件</span>
+        $dumpvars(<span class="number">0</span>, tb_and_gate);
+
+        a = <span class="number">0</span>; b = <span class="number">0</span>; #<span class="number">10</span>;
+        a = <span class="number">0</span>; b = <span class="number">1</span>; #<span class="number">10</span>;
+        a = <span class="number">1</span>; b = <span class="number">0</span>; #<span class="number">10</span>;
+        a = <span class="number">1</span>; b = <span class="number">1</span>; #<span class="number">10</span>;
+        $finish;
+    <span class="keyword">end</span>
+
+    <span class="comment">// 监视输出</span>
+    <span class="keyword">initial</span> <span class="keyword">begin</span>
+        $monitor("time=%0t a=%b b=%b y=%b", $time, a, b, y);
+    <span class="keyword">end</span>
+<span class="keyword">endmodule</span></pre>
+
+            <div class="note">
+                <strong>常用系统任务：</strong><br>
+                <code>$monitor</code>：持续监视信号变化并打印<br>
+                <code>$display</code>：一次性打印<br>
+                <code>#10</code>：延迟10个时间单位<br>
+                <code>$finish</code>：结束仿真<br>
+                <code>$dumpfile / $dumpvars</code>：生成波形文件
+            </div>
+        </div>
+
+        <!-- 总结 -->
+        <div class="card">
+            <h2>八、知识要点总结</h2>
+            <ol>
+                <li>Module是Verilog的基本单元，描述电路模块</li>
+                <li>wire表示连线，reg表示存储（always块中赋值用reg）</li>
+                <li>assign用于组合逻辑的连续赋值</li>
+                <li>always @(*) 描述组合逻辑，always @(posedge clk) 描述时序逻辑</li>
+                <li>组合逻辑用阻塞赋值=，时序逻辑用非阻塞赋值<=</li>
+                <li>case语句对应多路选择器，if-else对应优先逻辑</li>
+            </ol>
+        </div>
+
+        <!--
+            ========================================
+            文件总结：Verilog入门
+            ========================================
+            本文件涵盖了硬件描述语言Verilog的基础内容：
+            1. Module模块定义与端口声明
+            2. 数据类型（wire/reg/parameter）
+            3. 运算符与优先级
+            4. 连续赋值（assign）和过程赋值（=/<=）
+            5. always块的组合逻辑和时序逻辑描述
+            6. 常用电路代码：MUX、译码器、计数器、移位寄存器
+            7. Testbench编写方法
+
+            重点：always块使用、阻塞/非阻塞赋值区别
+            考点：用Verilog描述组合/时序电路
+            ========================================
+        -->
+    </div>
+</body>
+</html>

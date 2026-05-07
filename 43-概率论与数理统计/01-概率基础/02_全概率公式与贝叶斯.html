@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>全概率公式与贝叶斯</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; font-size: 2em; margin-bottom: 10px; border-bottom: 3px solid #2b6cb0; padding-bottom: 10px; }
+        .subtitle { text-align: center; color: #718096; margin-bottom: 30px; }
+        h2 { color: #2c5282; font-size: 1.4em; margin: 25px 0 12px; padding-left: 12px; border-left: 4px solid #3182ce; }
+        h3 { color: #2d3748; font-size: 1.15em; margin: 18px 0 8px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px 25px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .formula { background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 6px; padding: 12px 18px; margin: 10px 0; font-size: 1.05em; text-align: center; font-family: 'Times New Roman', serif; }
+        .formula-inline { background: #ebf8ff; padding: 2px 8px; border-radius: 4px; font-family: 'Times New Roman', serif; }
+        .example { background: #f0fff4; border-left: 4px solid #48bb78; border-radius: 0 6px 6px 0; padding: 15px 18px; margin: 12px 0; }
+        .example-title { font-weight: bold; color: #276749; margin-bottom: 6px; }
+        .note { background: #fffff0; border-left: 4px solid #ecc94b; border-radius: 0 6px 6px 0; padding: 12px 18px; margin: 12px 0; }
+        .note-title { font-weight: bold; color: #975a16; }
+        .step { background: #faf5ff; border-left: 4px solid #805ad5; border-radius: 0 6px 6px 0; padding: 10px 18px; margin: 8px 0; }
+        .diagram { background: #f7fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin: 10px 0; text-align: center; font-family: monospace; white-space: pre; line-height: 1.5; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 8px 12px; text-align: center; }
+        th { background: #bee3f8; color: #2a4365; }
+        tr:nth-child(even) { background: #f7fafc; }
+        ul, ol { margin-left: 25px; margin-bottom: 8px; }
+        li { margin-bottom: 4px; }
+        .summary-box { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; border-radius: 10px; padding: 20px 25px; margin-top: 30px; }
+        .summary-box h2 { color: #fff; border-left-color: #fff; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>全概率公式与贝叶斯</h1>
+    <p class="subtitle">概率论基础 · 由原因推结果与由结果推原因</p>
+
+    <!-- ==================== 全概率公式 ==================== -->
+    <h2>一、全概率公式</h2>
+
+    <div class="card">
+        <h3>1. 完备事件组（样本空间的划分）</h3>
+        <p>设 B₁, B₂, ..., Bₙ 是一组事件，满足：</p>
+        <ul>
+            <li><strong>互斥性</strong>：BᵢBⱼ = ∅（i ≠ j），任意两个事件不能同时发生</li>
+            <li><strong>完备性</strong>：B₁ ∪ B₂ ∪ ... ∪ Bₙ = Ω，它们的并集覆盖整个样本空间</li>
+            <li><strong>非零概率</strong>：P(Bᵢ) > 0（i = 1, 2, ..., n）</li>
+        </ul>
+        <p style="margin-top:8px;">则 {B₁, B₂, ..., Bₙ} 构成样本空间 Ω 的一个划分。</p>
+    </div>
+
+    <div class="card">
+        <h3>2. 全概率公式</h3>
+        <p>设 {B₁, B₂, ..., Bₙ} 是 Ω 的一个划分，A 为任一事件，则：</p>
+        <div class="formula">
+            P(A) = P(A|B₁)·P(B₁) + P(A|B₂)·P(B₂) + ... + P(A|Bₙ)·P(Bₙ)
+            <br><br>
+            P(A) = Σᵢ₌₁ⁿ P(A|Bᵢ)·P(Bᵢ)
+        </div>
+        <p style="margin-top:8px;"><strong>核心思想</strong>："化整为零"——将复杂事件 A 的概率分解为在各种"原因" Bᵢ 下 A 发生的概率之和。</p>
+    </div>
+
+    <div class="diagram">
+                    ┌── B₁ ──→ P(A|B₁)
+                    │
+            Ω ──┤── B₂ ──→ P(A|B₂) ──→ P(A) = Σ P(A|Bᵢ)·P(Bᵢ)
+                    │
+                    └── B₃ ──→ P(A|B₃)
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 1：产品合格率</div>
+        <p>某工厂有甲、乙、丙三条生产线，产量分别占总产量的 25%、35%、40%。各生产线的合格率分别为 95%、96%、98%。求该工厂产品的总合格率。</p>
+        <div class="step">
+            设 A = 合格品，B₁ = 甲线，B₂ = 乙线，B₃ = 丙线<br><br>
+            P(B₁) = 0.25, P(B₂) = 0.35, P(B₃) = 0.40<br>
+            P(A|B₁) = 0.95, P(A|B₂) = 0.96, P(A|B₃) = 0.98<br><br>
+            P(A) = 0.25×0.95 + 0.35×0.96 + 0.40×0.98<br>
+            &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= 0.2375 + 0.336 + 0.392<br>
+            <strong>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;= 0.9655 = 96.55%</strong>
+        </div>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 2：多阶段抽球</div>
+        <p>甲袋中有 3 个红球、2 个白球；乙袋中有 1 个红球、4 个白球。先随机选一袋，再从选中的袋中取一球，求取到红球的概率。</p>
+        <div class="step">
+            设 A = 取到红球，B₁ = 选甲袋，B₂ = 选乙袋<br><br>
+            P(B₁) = P(B₂) = 1/2<br>
+            P(A|B₁) = 3/5, P(A|B₂) = 1/5<br><br>
+            <strong>P(A) = (1/2)×(3/5) + (1/2)×(1/5) = 3/10 + 1/10 = 2/5</strong>
+        </div>
+    </div>
+
+    <div class="note">
+        <span class="note-title">何时使用全概率公式？</span>
+        当题目中存在多个"原因"或"途径"导致同一"结果"时，使用全概率公式将结果的概率分解为各原因下的条件概率之和。关键词：多个来源、分阶段、多个类别。
+    </div>
+
+    <!-- ==================== 贝叶斯公式深入 ==================== -->
+    <h2>二、贝叶斯公式（逆概率公式）</h2>
+
+    <div class="card">
+        <h3>1. 公式推导</h3>
+        <p>由条件概率定义和全概率公式联立：</p>
+        <div class="formula">
+            P(Bⱼ|A) = P(ABⱼ) / P(A) = P(A|Bⱼ)·P(Bⱼ) / Σᵢ₌₁ⁿ P(A|Bᵢ)·P(Bᵢ)
+        </div>
+        <p style="margin-top:8px;"><strong>本质</strong>：全概率公式是"由原因推结果"，贝叶斯公式是"由结果推原因"——已知结果 A 已经发生，反推是由原因 Bⱼ 导致的概率。</p>
+    </div>
+
+    <div class="card">
+        <h3>2. 先验概率与后验概率</h3>
+        <table>
+            <tr><th>概念</th><th>符号</th><th>含义</th></tr>
+            <tr><td>先验概率</td><td>P(Bⱼ)</td><td>在观测到结果之前，对原因 Bⱼ 发生概率的先验判断</td></tr>
+            <tr><td>似然度</td><td>P(A|Bⱼ)</td><td>在原因 Bⱼ 下产生结果 A 的可能性</td></tr>
+            <tr><td>后验概率</td><td>P(Bⱼ|A)</td><td>观测到结果 A 后，对原因 Bⱼ 的更新判断</td></tr>
+        </table>
+        <p style="margin-top:10px;">贝叶斯公式的核心：用观测数据（似然度）来修正先验判断，得到后验概率。</p>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 3：贝叶斯综合应用——邮件分类</div>
+        <p>某邮箱中 30% 的邮件是垃圾邮件。垃圾邮件中出现"免费"一词的概率为 80%，正常邮件中出现"免费"一词的概率为 10%。现收到一封含有"免费"的邮件，它是垃圾邮件的概率是多少？</p>
+        <div class="step">
+            设 S = 垃圾邮件，N = 正常邮件，W = 含"免费"<br><br>
+            先验：P(S) = 0.3, P(N) = 0.7<br>
+            似然：P(W|S) = 0.8, P(W|N) = 0.1<br><br>
+            全概率：P(W) = 0.8×0.3 + 0.1×0.7 = 0.24 + 0.07 = 0.31<br><br>
+            <strong>P(S|W) = 0.24 / 0.31 ≈ 77.4%</strong>
+        </div>
+        <p style="margin-top:8px;">先验 30% → 后验 77.4%。观测到"免费"一词使垃圾邮件的概率大幅上升。</p>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 4：多重贝叶斯更新</div>
+        <p>一种疾病的患病率为 1%。一种检测的灵敏度为 99%（有病→阳性），假阳性率为 5%（无病→阳性）。若第一次检测阳性后做第二次独立检测仍为阳性，求真正患病的概率。</p>
+        <div class="step">
+            设 D = 患病，T₁ = 第一次阳性，T₂ = 第二次阳性<br><br>
+            <strong>第一次检测后：</strong><br>
+            P(T₁) = 0.99×0.01 + 0.05×0.99 = 0.0099 + 0.0495 = 0.0594<br>
+            P(D|T₁) = 0.0099 / 0.0594 ≈ 16.67%<br><br>
+            <strong>第二次检测——用后验做先验：</strong><br>
+            新先验：P(D) = 16.67%, P(D̄) = 83.33%<br>
+            P(T₂) = 0.99×0.1667 + 0.05×0.8333 = 0.1650 + 0.0417 = 0.2067<br>
+            <strong>P(D|T₁T₂) = 0.1650 / 0.2067 ≈ 79.8%</strong>
+        </div>
+        <p style="margin-top:8px;">两次阳性后，患病概率从 1% → 16.67% → 79.8%，体现了贝叶斯逐步更新的过程。</p>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 5：蒙提霍尔问题（三门问题）</div>
+        <p>有三扇门，一扇后面是汽车，两扇后面是山羊。你选了一扇门后，主持人打开另一扇有山羊的门。问：换门是否更有利？</p>
+        <div class="step">
+            设 A = 你最初选的门后是汽车，B = 主持人打开有山羊的门<br><br>
+            <strong>不换门：</strong>P(赢) = P(A) = 1/3<br><br>
+            <strong>换门：</strong><br>
+            P(赢|A) = 0（换到山羊）<br>
+            P(赢|Ā) = 1（只剩汽车那扇）<br>
+            P(赢) = 0×(1/3) + 1×(2/3) = <strong>2/3</strong><br><br>
+            <strong>结论：换门获胜概率为 2/3，不换门为 1/3，应该换！</strong>
+        </div>
+    </div>
+
+    <div class="note">
+        <span class="note-title">贝叶斯方法的现实应用：</span>
+        <ul>
+            <li><strong>医学诊断</strong>：根据检测结果评估疾病概率</li>
+            <li><strong>垃圾邮件过滤</strong>：根据词汇出现频率分类邮件</li>
+            <li><strong>机器学习</strong>：朴素贝叶斯分类器</li>
+            <li><strong>司法推理</strong>：根据证据评估嫌疑概率</li>
+            <li><strong>搜索引擎</strong>：根据查询词判断文档相关性</li>
+        </ul>
+    </div>
+
+    <div class="summary-box">
+        <h2>本节总结</h2>
+        <ul>
+            <li><strong>全概率公式</strong>：P(A) = Σ P(A|Bᵢ)·P(Bᵢ)，将复杂事件分解为简单事件之和</li>
+            <li><strong>贝叶斯公式</strong>：P(Bⱼ|A) = P(A|Bⱼ)·P(Bⱼ) / Σ P(A|Bᵢ)·P(Bᵢ)，由结果推原因</li>
+            <li><strong>先验→后验</strong>：用观测数据修正初始判断</li>
+            <li><strong>逐步更新</strong>：后验可作为下一次的先验，不断迭代</li>
+            <li>解题关键：正确识别完备事件组，准确设定条件概率</li>
+        </ul>
+    </div>
+</div>
+</body>
+</html>
+<!-- 本文件涵盖：完备事件组的定义、全概率公式的推导与应用、先验/后验概率概念、贝叶斯公式的深入理解与多重更新、蒙提霍尔问题，共5道例题 -->

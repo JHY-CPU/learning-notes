@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>集合的基本运算 - 离散数学笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.7; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; font-size: 2em; margin-bottom: 10px; border-bottom: 3px solid #2b6cb0; padding-bottom: 10px; }
+        h2 { color: #2c5282; margin: 25px 0 12px; padding-left: 12px; border-left: 4px solid #4299e1; }
+        h3 { color: #2d3748; margin: 15px 0 8px; }
+        p { margin: 8px 0; }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; color: #e53e3e; }
+        .concept { background: #fff; border-radius: 10px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid #4299e1; }
+        .concept.success { border-left-color: #48bb78; }
+        .concept.warning { border-left-color: #ed8936; }
+        .truth-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.95em; }
+        .truth-table th { background: #2b6cb0; color: #fff; padding: 10px 14px; text-align: center; }
+        .truth-table td { padding: 8px 14px; text-align: center; border: 1px solid #e2e8f0; }
+        .truth-table tr:nth-child(even) { background: #f7fafc; }
+        .truth-table tr:hover { background: #ebf8ff; }
+        .formula-box { background: #ebf8ff; border: 1px solid #90cdf4; border-radius: 8px; padding: 15px; margin: 12px 0; text-align: center; font-size: 1.1em; }
+        .demo-area { background: #1a202c; color: #e2e8f0; border-radius: 10px; padding: 20px; margin: 15px 0; font-family: 'Consolas', monospace; }
+        .demo-result { margin-top: 12px; padding: 12px; background: #2d3748; border-radius: 6px; }
+        button { padding: 6px 14px; border-radius: 6px; border: none; background: #4299e1; color: #fff; cursor: pointer; margin: 3px; font-size: 0.9em; }
+        button:hover { background: #3182ce; }
+        input[type="text"] { padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e0; width: 150px; font-size: 0.9em; }
+
+        /* ========== Venn 图 CSS ========== */
+        .venn-container { position: relative; width: 400px; height: 260px; margin: 15px auto; }
+        .venn-circle { position: absolute; width: 200px; height: 200px; border-radius: 50%; border: 3px solid; display: flex; align-items: center; justify-content: center; font-size: 0.85em; font-weight: bold; }
+        .venn-a { left: 30px; top: 20px; background: rgba(66, 153, 225, 0.2); border-color: #4299e1; color: #2b6cb0; }
+        .venn-b { left: 160px; top: 20px; background: rgba(72, 187, 120, 0.2); border-color: #48bb78; color: #276749; }
+        .venn-label { position: absolute; font-size: 1.1em; font-weight: bold; }
+        .venn-label-a { left: 60px; top: 90px; color: #2b6cb0; }
+        .venn-label-b { left: 280px; top: 90px; color: #276749; }
+        .venn-label-ab { left: 185px; top: 90px; color: #805ad5; font-weight: bold; }
+        .venn-universe { position: absolute; width: 380px; height: 240px; border: 2px dashed #a0aec0; border-radius: 12px; left: 10px; top: 5px; }
+        .venn-u-label { position: absolute; left: 350px; top: 5px; font-size: 1.1em; color: #718096; font-weight: bold; }
+
+        /* 运算结果高亮 */
+        .venn-highlight { position: absolute; border-radius: 50%; pointer-events: none; }
+        .hl-union { left: 30px; top: 20px; width: 330px; height: 200px; background: rgba(128, 90, 213, 0.15); border: 2px dashed #805ad5; border-radius: 120px; }
+        .hl-intersect { left: 160px; top: 20px; width: 70px; height: 200px; background: rgba(237, 137, 54, 0.3); border-radius: 50%; }
+        .hl-diffAB { left: 30px; top: 20px; width: 170px; height: 200px; background: rgba(66, 153, 225, 0.25); border-radius: 50%; clip-path: inset(0 0 0 0); }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<h1>01 - 集合的基本运算</h1>
+<p style="text-align:center; color:#718096; margin-bottom:25px;">离散数学 | 集合论</p>
+
+<!-- ==================== 1. 集合的基本概念 ==================== -->
+<h2>1. 集合的基本概念</h2>
+
+<div class="concept">
+    <h3>集合的定义</h3>
+    <p><strong>集合（Set）</strong>是具有某种特定性质的、确定的、彼此不同的事物的总体。集合中的每个事物称为集合的<strong>元素（Element）</strong>。</p>
+    <ul>
+        <li><strong>确定性：</strong>给定一个集合，任何元素要么属于它，要么不属于它</li>
+        <li><strong>互异性：</strong>集合中的元素各不相同</li>
+        <li><strong>无序性：</strong>集合中的元素没有顺序</li>
+    </ul>
+</div>
+
+<div class="concept">
+    <h3>集合的表示方法</h3>
+    <table class="truth-table">
+        <tr><th>方法</th><th>示例</th><th>说明</th></tr>
+        <tr><td>列举法</td><td>A = {1, 2, 3, 4}</td><td>直接列出所有元素</td></tr>
+        <tr><td>描述法</td><td>B = {x | x是偶数且 x > 0}</td><td>用谓词描述元素特征</td></tr>
+        <tr><td>文氏图</td><td>用圆表示集合</td><td>直观可视化工具</td></tr>
+    </table>
+</div>
+
+<div class="concept">
+    <h3>特殊集合</h3>
+    <table class="truth-table">
+        <tr><th>符号</th><th>名称</th><th>说明</th></tr>
+        <tr><td>&empty;</td><td>空集</td><td>不包含任何元素的集合，唯一确定</td></tr>
+        <tr><td>N</td><td>自然数集</td><td>{0, 1, 2, 3, ...} 或 {1, 2, 3, ...}</td></tr>
+        <tr><td>Z</td><td>整数集</td><td>{..., -2, -1, 0, 1, 2, ...}</td></tr>
+        <tr><td>Q</td><td>有理数集</td><td>可表示为分数的数</td></tr>
+        <tr><td>R</td><td>实数集</td><td>所有实数</td></tr>
+        <tr><td>U</td><td>全集</td><td>当前讨论范围内的所有元素组成的集合</td></tr>
+    </table>
+</div>
+
+<!-- ==================== 2. 子集与包含 ==================== -->
+<h2>2. 子集与包含关系</h2>
+
+<div class="concept">
+    <p><strong>子集（Subset）：</strong>A &sube; B 当且仅当 A 中的每个元素都属于 B。</p>
+    <p><strong>真子集（Proper Subset）：</strong>A &sub; B 当且仅当 A &sube; B 且 A &ne; B。</p>
+    <p><strong>集合相等：</strong>A = B &harr; A &sube; B 且 B &sube; A</p>
+    <p><strong>空集性质：</strong>&empty; &sube; A（空集是任何集合的子集）</p>
+</div>
+
+<!-- ==================== 3. 集合的基本运算 ==================== -->
+<h2>3. 集合的基本运算</h2>
+
+<h2>3.1 并集 A &cup; B（Union）</h2>
+<div class="concept success">
+    <p><strong>定义：</strong>A &cup; B = {x | x &isin; A 或 x &isin; B}</p>
+    <p>把两个集合的所有元素合在一起（重复元素只算一次）。</p>
+    <p><strong>示例：</strong>A = {1, 2, 3}，B = {3, 4, 5} &rarr; A &cup; B = {1, 2, 3, 4, 5}</p>
+    <p><strong>性质：</strong>A &cup; A = A（幂等律）；A &cup; &empty; = A（同一律）；A &cup; U = U</p>
+</div>
+
+<h2>3.2 交集 A &cap; B（Intersection）</h2>
+<div class="concept success">
+    <p><strong>定义：</strong>A &cap; B = {x | x &isin; A 且 x &isin; B}</p>
+    <p>取出两个集合共有的元素。</p>
+    <p><strong>示例：</strong>A = {1, 2, 3}，B = {3, 4, 5} &rarr; A &cap; B = {3}</p>
+    <p><strong>不相交：</strong>A &cap; B = &empty; 时，称A和B不相交（Disjoint）</p>
+    <p><strong>性质：</strong>A &cap; A = A；A &cap; &empty; = &empty;；A &cap; U = A</p>
+</div>
+
+<h2>3.3 差集 A - B（Difference）</h2>
+<div class="concept warning">
+    <p><strong>定义：</strong>A - B = {x | x &isin; A 且 x &notin; B}</p>
+    <p>从A中去掉A和B共有的元素。</p>
+    <p><strong>示例：</strong>A = {1, 2, 3, 4}，B = {3, 4, 5} &rarr; A - B = {1, 2}</p>
+    <p><strong>注意：</strong>A - B &ne; B - A（差运算不满足交换律）</p>
+</div>
+
+<h2>3.4 补集 A&prime; 或 A&#773;（Complement）</h2>
+<div class="concept warning">
+    <p><strong>定义：</strong>A&prime; = U - A = {x | x &isin; U 且 x &notin; A}</p>
+    <p>全集中不属于A的所有元素组成的集合。</p>
+    <p><strong>示例：</strong>U = {1,2,3,4,5}，A = {1,2} &rarr; A&prime; = {3,4,5}</p>
+    <p><strong>性质：</strong>(A&prime;)&prime; = A；A &cup; A&prime; = U；A &cap; A&prime; = &empty;</p>
+</div>
+
+<h2>3.5 对称差 A &oplus; B（Symmetric Difference）</h2>
+<div class="concept">
+    <p><strong>定义：</strong>A &oplus; B = (A - B) &cup; (B - A) = (A &cup; B) - (A &cap; B)</p>
+    <p>属于A或属于B，但不同时属于A和B的元素。</p>
+    <p><strong>示例：</strong>A = {1, 2, 3}，B = {3, 4, 5} &rarr; A &oplus; B = {1, 2, 4, 5}</p>
+</div>
+
+<!-- ==================== 4. Venn 图可视化 ==================== -->
+<h2>4. Venn 图可视化</h2>
+
+<div class="concept">
+    <p>点击下面的按钮，观察不同集合运算在Venn图中的结果：</p>
+    <div style="text-align:center; margin:10px 0;">
+        <button onclick="showVenn('union')">A &cup; B 并集</button>
+        <button onclick="showVenn('intersect')">A &cap; B 交集</button>
+        <button onclick="showVenn('diffAB')">A - B 差集</button>
+        <button onclick="showVenn('diffBA')">B - A 差集</button>
+        <button onclick="showVenn('symdiff')">A &oplus; B 对称差</button>
+        <button onclick="showVenn('complement')">A&prime; 补集</button>
+        <button onclick="showVenn('none')">清除高亮</button>
+    </div>
+
+    <div class="venn-container" id="vennContainer">
+        <div class="venn-universe"></div>
+        <div class="venn-u-label">U（全集）</div>
+        <div class="venn-circle venn-a">A = {1,2,3,4}</div>
+        <div class="venn-circle venn-b">B = {3,4,5,6}</div>
+        <div class="venn-label venn-label-a">A</div>
+        <div class="venn-label venn-label-b">B</div>
+        <div class="venn-label venn-label-ab">A&cap;B<br/>{3,4}</div>
+    </div>
+    <p id="vennText" style="text-align:center; color:#805ad5; font-weight:bold; min-height:1.5em;"></p>
+</div>
+
+<script>
+/* Venn 图高亮切换函数 */
+function showVenn(type) {
+    const container = document.getElementById('vennContainer');
+    const text = document.getElementById('vennText');
+    // 移除旧高亮
+    container.querySelectorAll('.venn-highlight').forEach(el => el.remove());
+
+    const highlights = {
+        union:     { cls: 'hl-union', html: 'A &cup; B = {1,2,3,4,5,6}' },
+        intersect: { cls: 'hl-intersect', html: 'A &cap; B = {3,4}' },
+        diffAB:    { cls: 'hl-diffAB', html: 'A - B = {1,2}' },
+        diffBA:    { cls: '', html: 'B - A = {5,6}（右侧月牙形区域）' },
+        symdiff:   { cls: 'hl-union', html: 'A &oplus; B = {1,2,5,6}' },
+        complement:{ cls: '', html: 'A&prime; = {5,6,7,8,...}（A的补集）' },
+        none:      { cls: '', html: '' }
+    };
+
+    if (type === 'diffBA') {
+        // B-A 需要不同的高亮样式
+        const el = document.createElement('div');
+        el.className = 'venn-highlight';
+        el.style.cssText = 'left:200px;top:20px;width:160px;height:200px;background:rgba(72,187,120,0.25);border-radius:50%;';
+        container.appendChild(el);
+    } else if (type === 'complement') {
+        const el = document.createElement('div');
+        el.className = 'venn-highlight';
+        el.style.cssText = 'left:10px;top:5px;width:380px;height:240px;background:rgba(237,137,54,0.1);border-radius:12px;clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%);';
+        container.appendChild(el);
+    } else if (highlights[type].cls) {
+        const el = document.createElement('div');
+        el.className = 'venn-highlight ' + highlights[type].cls;
+        container.appendChild(el);
+    }
+
+    text.innerHTML = highlights[type].html;
+}
+</script>
+
+<!-- ==================== 5. 运算律 ==================== -->
+<h2>5. 集合运算律</h2>
+
+<div class="concept">
+    <table class="truth-table">
+        <tr><th>运算律</th><th>并集 &cup;</th><th>交集 &cap;</th></tr>
+        <tr><td>交换律</td><td>A&cup;B = B&cup;A</td><td>A&cap;B = B&cap;A</td></tr>
+        <tr><td>结合律</td><td>(A&cup;B)&cup;C = A&cup;(B&cup;C)</td><td>(A&cap;B)&cap;C = A&cap;(B&cap;C)</td></tr>
+        <tr><td>分配律</td><td>A&cup;(B&cap;C) = (A&cup;B)&cap;(A&cup;C)</td><td>A&cap;(B&cup;C) = (A&cap;B)&cup;(A&cap;C)</td></tr>
+        <tr><td>幂等律</td><td>A&cup;A = A</td><td>A&cap;A = A</td></tr>
+        <tr><td>同一律</td><td>A&cup;&empty; = A</td><td>A&cap;U = A</td></tr>
+        <tr><td>零律</td><td>A&cup;U = U</td><td>A&cap;&empty; = &empty;</td></tr>
+        <tr><td>吸收律</td><td colspan="2">A&cup;(A&cap;B) = A &nbsp; ; &nbsp; A&cap;(A&cup;B) = A</td></tr>
+    </table>
+</div>
+
+<div class="concept success">
+    <h3>德摩根律（De Morgan's Laws）</h3>
+    <p><code>(A &cup; B)&prime; = A&prime; &cap; B&prime;</code></p>
+    <p><code>(A &cap; B)&prime; = A&prime; &cup; B&prime;</code></p>
+    <p>"并的补等于补的交，交的补等于补的并" — 与命题逻辑的德摩根律完全对应。</p>
+</div>
+
+<!-- ==================== 6. 交并运算规模计算 ==================== -->
+<h2>6. 集合元素个数公式</h2>
+
+<div class="concept">
+    <h3>容斥公式（两个集合）</h3>
+    <div class="formula-box">
+        |A &cup; B| = |A| + |B| - |A &cap; B|
+    </div>
+    <p><strong>示例：</strong>某班30人选数学，25人选物理，10人同时选了两门。则选了数学或物理的有 30+25-10 = 45 人。</p>
+</div>
+
+<div class="concept">
+    <h3>容斥公式（三个集合）</h3>
+    <div class="formula-box">
+        |A&cup;B&cup;C| = |A|+|B|+|C| - |A&cap;B| - |A&cap;C| - |B&cap;C| + |A&cap;B&cap;C|
+    </div>
+</div>
+
+<!-- ==================== 7. 交互式集合运算 ==================== -->
+<h2>7. 交互式集合运算演示</h2>
+
+<div class="demo-area">
+    <p style="color:#a0aec0;">// 输入两个集合（用逗号分隔元素），自动计算所有运算结果</p>
+    <div style="margin:10px 0;">
+        <label>集合 A：<input type="text" id="setA" value="1,2,3,4" placeholder="如: 1,2,3"></label>
+        <label style="margin-left:15px;">集合 B：<input type="text" id="setB" value="3,4,5,6" placeholder="如: 3,4,5"></label>
+        <button onclick="calcSets()">计算</button>
+    </div>
+    <div class="demo-result" id="setResult"></div>
+</div>
+
+<script>
+/* 集合运算交互演示 */
+function parseSet(str) {
+    return new Set(str.split(',').map(s => s.trim()).filter(s => s !== ''));
+}
+
+function setToArr(s) {
+    return '{' + [...s].sort((a, b) => isNaN(a) || isNaN(b) ? a.localeCompare(b) : a - b).join(', ') + '}';
+}
+
+function calcSets() {
+    const A = parseSet(document.getElementById('setA').value);
+    const B = parseSet(document.getElementById('setB').value);
+
+    const union = new Set([...A, ...B]);
+    const intersect = new Set([...A].filter(x => B.has(x)));
+    const diffAB = new Set([...A].filter(x => !B.has(x)));
+    const diffBA = new Set([...B].filter(x => !A.has(x)));
+    const symDiff = new Set([...diffAB, ...diffBA]);
+
+    const html = [
+        `<p>A = ${setToArr(A)}, |A| = ${A.size}</p>`,
+        `<p>B = ${setToArr(B)}, |B| = ${B.size}</p>`,
+        `<p>A &cup; B = ${setToArr(union)}, |A&cup;B| = ${union.size}</p>`,
+        `<p>A &cap; B = ${setToArr(intersect)}, |A&cap;B| = ${intersect.size}</p>`,
+        `<p>A - B = ${setToArr(diffAB)}</p>`,
+        `<p>B - A = ${setToArr(diffBA)}</p>`,
+        `<p>A &oplus; B = ${setToArr(symDiff)}</p>`,
+        `<p style="color:#a0aec0;">验证: |A&cup;B| = |A|+|B|-|A&cap;B| = ${A.size}+${B.size}-${intersect.size} = ${A.size+B.size-intersect.size}</p>`
+    ].join('');
+
+    document.getElementById('setResult').innerHTML = html;
+}
+
+calcSets();
+</script>
+
+</div><!-- /.container -->
+
+<!--
+    ==========================================
+    总结：
+    1. 集合是离散数学的基础数据结构，具有确定性、互异性、无序性
+    2. 五种基本运算：
+       - 并集 A∪B：所有元素合在一起
+       - 交集 A∩B：共有的元素
+       - 差集 A-B：属于A但不属于B的元素
+       - 补集 A'：全集中不属于A的元素
+       - 对称差 A⊕B：属于其一但不同时属于两者的元素
+    3. 核心运算律：交换律、结合律、分配律、吸收律、幂等律
+    4. 德摩根律：(A∪B)' = A'∩B'，(A∩B)' = A'∪B'
+    5. 容斥公式：|A∪B| = |A| + |B| - |A∩B|
+    ==========================================
+-->
+</body>
+</html>

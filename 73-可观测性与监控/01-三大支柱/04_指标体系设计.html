@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>指标体系设计</title>
+    <!-- 可观测性与监控 - 指标体系设计 笔记 -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        .tag { display: inline-block; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>指标体系设计</h2>
+        <p><span class="tag">可观测性</span><span class="tag">指标</span><span class="tag">Prometheus</span></p>
+        <p>好的指标体系是监控和告警的基础，选择正确的指标方法论至关重要。</p>
+    </div>
+
+    <div class="card">
+        <h2>指标方法论</h2>
+        <div class="code">
+RED 方法（面向请求的服务）：
+┌──────────┬──────────────────────────────────┐
+│ 指标       │ 含义                             │
+├──────────┼──────────────────────────────────┤
+│ Rate     │ 请求速率（QPS）                   │
+│ Errors   │ 错误率（失败请求占比）            │
+│ Duration │ 请求耗时（延迟分布）              │
+└──────────┴──────────────────────────────────┘
+
+USE 方法（面向资源）：
+┌──────────────┬──────────────────────────────────┐
+│ 指标           │ 含义                             │
+├──────────────┼──────────────────────────────────┤
+│ Utilization  │ 使用率（资源忙的时间百分比）       │
+│ Saturation   │ 饱和度（排队等待的长度）           │
+│ Errors       │ 错误数（资源错误事件计数）        │
+└──────────────┴──────────────────────────────────┘
+
+Google四大黄金信号 (Golden Signals)：
+┌──────────┬──────────────────────────────────┐
+│ 信号       │ 说明                             │
+├──────────┼──────────────────────────────────┤
+│ Latency  │ 请求耗时（区分成功/失败）         │
+│ Traffic  │ 系统负载（QPS、并发数）           │
+│ Errors   │ 失败请求的速率                    │
+│ Saturation │ 资源使用程度（CPU/内存/IO）     │
+└──────────┴──────────────────────────────────┘
+
+方法论选择：
+- 微服务/HTTP API → RED方法
+- 基础设施/中间件 → USE方法
+- 整体系统健康 → Golden Signals
+- 业务指标 → 自定义指标
+
+指标覆盖层次：
+┌─────────────────────────────────────┐
+│  业务指标（转化率、订单量、GMV）     │  ← 产品关注
+├─────────────────────────────────────┤
+│  应用指标（RED: QPS/错误率/延迟）   │  ← 开发关注
+├─────────────────────────────────────┤
+│  中间件指标（连接池/队列深度/缓存） │  ← 架构关注
+├─────────────────────────────────────┤
+│  基础设施指标（USE: CPU/内存/磁盘） │  ← 运维关注
+└─────────────────────────────────────┘
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Prometheus指标类型</h2>
+        <div class="code">
+四种指标类型：
+
+1. Counter（计数器）：
+- 只增不减（重启时归零）
+- 适用于：请求总数、错误总数、处理数据总量
+# HELP http_requests_total Total HTTP requests
+# TYPE http_requests_total counter
+http_requests_total{method="GET",path="/api/users"} 14234
+
+2. Gauge（仪表盘）：
+- 可增可减
+- 适用于：当前温度、队列长度、内存使用量
+# HELP queue_length Current queue length
+# TYPE queue_length gauge
+queue_length{queue="orders"} 42
+
+3. Histogram（直方图）：
+- 统计值分布，自动计算分位数
+- 适用于：请求延迟分布、响应大小分布
+# HELP http_request_duration_seconds HTTP request duration
+# TYPE http_request_duration_seconds histogram
+http_request_duration_seconds_bucket{le="0.05"} 24054
+http_request_duration_seconds_bucket{le="0.1"} 33444
+http_request_duration_seconds_bucket{le="0.25"} 100392
+http_request_duration_seconds_bucket{le="0.5"} 127200
+http_request_duration_seconds_bucket{le="+Inf"} 133988
+http_request_duration_seconds_sum 53423
+http_request_duration_seconds_count 133988
+
+4. Summary（摘要）：
+- 客户端计算分位数
+- 适用于：精确分位数需求
+# HELP rpc_duration_seconds RPC latency
+# TYPE rpc_duration_seconds summary
+rpc_duration_seconds{quantile="0.5"} 0.05
+rpc_duration_seconds{quantile="0.9"} 0.08
+rpc_duration_seconds{quantile="0.99"} 0.15
+
+Histogram vs Summary：
+┌──────────┬──────────────────┬──────────────────┐
+│ 维度       │ Histogram         │ Summary          │
+├──────────┼──────────────────┼──────────────────┤
+│ 计算位置   │ 服务端(PromQL)   │ 客户端SDK         │
+│ 聚合能力   │ 可跨实例聚合      │ 不可跨实例聚合    │
+│ 存储开销   │ 中（N个bucket）   │ 低（N个分位数）   │
+│ 推荐场景   │ 通用（首选）       │ 单实例精确分位数  │
+└──────────┴──────────────────┴──────────────────┘
+
+自定义指标示例（Go + Prometheus client）：
+// Counter
+var ordersTotal = prometheus.NewCounterVec(
+  prometheus.CounterOpts{
+    Name: "orders_total",
+    Help: "Total number of orders",
+  },
+  []string{"status"},  // 标签
+)
+
+// Histogram
+var orderDuration = prometheus.NewHistogramVec(
+  prometheus.HistogramOpts{
+    Name:    "order_process_duration_seconds",
+    Help:    "Order processing duration",
+    Buckets: prometheus.DefBuckets,  // 默认分桶
+  },
+  []string{"payment_type"},
+)
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>PromQL实战</h2>
+        <div class="code">
+常用PromQL模式：
+
+1. 请求速率（QPS）：
+rate(http_requests_total[5m])
+
+2. 错误率：
+sum(rate(http_requests_total{status=~"5.."}[5m]))
+/
+sum(rate(http_requests_total[5m]))
+
+3. P99延迟（Histogram）：
+histogram_quantile(0.99,
+  sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+)
+
+4. 增长率（Gauge）：
+delta(memory_usage_bytes[1h])
+
+5. 预测（Predict Linear）：
+predict_linear(node_filesystem_avail_bytes[1h], 4*3600) < 0
+# 预测4小时后磁盘是否满
+
+6. 告警规则示例：
+groups:
+- name: service_alerts
+  rules:
+  # 高错误率告警
+  - alert: HighErrorRate
+    expr: |
+      sum(rate(http_requests_total{status=~"5.."}[5m])) by (service)
+      /
+      sum(rate(http_requests_total[5m])) by (service)
+      > 0.05
+    for: 5m
+    labels:
+      severity: critical
+    annotations:
+      summary: "{{ $labels.service }} 错误率过高"
+      description: "当前错误率: {{ $value | humanizePercentage }}"
+
+  # P99延迟告警
+  - alert: HighLatency
+    expr: |
+      histogram_quantile(0.99,
+        sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service)
+      ) > 1
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "{{ $labels.service }} P99延迟过高"
+
+标签设计原则：
+- service_name：服务名称
+- endpoint：API路径（不要包含参数）
+- method：HTTP方法
+- status_code：HTTP状态码
+- environment：环境（prod/staging）
+- region：区域（cn-east/cn-north）
+
+注意：避免高基数(High Cardinality)标签
+✗ user_id（百万级不同值）
+✗ request_id（每个请求唯一）
+✓ status_code（有限枚举值）
+✓ method（GET/POST/PUT/DELETE）
+        </div>
+        <div class="note">RED方法适合服务监控，USE方法适合资源监控，Golden Signals是两者的综合。Histogram是首选指标类型（支持服务端聚合）。PromQL的rate()和histogram_quantile()是最常用的两个函数。警惕标签高基数问题，它会导致指标爆炸。</div>
+    </div>
+
+    <!-- 总结：三大指标方法论：RED（请求维度）、USE（资源维度）、Golden Signals（综合）。
+    Prometheus四种类型：Counter(只增)、Gauge(可变)、Histogram(分布)、Summary(分位数)。
+    Histogram支持跨实例聚合，是首选；Summary适合单实例精确分位数。
+    PromQL核心函数：rate()计算速率、histogram_quantile()计算分位数、predict_linear()预测趋势。 -->
+</body>
+</html>

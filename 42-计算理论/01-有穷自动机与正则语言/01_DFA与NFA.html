@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DFA与NFA - 有穷自动机</title>
+    <style>
+        /* ========== 全局样式 ========== */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            background: #f0f4f8;
+            color: #2d3748;
+            line-height: 1.7;
+            padding: 20px;
+        }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 {
+            text-align: center;
+            color: #2b6cb0;
+            border-bottom: 3px solid #3182ce;
+            padding-bottom: 12px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #2c5282;
+            margin: 25px 0 12px;
+            padding-left: 10px;
+            border-left: 4px solid #3182ce;
+        }
+        h3 { color: #2d3748; margin: 15px 0 8px; }
+        p, li { margin-bottom: 8px; }
+        ul, ol { padding-left: 25px; }
+
+        /* ========== 卡片样式 ========== */
+        .card {
+            background: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        /* ========== 状态图可视化 ========== */
+        .state-diagram {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 40px;
+            padding: 30px 20px;
+            background: #ebf8ff;
+            border-radius: 10px;
+            margin: 15px 0;
+            position: relative;
+            flex-wrap: wrap;
+        }
+        .state {
+            width: 70px; height: 70px;
+            border-radius: 50%;
+            border: 3px solid #3182ce;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.1em;
+            background: #fff;
+            position: relative;
+            z-index: 2;
+        }
+        .state.accept {
+            border-color: #38a169;
+            box-shadow: 0 0 0 4px #c6f6d5;
+        }
+        .state.start {
+            border-color: #e53e3e;
+            background: #fff5f5;
+        }
+        .arrow {
+            font-size: 2em;
+            color: #718096;
+        }
+        .arrow-label {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+        }
+        .arrow-label span {
+            font-size: 0.85em;
+            color: #4a5568;
+            background: #e2e8f0;
+            padding: 1px 8px;
+            border-radius: 4px;
+        }
+
+        /* ========== 转移表 ========== */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+        }
+        th, td {
+            border: 1px solid #cbd5e0;
+            padding: 10px 14px;
+            text-align: center;
+        }
+        th {
+            background: #3182ce;
+            color: #fff;
+            font-weight: 600;
+        }
+        tr:nth-child(even) { background: #f7fafc; }
+        tr:hover { background: #ebf8ff; }
+
+        /* ========== 对比框 ========== */
+        .compare {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .compare-item {
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid;
+        }
+        .compare-item.dfa { border-color: #3182ce; background: #ebf8ff; }
+        .compare-item.nfa { border-color: #d69e2e; background: #fffff0; }
+
+        /* ========== 代码块 ========== */
+        code {
+            background: #edf2f7;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: "Consolas", "Courier New", monospace;
+            font-size: 0.95em;
+            color: #c53030;
+        }
+        pre {
+            background: #1a202c;
+            color: #e2e8f0;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 10px 0;
+            font-size: 0.9em;
+        }
+        pre code { background: none; color: inherit; padding: 0; }
+
+        /* ========== 标签 ========== */
+        .tag {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: bold;
+            margin: 2px;
+        }
+        .tag-blue { background: #bee3f8; color: #2a4365; }
+        .tag-green { background: #c6f6d5; color: #22543d; }
+        .tag-yellow { background: #fefcbf; color: #744210; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- 页面标题 -->
+    <h1>DFA与NFA — 确定性与非确定性有穷自动机</h1>
+
+    <!-- ====== 第一部分：DFA定义 ====== -->
+    <div class="card">
+        <h2>一、确定性有穷自动机 (DFA)</h2>
+        <p>DFA是一个五元组 <code>M = (Q, Σ, δ, q₀, F)</code>，其中：</p>
+        <ul>
+            <li><strong>Q</strong> — 有穷状态集合</li>
+            <li><strong>Σ</strong> — 有穷输入字母表</li>
+            <li><strong>δ</strong> — 转移函数 <code>δ: Q × Σ → Q</code>（每个状态对每个输入符号恰好一个后继）</li>
+            <li><strong>q₀</strong> — 初始状态</li>
+            <li><strong>F</strong> — 接受状态集合 (F ⊆ Q)</li>
+        </ul>
+        <p>DFA的关键特征：<strong>确定性</strong>——读取一个符号后，下一状态唯一确定。</p>
+
+        <!-- DFA状态图示例：接受以01结尾的串 -->
+        <h3>示例：接受以"01"结尾的二进制串</h3>
+        <div class="state-diagram">
+            <div class="arrow-label">
+                <div class="state start">q₀</div>
+                <span>start</span>
+            </div>
+            <div class="arrow-label">
+                <span>0</span>
+                <div class="arrow">&#8594;</div>
+            </div>
+            <div class="state">q₁</div>
+            <div class="arrow-label">
+                <span>1</span>
+                <div class="arrow">&#8594;</div>
+            </div>
+            <div class="state accept">q₂</div>
+            <div class="arrow-label">
+                <span style="font-size:0.75em;">(接受)</span>
+            </div>
+        </div>
+        <p style="text-align:center; font-size:0.9em; color:#718096;">
+            q₀ --0--&gt; q₁ --1--&gt; q₂(接受)；q₀上读1留在q₀；q₁上读0留在q₁；q₂上读0回q₀，读1回q₂
+        </p>
+    </div>
+
+    <!-- ====== DFA转移表 ====== -->
+    <div class="card">
+        <h2>二、DFA转移表</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>当前状态</th>
+                    <th>输入 0</th>
+                    <th>输入 1</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>→ q₀</td><td>q₁</td><td>q₀</td></tr>
+                <tr><td>q₁</td><td>q₁</td><td>*q₂</td></tr>
+                <tr><td>*q₂</td><td>q₀</td><td>q₀</td></tr>
+            </tbody>
+        </table>
+        <p><span class="tag tag-blue">→ 初始状态</span> <span class="tag tag-green">* 接受状态</span></p>
+    </div>
+
+    <!-- ====== 第三部分：NFA定义 ====== -->
+    <div class="card">
+        <h2>三、非确定性有穷自动机 (NFA)</h2>
+        <p>NFA与DFA类似，但转移函数可以映射到<strong>状态的集合</strong>：</p>
+        <ul>
+            <li><strong>δ: Q × (Σ ∪ {ε}) → P(Q)</strong> — 后继可以是零个、一个或多个状态</li>
+            <li>允许<strong>ε-转移</strong>（不消耗输入的状态跳转）</li>
+            <li>若存在<strong>某条路径</strong>使输入被接受，则串被接受</li>
+        </ul>
+
+        <h3>NFA状态图示意</h3>
+        <div class="state-diagram">
+            <div class="state start">q₀</div>
+            <div class="arrow-label">
+                <span>0, 1</span>
+                <div class="arrow">&#8594;</div>
+            </div>
+            <div class="state">q₁</div>
+            <div class="arrow-label">
+                <span>0</span>
+                <div class="arrow">&#8594;</div>
+            </div>
+            <div class="state accept">q₂</div>
+            <div class="arrow" style="position:absolute; top:30px; left:50%; transform:rotate(90deg);">&#8594;</div>
+            <div class="arrow-label">
+                <span>ε</span>
+                <div class="arrow">&#8634;</div>
+            </div>
+            <div class="state">q₃</div>
+        </div>
+        <p style="text-align:center; font-size:0.9em; color:#718096;">
+            NFA允许一个状态对同一输入有多个转移，也允许ε-转移
+        </p>
+    </div>
+
+    <!-- ====== DFA与NFA对比 ====== -->
+    <div class="card">
+        <h2>四、DFA与NFA对比</h2>
+        <div class="compare">
+            <div class="compare-item dfa">
+                <h3 style="color:#2b6cb0;">DFA</h3>
+                <ul>
+                    <li>每个输入恰好<strong>一个</strong>后继状态</li>
+                    <li>无 ε-转移</li>
+                    <li>模拟无需回溯，实现高效</li>
+                    <li>状态数可能<strong>指数级增长</strong></li>
+                    <li>转移函数：δ: Q × Σ → Q</li>
+                </ul>
+            </div>
+            <div class="compare-item nfa">
+                <h3 style="color:#b7791f;">NFA</h3>
+                <ul>
+                    <li>每个输入可有<strong>零个或多个</strong>后继</li>
+                    <li>允许 ε-转移</li>
+                    <li>设计更直观、简洁</li>
+                    <li>状态数通常<strong>较少</strong></li>
+                    <li>转移函数：δ: Q × (Σ∪{ε}) → P(Q)</li>
+                </ul>
+            </div>
+        </div>
+        <p><strong>核心定理：</strong>对任意 NFA，存在等价的 DFA。即 DFA 与 NFA 描述的语言类相同——<strong>正则语言</strong>。（证明方法：子集构造法）</p>
+    </div>
+
+    <!-- ====== 第五部分：子集构造法 ====== -->
+    <div class="card">
+        <h2>五、子集构造法（NFA → DFA）</h2>
+        <p>将NFA转换为等价DFA的系统方法：</p>
+        <ol>
+            <li>DFA的每个状态 = NFA状态的<strong>子集</strong></li>
+            <li>DFA初始状态 = <code>ε-closure({q₀})</code></li>
+            <li>对DFA状态 S 和输入 a：δ'(S, a) = ε-closure(∪ δ(q, a))，对所有 q ∈ S</li>
+            <li>DFA接受状态 = 包含NFA任意接受状态的子集</li>
+        </ol>
+
+        <pre><code>// 子集构造法伪代码
+function subset_construction(NFA):
+    DFA_start = ε_closure({NFA.start})
+    worklist = [DFA_start]
+    visited = {DFA_start}
+
+    while worklist is not empty:
+        S = worklist.pop()
+        for each symbol a in alphabet:
+            T = ε_closure( { q | p in S, q in NFA.delta(p, a) } )
+            DFA.delta(S, a) = T
+            if T not in visited:
+                visited.add(T)
+                worklist.push(T)
+
+    DFA.accept = { S | S ∩ NFA.accept ≠ ∅ }
+    return DFA</code></pre>
+    </div>
+
+    <!-- ====== 第六部分：最小化DFA ====== -->
+    <div class="card">
+        <h2>六、DFA最小化（Hopcroft算法）</h2>
+        <p>每个正则语言都有<strong>唯一的最小DFA</strong>（状态数最少），通过等价状态合并得到：</p>
+        <ol>
+            <li>初始划分：{接受状态}, {非接受状态}</li>
+            <li>反复细化：若两个状态在同一组中，但对某个输入到达不同组，则将它们分开</li>
+            <li>直到无法再细化为止</li>
+            <li>合并每个等价类为一个状态</li>
+        </ol>
+        <p><span class="tag tag-yellow">时间复杂度</span> O(n log n)，其中 n 为状态数。</p>
+    </div>
+
+    <!-- ====== 第七部分：代码实现 ====== -->
+    <div class="card">
+        <h2>七、简单DFA模拟器 (Python)</h2>
+        <pre><code># DFA模拟器：判断二进制串是否以"01"结尾
+class DFA:
+    def __init__(self, states, alphabet, transitions, start, accept):
+        self.states = states          # 状态集合
+        self.alphabet = alphabet      # 字母表
+        self.delta = transitions      # 转移函数 dict[(state, char)] -> state
+        self.start = start            # 初始状态
+        self.accept = accept          # 接受状态集合
+
+    def run(self, input_string):
+        current = self.start
+        for ch in input_string:
+            if ch not in self.alphabet:
+                return False
+            current = self.delta[(current, ch)]
+        return current in self.accept
+
+# 定义 DFA: 接受以 "01" 结尾的二进制串
+dfa = DFA(
+    states={'q0', 'q1', 'q2'},
+    alphabet={'0', '1'},
+    transitions={
+        ('q0', '0'): 'q1', ('q0', '1'): 'q0',
+        ('q1', '0'): 'q1', ('q1', '1'): 'q2',
+        ('q2', '0'): 'q0', ('q2', '1'): 'q0',
+    },
+    start='q0',
+    accept={'q2'}
+)
+
+# 测试
+test_cases = ["101", "0101", "10", "01", "1101"]
+for s in test_cases:
+    result = "接受" if dfa.run(s) else "拒绝"
+    print(f"  串 '{s}' -> {result}")</code></pre>
+    </div>
+
+</div>
+
+<!--
+========================================
+  笔记总结
+========================================
+本文件涵盖了计算理论中有限自动机的核心内容：
+
+1. DFA（确定性有穷自动机）：
+   - 五元组定义 (Q, Σ, δ, q₀, F)
+   - 转移函数 δ: Q × Σ → Q，每步转移唯一确定
+   - 可用状态图和转移表两种方式表示
+
+2. NFA（非确定性有穷自动机）：
+   - 允许 ε-转移和多条转移路径
+   - 转移函数 δ: Q × (Σ∪{ε}) → P(Q)
+   - 存在任意一条接受路径即接受
+
+3. DFA与NFA的等价性：
+   - 子集构造法将NFA转为DFA
+   - 两者描述的语言类完全相同（正则语言）
+   - DFA状态数可能是NFA的指数级
+
+4. DFA最小化：
+   - Hopcroft算法，O(n log n)
+   - 等价状态合并，得到唯一最小DFA
+
+5. 应用：词法分析器、模式匹配、协议验证等
+========================================
+-->
+</body>
+</html>

@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>爬虫架构</title>
+    <!-- 搜索引擎技术 - 爬虫架构 笔记 -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        .tag { display: inline-block; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>网络爬虫架构</h2>
+        <p><span class="tag">爬虫</span><span class="tag">PageRank</span><span class="tag">URL去重</span></p>
+        <p>网络爬虫是搜索引擎的数据来源，负责从互联网收集网页内容。</p>
+    </div>
+
+    <!-- ====== 爬虫架构 ====== -->
+    <div class="card">
+        <h2>爬虫整体架构</h2>
+        <div class="code">
+┌─────────────────────────────────────────────────┐
+│  种子URL → URL Frontier → DNS解析 → Fetcher     │
+│                       ↓                          │
+│                  URL过滤/去重                      │
+│                       ↓                          │
+│              网页内容解析 (Parser)                 │
+│              ├── 文本提取                         │
+│              ├── 链接提取 → 回到URL Frontier      │
+│              └── 元数据提取                       │
+│                       ↓                          │
+│              内容存储 (Storage)                    │
+│              └── 文档库 + 索引                    │
+└─────────────────────────────────────────────────┘
+
+URL Frontier (URL待抓取队列)：
+┌─────────────────────────────────────────────┐
+│  优先级队列                                  │
+│  ├── 高优先级：重要页面（首页、热门页面）     │
+│  ├── 中优先级：一般页面                      │
+│  └── 低优先级：深层页面                      │
+│                                             │
+│  各站点独立队列（礼貌策略）                   │
+│  ├── site1.com → [url1, url2, url3]        │
+│  ├── site2.com → [url4, url5]              │
+│  └── site3.com → [url6]                    │
+│                                             │
+│  Host Scheduler：轮询各站点队列              │
+│  确保不会频繁请求同一站点                     │
+└─────────────────────────────────────────────┘
+        </div>
+    </div>
+
+    <!-- ====== 礼貌策略 ====== -->
+    <div class="card">
+        <h2>爬虫礼貌策略 (Politeness)</h2>
+        <div class="code">
+robots.txt 协议：
+User-agent: *
+Disallow: /private/
+Disallow: /admin/
+Crawl-delay: 5          # 每次请求间隔5秒
+Sitemap: https://example.com/sitemap.xml
+
+爬虫必须遵守：
+1. 抓取前先获取并解析 robots.txt
+2. 遵守 Disallow 规则
+3. 遵守 Crawl-delay 延迟要求
+4. 同一域名的请求间隔控制
+
+实际实施：
+- 同一站点间隔：5-30秒（取决于站点规模）
+- 使用 If-Modified-Since 检查页面更新
+- 设置 User-Agent 标识爬虫身份
+- 处理 HTTP 429 (Too Many Requests) 响应
+- 支持 robots.txt 的 * 和 $ 通配符
+
+过度爬取的后果：
+- 网站服务器过载
+- IP被封禁
+- 违反法律风险
+        </div>
+    </div>
+
+    <!-- ====== URL去重 ====== -->
+    <div class="card">
+        <h2>URL去重策略</h2>
+        <div class="code">
+URL去重是爬虫的核心挑战：互联网有数十亿URL
+
+方案对比：
+┌──────────┬────────────┬──────────┬────────────┐
+│ 方案      │ 空间复杂度  │ 查询时间  │ 误判率      │
+├──────────┼────────────┼──────────┼────────────┤
+│ HashSet  │ O(n)       │ O(1)     │ 0          │
+│ 布隆过滤器│ O(n)压缩   │ O(k)     │ 有(可控)    │
+│ 数据库    │ O(n)       │ O(logn)  │ 0          │
+└──────────┴────────────┴──────────┴────────────┘
+
+布隆过滤器 (Bloom Filter)：
+- 位数组 + 多个哈希函数
+- 可能误判（False Positive），不会漏判（False Negative）
+- 占用空间极小，适合大规模URL去重
+
+URL规范化 (URL Normalization)：
+- 去除 fragment (#...)
+- 统一小写
+- 去除默认端口 (:80, :443)
+- 去除尾部斜杠
+- 解析相对路径
+- 去除无关参数
+
+示例：
+https://Example.com/page/../index.html?utm=1#top
+→ https://example.com/index.html
+        </div>
+    </div>
+
+    <!-- ====== PageRank ====== -->
+    <div class="card">
+        <h2>PageRank算法</h2>
+        <div class="code">
+PageRank：基于链接分析的网页重要性评估
+
+核心思想：一个网页被越多重要网页链接，它就越重要
+
+公式：
+PR(A) = (1-d) + d × Σ[PR(Ti)/C(Ti)]
+- d：阻尼因子（通常0.85）
+- Ti：链接到A的所有页面
+- C(Ti)：Ti的出链数量
+- (1-d)：随机跳转概率
+
+示例：
+┌─────┐    ┌─────┐
+│  A  │←───│  B  │
+│     │───→│     │
+└──┬──┘    └──┬──┘
+   │    ┌─────┘
+   ↓    ↓
+┌─────┐
+│  C  │
+└─────┘
+
+迭代计算：
+初始：PR(A)=PR(B)=PR(C)=1/3
+第1轮：PR(A)=0.15+0.85×(PR(B)/2) ≈ 0.29
+第2轮：PR(A)=0.15+0.85×(PR(B)/2) ≈ ...
+持续迭代直到收敛
+
+实际中的改进：
+- Topic-Sensitive PageRank：按主题加权
+- TrustRank：区分可信网页和垃圾网页
+- Personalized PageRank：个性化排名
+        </div>
+        <div class="note">Google最初靠PageRank起家，但现代搜索引擎已将PageRank作为数百个排名信号之一。</div>
+    </div>
+
+    <!-- 总结：网络爬虫通过URL Frontier管理待抓取URL队列，使用礼貌策略避免过度请求，
+    使用布隆过滤器进行大规模URL去重。PageRank算法通过链接分析评估网页重要性，
+    是搜索引擎排序的经典方法。 -->
+</body>
+</html>

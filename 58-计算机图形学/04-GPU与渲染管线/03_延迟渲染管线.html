@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- 延迟渲染管线 - 计算机图形学笔记 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>延迟渲染管线</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f5f7fa; color: #2c3e50; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 40px; }
+        h1 { font-size: 28px; color: #1a5276; border-bottom: 3px solid #2980b9; padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 22px; color: #2980b9; margin: 28px 0 14px; border-left: 4px solid #2980b9; padding-left: 12px; }
+        h3 { font-size: 18px; color: #34495e; margin: 20px 0 10px; }
+        p { margin: 8px 0; text-indent: 2em; }
+        ul, ol { margin: 10px 0 10px 2em; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: left; }
+        th { background: #2980b9; color: #fff; }
+        tr:nth-child(even) { background: #f0f4f8; }
+        .note { background: #eaf2f8; border-left: 4px solid #2980b9; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .key-point { background: #fef9e7; border-left: 4px solid #f39c12; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        code { background: #ecf0f1; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>延迟渲染管线</h1>
+
+    <!-- 一、渲染管线概述 -->
+    <h2>一、前向渲染 vs 延迟渲染</h2>
+    <p>传统前向渲染（Forward Rendering）对每个物体执行完整的光照计算，当场景中光源数量增多时性能线性下降。延迟渲染（Deferred Rendering）将几何信息和光照计算分离，光照计算的复杂度与场景几何复杂度无关。</p>
+
+    <h3>1.1 对比</h3>
+    <table>
+        <tr><th>维度</th><th>前向渲染</th><th>延迟渲染</th></tr>
+        <tr><td>渲染Pass</td><td>物体 × 光源次</td><td>几何Pass + 光源Pass</td></tr>
+        <tr><td>光照复杂度</td><td>O(物体数 × 光源数)</td><td>O(像素数 × 光源数)</td></tr>
+        <tr><td>多光源支持</td><td>较差</td><td>优秀</td></tr>
+        <tr><td>带宽消耗</td><td>低</td><td>高（G-buffer读写）</td></tr>
+        <tr><td>MSAA支持</td><td>原生支持</td><td>需要额外处理</td></tr>
+        <tr><td>透明物体</td><td>容易处理</td><td>需要额外前向Pass</td></tr>
+    </table>
+
+    <!-- 二、G-Buffer -->
+    <h2>二、G-Buffer（几何缓冲区）</h2>
+    <p>G-Buffer是延迟渲染的核心数据结构，存储了场景中每个像素的几何和材质信息。它通常由多个渲染目标（MRT）组成。</p>
+
+    <h3>2.1 G-Buffer内容</h3>
+    <table>
+        <tr><th>RT</th><th>通道</th><th>内容</th><th>格式</th></tr>
+        <tr><td>RT0</td><td>RGBA</td><td>漫反射颜色 (RGB) + 环境光遮蔽 (A)</td><td>RGBA8</td></tr>
+        <tr><td>RT1</td><td>RGBA</td><td>世界空间法线 (RGB) + 粗糙度 (A)</td><td>RGBA16F</td></tr>
+        <tr><td>RT2</td><td>RGBA</td><td>镜面反射颜色 (RGB) + 金属度 (A)</td><td>RGBA8</td></tr>
+        <tr><td>RT3</td><td>RG</td><td>运动向量 (RG)</td><td>RG16F</td></tr>
+        <tr><td>Depth</td><td>D</td><td>深度值</td><td>D24S8</td></tr>
+    </table>
+
+    <h3>2.2 几何Pass（Geometry Pass）</h3>
+    <div class="key-point">
+        <pre>
+// 几何Pass - 片段着色器
+#version 330 core
+
+layout (location = 0) out vec4 gAlbedoAO;
+layout (location = 1) out vec4 gNormalRoughness;
+layout (location = 2) out vec4 gSpecMetallic;
+
+in vec3 FragPos;
+in vec3 Normal;
+in vec2 TexCoord;
+
+uniform sampler2D albedoMap;
+uniform sampler2D normalMap;
+uniform sampler2D metallicRoughnessMap;
+
+void main() {
+    // RT0: 漫反射颜色 + AO
+    gAlbedoAO.rgb = texture(albedoMap, TexCoord).rgb;
+    gAlbedoAO.a = 1.0; // AO
+
+    // RT1: 世界空间法线 + 粗糙度
+    vec3 normal = normalize(Normal); // 实际应从法线贴图读取
+    gNormalRoughness.rgb = normal * 0.5 + 0.5;
+    gNormalRoughness.a = texture(metallicRoughnessMap, TexCoord).g; // roughness
+
+    // RT2: 镜面反射 + 金属度
+    gSpecMetallic.rgb = vec3(0.04); // 非金属的F0
+    gSpecMetallic.a = texture(metallicRoughnessMap, TexCoord).b; // metallic
+}
+        </pre>
+    </div>
+
+    <!-- 三、光照Pass -->
+    <h2>三、光照Pass（Lighting Pass）</h2>
+    <p>光照Pass是一个全屏后处理操作，读取G-Buffer中的信息，对每个像素计算光照。</p>
+
+    <h3>3.1 光照Pass实现</h3>
+    <div class="key-point">
+        <pre>
+// 光照Pass - 片段着色器
+#version 330 core
+
+uniform sampler2D gAlbedoAO;
+uniform sampler2D gNormalRoughness;
+uniform sampler2D gSpecMetallic;
+uniform sampler2D gDepth;
+
+uniform vec3 viewPos;
+uniform mat4 invViewProj;
+
+// 光源数组
+struct PointLight {
+    vec3 position;
+    vec3 color;
+    float radius;
+};
+uniform PointLight lights[64];
+uniform int numLights;
+
+out vec4 FragColor;
+
+void main() {
+    vec2 uv = gl_FragCoord.xy / screenSize;
+
+    // 从G-Buffer读取数据
+    vec3 albedo = texture(gAlbedoAO, uv).rgb;
+    vec3 normal = texture(gNormalRoughness, uv).rgb * 2.0 - 1.0;
+    float roughness = texture(gNormalRoughness, uv).a;
+    float metallic = texture(gSpecMetallic, uv).a;
+    float depth = texture(gDepth, uv).r;
+
+    // 重建世界坐标
+    vec4 clipPos = vec4(uv * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+    vec4 worldPos = invViewProj * clipPos;
+    vec3 fragPos = worldPos.xyz / worldPos.w;
+
+    vec3 viewDir = normalize(viewPos - fragPos);
+    vec3 result = vec3(0.0);
+
+    // 对每个光源计算光照
+    for (int i = 0; i &lt; numLights; i++) {
+        vec3 lightDir = normalize(lights[i].position - fragPos);
+        vec3 halfDir = normalize(lightDir + viewDir);
+
+        float dist = length(lights[i].position - fragPos);
+        float attenuation = clamp(1.0 - dist / lights[i].radius, 0.0, 1.0);
+        attenuation *= attenuation; // 平方衰减
+
+        // 简化光照
+        float NdotL = max(dot(normal, lightDir), 0.0);
+        float NdotH = max(dot(normal, halfDir), 0.0);
+        float spec = pow(NdotH, mix(1.0, 128.0, 1.0 - roughness));
+
+        vec3 diffuse = albedo * NdotL;
+        vec3 specular = mix(vec3(0.04), albedo, metallic) * spec;
+
+        result += (diffuse + specular) * lights[i].color * attenuation;
+    }
+
+    FragColor = vec4(result, 1.0);
+}
+        </pre>
+    </div>
+
+    <!-- 四、光源体积 -->
+    <h2>四、光源体积优化</h2>
+    <p>全屏光照Pass会处理所有像素，即使某些像素不受特定光源影响。使用光源体积可以只处理受光源影响的像素。</p>
+
+    <h3>4.1 点光源体积</h3>
+    <ul>
+        <li>为每个点光源渲染一个球体（包围球）</li>
+        <li>只对球体覆盖的像素执行光照计算</li>
+        <li>球体大小等于光源的衰减半径</li>
+        <li>使用模板测试或深度测试剔除无关像素</li>
+    </ul>
+
+    <div class="note">
+        <strong>优化技巧：</strong><br>
+        - 使用Icosphere近似球体，减少顶点数<br>
+        - 用背面剔除渲染球体，相机在光源内部时切换为正面剔除<br>
+        - 在球体片段着色器中读取G-Buffer并计算光照
+    </div>
+
+    <!-- 五、Tiled延迟渲染 -->
+    <h2>五、Tiled Deferred Rendering</h2>
+    <p>Tiled延迟渲染将屏幕划分为小的瓦片（tile），为每个瓦片计算影响它的光源列表，避免对不受光源影响的像素执行光照计算。</p>
+
+    <h3>5.1 算法流程</h3>
+    <ol>
+        <li><strong>几何Pass：</strong>生成G-Buffer（同普通延迟渲染）</li>
+        <li><strong>光源剔除Pass：</strong>将屏幕划分为16×16像素的瓦片，用计算着色器判断每个光源与哪些瓦片相交</li>
+        <li><strong>光照Pass：</strong>每个瓦片只计算其光源列表中的光照</li>
+    </ol>
+
+    <h3>5.2 Clustered Deferred Rendering</h3>
+    <p>Clustered延迟渲染在Tiled的基础上增加深度维度，将视锥体划分为3D簇（cluster），更精确地剔除光源。</p>
+    <table>
+        <tr><th>方案</th><th>划分方式</th><th>优势</th><th>劣势</th></tr>
+        <tr><td>Tiled</td><td>2D屏幕瓦片</td><td>简单高效</td><td>深度不连续时过度包含</td></tr>
+        <tr><td>Clustered</td><td>3D视锥体簇</td><td>更精确剔除</td><td>实现复杂</td></tr>
+    </table>
+
+    <!-- 六、Forward+ -->
+    <h2>六、Forward+ Rendering</h2>
+    <p>Forward+结合了前向渲染和延迟渲染的优点：使用与Tiled/Clustered相同的光源剔除策略，但在前向渲染Pass中直接计算光照，避免了G-Buffer的带宽开销。</p>
+
+    <h3>6.1 Forward+流程</h3>
+    <ol>
+        <li><strong>深度Pre-Pass：</strong>渲染场景深度（可选，但推荐）</li>
+        <li><strong>光源剔除Pass：</strong>用计算着色器构建瓦片/簇的光源列表</li>
+        <li><strong>前向渲染Pass：</strong>渲染物体，片段着色器从光源列表计算光照</li>
+    </ol>
+
+    <h3>6.2 延迟 vs Forward+ 对比</h3>
+    <table>
+        <tr><th>维度</th><th>Deferred</th><th>Forward+</th></tr>
+        <tr><td>G-Buffer</td><td>需要（高带宽）</td><td>不需要</td></tr>
+        <tr><td>MSAA</td><td>困难</td><td>原生支持</td></tr>
+        <tr><td>透明物体</td><td>需要额外Pass</td><td>同Pass处理</td></tr>
+        <tr><td>材质多样性</td><td>G-Buffer格式固定</td><td>任意材质</td></tr>
+        <tr><td>多光源效率</td><td>优秀</td><td>优秀</td></tr>
+        <tr><td>显存消耗</td><td>高</td><td>较低</td></tr>
+    </table>
+
+    <div class="note">
+        <strong>现代游戏引擎选择：</strong><br>
+        - Unreal Engine 5：Clustered Deferred + 前向渲染混合<br>
+        - Unity：Forward+（URP）/ Deferred（内置管线）<br>
+        - Frostbite（战地）：Tiled Deferred<br>
+        - 寒霜引擎：Clustered Forward
+    </div>
+
+</div>
+
+<!--
+========================================
+  文件总结
+========================================
+  主题：延迟渲染管线
+  内容概要：
+    1. 前向 vs 延迟 - 物体×光源 vs 几何Pass+光照Pass
+    2. G-Buffer - 存储法线/颜色/材质的多RT缓冲区
+    3. 光照Pass - 全屏读取G-Buffer计算光照
+    4. 光源体积 - 渲染光源包围球减少无效计算
+    5. Tiled/Clustered - 2D瓦片/3D簇剔除光源
+    6. Forward+ - 前向渲染 + 计算着色器光源剔除
+  重点知识：
+    - G-Buffer存储：漫反射/法线/粗糙度/金属度/深度
+    - 延迟渲染光照复杂度=O(像素×光源)，与几何复杂度无关
+    - Tiled将屏幕分为16×16像素瓦片，每瓦片维护光源列表
+    - Clustered增加深度维度，更精确剔除
+    - Forward+原生支持MSAA和透明物体
+========================================
+-->
+</body>
+</html>

@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>网络流与匹配</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; font-size: 2em; margin-bottom: 10px; border-bottom: 3px solid #2b6cb0; padding-bottom: 10px; }
+        h2 { color: #2c5282; margin: 25px 0 10px; border-left: 4px solid #3182ce; padding-left: 12px; }
+        h3 { color: #2d3748; margin: 15px 0 8px; }
+        .note { background: #ebf8ff; border-left: 4px solid #3182ce; padding: 12px 16px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+        .theorem { background: #f0fff4; border: 1px solid #68d391; padding: 14px 18px; margin: 15px 0; border-radius: 8px; }
+        .theorem::before { content: "定理"; font-weight: bold; color: #276749; }
+        .example { background: #fffff0; border: 1px solid #ecc94b; padding: 14px 18px; margin: 15px 0; border-radius: 8px; }
+        .example::before { content: "例题"; font-weight: bold; color: #975a16; }
+        .warning { background: #fff5f5; border-left: 4px solid #e53e3e; padding: 12px 16px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 8px 12px; text-align: center; }
+        th { background: #2b6cb0; color: white; }
+        tr:nth-child(even) { background: #edf2f7; }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; }
+        .graph-demo { display: flex; justify-content: center; margin: 20px 0; }
+        .graph-demo svg { border: 1px solid #e2e8f0; border-radius: 8px; background: white; }
+        .summary { background: #faf5ff; border: 2px solid #805ad5; padding: 18px; margin: 30px 0; border-radius: 10px; }
+        .summary h2 { border-left-color: #805ad5; color: #553c9a; }
+        .formula { text-align: center; font-size: 1.2em; background: #edf2f7; padding: 12px; margin: 12px 0; border-radius: 8px; font-family: 'Cambria Math', serif; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<h1>网络流与匹配</h1>
+<p style="text-align:center; color:#718096;">离散数学 · 图论 · 第7节</p>
+
+<!-- ==================== 1. 网络流基础 ==================== -->
+<h2>1. 网络流基础</h2>
+
+<h3>1.1 基本定义</h3>
+<div class="note">
+    <strong>流网络 (Flow Network)：</strong>有向图 G=(V,E)，其中：
+    <ul style="margin-left:20px;">
+        <li>每条边 (u,v) 有非负<strong>容量</strong> c(u,v) ≥ 0</li>
+        <li>有且仅有一个<strong>源点</strong> s 和一个<strong>汇点</strong> t</li>
+        <li>不存在反向边（若 (u,v) ∈ E 则 (v,u) ∉ E）</li>
+    </ul>
+</div>
+
+<div class="note">
+    <strong>可行流 (Flow)：</strong>函数 f: V×V → ℝ 满足：
+    <ul style="margin-left:20px;">
+        <li><strong>容量限制：</strong>0 ≤ f(u,v) ≤ c(u,v) 对所有边</li>
+        <li><strong>流量守恒：</strong>对所有非 s,t 的顶点 v：∑f(u,v) = ∑f(v,w)</li>
+    </ul>
+    流的值：<code>|f| = ∑f(s,v) - ∑f(v,s)</code>（流出源点的净流量）
+</div>
+
+<!-- 流网络示意 -->
+<div class="graph-demo">
+    <svg width="480" height="240" viewBox="0 0 480 240">
+        <text x="240" y="20" text-anchor="middle" font-size="14" font-weight="bold">流网络示例 (容量/流量)</text>
+        <!-- 顶点 -->
+        <circle cx="60" cy="120" r="22" fill="#68d391" stroke="#38a169" stroke-width="2"/>
+        <text x="60" y="125" text-anchor="middle" font-size="14" font-weight="bold">s</text>
+        <circle cx="180" cy="60" r="20" fill="#bee3f8" stroke="#3182ce" stroke-width="2"/>
+        <text x="180" y="65" text-anchor="middle" font-size="13">A</text>
+        <circle cx="180" cy="180" r="20" fill="#bee3f8" stroke="#3182ce" stroke-width="2"/>
+        <text x="180" y="185" text-anchor="middle" font-size="13">B</text>
+        <circle cx="320" cy="60" r="20" fill="#bee3f8" stroke="#3182ce" stroke-width="2"/>
+        <text x="320" y="65" text-anchor="middle" font-size="13">C</text>
+        <circle cx="320" cy="180" r="20" fill="#bee3f8" stroke="#3182ce" stroke-width="2"/>
+        <text x="320" y="185" text-anchor="middle" font-size="13">D</text>
+        <circle cx="430" cy="120" r="22" fill="#fc8181" stroke="#e53e3e" stroke-width="2"/>
+        <text x="430" y="125" text-anchor="middle" font-size="14" font-weight="bold">t</text>
+        <!-- 边 -->
+        <line x1="82" y1="112" x2="158" y2="68" stroke="#2d3748" stroke-width="2"/>
+        <line x1="82" y1="128" x2="158" y2="172" stroke="#2d3748" stroke-width="2"/>
+        <line x1="200" y1="60" x2="300" y2="60" stroke="#2d3748" stroke-width="2"/>
+        <line x1="180" y1="80" x2="180" y2="160" stroke="#2d3748" stroke-width="2"/>
+        <line x1="200" y1="180" x2="300" y2="180" stroke="#2d3748" stroke-width="2"/>
+        <line x1="320" y1="80" x2="320" y2="160" stroke="#2d3748" stroke-width="2"/>
+        <line x1="340" y1="68" x2="408" y2="112" stroke="#2d3748" stroke-width="2"/>
+        <line x1="340" y1="172" x2="408" y2="128" stroke="#2d3748" stroke-width="2"/>
+        <!-- 容量标注 -->
+        <text x="110" y="80" text-anchor="middle" font-size="11" fill="#e53e3e">10</text>
+        <text x="110" y="168" text-anchor="middle" font-size="11" fill="#e53e3e">8</text>
+        <text x="250" y="52" text-anchor="middle" font-size="11" fill="#e53e3e">10</text>
+        <text x="168" y="125" text-anchor="middle" font-size="11" fill="#e53e3e">2</text>
+        <text x="250" y="192" text-anchor="middle" font-size="11" fill="#e53e3e">10</text>
+        <text x="332" y="125" text-anchor="middle" font-size="11" fill="#e53e3e">6</text>
+        <text x="385" y="80" text-anchor="middle" font-size="11" fill="#e53e3e">10</text>
+        <text x="385" y="168" text-anchor="middle" font-size="11" fill="#e53e3e">8</text>
+        <!-- 箭头 -->
+        <polygon points="158,68 148,62 150,72" fill="#2d3748"/>
+        <polygon points="158,172 148,178 150,168" fill="#2d3748"/>
+    </svg>
+</div>
+
+<!-- ==================== 2. 最大流最小割定理 ==================== -->
+<h2>2. 最大流最小割定理 (Max-Flow Min-Cut)</h2>
+
+<h3>2.1 割的定义</h3>
+<div class="note">
+    <strong>s-t 割 (Cut)：</strong>将顶点集 V 划分为 S 和 T=V\S，使得 s ∈ S，t ∈ T。<br>
+    <strong>割的容量：</strong><code>c(S,T) = ∑ c(u,v)</code>，其中 u ∈ S, v ∈ T。<br>
+    <strong>最小割：</strong>容量最小的 s-t 割。
+</div>
+
+<h3>2.2 核心定理</h3>
+<div class="theorem">
+    <strong>最大流最小割定理 (Ford & Fulkerson, 1956)：</strong><br>
+    网络中最大流的值 = 最小割的容量：<div class="formula">max |f| = min c(S,T)</div>
+    这是图论中最重要的对偶性结果之一。
+</div>
+
+<!-- ==================== 3. Ford-Fulkerson 算法 ==================== -->
+<h2>3. Ford-Fulkerson 算法</h2>
+
+<h3>3.1 增广路径</h3>
+<div class="note">
+    <strong>残余网络 (Residual Network)：</strong>对当前流 f，定义残余容量：<br>
+    c_f(u,v) = c(u,v) - f(u,v) （正向边）<br>
+    c_f(v,u) = f(u,v) （反向边，允许"退流"）<br><br>
+    <strong>增广路径 (Augmenting Path)：</strong>残余网络中从 s 到 t 的路径。沿增广路径增加流量可增大总流。
+</div>
+
+<h3>3.2 算法步骤</h3>
+<div class="note">
+    <ol style="margin-left:20px;">
+        <li>初始化所有边流量 f = 0</li>
+        <li><strong>循环：</strong>在残余网络中寻找 s→t 的增广路径</li>
+        <li>若找到：沿路径增加 min{c_f(e)} 的流量</li>
+        <li>若找不到：当前流即为最大流，算法结束</li>
+    </ol>
+    <strong>BFS 找增广路径</strong>时称为 <strong>Edmonds-Karp 算法</strong>，时间复杂度 O(VE²)。
+</div>
+
+<div class="example">
+    上图的最大流计算：<br>
+    路径1: s→A→C→t, 流量 = min(10,10,10) = 10<br>
+    路径2: s→B→D→t, 流量 = min(8,10,8) = 8<br>
+    路径3: s→A→B→D→t, 流量 = min(0,2,...) 无残余<br>
+    检查残余网络，发现 s→A 无剩余容量，s→B→D→t 也饱和。<br>
+    最大流 = 10 + 8 = 18，最小割 = {s} 与其余的割 = 18。
+</div>
+
+<h3>3.3 整数流定理</h3>
+<div class="theorem">
+    若所有容量为整数，则存在一个所有流量为整数的最大流。<br>
+    Ford-Fulkerson 算法在整数容量下一定在有限步内终止。
+</div>
+
+<!-- ==================== 4. 二分图匹配 ==================== -->
+<h2>4. 二分图匹配 (Bipartite Matching)</h2>
+
+<h3>4.1 基本定义</h3>
+<div class="note">
+    <strong>匹配 (Matching)：</strong>图中没有公共顶点的边的集合。<br>
+    <strong>最大匹配：</strong>边数最多的匹配。<br>
+    <strong>完美匹配 (Perfect Matching)：</strong>覆盖所有顶点的匹配。<br>
+    <strong>二分图：</strong>顶点可分为两个不相交集合 X, Y，所有边连接 X 和 Y 中的顶点。
+</div>
+
+<!-- 二分图匹配示意 -->
+<div class="graph-demo">
+    <svg width="400" height="220" viewBox="0 0 400 220">
+        <text x="200" y="20" text-anchor="middle" font-size="14" font-weight="bold">二分图最大匹配</text>
+        <!-- X集合 -->
+        <circle cx="80" cy="60" r="18" fill="#bee3f8" stroke="#3182ce" stroke-width="2"/>
+        <text x="80" y="65" text-anchor="middle" font-size="12">x₁</text>
+        <circle cx="80" cy="120" r="18" fill="#bee3f8" stroke="#3182ce" stroke-width="2"/>
+        <text x="80" y="125" text-anchor="middle" font-size="12">x₂</text>
+        <circle cx="80" cy="180" r="18" fill="#bee3f8" stroke="#3182ce" stroke-width="2"/>
+        <text x="80" y="185" text-anchor="middle" font-size="12">x₃</text>
+        <!-- Y集合 -->
+        <circle cx="320" cy="60" r="18" fill="#c6f6d5" stroke="#38a169" stroke-width="2"/>
+        <text x="320" y="65" text-anchor="middle" font-size="12">y₁</text>
+        <circle cx="320" cy="120" r="18" fill="#c6f6d5" stroke="#38a169" stroke-width="2"/>
+        <text x="320" y="125" text-anchor="middle" font-size="12">y₂</text>
+        <circle cx="320" cy="180" r="18" fill="#c6f6d5" stroke="#38a169" stroke-width="2"/>
+        <text x="320" y="185" text-anchor="middle" font-size="12">y₃</text>
+        <!-- 边 -->
+        <line x1="98" y1="60" x2="302" y2="60" stroke="#e2e8f0" stroke-width="1.5"/>
+        <line x1="98" y1="60" x2="302" y2="120" stroke="#e2e8f0" stroke-width="1.5"/>
+        <line x1="98" y1="120" x2="302" y2="120" stroke="#e2e8f0" stroke-width="1.5"/>
+        <line x1="98" y1="120" x2="302" y2="180" stroke="#e2e8f0" stroke-width="1.5"/>
+        <line x1="98" y1="180" x2="302" y2="180" stroke="#e2e8f0" stroke-width="1.5"/>
+        <!-- 匹配边加粗 -->
+        <line x1="98" y1="60" x2="302" y2="60" stroke="#e53e3e" stroke-width="3"/>
+        <line x1="98" y1="120" x2="302" y2="120" stroke="#e53e3e" stroke-width="3"/>
+        <line x1="98" y1="180" x2="302" y2="180" stroke="#e53e3e" stroke-width="3"/>
+        <text x="200" y="210" text-anchor="middle" font-size="12" fill="#e53e3e">红色 = 最大匹配 (大小3 = 完美匹配)</text>
+    </svg>
+</div>
+
+<h3>4.2 用网络流求最大匹配</h3>
+<div class="note">
+    将二分图匹配转化为最大流问题：
+    <ol style="margin-left:20px;">
+        <li>添加超级源点 s，连向 X 中所有顶点（容量1）</li>
+        <li>添加超级汇点 t，Y 中所有顶点连向 t（容量1）</li>
+        <li>原图中 X-Y 的边容量设为 1（或无穷）</li>
+        <li>求 s-t 最大流 = 最大匹配</li>
+    </ol>
+</div>
+
+<h3>4.3 匈牙利算法</h3>
+<div class="note">
+    通过寻找<strong>增广路径</strong>（交替经过非匹配边和匹配边的路径）来增大匹配。<br>
+    时间复杂度：O(VE)。等价于 Ford-Fulkerson 在二分图上的应用。
+</div>
+
+<!-- ==================== 5. Hall 定理 ==================== -->
+<h2>5. Hall 婚姻定理</h2>
+
+<div class="theorem">
+    <strong>Hall 定理 (1935)：</strong>二分图 G=(X,Y,E) 中存在覆盖 X 的匹配（即 |M|=|X|）<strong>当且仅当</strong><br>
+    对 X 的任意子集 S，其邻居集合 N(S) 满足：<div class="formula">|N(S)| ≥ |S| &nbsp;&nbsp; 对所有 S ⊆ X</div>
+    这个条件称为 <strong>Hall 条件</strong>。
+</div>
+
+<div class="example">
+    <strong>应用：</strong>有 n 个男生和 n 个女生，每个男生认识若干女生。<br>
+    问：能否给每个男生配对一个他认识的女生？<br>
+    定理回答：当且仅当任意 k 个男生认识的女生总数 ≥ k。
+</div>
+
+<h3>5.1 推论</h3>
+<table>
+    <tr><th>推论</th><th>内容</th></tr>
+    <tr><td>k-正则二分图</td><td>k-正则二分图一定有完美匹配（每个顶点度数=k）</td></tr>
+    <tr><td>婚姻定理</td><td>|X|=|Y| 时，存在完美匹配 ⟺ Hall 条件成立</td></tr>
+    <tr><td>覆盖定理</td><td>最大匹配大小 = 最小顶点覆盖大小 (König定理，仅限二分图)</td></tr>
+</table>
+
+<h3>5.2 König-Egerváry 定理</h3>
+<div class="theorem">
+    在二分图中：<div class="formula">最大匹配大小 = 最小顶点覆盖大小</div>
+    这是最大流最小割定理在二分图上的特例。
+</div>
+
+<!-- ==================== 6. 最大匹配与最小覆盖 ==================== -->
+<h2>6. 相关概念对比</h2>
+
+<table>
+    <tr><th>概念</th><th>定义</th><th>对偶概念</th></tr>
+    <tr><td>最大流</td><td>s-t 流量最大</td><td>最小割</td></tr>
+    <tr><td>最大匹配</td><td>边数最多的匹配</td><td>最小顶点覆盖 (二分图)</td></tr>
+    <tr><td>最大独立集</td><td>不相邻顶点最多的集合</td><td>最小顶点覆盖</td></tr>
+</table>
+
+<div class="warning">
+    <strong>注意：</strong>一般图中最大匹配 ≠ 最小顶点覆盖。König 定理仅适用于二分图。<br>
+    一般图的最大匹配可用 Edmonds 的"花算法"求解。
+</div>
+
+<!-- ==================== 总结 ==================== -->
+<div class="summary">
+    <h2>本节总结</h2>
+    <ul style="margin-left:20px;">
+        <li><strong>流网络：</strong>有向图 + 容量 + 源汇，可行流满足容量限制和流量守恒</li>
+        <li><strong>最大流最小割定理：</strong>max|f| = min c(S,T)，网络流的对偶性</li>
+        <li><strong>Ford-Fulkerson：</strong>通过增广路径迭代增大流；BFS 版本为 Edmonds-Karp O(VE²)</li>
+        <li><strong>残余网络：</strong>允许退流（反向边），是寻找增广路径的关键</li>
+        <li><strong>二分图匹配：</strong>可转化为网络流；匈牙利算法 O(VE)</li>
+        <li><strong>Hall 定理：</strong>|N(S)|≥|S| 对所有 S⊆X ⟺ 存在覆盖X的匹配</li>
+        <li><strong>König 定理：</strong>二分图中最大匹配 = 最小顶点覆盖</li>
+    </ul>
+</div>
+
+<!--
+    本文件总结：
+    - 主题：网络流与匹配
+    - 内容：流网络定义、最大流最小割定理、Ford-Fulkerson/Edmonds-Karp算法、二分图匹配与匈牙利算法、Hall婚姻定理、König定理
+    - 可视化：流网络图、二分图匹配图
+    - 关键公式：max|f|=min c(S,T), |N(S)|≥|S|, 最大匹配=最小顶点覆盖
+    - 适用：离散数学图论课程复习与参考
+-->
+
+</div>
+</body>
+</html>

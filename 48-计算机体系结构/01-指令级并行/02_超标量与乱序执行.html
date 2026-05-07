@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>超标量与乱序执行 - 计算机体系结构笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", "SimSun", sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; border-bottom: 3px solid #2b6cb0; padding-bottom: 12px; margin-bottom: 30px; }
+        h2 { color: #2c5282; margin: 25px 0 12px; padding-left: 10px; border-left: 4px solid #2b6cb0; }
+        h3 { color: #2d3748; margin: 18px 0 8px; }
+        p, li { margin-bottom: 8px; }
+        ul, ol { padding-left: 25px; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 10px 14px; text-align: center; }
+        th { background: #2b6cb0; color: #fff; }
+        tr:nth-child(even) { background: #edf2f7; }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: "Consolas", monospace; color: #c53030; }
+        .diagram { background: #ebf8ff; border: 2px solid #3182ce; border-radius: 8px; padding: 20px; margin: 15px 0; text-align: center; font-family: monospace; white-space: pre; line-height: 1.6; }
+        .highlight { background: #fefcbf; border-left: 4px solid #d69e2e; padding: 12px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+        .example { background: #f0fff4; border: 1px solid #48bb78; border-radius: 6px; padding: 14px; margin: 12px 0; }
+        .tag { display: inline-block; background: #2b6cb0; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 0.85em; margin: 2px; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<!-- 超标量与乱序执行 -->
+<!-- 本页面讨论现代处理器的超标量执行、乱序执行和Tomasulo算法 -->
+<h1>02 - 超标量与乱序执行</h1>
+
+<!-- ====== 第一部分：超标量执行 ====== -->
+<h2>一、超标量执行（Superscalar Execution）</h2>
+<div class="card">
+    <p>超标量处理器在每个时钟周期内可以<strong>发射多条指令</strong>到不同的功能单元执行，通过硬件并行度提高性能。</p>
+
+    <h3>1.1 度（Degree of Superscalar）</h3>
+    <p>超标量的"度"指每个周期最多发射的指令数。</p>
+    <table>
+        <tr><th>处理器</th><th>发射宽度</th><th>功能单元数</th></tr>
+        <tr><td>ARM Cortex-A53</td><td>2路</td><td>ALU×2, MAC, Load/Store, Branch</td></tr>
+        <tr><td>Intel Skylake</td><td>6路</td><td>ALU×4, Load, Store</td></tr>
+        <tr><td>Apple M1 (Firestorm)</td><td>8路</td><td>ALU×6, Load×2, Store×2, FP×4</td></tr>
+    </table>
+
+    <h3>1.2 超标量流水线</h3>
+    <div class="diagram">  周期:   1    2    3    4    5    6
+  I1:    IF   ID   EX  MEM  WB
+  I2:    IF   ID   EX  MEM  WB        ← 同一周期取/发射两条指令
+  I3:         IF   ID   EX  MEM  WB
+  I4:         IF   ID   EX  MEM  WB
+  I5:              IF   ID   EX  MEM  WB
+  I6:              IF   ID   EX  MEM  WB</div>
+
+    <h3>1.3 顺序超标量 vs 乱序超标量</h3>
+    <table>
+        <tr><th>类型</th><th>指令完成顺序</th><th>硬件复杂度</th><th>性能</th></tr>
+        <tr><td>顺序发射+顺序完成</td><td>程序顺序</td><td>低</td><td>较低</td></tr>
+        <tr><td>顺序发射+乱序完成</td><td>乱序</td><td>中</td><td>中</td></tr>
+        <tr><td>乱序发射+乱序完成</td><td>乱序</td><td>高</td><td>最高</td></tr>
+    </table>
+</div>
+
+<!-- ====== 第二部分：乱序执行 ====== -->
+<h2>二、乱序执行（Out-of-Order Execution）</h2>
+<div class="card">
+    <p>乱序执行允许指令在操作数就绪后立即执行，不必等待前面的指令完成，从而突破数据依赖带来的延迟。</p>
+
+    <h3>2.1 乱序执行的流水线阶段</h3>
+    <div class="diagram">  取指 → 译码 → 重命名 → 发射/派遣 → 执行 → 写回 → 提交
+  IF    ID    Rename   Dispatch   EX     WB    Commit
+
+  ┌─────────────────────────────────────────────────┐
+  │                  前端(Frontend)                  │
+  │  IF → ID → Rename → Dispatch                   │
+  ├─────────────────────────────────────────────────┤
+  │                  后端(Backend)                   │
+  │  Issue Queue → Execute → WB → Reorder Buffer   │
+  └─────────────────────────────────────────────────┘</div>
+
+    <h3>2.2 关键硬件结构</h3>
+    <ul>
+        <li><strong>重命名寄存器</strong>（Register Renaming）：消除WAR和WAW冒险</li>
+        <li><strong>保留站</strong>（Reservation Station）：存放等待操作数的指令</li>
+        <li><strong>重排序缓冲区</strong>（Reorder Buffer, ROB）：维持程序顺序，保证精确异常</li>
+        <li><strong>指令队列</strong>（Issue Queue）：选择就绪指令发射</li>
+    </ul>
+</div>
+
+<!-- ====== 第三部分：寄存器重命名 ====== -->
+<h2>三、寄存器重命名（Register Renaming）</h2>
+<div class="card">
+    <p>寄存器重命名通过将<strong>架构寄存器</strong>映射到更大的<strong>物理寄存器</strong>池，消除假依赖（WAR/WAW）。</p>
+
+    <h3>3.1 示例</h3>
+    <div class="example">
+        <p><strong>原始代码（存在WAR冒险）：</strong></p>
+        <div class="code-block">ADD R1, R2, R3    // 写R1
+SUB R4, R1, R5    // 读R1 (RAW - 真依赖)
+MUL R1, R6, R7    // 写R1 (WAR - 反依赖，WAW - 输出依赖)</div>
+        <p><strong>重命名后：</strong></p>
+        <div class="code-block">ADD P1, P2, P3    // R1→P1, R2→P2, R3→P3
+SUB P4, P1, P5    // R4→P4, R1→P1(读), R5→P5
+MUL P6, P7, P8    // R1→P6(新映射!), R6→P7, R7→P8</div>
+        <p>ADD 和 MUL 之间不再有依赖，可以并行执行。</p>
+    </div>
+
+    <h3>3.2 重命名方式</h3>
+    <table>
+        <tr><th>方式</th><th>描述</th><th>典型使用</th></tr>
+        <tr><td>重命名表（RAT）</td><td>架构寄存器→物理寄存器映射表</td><td>Intel/AMD/x86</td></tr>
+        <tr><td>ROB直接重命名</td><td>ROB条目直接作为重命名寄存器</td><td>早期MIPS R10000</td></tr>
+    </table>
+</div>
+
+<!-- ====== 第四部分：Tomasulo算法 ====== -->
+<h2>四、Tomasulo 算法</h2>
+<div class="card">
+    <p>Tomasulo算法是Robert Tomasulo于1967年为IBM 360/91设计的<strong>动态调度算法</strong>，是现代乱序执行的基础。</p>
+
+    <h3>4.1 核心组件</h3>
+    <table>
+        <tr><th>组件</th><th>功能</th></tr>
+        <tr><td><strong>保留站（RS）</strong></td><td>存放等待执行的指令及操作数</td></tr>
+        <tr><td><strong>公共数据总线（CDB）</strong></td><td>广播计算结果，同时更新所有等待该值的保留站</td></tr>
+        <tr><td><strong>寄存器状态表</strong></td><td>记录每个架构寄存器由哪个保留站写入</td></tr>
+    </table>
+
+    <h3>4.2 三阶段</h3>
+    <ol>
+        <li><strong>发射（Issue）</strong>：从指令队列取指令，若有空闲保留站则发射，记录操作数来源</li>
+        <li><strong>执行（Execute）</strong>：当所有操作数就绪，在功能单元执行</li>
+        <li><strong>写回（Write Back）</strong>：通过CDB广播结果，更新所有等待的保留站</li>
+    </ol>
+
+    <h3>4.3 执行过程示例</h3>
+    <div class="diagram">  指令序列:
+  LD  F6, 34(R2)
+  LD  F2, 45(R3)
+  MULTD F0, F2, F4
+  SUBD  F8, F6, F2
+  DIVD  F10, F0, F6
+  ADDD  F6, F8, F2
+
+  ┌─────────────────────────────────────────────────────┐
+  │ 保留站内容（MULTD完成后的状态）：                     │
+  │                                                     │
+  │ Busy  Op     Vj       Vk      Qj      Qk           │
+  │ ───   ────   ────     ────    ────    ────         │
+  │ Yes   MULTD  [F2值]   [F4值]  -       -   ←就绪    │
+  │ Yes   SUBD   [F6值]   -       RS(MULTD) -  ←等F2   │
+  │ Yes   DIVD   -        [F6值]  RS(MULTD) -  ←等F0   │
+  │ Yes   ADDD   -        -       RS(SUBD)  RS(MULTD)  │
+  └─────────────────────────────────────────────────────┘</div>
+
+    <h3>4.4 Tomasulo 的优势</h3>
+    <ul>
+        <li>通过CDB广播实现<strong>隐含的数据流调度</strong></li>
+        <li>寄存器重命名效果 — 消除WAR和WAW冒险</li>
+        <li>分布式控制 — 每个保留站独立判断何时执行</li>
+    </ul>
+</div>
+
+<!-- ====== 第五部分：ROB与精确异常 ====== -->
+<h2>五、重排序缓冲区与精确异常</h2>
+<div class="card">
+    <h3>5.1 ROB（Reorder Buffer）</h3>
+    <p>ROB 是一个<strong>环形 FIFO 缓冲区</strong>，按程序顺序记录所有未提交的指令，确保指令按序<strong>提交（Commit/Retire）</strong>。</p>
+
+    <h3>5.2 精确异常（Precise Exception）</h3>
+    <p>精确异常要求：当第 i 条指令发生异常时，i 之前的指令全部完成，i 及之后的指令全部作废。</p>
+
+    <div class="diagram">  ROB状态:
+  ┌─────┬──────┬────────┬────────┬────────┐
+  │ 序号│ 指令 │ 目标   │ 值     │ 状态   │
+  ├─────┼──────┼────────┼────────┼────────┤
+  │  1  │ ADD  │ R1     │ 42     │ 完成 ✓ │ ← 可提交
+  │  2  │ SUB  │ R2     │ 17     │ 完成 ✓ │ ← 可提交
+  │  3  │ MUL  │ R3     │        │ 执行中  │ ← 等待
+  │  4  │ DIV  │ R4     │        │ 发射   │ ← 等待
+  └─────┴──────┴────────┴────────┴────────┘
+  头指针→1(待提交)  尾指针→5(待分配)</div>
+</div>
+
+<!-- ====== 第六部分：分支预测 ====== -->
+<h2>六、分支预测（Branch Prediction）</h2>
+<div class="card">
+    <p>分支预测是乱序执行的关键配套技术 — 在分支结果确定之前就需要取指和发射后续指令。</p>
+
+    <h3>6.1 静态预测</h3>
+    <ul>
+        <li><strong>预测不跳转</strong>（BTFNT）：简单但准确率低</li>
+        <li><strong>预测后向跳转</strong>：循环分支通常跳转（for/while）</li>
+    </ul>
+
+    <h3>6.2 动态预测</h3>
+    <table>
+        <tr><th>方法</th><th>原理</th><th>准确率</th></tr>
+        <tr><td>1-bit 饱和计数器</td><td>上次跳则预测跳</td><td>~60%</td></tr>
+        <tr><td>2-bit 饱和计数器</td><td>需连续两次变化才切换预测</td><td>~85%</td></tr>
+        <tr><td>两级自适应预测器</td><td>用分支历史模式查表</td><td>~95%</td></tr>
+        <tr><td>GShare / GSelect</td><td>全局历史+PC异或/拼接索引</td><td>~96%</td></tr>
+        <tr><td>Tournament预测器</td><td>多个预测器竞争选择</td><td>~97%</td></tr>
+    </table>
+
+    <h3>6.3 分支目标缓冲（BTB）</h3>
+    <p>BTB 缓存分支指令的 PC 和上次的跳转目标地址，实现<strong>零周期分支</strong>（若预测正确）。</p>
+
+    <div class="highlight">
+        <strong>推测执行的代价</strong>：分支预测错误时，需要冲刷（flush）所有推测执行的指令。现代处理器的分支预测准确率约95-97%，剩余3-5%的误预测是性能损失的主要来源之一。
+    </div>
+</div>
+
+</div>
+<!-- ====== 总结 ====== -->
+<!--
+本笔记总结：
+1. 超标量处理器每个周期发射多条指令，现代处理器支持4-8路发射
+2. 乱序执行允许操作数就绪的指令提前执行，突破数据依赖的限制
+3. 寄存重命名通过物理寄存器池消除WAR和WAW假依赖
+4. Tomasulo算法通过保留站+CDB广播实现动态调度，是乱序执行的基础
+5. ROB保证指令按程序顺序提交，实现精确异常
+6. 动态分支预测(2-bit/GShare/Tournament)准确率达95-97%，减少控制冒险损失
+7. 现代高性能处理器(如Intel/Apple)综合运用超标量+乱序执行+分支预测+ROB
+-->
+</body>
+</html>

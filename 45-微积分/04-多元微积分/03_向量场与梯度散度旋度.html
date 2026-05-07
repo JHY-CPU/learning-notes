@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>向量场与梯度散度旋度 - 多元微积分</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #c0392b;
+            --accent: #e74c3c;
+            --bg: #fdfdfd;
+            --card-bg: #ffffff;
+            --border: #dfe6e9;
+            --text: #2d3436;
+            --text-light: #636e72;
+            --success: #27ae60;
+            --info: #2980b9;
+            --warning: #f39c12;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--primary);
+            font-size: 2.2rem;
+            margin-bottom: 0.5rem;
+            border-bottom: 3px solid var(--secondary);
+            padding-bottom: 0.8rem;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--text-light);
+            margin-bottom: 2rem;
+        }
+
+        h2 {
+            color: var(--secondary);
+            font-size: 1.5rem;
+            margin: 2rem 0 1rem;
+            padding-left: 0.8rem;
+            border-left: 4px solid var(--secondary);
+        }
+
+        h3 {
+            color: var(--primary);
+            font-size: 1.2rem;
+            margin: 1.2rem 0 0.6rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .formula-box {
+            background: linear-gradient(135deg, #f8f9fa, #fdedec);
+            border-left: 4px solid var(--secondary);
+            padding: 1.2rem 1.5rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+            font-family: 'Cambria Math', 'Latin Modern Math', serif;
+        }
+
+        .formula {
+            font-size: 1.15rem;
+            text-align: center;
+            margin: 0.5rem 0;
+        }
+
+        .formula .highlight { color: var(--accent); font-weight: bold; }
+        .formula .big { font-size: 1.35rem; }
+
+        .definition {
+            background: linear-gradient(135deg, #fdedec, #f9ebea);
+            border: 1px solid #f1948a;
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin: 1rem 0;
+        }
+
+        .definition::before {
+            content: "定义";
+            background: var(--secondary);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .theorem {
+            background: linear-gradient(135deg, #fef9e7, #fdebd0);
+            border: 1px solid #f0c27a;
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin: 1rem 0;
+        }
+
+        .theorem::before {
+            content: "性质";
+            background: var(--warning);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .example {
+            background: linear-gradient(135deg, #eafaf1, #d5f5e3);
+            border: 1px solid #82e0aa;
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin: 1rem 0;
+        }
+
+        .example::before {
+            content: "例题";
+            background: var(--success);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .note {
+            background: linear-gradient(135deg, #d6eaf8, #aed6f1);
+            border: 1px solid #85c1e9;
+            border-radius: 8px;
+            padding: 1rem 1.2rem;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+
+        .note::before {
+            content: "物理意义";
+            background: var(--info);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        th {
+            background: var(--secondary);
+            color: white;
+            padding: 0.7rem 1rem;
+            text-align: left;
+        }
+
+        td {
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:nth-child(even) td { background: #f8f9fa; }
+
+        .operator-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 1rem 0;
+        }
+
+        .operator-card {
+            border-radius: 8px;
+            padding: 1rem;
+            text-align: center;
+            border: 1px solid;
+        }
+
+        .op-grad { background: linear-gradient(135deg, #d6eaf8, #aed6f1); border-color: #85c1e9; }
+        .op-div  { background: linear-gradient(135deg, #eafaf1, #d5f5e3); border-color: #82e0aa; }
+        .op-curl { background: linear-gradient(135deg, #fdedec, #f9ebea); border-color: #f1948a; }
+        .op-lap  { background: linear-gradient(135deg, #f4ecf7, #ebdef0); border-color: #c39bd3; }
+
+        .operator-card .symbol { font-size: 1.8rem; font-weight: bold; }
+        .operator-card .name { font-weight: bold; margin-top: 0.3rem; }
+
+        .nabla {
+            font-size: 1.3rem;
+            font-weight: bold;
+            font-style: italic;
+        }
+
+        .summary {
+            background: var(--primary);
+            color: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .summary h2 { color: var(--warning); border-left-color: var(--warning); }
+        .summary ul { padding-left: 1.5rem; }
+        .summary li { margin: 0.3rem 0; }
+
+        @media (max-width: 600px) {
+            body { padding: 1rem; }
+            h1 { font-size: 1.6rem; }
+        }
+    </style>
+</head>
+<body>
+
+<h1>向量场与梯度、散度、旋度</h1>
+<p class="subtitle">Vector Fields, Gradient, Divergence &amp; Curl &mdash; 多元微积分 · 第三节</p>
+
+<!-- ============ 算子总览 ============ -->
+<div class="operator-grid">
+    <div class="operator-card op-grad">
+        <div class="symbol">&#8711;f</div>
+        <div class="name">梯度 Gradient</div>
+        <p style="font-size:0.85rem; color:var(--text-light);">标量场 → 向量场</p>
+    </div>
+    <div class="operator-card op-div">
+        <div class="symbol">&#8711; &middot; <b>F</b></div>
+        <div class="name">散度 Divergence</div>
+        <p style="font-size:0.85rem; color:var(--text-light);">向量场 → 标量场</p>
+    </div>
+    <div class="operator-card op-curl">
+        <div class="symbol">&#8711; &times; <b>F</b></div>
+        <div class="name">旋度 Curl</div>
+        <p style="font-size:0.85rem; color:var(--text-light);">向量场 → 向量场</p>
+    </div>
+    <div class="operator-card op-lap">
+        <div class="symbol">&#8711;&sup2;f</div>
+        <div class="name">拉普拉斯 Laplacian</div>
+        <p style="font-size:0.85rem; color:var(--text-light);">标量场 → 标量场</p>
+    </div>
+</div>
+
+<!-- ============ 一、向量场 ============ -->
+<h2>一、向量场（Vector Field）</h2>
+
+<div class="definition">
+    <p><strong>向量场</strong>是空间中每个点对应一个向量的映射。在 ℝ³ 中：</p>
+    <div class="formula-box">
+        <p class="formula big"><b>F</b>(x, y, z) = P(x,y,z) <b>i</b> + Q(x,y,z) <b>j</b> + R(x,y,z) <b>k</b></p>
+    </div>
+    <p>例如：速度场、力场、电场、磁场都是向量场。</p>
+</div>
+
+<div class="card">
+    <h3>1.1 相关概念</h3>
+    <ul style="padding-left:1.5rem;">
+        <li><strong>保守场（Conservative Field）</strong>：若存在标量函数 f 使得 <b>F</b> = ∇f，则 <b>F</b> 为保守场</li>
+        <li><strong>势函数（Potential）</strong>：上述函数 f 称为 <b>F</b> 的势函数</li>
+        <li><strong>无旋场（Irrotational）</strong>：curl <b>F</b> = <b>0</b></li>
+        <li><strong>无源场（Solenoidal）</strong>：div <b>F</b> = 0</li>
+    </ul>
+</div>
+
+<!-- ============ 二、梯度 ============ -->
+<h2>二、梯度（Gradient）</h2>
+
+<div class="definition">
+    <p>标量场 f(x, y, z) 的<strong>梯度</strong>：</p>
+    <div class="formula-box">
+        <p class="formula big"><span class="highlight">grad f = ∇f = (∂f/∂x) <b>i</b> + (∂f/∂y) <b>j</b> + (∂f/∂z) <b>k</b></span></p>
+    </div>
+</div>
+
+<div class="note">
+    <p><strong>方向导数</strong>：函数 f 在单位向量 <b>u</b> 方向上的变化率</p>
+    <div class="formula-box">
+        <p class="formula">D<sub>u</sub>f = ∇f &middot; <b>u</b> = |∇f| cos θ</p>
+        <p class="formula">当 <b>u</b> 与 ∇f 同向（θ = 0）时，方向导数最大，值为 <span class="highlight">|∇f|</span></p>
+    </div>
+    <p>梯度的方向是函数增长最快的方向，梯度的大小是最大变化率。</p>
+</div>
+
+<div class="theorem">
+    <p><strong>梯度的重要性质：</strong></p>
+    <ul style="padding-left:1.5rem; margin-top:0.5rem;">
+        <li>∇f 垂直于等值面 f(x,y,z) = c</li>
+        <li>∇(fg) = f∇g + g∇f</li>
+        <li>∇(f/g) = (g∇f − f∇g) / g²</li>
+        <li>若 <b>F</b> = ∇f，则 <b>F</b> 是保守场 ⟺ ∮<b>F</b> · d<b>r</b> = 0（沿任意闭曲线）</li>
+    </ul>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求 f(x,y,z) = x²y + yz³ 的梯度</p>
+    <div class="formula-box">
+        <p class="formula">∂f/∂x = 2xy,  ∂f/∂y = x² + z³,  ∂f/∂z = 3yz²</p>
+        <p class="formula"><span class="highlight">∇f = (2xy, x² + z³, 3yz²)</span></p>
+    </div>
+</div>
+
+<!-- ============ 三、散度 ============ -->
+<h2>三、散度（Divergence）</h2>
+
+<div class="definition">
+    <p>向量场 <b>F</b> = (P, Q, R) 的<strong>散度</strong>是一个标量：</p>
+    <div class="formula-box">
+        <p class="formula big"><span class="highlight">div <b>F</b> = ∇ &middot; <b>F</b> = ∂P/∂x + ∂Q/∂y + ∂R/∂z</span></p>
+    </div>
+</div>
+
+<div class="note">
+    <p><strong>物理意义——流体流动：</strong></p>
+    <ul style="padding-left:1.5rem;">
+        <li>div <b>F</b> > 0：该点是<strong>源</strong>（source），流体从该点流出多于流入</li>
+        <li>div <b>F</b> < 0：该点是<strong>汇</strong>（sink），流体流入多于流出</li>
+        <li>div <b>F</b> = 0：该场为<strong>无源场</strong>（不可压缩流体的速度场）</li>
+    </ul>
+    <p style="margin-top:0.5rem;"><strong>电磁学：</strong>电场的散度与电荷密度成正比——麦克斯韦方程 ∇ &middot; <b>E</b> = ρ/ε₀</p>
+</div>
+
+<div class="theorem">
+    <p><strong>散度的运算法则：</strong></p>
+    <ul style="padding-left:1.5rem; margin-top:0.5rem;">
+        <li>∇ &middot; (<b>F</b> + <b>G</b>) = ∇ &middot; <b>F</b> + ∇ &middot; <b>G</b></li>
+        <li>∇ &middot; (f<b>F</b>) = f(∇ &middot; <b>F</b>) + <b>F</b> &middot; ∇f</li>
+        <li>∇ &middot; (∇f) = ∇²f = Δf（散度的梯度 = 拉普拉斯算子）</li>
+    </ul>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求 <b>F</b> = (x²y, yz, xz²) 的散度</p>
+    <div class="formula-box">
+        <p class="formula">div <b>F</b> = ∂(x²y)/∂x + ∂(yz)/∂y + ∂(xz²)/∂z</p>
+        <p class="formula">= 2xy + z + 2xz</p>
+        <p class="formula"><span class="highlight">= 2xy + z + 2xz</span></p>
+    </div>
+</div>
+
+<!-- ============ 四、旋度 ============ -->
+<h2>四、旋度（Curl）</h2>
+
+<div class="definition">
+    <p>向量场 <b>F</b> = (P, Q, R) 的<strong>旋度</strong>是一个向量：</p>
+    <div class="formula-box">
+        <p class="formula big">curl <b>F</b> = ∇ &times; <b>F</b></p>
+        <p class="formula" style="font-size:1.2rem; margin-top:0.5rem;">
+            = (<span class="highlight">∂R/∂y − ∂Q/∂z</span>) <b>i</b>
+            + (<span class="highlight">∂P/∂z − ∂R/∂x</span>) <b>j</b>
+            + (<span class="highlight">∂Q/∂x − ∂P/∂y</span>) <b>k</b>
+        </p>
+    </div>
+    <p style="margin-top:0.5rem; text-align:center; color:var(--text-light);">可用行列式记忆：</p>
+    <div class="formula-box">
+        <p class="formula">∇ &times; <b>F</b> = </p>
+        <table style="margin:0 auto; text-align:center; font-size:1.1rem;">
+            <tr><td>|</td><td><b>i</b></td><td>&nbsp;&nbsp;<b>j</b>&nbsp;&nbsp;</td><td><b>k</b></td><td>|</td></tr>
+            <tr><td>|</td><td>∂/∂x</td><td>∂/∂y</td><td>∂/∂z</td><td>|</td></tr>
+            <tr><td>|</td><td>&nbsp;P&nbsp;</td><td>&nbsp;Q&nbsp;</td><td>&nbsp;R&nbsp;</td><td>|</td></tr>
+        </table>
+    </div>
+</div>
+
+<div class="note">
+    <p><strong>物理意义——旋转与环量：</strong></p>
+    <ul style="padding-left:1.5rem;">
+        <li>curl <b>F</b> 的方向：旋转轴方向（右手定则）</li>
+        <li>curl <b>F</b> 的大小：旋转角速度的两倍</li>
+        <li><strong>流体</strong>：旋度描述流体的涡旋程度；curl <b>F</b> = <b>0</b> 表示无旋流（层流）</li>
+        <li><strong>电磁学</strong>：磁场的旋度与电流密度成正比——∇ &times; <b>B</b> = μ₀<b>J</b></li>
+    </ul>
+</div>
+
+<div class="theorem">
+    <p><strong>旋度的重要性质：</strong></p>
+    <ul style="padding-left:1.5rem; margin-top:0.5rem;">
+        <li>∇ &times; (∇f) = <b>0</b>（梯度的旋度恒为零——保守场无旋）</li>
+        <li>∇ &middot; (∇ &times; <b>F</b>) = 0（旋度的散度恒为零）</li>
+        <li>∇ &times; (f<b>F</b>) = f(∇ &times; <b>F</b>) + (∇f) &times; <b>F</b></li>
+    </ul>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求 <b>F</b> = (yz, xz, xy) 的旋度</p>
+    <div class="formula-box">
+        <p class="formula">(∂R/∂y − ∂Q/∂z) = x − x = 0</p>
+        <p class="formula">(∂P/∂z − ∂R/∂x) = y − y = 0</p>
+        <p class="formula">(∂Q/∂x − ∂P/∂y) = z − z = 0</p>
+        <p class="formula">curl <b>F</b> = <b>0</b>，说明 <b>F</b> 是保守场</p>
+        <p class="formula">（事实上 <b>F</b> = ∇(xyz)）</p>
+    </div>
+</div>
+
+<!-- ============ 五、拉普拉斯算子 ============ -->
+<h2>五、拉普拉斯算子（Laplacian）</h2>
+
+<div class="definition">
+    <p><strong>拉普拉斯算子</strong>是梯度的散度：</p>
+    <div class="formula-box">
+        <p class="formula big"><span class="highlight">Δf = ∇²f = ∇ &middot; (∇f) = ∂²f/∂x² + ∂²f/∂y² + ∂²f/∂z²</span></p>
+    </div>
+</div>
+
+<div class="card">
+    <h3>拉普拉斯方程与泊松方程</h3>
+    <div class="formula-box">
+        <p class="formula"><strong>拉普拉斯方程</strong>：∇²f = 0（调和函数）</p>
+        <p class="formula"><strong>泊松方程</strong>：∇²f = g（源项 g）</p>
+    </div>
+    <p style="margin-top:0.5rem;">应用：热传导方程、波动方程、薛定谔方程、引力势、静电势等都涉及拉普拉斯算子。</p>
+</div>
+
+<!-- ============ 六、各坐标系中的表达 ============ -->
+<h2>六、正交曲线坐标系中的算子</h2>
+
+<table>
+    <tr>
+        <th>坐标系</th>
+        <th>∇f（梯度）</th>
+        <th>∇²f（拉普拉斯）</th>
+    </tr>
+    <tr>
+        <td>直角坐标</td>
+        <td>(∂f/∂x, ∂f/∂y, ∂f/∂z)</td>
+        <td>f<sub>xx</sub> + f<sub>yy</sub> + f<sub>zz</sub></td>
+    </tr>
+    <tr>
+        <td>柱坐标<br>(r, θ, z)</td>
+        <td>(∂f/∂r, (1/r)∂f/∂θ, ∂f/∂z)</td>
+        <td>(1/r)∂/∂r(r·∂f/∂r) + (1/r²)∂²f/∂θ² + ∂²f/∂z²</td>
+    </tr>
+    <tr>
+        <td>球坐标<br>(r, θ, φ)</td>
+        <td>(∂f/∂r, (1/r)∂f/∂θ, (1/(r sin θ))∂f/∂φ)</td>
+        <td>(1/r²)∂/∂r(r²∂f/∂r) + (1/(r²sin θ))∂/∂θ(sin θ ∂f/∂θ) + (1/(r²sin²θ))∂²f/∂φ²</td>
+    </tr>
+</table>
+
+<!-- ============ 汇总 ============ -->
+<div class="summary">
+    <h2>核心要点汇总</h2>
+    <ul>
+        <li><strong>梯度 ∇f</strong>：标量 → 向量，指向最大增长方向，垂直等值面</li>
+        <li><strong>散度 ∇ &middot; <b>F</b></strong>：向量 → 标量，衡量"源"或"汇"的强度</li>
+        <li><strong>旋度 ∇ &times; <b>F</b></strong>：向量 → 向量，衡量旋转/涡旋程度</li>
+        <li><strong>拉普拉斯 ∇²f</strong>：梯度的散度，出现在热传导、波动、薛定谔方程中</li>
+        <li><strong>关键恒等式</strong>：curl(grad f) = 0；div(curl <b>F</b>) = 0</li>
+        <li><strong>保守场判据</strong>：curl <b>F</b> = <b>0</b>（在单连通区域上） ⟺ <b>F</b> = ∇f</li>
+    </ul>
+</div>
+
+<!-- 总结：梯度、散度、旋度是向量微积分的三大核心算子，分别描述标量场的变化率、向量场的源汇特性和旋转特性，在流体力学和电磁学中有深刻物理意义 -->
+
+</body>
+</html>

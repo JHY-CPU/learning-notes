@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>关系的性质 - 离散数学笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.7; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; font-size: 2em; margin-bottom: 10px; border-bottom: 3px solid #2b6cb0; padding-bottom: 10px; }
+        h2 { color: #2c5282; margin: 25px 0 12px; padding-left: 12px; border-left: 4px solid #4299e1; }
+        h3 { color: #2d3748; margin: 15px 0 8px; }
+        p { margin: 8px 0; }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; color: #e53e3e; }
+        .concept { background: #fff; border-radius: 10px; padding: 20px; margin: 15px 0; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border-left: 4px solid #4299e1; }
+        .concept.success { border-left-color: #48bb78; }
+        .concept.warning { border-left-color: #ed8936; }
+        .concept.danger { border-left-color: #e53e3e; }
+        .truth-table { width: 100%; border-collapse: collapse; margin: 12px 0; font-size: 0.95em; }
+        .truth-table th { background: #2b6cb0; color: #fff; padding: 10px 14px; text-align: center; }
+        .truth-table td { padding: 8px 14px; text-align: center; border: 1px solid #e2e8f0; }
+        .truth-table tr:nth-child(even) { background: #f7fafc; }
+        .truth-table tr:hover { background: #ebf8ff; }
+        .formula-box { background: #ebf8ff; border: 1px solid #90cdf4; border-radius: 8px; padding: 15px; margin: 12px 0; text-align: center; font-size: 1.1em; }
+        .demo-area { background: #1a202c; color: #e2e8f0; border-radius: 10px; padding: 20px; margin: 15px 0; font-family: 'Consolas', monospace; }
+        .demo-result { margin-top: 12px; padding: 12px; background: #2d3748; border-radius: 6px; }
+        button { padding: 6px 14px; border-radius: 6px; border: none; background: #4299e1; color: #fff; cursor: pointer; margin: 3px; font-size: 0.9em; }
+        button:hover { background: #3182ce; }
+
+        /* 关系矩阵 */
+        .matrix-grid { display: inline-grid; gap: 1px; margin: 10px 0; background: #2b6cb0; border-radius: 6px; overflow: hidden; }
+        .matrix-cell { width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.9em; }
+        .matrix-header { background: #2c5282; color: #fff; }
+        .matrix-row-header { background: #ebf8ff; color: #2b6cb0; }
+        .matrix-one { background: #48bb78; color: #fff; }
+        .matrix-zero { background: #fff; color: #a0aec0; }
+
+        /* 性质标签 */
+        .prop-tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.8em; font-weight: bold; margin: 2px; }
+        .prop-yes { background: #c6f6d5; color: #276749; }
+        .prop-no { background: #fed7d7; color: #9b2c2c; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<h1>01 - 关系的性质</h1>
+<p style="text-align:center; color:#718096; margin-bottom:25px;">离散数学 | 关系与函数</p>
+
+<!-- ==================== 1. 关系的定义 ==================== -->
+<h2>1. 二元关系的定义</h2>
+
+<div class="concept">
+    <h3>从笛卡尔积到关系</h3>
+    <p><strong>二元关系</strong> R 是集合 A &times; B 的一个子集：R &sube; A &times; B。</p>
+    <p>若 (a, b) &isin; R，则记为 <code>aRb</code>，称"a与b有关系R"。</p>
+    <p>当 A = B 时，R 是 <strong>A 上的关系</strong>（A 上的二元关系），R &sube; A &times; A = A&sup2;。</p>
+    <p><strong>示例：</strong>A = {1, 2, 3}，R = {(1,1), (1,2), (2,2), (3,3)} 是 A 上的一个关系。</p>
+</div>
+
+<div class="concept">
+    <h3>关系的表示方法</h3>
+    <table class="truth-table">
+        <tr><th>方法</th><th>说明</th></tr>
+        <tr><td>集合表示</td><td>R = {(1,1), (1,2), (2,3)} — 列出所有有序对</td></tr>
+        <tr><td>关系矩阵</td><td>用 0-1 矩阵表示，M[i][j]=1 当且仅当 (i,j) &isin; R</td></tr>
+        <tr><td>关系图</td><td>用有向图表示，顶点为元素，有向边表示关系</td></tr>
+    </table>
+</div>
+
+<!-- ==================== 2. 关系矩阵 ==================== -->
+<h2>2. 关系矩阵（Matrix Representation）</h2>
+
+<div class="concept">
+    <h3>定义</h3>
+    <p>设 A = {a₁, a₂, ..., aₙ}，R 是 A 上的关系。<strong>关系矩阵</strong> M<sub>R</sub> 是一个 n&times;n 矩阵，其中：</p>
+    <div class="formula-box">
+        M<sub>R</sub>[i][j] = 1 当且仅当 (a<sub>i</sub>, a<sub>j</sub>) &isin; R，否则为 0
+    </div>
+</div>
+
+<div class="concept">
+    <h3>示例：A = {1, 2, 3, 4}，R = "小于等于关系"</h3>
+    <p>R = {(1,1),(1,2),(1,3),(1,4),(2,2),(2,3),(2,4),(3,3),(3,4),(4,4)}</p>
+    <div style="overflow-x:auto;">
+        <table class="truth-table" style="display:inline-table; width:auto;">
+            <tr><th></th><th>1</th><th>2</th><th>3</th><th>4</th></tr>
+            <tr><td><strong>1</strong></td><td style="background:#c6f6d5;">1</td><td style="background:#c6f6d5;">1</td><td style="background:#c6f6d5;">1</td><td style="background:#c6f6d5;">1</td></tr>
+            <tr><td><strong>2</strong></td><td style="background:#fff;">0</td><td style="background:#c6f6d5;">1</td><td style="background:#c6f6d5;">1</td><td style="background:#c6f6d5;">1</td></tr>
+            <tr><td><strong>3</strong></td><td style="background:#fff;">0</td><td style="background:#fff;">0</td><td style="background:#c6f6d5;">1</td><td style="background:#c6f6d5;">1</td></tr>
+            <tr><td><strong>4</strong></td><td style="background:#fff;">0</td><td style="background:#fff;">0</td><td style="background:#fff;">0</td><td style="background:#c6f6d5;">1</td></tr>
+        </table>
+    </div>
+    <p>注意：这是一个上三角矩阵，反映了"小于等于"关系的特性。</p>
+</div>
+
+<!-- ==================== 3. 四大性质 ==================== -->
+<h2>3. 关系的四大性质</h2>
+
+<h2>3.1 自反性（Reflexive）</h2>
+<div class="concept success">
+    <h3>定义</h3>
+    <p>R 在 A 上是<strong>自反的</strong> &harr; 对所有 a &isin; A，都有 (a, a) &isin; R。</p>
+    <div class="formula-box">&forall;a &isin; A, (a,a) &isin; R</div>
+    <p><strong>矩阵特征：</strong>主对角线全为 1。</p>
+    <p><strong>关系图特征：</strong>每个顶点都有自环。</p>
+    <p><strong>示例：</strong>"等于"关系、"小于等于"关系是自反的；"小于"关系不是自反的。</p>
+</div>
+
+<div class="concept danger">
+    <h3>反自反性（Irreflexive）</h3>
+    <p>R 在 A 上是<strong>反自反的</strong> &harr; 对所有 a &isin; A，都有 (a, a) &notin; R。</p>
+    <p><strong>矩阵特征：</strong>主对角线全为 0。</p>
+    <p><strong>示例：</strong>"小于"关系是反自反的（不存在 a < a）。</p>
+    <p><strong>注意：</strong>一个关系可以既不是自反的也不是反自反的（主对角线部分为1部分为0）。</p>
+</div>
+
+<h2>3.2 对称性（Symmetric）</h2>
+<div class="concept success">
+    <h3>定义</h3>
+    <p>R 在 A 上是<strong>对称的</strong> &harr; 对所有 a, b &isin; A，若 (a,b) &isin; R 则 (b,a) &isin; R。</p>
+    <div class="formula-box">(a,b) &isin; R &rArr; (b,a) &isin; R</div>
+    <p><strong>矩阵特征：</strong>矩阵关于主对角线对称（M = M<sup>T</sup>）。</p>
+    <p><strong>关系图特征：</strong>若有 a&rarr;b 的边，则必有 b&rarr;a 的边。</p>
+    <p><strong>示例：</strong>"同学关系"、"等于"关系是对称的；"小于"关系不是对称的。</p>
+</div>
+
+<h2>3.3 反对称性（Antisymmetric）</h2>
+<div class="concept warning">
+    <h3>定义</h3>
+    <p>R 在 A 上是<strong>反对称的</strong> &harr; 对所有 a, b &isin; A，若 (a,b) &isin; R 且 (b,a) &isin; R，则 a = b。</p>
+    <div class="formula-box">(a,b) &isin; R &and; (b,a) &isin; R &rArr; a = b</div>
+    <p><strong>等价表述：</strong>若 a &ne; b，则 (a,b) &isin; R 和 (b,a) &isin; R <strong>不能同时成立</strong>。</p>
+    <p><strong>矩阵特征：</strong>对于 i &ne; j，M[i][j] 和 M[j][i] 不能同时为 1。</p>
+    <p><strong>示例：</strong>"小于等于"关系是反对称的（a&le;b 且 b&le;a &rarr; a=b）。</p>
+</div>
+
+<div class="concept danger">
+    <h3>对称 vs 反对称</h3>
+    <p><strong>对称</strong>：有 (a,b) 就必须有 (b,a) — 鼓励成对</p>
+    <p><strong>反对称</strong>：a&ne;b 时不能同时有 (a,b) 和 (b,a) — 禁止成对（对角线除外）</p>
+    <p>一个关系<strong>可以同时是对称且反对称的</strong>：恒等关系 I = {(a,a) | a &isin; A}。</p>
+    <p>一个关系<strong>也可以既不对称也不反对称</strong>：如 R = {(1,2),(2,1),(2,3)}。</p>
+</div>
+
+<h2>3.4 传递性（Transitive）</h2>
+<div class="concept success">
+    <h3>定义</h3>
+    <p>R 在 A 上是<strong>传递的</strong> &harr; 对所有 a, b, c &isin; A，若 (a,b) &isin; R 且 (b,c) &isin; R，则 (a,c) &isin; R。</p>
+    <div class="formula-box">(a,b) &isin; R &and; (b,c) &isin; R &rArr; (a,c) &isin; R</div>
+    <p><strong>矩阵特征：</strong>M&sup2; 中为 1 的位置，M 中对应位置也必须为 1（M&sup2; &le; M，逐元素比较）。</p>
+    <p><strong>示例：</strong>"小于"关系是传递的（a<b 且 b<c &rarr; a<c）。</p>
+    <p><strong>反例：</strong>R = {(1,2),(2,3)} 不是传递的，因为 (1,2)&isin;R 且 (2,3)&isin;R 但 (1,3)&notin;R。</p>
+</div>
+
+<!-- ==================== 4. 性质总结表 ==================== -->
+<h2>4. 性质总结对比</h2>
+
+<div class="concept">
+    <table class="truth-table">
+        <tr><th>性质</th><th>定义条件</th><th>矩阵特征</th><th>图论特征</th></tr>
+        <tr>
+            <td><strong>自反</strong></td>
+            <td>&forall;a, (a,a)&isin;R</td>
+            <td>对角线全1</td>
+            <td>每个顶点有自环</td>
+        </tr>
+        <tr>
+            <td><strong>反自反</strong></td>
+            <td>&forall;a, (a,a)&notin;R</td>
+            <td>对角线全0</td>
+            <td>无自环</td>
+        </tr>
+        <tr>
+            <td><strong>对称</strong></td>
+            <td>(a,b)&isin;R &rArr; (b,a)&isin;R</td>
+            <td>对称矩阵</td>
+            <td>双向边</td>
+        </tr>
+        <tr>
+            <td><strong>反对称</strong></td>
+            <td>(a,b),(b,a)&isin;R &rArr; a=b</td>
+            <td>非对角对称位不能都为1</td>
+            <td>无双向边（自环除外）</td>
+        </tr>
+        <tr>
+            <td><strong>传递</strong></td>
+            <td>(a,b),(b,c)&isin;R &rArr; (a,c)&isin;R</td>
+            <td>M&sup2; &le; M</td>
+            <td>有路径则有边</td>
+        </tr>
+    </table>
+</div>
+
+<!-- ==================== 5. 经典关系类型 ==================== -->
+<h2>5. 经典关系类型</h2>
+
+<div class="concept">
+    <table class="truth-table">
+        <tr><th>关系类型</th><th>自反</th><th>对称</th><th>反对称</th><th>传递</th></tr>
+        <tr>
+            <td><strong>恒等关系</strong> I = {(a,a)}</td>
+            <td><span class="prop-tag prop-yes">是</span></td>
+            <td><span class="prop-tag prop-yes">是</span></td>
+            <td><span class="prop-tag prop-yes">是</span></td>
+            <td><span class="prop-tag prop-yes">是</span></td>
+        </tr>
+        <tr>
+            <td><strong>全域关系</strong> A&times;A</td>
+            <td><span class="prop-tag prop-yes">是</span></td>
+            <td><span class="prop-tag prop-yes">是</span></td>
+            <td><span class="prop-tag prop-no">否</span></td>
+            <td><span class="prop-tag prop-yes">是</span></td>
+        </tr>
+        <tr>
+            <td><strong>等于</strong> =</td>
+            <td><span class="prop-tag prop-yes">是</span></td>
+            <td><span class="prop-tag prop-yes">是</span></td>
+            <td><span class="prop-tag prop-yes">是</span></td>
+            <td><span class="prop-tag prop-yes">是</span></td>
+        </tr>
+        <tr>
+            <td><strong>小于</strong> <</td>
+            <td><span class="prop-tag prop-no">否</span></td>
+            <td><span class="prop-tag prop-no">否</span></td>
+            <td><span class="prop-tag prop-yes">是</span></td>
+            <td><span class="prop-tag prop-yes">是</span></td>
+        </tr>
+        <tr>
+            <td><strong>小于等于</strong> &le;</td>
+            <td><span class="prop-tag prop-yes">是</span></td>
+            <td><span class="prop-tag prop-no">否</span></td>
+            <td><span class="prop-tag prop-yes">是</span></td>
+            <td><span class="prop-tag prop-yes">是</span></td>
+        </tr>
+        <tr>
+            <td><strong>朋友关系</strong></td>
+            <td><span class="prop-tag prop-no">否</span></td>
+            <td><span class="prop-tag prop-yes">是</span></td>
+            <td><span class="prop-tag prop-no">否</span></td>
+            <td><span class="prop-tag prop-no">否</span></td>
+        </tr>
+    </table>
+</div>
+
+<!-- ==================== 6. 交互式检验器 ==================== -->
+<h2>6. 交互式关系性质检验</h2>
+
+<div class="demo-area">
+    <p style="color:#a0aec0;">// 输入集合和关系，自动判断四大性质</p>
+    <div style="margin:10px 0;">
+        <label>集合 A：<input type="text" id="relSet" value="1,2,3" style="width:150px;"></label><br>
+        <label>关系 R（逗号分隔有序对，如 (1,1),(1,2)）：</label><br>
+        <input type="text" id="relPairs" value="(1,1),(2,2),(3,3),(1,2),(2,1)" style="width:400px;">
+        <button onclick="checkRelation()">检验</button>
+    </div>
+    <div class="demo-result" id="relResult"></div>
+</div>
+
+<script>
+/* 关系性质检验器 */
+function checkRelation() {
+    const elements = document.getElementById('relSet').value.split(',').map(s => s.trim());
+    const raw = document.getElementById('relPairs').value;
+
+    // 解析有序对
+    const pairs = [];
+    const regex = /\(([^,]+),\s*([^)]+)\)/g;
+    let m;
+    while ((m = regex.exec(raw)) !== null) {
+        pairs.push([m[1].trim(), m[2].trim()]);
+    }
+
+    const R = new Set(pairs.map(p => p[0] + ',' + p[1]));
+    const has  = (a, b) => R.has(a + ',' + b);
+
+    // 检验四大性质
+    let reflexive = true, irreflexive = true, symmetric = true, antisymmetric = true, transitive = true;
+    let reasons = [];
+
+    for (const a of elements) {
+        if (!has(a, a)) { reflexive = false; reasons.push(`自反性失败: (${a},${a}) &notin; R`); }
+        if (has(a, a)) irreflexive = false;
+    }
+
+    for (const [a, b] of pairs) {
+        if (a !== b && !has(b, a)) { symmetric = false; reasons.push(`对称性失败: (${a},${b})&isin;R 但 (${b},${a})&notin;R`); }
+        if (a !== b && has(b, a)) { antisymmetric = false; }
+    }
+
+    for (const [a, b] of pairs) {
+        for (const [c, d] of pairs) {
+            if (b === c && !has(a, d)) { transitive = false; reasons.push(`传递性失败: (${a},${b})&isin;R 且 (${c},${d})&isin;R 但 (${a},${d})&notin;R`); }
+        }
+    }
+
+    const fmtBool = v => v ? '<span style="color:#48bb78">满足</span>' : '<span style="color:#fc8181">不满足</span>';
+
+    let html = `<p>R = {${pairs.map(p => `(${p[0]},${p[1]})`).join(', ')}}</p>`;
+    html += `<p style="margin-top:10px;">`;
+    html += `自反性: ${fmtBool(reflexive)}　`;
+    html += `反自反性: ${fmtBool(irreflexive)}<br>`;
+    html += `对称性: ${fmtBool(symmetric)}　`;
+    html += `反对称性: ${fmtBool(antisymmetric)}<br>`;
+    html += `传递性: ${fmtBool(transitive)}`;
+    html += `</p>`;
+    if (reasons.length > 0) {
+        html += `<p style="color:#fc8181; margin-top:8px;">${reasons.slice(0, 5).join('<br>')}</p>`;
+    }
+
+    document.getElementById('relResult').innerHTML = html;
+}
+</script>
+
+</div><!-- /.container -->
+
+<!--
+    ==========================================
+    总结：
+    1. 二元关系 R ⊆ A×A 可用集合、关系矩阵、关系图三种方式表示
+    2. 四大性质：
+       - 自反性：∀a, (a,a)∈R — 对角线全1
+       - 对称性：(a,b)∈R ⇒ (b,a)∈R — 矩阵对称
+       - 反对称性：(a,b),(b,a)∈R ⇒ a=b — 非对角对称位不能都为1
+       - 传递性：(a,b),(b,c)∈R ⇒ (a,c)∈R — M² ≤ M
+    3. 对称和反对称不是互斥的，一个关系可以同时满足两者
+    4. 等于关系和恒等关系同时满足四大性质
+    ==========================================
+-->
+</body>
+</html>

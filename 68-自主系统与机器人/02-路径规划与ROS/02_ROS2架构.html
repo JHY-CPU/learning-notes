@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ROS2架构</title>
+    <!-- 自主系统与机器人 - ROS2架构 笔记 -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        .tag { display: inline-block; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>ROS2架构</h2>
+        <p><span class="tag">ROS2</span><span class="tag">DDS</span><span class="tag">Nav2</span><span class="tag">生命周期</span></p>
+        <p>ROS2是新一代机器人操作系统，基于DDS通信中间件，支持实时计算和安全通信。</p>
+    </div>
+
+    <!-- ====== ROS1 vs ROS2 ====== -->
+    <div class="card">
+        <h2>ROS1 vs ROS2</h2>
+        <div class="code">
+ROS1的局限性：
+┌─────────────────────────────────────────────────────┐
+│  1. 单点故障：依赖ROS Master                         │
+│     Master宕机 → 整个系统瘫痪                       │
+│                                                     │
+│  2. 不支持实时系统                                   │
+│     无QoS策略，通信不可靠                            │
+│     不适合安全关键应用                               │
+│                                                     │
+│  3. 安全性缺失                                       │
+│     通信未加密，无身份认证                          │
+│     任何人可接入话题                                │
+│                                                     │
+│  4. 平台限制                                         │
+│     仅支持Linux，Windows/macOS支持差                │
+│     不支持微控制器                                   │
+│                                                     │
+│  5. Python 2依赖（ROS1 Melodic之前）                │
+└─────────────────────────────────────────────────────┘
+
+ROS2改进：
+┌─────────────────────────────────────────────────────┐
+│  1. 去中心化                                         │
+│     基于DDS的分布式发现机制                          │
+│     无单点故障                                       │
+│     节点可随时加入/退出                              │
+│                                                     │
+│  2. 实时支持                                         │
+│     支持RTOS (如VxWorks, FreeRTOS)                  │
+│     实时安全的通信                                   │
+│     QoS策略控制                                      │
+│                                                     │
+│  3. 安全机制                                         │
+│     SROS2：基于DDS-Security的安全框架               │
+│     通信加密、身份认证、访问控制                    │
+│                                                     │
+│  4. 多平台支持                                       │
+│     Linux, Windows, macOS, RTOS                     │
+│     跨平台统一API                                   │
+│                                                     │
+│  5. 现代C++/Python                                  │
+│     C++17标准                                       │
+│     Python 3                                        │
+│     更好的类型系统                                  │
+└─────────────────────────────────────────────────────┘
+
+ROS2版本发布：
+┌──────────────┬──────────────┬──────────────────────┐
+│ 版本          │ 发布时间      │ 特性                  │
+├──────────────┼──────────────┼──────────────────────┤
+│ Foxy         │ 2020.06      │ 首个LTS               │
+│ Galactic     │ 2021.05      │ 生命周期节点改进      │
+│ Humble       │ 2022.05      │ LTS，性能优化         │
+│ Iron         │ 2023.05      │ 新功能密集            │
+│ Jazzy        │ 2024.05      │ 当前LTS               │
+│ Rolling      │ 持续更新      │ 开发版                │
+└──────────────┴──────────────┴──────────────────────┘
+        </div>
+    </div>
+
+    <!-- ====== DDS通信 ====== -->
+    <div class="card">
+        <h2>DDS通信中间件</h2>
+        <div class="code">
+DDS (Data Distribution Service)：
+┌─────────────────────────────────────────────────────┐
+│  OMG标准的实时发布-订阅通信中间件                     │
+│  广泛用于航空航天、国防、工业自动化                  │
+│                                                     │
+│  核心概念：                                          │
+│  - Domain：通信域，同一域内的节点可通信              │
+│  - Participant：域参与者（对应ROS2节点）            │
+│  - Topic：数据主题（对应ROS2话题）                  │
+│  - Publisher/Subscriber：发布者/订阅者              │
+│  - DataWriter/DataReader：数据写入/读取             │
+│  - QoS：服务质量策略                                │
+└─────────────────────────────────────────────────────┘
+
+DDS QoS策略：
+┌─────────────────────────────────────────────────────┐
+│  可靠性 (Reliability)：                              │
+│  - RELIABLE：保证消息送达（TCP-like）               │
+│  - BEST_EFFORT：尽力发送，可能丢消息（UDP-like）    │
+│  用途：传感器数据用BEST_EFFORT，控制指令用RELIABLE │
+│                                                     │
+│  持久性 (Durability)：                               │
+│  - VOLATILE：不存储历史                             │
+│  - TRANSIENT_LOCAL：为迟到的订阅者保存最近消息      │
+│  用途：配置参数/地图用TRANSIENT_LOCAL               │
+│                                                     │
+│  历史 (History)：                                    │
+│  - KEEP_LAST(N)：保留最近N条消息                    │
+│  - KEEP_ALL：保留所有消息                           │
+│  用途：高频率传感器用KEEP_LAST(1)                   │
+│                                                     │
+│  截止时间 (Deadline)：                               │
+│  - 消息必须在指定时间内到达                          │
+│  - 超时触发通知                                     │
+│  用途：实时控制系统的安全检查                        │
+│                                                     │
+│  生命线 (Liveliness)：                               │
+│  - AUTOMATIC：DDS自动管理                           │
+│  - MANUAL_BY_TOPIC：应用手动声明存活               │
+│  用途：检测节点是否在线                              │
+│                                                     │
+│  历史深度 (Depth)：                                  │
+│  - 与KEEP_LAST配合，指定保留的消息数               │
+└─────────────────────────────────────────────────────┘
+
+ROS2支持的DDS实现：
+┌──────────────┬──────────────┬──────────────────────┐
+│ 实现          │ 许可证        │ 特点                  │
+├──────────────┼──────────────┼──────────────────────┤
+│ FastDDS      │ Apache 2.0   │ 默认实现，性能好       │
+│ CycloneDDS   │ Eclipse      │ 轻量，适合嵌入式       │
+│ Connext DDS  │ 商业          │ 功能全，企业级支持     │
+│ GurumDDS     │ 商业          │ 低延迟                 │
+└──────────────┴──────────────┴──────────────────────┘
+
+DDS发现机制：
+- 使用简单发现协议(SDP)或DDS内置发现
+- 同一Domain ID的节点自动发现彼此
+- 支持跨机器通信（通过网络多播/单播）
+        </div>
+    </div>
+
+    <!-- ====== 生命周期节点 ====== -->
+    <div class="card">
+        <h2>生命周期节点 (Lifecycle Node)</h2>
+        <div class="code">
+生命周期节点：有明确定义状态和转换的受控节点
+
+状态机：
+┌─────────────────────────────────────────────────────┐
+│                                                     │
+│  ┌─────────┐   configure   ┌─────────┐            │
+│  │Unconfigured├────────────→│Inactive │            │
+│  └─────────┘               └────┬────┘            │
+│       ↑                          │                  │
+│       │ cleanup                  │ activate         │
+│       │                          ▼                  │
+│  ┌────┴────┐               ┌─────────┐            │
+│  │Finalized│←── shutdown ──┤ Active  │            │
+│  └─────────┘               └─────────┘            │
+│                                                     │
+│  状态说明：                                          │
+│  Unconfigured：初始状态，未配置                     │
+│  Inactive：已配置，未激活（不处理数据）             │
+│  Active：运行中，正常处理数据                       │
+│  Finalized：终止                                    │
+│                                                     │
+│  有效转换：                                          │
+│  Unconfigured → Inactive (configure)               │
+│  Inactive → Active (activate)                      │
+│  Active → Inactive (deactivate)                    │
+│  Inactive → Unconfigured (cleanup)                 │
+│  * → Finalized (shutdown)                          │
+└─────────────────────────────────────────────────────┘
+
+生命周期节点接口：
+┌─────────────────────────────────────────────────────┐
+│  服务接口（外部调用）：                               │
+│  /node_name/change_state                            │
+│  /node_name/get_state                               │
+│  /node_name/get_available_states                    │
+│  /node_name/get_available_transitions               │
+│                                                     │
+│  回调函数（节点实现）：                               │
+│  on_configure()：加载参数、初始化资源               │
+│  on_activate()：开始处理数据、启动定时器            │
+│  on_deactivate()：暂停处理、停止定时器             │
+│  on_cleanup()：释放资源                             │
+│  on_shutdown()：清理并退出                          │
+│  on_error()：错误处理                               │
+│                                                     │
+│  返回值：                                            │
+│  SUCCESS / FAILURE / ERROR                          │
+└─────────────────────────────────────────────────────┘
+
+Nav2生命周期管理器：
+┌─────────────────────────────────────────────────────┐
+│  Nav2使用生命周期节点管理整个导航栈                  │
+│                                                     │
+│  启动顺序：                                          │
+│  1. controller_server (Inactive)                   │
+│  2. planner_server (Inactive)                      │
+│  3. recoveries_server (Inactive)                   │
+│  4. bt_navigator (Inactive)                        │
+│  5. waypoint_follower (Inactive)                   │
+│  6. 按依赖关系依次activate                         │
+│                                                     │
+│  好处：                                              │
+│  - 确定性启动和关闭顺序                            │
+│  - 支持动态加载/卸载节点                            │
+│  - 故障时可优雅恢复                                 │
+│  - 适合安全关键系统                                 │
+└─────────────────────────────────────────────────────┘
+        </div>
+    </div>
+
+    <!-- ====== Nav2导航栈 ====== -->
+    <div class="card">
+        <h2>Nav2导航栈</h2>
+        <div class="code">
+Nav2：ROS2的完整导航解决方案
+
+架构：
+┌─────────────────────────────────────────────────────┐
+│  ┌──────────────────────────────────────────┐      │
+│  │           BT Navigator                    │      │
+│  │    (行为树导航器 - 核心调度器)             │      │
+│  └──┬────────┬────────┬────────┬───────────┘      │
+│     │        │        │        │                    │
+│     ▼        ▼        ▼        ▼                    │
+│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────────┐         │
+│  │Planner│ │Control│ │Recovery│ │Waypoint  │         │
+│  │Server │ │Server │ │Server │ │Follower  │         │
+│  └──┬────┘ └──┬────┘ └──┬────┘ └────┬─────┘         │
+│     │         │         │           │                │
+│     ▼         ▼         ▼           ▼                │
+│  ┌──────────────────────────────────────────┐      │
+│  │            成本地图 (Costmap)              │      │
+│  │   全局代价地图 + 局部代价地图             │      │
+│  └──────────────────────────────────────────┘      │
+│                                                     │
+│  Planner Server：                                   │
+│  - 全局路径规划器                                   │
+│  - 支持：NavFn(A*/Dijkstra), SMAC, Theta*         │
+│  - 插件化架构，可自定义规划器                      │
+│                                                     │
+│  Controller Server：                                │
+│  - 局部路径跟踪控制器                               │
+│  - 支持：DWB, MPPI, RPP, LQR                       │
+│  - 跟随全局路径并避障                               │
+│                                                     │
+│  Recovery Server：                                  │
+│  - 故障恢复行为                                     │
+│  - 支持：旋转、备份、等待                          │
+│  - 可自定义恢复策略                                 │
+│                                                     │
+│  BT Navigator：                                     │
+│  - 行为树引擎                                       │
+│  - 协调规划、控制、恢复                             │
+│  - 支持XML定义行为树                                │
+└─────────────────────────────────────────────────────┘
+
+代价地图 (Costmap)：
+┌─────────────────────────────────────────────────────┐
+│  静态层 (Static Layer)：                             │
+│  - 从地图服务器加载的静态地图                       │
+│  - 不会变化                                         │
+│                                                     │
+│  障碍物层 (Obstacle Layer)：                        │
+│  - 实时传感器数据（LiDAR、深度相机）               │
+│  - 动态障碍物检测                                   │
+│                                                     │
+│  膨胀层 (Inflation Layer)：                         │
+│  - 在障碍物周围生成安全距离                         │
+│  - 代价随距离递减                                   │
+│                                                     │
+│  代价定义：                                          │
+│  - LETHAL (254)：障碍物内部                        │
+│  - INSCRIBED (253)：内切距离边界                   │
+│  - 空间：代价随距离高斯递减                         │
+│  - FREE (0)：可通过                                 │
+└─────────────────────────────────────────────────────┘
+
+行为树 (Behavior Tree) 示例：
+┌─────────────────────────────────────────────────────┐
+│  <root main_tree_to_execute="MainTree">             │
+│    <BehaviorTree ID="MainTree">                     │
+│      <Sequence>                                     │
+│        <ComputePathToPose goal="{goal}"/>           │
+│        <FollowPath/>                                │
+│        <Sequence>                                   │
+│          <Spin spin_dist="1.57"/>                   │
+│          <Backup backup_dist="0.15"/>               │
+│          <Wait wait_time="2.0"/>                    │
+│        </Sequence>                                  │
+│      </Sequence>                                    │
+│    </BehaviorTree>                                  │
+│  </root>                                            │
+│                                                     │
+│  行为树节点类型：                                    │
+│  - Sequence：顺序执行子节点                         │
+│  - Fallback：选择执行（类似OR）                    │
+│  - Action：执行具体动作                             │
+│  - Condition：条件判断                              │
+│  - Decorator：修饰子节点行为                        │
+└─────────────────────────────────────────────────────┘
+
+使用方式：
+1. ros2 launch nav2_bringup navigation_launch.py
+2. ros2 launch nav2_bringup bringup_launch.py map:=map.yaml
+3. rviz2 发送目标点
+4. ros2 topic pub /goal_pose geometry_msgs/PoseStamped ...
+        </div>
+    </div>
+
+    <!-- ====== ROS2编程 ====== -->
+    <div class="card">
+        <h2>ROS2编程接口</h2>
+        <div class="code">
+核心概念：
+┌─────────────────────────────────────────────────────┐
+│  节点 (Node)：                                        │
+│  - 独立的计算单元                                    │
+│  - 拥有话题、服务、动作的接口                        │
+│  - 通过Executor处理回调                             │
+│                                                     │
+│  话题 (Topic)：                                      │
+│  - 异步发布-订阅通信                                │
+│  - 支持QoS策略                                      │
+│  - 多对多通信                                        │
+│                                                     │
+│  服务 (Service)：                                    │
+│  - 同步请求-响应通信                                │
+│  - 一对一                                            │
+│  - 超时控制                                          │
+│                                                     │
+│  动作 (Action)：                                     │
+│  - 支持反馈和取消的长时任务                          │
+│  - Goal → Feedback → Result                         │
+│  - 可异步执行                                        │
+│                                                     │
+│  参数 (Parameter)：                                  │
+│  - 运行时可配置的节点参数                            │
+│  - 支持动态重配置                                    │
+└─────────────────────────────────────────────────────┘
+
+Python节点示例：
+┌─────────────────────────────────────────────────────┐
+│  import rclpy                                        │
+│  from rclpy.node import Node                        │
+│  from std_msgs.msg import String                    │
+│                                                     │
+│  class MyNode(Node):                                │
+│      def __init__(self):                            │
+│          super().__init__('my_node')                │
+│          # 发布者                                   │
+│          self.pub = self.create_publisher(          │
+│              String, 'topic', 10)                   │
+│          # 订阅者                                   │
+│          self.sub = self.create_subscription(       │
+│              String, 'topic', self.cb, 10)          │
+│          # 定时器                                   │
+│          self.timer = self.create_timer(            │
+│              1.0, self.timer_cb)                    │
+│                                                     │
+│      def cb(self, msg):                             │
+│          self.get_logger().info(f'{msg.data}')      │
+│                                                     │
+│      def timer_cb(self):                            │
+│          msg = String()                             │
+│          msg.data = 'hello'                         │
+│          self.pub.publish(msg)                      │
+│                                                     │
+│  def main():                                        │
+│      rclpy.init()                                   │
+│      node = MyNode()                                │
+│      rclpy.spin(node)                               │
+│      node.destroy_node()                            │
+│      rclpy.shutdown()                               │
+└─────────────────────────────────────────────────────┘
+
+Executor类型：
+┌─────────────────────────────────────────────────────┐
+│  SingleThreadedExecutor：                           │
+│  - 单线程处理所有回调                               │
+│  - 简单但可能阻塞                                   │
+│                                                     │
+│  MultiThreadedExecutor：                            │
+│  - 多线程并行处理回调                               │
+│  - 可配置线程数                                     │
+│  - 适合IO密集型任务                                 │
+│                                                     │
+│  StaticSingleThreadedExecutor：                     │
+│  - 编译时确定执行顺序                               │
+│  - 最确定性，适合实时系统                           │
+│  - ROS2 Humble+                                     │
+└─────────────────────────────────────────────────────┘
+
+组件 (Component)：
+┌─────────────────────────────────────────────────────┐
+│  可组合节点：在同一线程中运行多个节点                 │
+│  优势：                                              │
+│  - 减少进程间通信开销                               │
+│  - 零拷贝消息传递                                   │
+│  - 动态加载/卸载                                    │
+│                                                     │
+│  ros2 component list                                │
+│  ros2 component load /my_container my_pkg.MyNode    │
+│  ros2 component unload /my_container 1              │
+└─────────────────────────────────────────────────────┘
+        </div>
+        <div class="note">ROS2基于DDS实现去中心化通信，QoS策略提供灵活的可靠性控制。生命周期节点适合安全关键系统。Nav2是完整的导航解决方案，插件化设计方便扩展。</div>
+    </div>
+
+    <!-- 总结：ROS2相比ROS1的核心改进是去中心化（DDS）、实时支持、安全机制和多平台兼容。
+    DDS提供灵活的QoS策略控制通信行为。生命周期节点提供受控的状态管理。Nav2导航栈是完整的机器人导航解决方案。
+    行为树协调规划、控制和恢复逻辑，插件化架构方便扩展。 -->
+</body>
+</html>

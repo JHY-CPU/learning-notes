@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- ARM架构与GPIO - 嵌入式系统笔记 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARM架构与GPIO</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f5f7fa; color: #2c3e50; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 40px; }
+        h1 { font-size: 28px; color: #1a5276; border-bottom: 3px solid #2980b9; padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 22px; color: #2980b9; margin: 28px 0 14px; border-left: 4px solid #2980b9; padding-left: 12px; }
+        h3 { font-size: 18px; color: #34495e; margin: 20px 0 10px; }
+        p { margin: 8px 0; text-indent: 2em; }
+        ul, ol { margin: 10px 0 10px 2em; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: left; }
+        th { background: #2980b9; color: #fff; }
+        tr:nth-child(even) { background: #f0f4f8; }
+        .note { background: #eaf2f8; border-left: 4px solid #2980b9; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .key-point { background: #fef9e7; border-left: 4px solid #f39c12; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        code { background: #ecf0f1; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>ARM架构与GPIO</h1>
+
+    <!-- 一、ARM架构概述 -->
+    <h2>一、ARM Cortex-M架构概述</h2>
+    <p>ARM Cortex-M系列是专为微控制器设计的处理器内核，广泛应用于嵌入式系统和物联网设备。</p>
+
+    <h3>1.1 Cortex-M系列对比</h3>
+    <table>
+        <tr><th>型号</th><th>流水线</th><th>特点</th><th>应用场景</th></tr>
+        <tr><td>Cortex-M0</td><td>3级</td><td>最低功耗、最小面积</td><td>简单传感器节点</td></tr>
+        <tr><td>Cortex-M0+</td><td>2级</td><td>M0的优化版</td><td>超低功耗IoT</td></tr>
+        <tr><td>Cortex-M3</td><td>3级</td><td>性能与功耗平衡</td><td>通用嵌入式</td></tr>
+        <tr><td>Cortex-M4</td><td>3级</td><td>DSP和浮点运算</td><td>信号处理、控制</td></tr>
+        <tr><td>Cortex-M7</td><td>6级</td><td>最高性能</td><td>高端嵌入式应用</td></tr>
+    </table>
+
+    <h3>1.2 核心特性</h3>
+    <ul>
+        <li><strong>Thumb/Thumb-2指令集：</strong>16位/32位混合指令，节省存储空间</li>
+        <li><strong>NVIC（嵌套向量中断控制器）：</strong>低延迟中断响应</li>
+        <li><strong>位带操作（Bit-banding）：</strong>原子级别的位操作</li>
+        <li><strong>SysTick定时器：</strong>系统节拍定时器，支持RTOS</li>
+        <li><strong>调试接口：</strong>SWD/JTAG调试支持</li>
+    </ul>
+
+    <h3>1.3 存储架构</h3>
+    <table>
+        <tr><th>区域</th><th>地址范围</th><th>用途</th></tr>
+        <tr><td>Code</td><td>0x0000_0000 - 0x1FFF_FFFF</td><td>Flash程序存储</td></tr>
+        <tr><td>SRAM</td><td>0x2000_0000 - 0x3FFF_FFFF</td><td>内部SRAM</td></tr>
+        <tr><td>Peripheral</td><td>0x4000_0000 - 0x5FFF_FFFF</td><td>外设寄存器</td></tr>
+        <tr><td>External RAM</td><td>0x6000_0000 - 0x9FFF_FFFF</td><td>外部存储</td></tr>
+        <tr><td>PPB</td><td>0xE000_0000 - 0xE00F_FFFF</td><td>私有外设总线（NVIC等）</td></tr>
+    </table>
+
+    <!-- 二、GPIO -->
+    <h2>二、GPIO（通用输入输出）</h2>
+    <p>GPIO是微控制器与外部世界交互的最基本接口，可以配置为数字输入或输出。</p>
+
+    <h3>2.1 GPIO工作模式</h3>
+    <table>
+        <tr><th>模式</th><th>说明</th><th>应用场景</th></tr>
+        <tr><td>推挽输出</td><td>可输出高/低电平，驱动能力强</td><td>LED驱动、数字信号输出</td></tr>
+        <tr><td>开漏输出</td><td>只能拉低，需外部上拉</td><td>I2C总线、电平转换</td></tr>
+        <tr><td>浮空输入</td><td>无上下拉，高阻态</td><td>外部已有上下拉的信号</td></tr>
+        <tr><td>上拉输入</td><td>内部上拉电阻，默认高电平</td><td>按键检测</td></tr>
+        <tr><td>下拉输入</td><td>内部下拉电阻，默认低电平</td><td>传感器输入</td></tr>
+        <tr><td>模拟输入</td><td>连接到ADC</td><td>模拟信号采集</td></tr>
+        <tr><td>复用功能</td><td>连接到外设（UART/SPI/I2C等）</td><td>通信接口</td></tr>
+    </table>
+
+    <h3>2.2 GPIO配置示例（STM32 HAL）</h3>
+    <div class="key-point">
+        <pre>
+// 配置GPIO引脚为推挽输出
+GPIO_InitTypeDef GPIO_InitStruct = {0};
+GPIO_InitStruct.Pin = GPIO_PIN_5;
+GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;  // 推挽输出
+GPIO_InitStruct.Pull = GPIO_NOPULL;           // 无上下拉
+GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW; // 低速
+HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+// 控制输出
+HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_SET);   // 高电平
+HAL_GPIO_WritePin(GPIOA, GPIO_PIN_5, GPIO_PIN_RESET); // 低电平
+HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_5);                // 翻转
+
+// 读取输入
+GPIO_PinState state = HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0);
+        </pre>
+    </div>
+
+    <!-- 三、中断 -->
+    <h2>三、中断（Interrupts）</h2>
+    <p>中断是嵌入式系统中实现异步事件响应的核心机制。</p>
+
+    <h3>3.1 NVIC特性</h3>
+    <ul>
+        <li><strong>嵌套中断：</strong>高优先级中断可打断低优先级中断</li>
+        <li><strong>可配置优先级：</strong>优先级可动态调整</li>
+        <li><strong>向量表：</strong>每个中断源有独立的中断向量</li>
+        <li><strong>低延迟：</strong>12个时钟周期的中断响应</li>
+    </ul>
+
+    <h3>3.2 中断优先级</h3>
+    <div class="note">
+        <strong>优先级规则：</strong>数值越小优先级越高。优先级分为抢占优先级和子优先级。<br>
+        优先级寄存器位数可配置（0-7位），STM32通常使用4位。
+    </div>
+
+    <!-- 四、定时器 -->
+    <h2>四、定时器（Timers）</h2>
+    <table>
+        <tr><th>定时器类型</th><th>特点</th><th>应用</th></tr>
+        <tr><td>SysTick</td><td>24位倒计时，内核内置</td><td>RTOS系统节拍</td></tr>
+        <tr><td>基本定时器</td><td>仅计数和中断</td><td>简单定时任务</td></tr>
+        <tr><td>通用定时器</td><td>PWM、输入捕获、输出比较</td><td>电机控制、信号测量</td></tr>
+        <tr><td>高级定时器</td><td>互补输出、死区控制</td><td>三相电机驱动</td></tr>
+    </table>
+
+    <!-- 五、ADC/DAC -->
+    <h2>五、ADC与DAC</h2>
+
+    <h3>5.1 ADC（模数转换器）</h3>
+    <ul>
+        <li><strong>分辨率：</strong>通常12位（0-4095）</li>
+        <li><strong>采样率：</strong>STM32可达数MSPS</li>
+        <li><strong>转换模式：</strong>单次转换、连续转换、扫描模式</li>
+        <li><strong>触发源：</strong>软件触发、定时器触发、外部触发</li>
+    </ul>
+
+    <h3>5.2 DAC（数模转换器）</h3>
+    <ul>
+        <li><strong>分辨率：</strong>通常8位或12位</li>
+        <li><strong>输出模式：</strong>可直接输出或通过DMA连续输出</li>
+        <li><strong>应用场景：</strong>音频输出、波形生成、模拟控制信号</li>
+    </ul>
+
+    <div class="key-point">
+        <strong>ADC电压计算：</strong><br>
+        <code>V = ADC_value × V_ref / (2^resolution - 1)</code><br>
+        例如12位ADC，Vref=3.3V，ADC值=2048，则V = 2048 × 3.3 / 4095 ≈ 1.65V
+    </div>
+
+</div>
+
+<!--
+========================================
+  文件总结
+========================================
+  主题：ARM架构与GPIO
+  内容概要：
+    1. Cortex-M系列 - M0/M0+/M3/M4/M7，不同性能定位
+    2. GPIO - 推挽/开漏输出，浮空/上拉/下拉输入，模拟输入，复用功能
+    3. 中断 - NVIC嵌套中断，优先级配置，12周期响应
+    4. 定时器 - SysTick/基本/通用/高级定时器
+    5. ADC/DAC - 模数/数模转换，分辨率和采样率
+  重点知识：
+    - ARM存储映射：Code/SRAM/Peripheral/PPB
+    - GPIO八种工作模式及应用场景
+    - 优先级数值越小优先级越高
+    - ADC电压公式：V = ADC_value × V_ref / (2^resolution - 1)
+========================================
+-->
+</body>
+</html>

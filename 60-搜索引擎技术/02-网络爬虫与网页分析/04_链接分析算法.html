@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>链接分析算法</title>
+    <!-- 搜索引擎技术 - 链接分析算法 笔记 -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        .tag { display: inline-block; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>链接分析算法</h2>
+        <p><span class="tag">搜索引擎</span><span class="tag">PageRank</span><span class="tag">HITS</span></p>
+        <p>链接分析算法利用网页之间的超链接关系评估网页重要性，是搜索引擎排序的核心信号之一。</p>
+    </div>
+
+    <!-- ====== PageRank ====== -->
+    <div class="card">
+        <h2>PageRank 算法</h2>
+        <div class="code">
+PageRank：由Google创始人Larry Page和Sergey Brin于1998年提出
+核心思想：一个网页被越多重要网页链接，它就越重要。
+
+数学定义：
+PR(A) = (1-d)/N + d × Σ[PR(Ti)/C(Ti)]
+
+其中：
+- PR(A)：网页A的PageRank值
+- d：阻尼因子（Damping Factor），通常0.85
+- N：网页总数
+- Ti：所有链接到A的网页
+- C(Ti)：网页Ti的出链数量
+- (1-d)/N：随机跳转到任意网页的概率
+
+直观理解：
+┌─────────────────────────────────────────────┐
+│  一个随机上网者的行为模型：                    │
+│  以概率d：点击当前页面上的一个随机链接          │
+│  以概率(1-d)：随机跳转到互联网上的任意页面     │
+│  长期来看，被访问频率高的页面PageRank值高      │
+└─────────────────────────────────────────────┘
+
+幂迭代法 (Power Iteration)：
+PR向量初始化：PR⁰ = [1/N, 1/N, ..., 1/N]
+
+迭代公式：PR^(k+1) = M × PR^(k)
+其中M是转移矩阵
+
+示例（4个网页）：
+A → B, C
+B → C
+C → A
+D → C（D是悬挂节点，出链为0）
+
+转移矩阵M：
+      A    B    C    D
+A  [ 0    0    1    0  ]
+B  [ 1/2  0    0    0  ]
+C  [ 1/2  1    0    0  ]
+D  [ 0    0    0    0  ]
+
+处理悬挂节点：将D的出链设为均匀分布到所有节点
+      A    B    C    D
+D  [ 1/4  1/4  1/4  1/4 ]
+
+加入阻尼因子：
+PR = (1-d)/N × 1 + d × M × PR
+1是全1向量
+
+迭代过程：
+PR⁰ = [0.25, 0.25, 0.25, 0.25]
+PR¹ = M × PR⁰ = ...
+持续迭代直到收敛（||PR^(k+1) - PR^(k)|| < ε）
+
+收敛条件：
+- 通常10-50次迭代即可收敛
+- ε = 10^-6 是常用的收敛阈值
+- Google一次迭代处理数十亿网页
+        </div>
+    </div>
+
+    <!-- ====== PageRank实现 ====== -->
+    <div class="card">
+        <h2>PageRank 工程实现</h2>
+        <div class="code">
+大规模PageRank计算的挑战：
+- 数十亿网页 → 转移矩阵巨大（无法放入单机内存）
+- 需要分布式计算
+
+MapReduce实现：
+┌─────────────────────────────────────────────┐
+│  Map阶段：                                    │
+│  输入：(URL, [out_links], rank)              │
+│  输出：                                       │
+│    1. (URL, [out_links]) — 保留图结构        │
+│    2. 对每个out_link：(out_link, rank/k)     │
+│       k = out_links数量                      │
+│                                             │
+│  Reduce阶段：                                │
+│  输入：(URL, [contributions])               │
+│  计算：new_rank = (1-d)/N + d × Σcontributions│
+│  输出：(URL, new_rank, [out_links])         │
+└─────────────────────────────────────────────┘
+
+PageRank的稀疏性优化：
+- 转移矩阵M是稀疏矩阵（每个网页平均只有10个出链）
+- 只存储非零元素
+- 迭代时只计算有贡献的元素
+
+实际改进：
+1. Topic-Sensitive PageRank
+   - 不是均匀随机跳转，而是按主题分布跳转
+   - 计算多个PageRank向量（每个主题一个）
+   - 根据用户查询的类别选择对应的PageRank向量
+
+2. Personalized PageRank
+   - 随机跳转到用户收藏/历史页面集合
+   - 实现个性化排序
+   - 计算开销大，通常离线预计算
+
+3. TrustRank
+   - 从一组人工审核的可信页面出发
+   - 信任沿链接传播，距离垃圾页面越远越可信
+   - 用于检测垃圾网页
+
+Python实现（小规模）：
+import numpy as np
+
+def pagerank(adj_matrix, d=0.85, tol=1e-6, max_iter=100):
+    n = len(adj_matrix)
+    # 构建转移矩阵
+    M = np.zeros((n, n))
+    for i in range(n):
+        out_links = np.where(adj_matrix[i] > 0)[0]
+        if len(out_links) == 0:
+            M[:, i] = 1.0 / n  # 悬挂节点
+        else:
+            for j in out_links:
+                M[j, i] = 1.0 / len(out_links)
+    # 迭代
+    PR = np.ones(n) / n
+    teleport = np.ones(n) * (1 - d) / n
+    for _ in range(max_iter):
+        new_PR = teleport + d * M.dot(PR)
+        if np.linalg.norm(new_PR - PR) < tol:
+            break
+        PR = new_PR
+    return PR
+        </div>
+    </div>
+
+    <!-- ====== HITS ====== -->
+    <div class="card">
+        <h2>HITS 算法 (Hubs & Authorities)</h2>
+        <div class="code">
+HITS (Hyperlink-Induced Topic Search)：
+由Jon Kleinberg于1998年提出（与PageRank同期）
+
+核心思想：网页有两种角色
+┌─────────────────────────────────────────────┐
+│  Authority（权威页）：                        │
+│  包含高质量内容的页面                         │
+│  被很多Hub页面链接                           │
+│  例：学术论文、官方文档、Wikipedia词条        │
+│                                             │
+│  Hub（枢纽页）：                              │
+│  汇集了指向权威页的链接                       │
+│  本身内容不一定好，但链接质量高               │
+│  例：导航页面、目录页面、资源列表             │
+└─────────────────────────────────────────────┘
+
+HITS评分计算：
+对于每个网页p：
+  Authority(p) = Σ Hub(q)   (对所有链接到p的页面q)
+  Hub(p) = Σ Authority(q)   (对所有p链接到的页面q)
+
+迭代过程：
+1. 初始化：所有网页的Hub和Authority分数 = 1
+2. Authority更新：a = L^T × h （L是邻接矩阵）
+3. Hub更新：h = L × a
+4. 归一化：a /= ||a||，h /= ||h||
+5. 重复2-4直到收敛
+
+示例：
+图结构：
+  D1 → D2, D3
+  D2 → D3
+  D3 → D1
+
+迭代过程：
+初始：h=[1,1,1], a=[1,1,1]
+
+第1轮Authority更新：
+  a(D1) = h(D3) = 1
+  a(D2) = h(D1) = 1
+  a(D3) = h(D1) + h(D2) = 2
+  a = [1, 1, 2] → 归一化 → [0.41, 0.41, 0.82]
+
+第1轮Hub更新：
+  h(D1) = a(D2) + a(D3) = 1 + 2 = 3
+  h(D2) = a(D3) = 2
+  h(D3) = a(D1) = 1
+  h = [3, 2, 1] → 归一化 → [0.80, 0.53, 0.27]
+
+持续迭代直到收敛
+
+HITS vs PageRank：
+┌──────────────┬──────────────┬──────────────┐
+│ 特性          │ PageRank     │ HITS         │
+├──────────────┼──────────────┼──────────────┤
+│ 计算范围      │ 全网离线     │ 查询时在线   │
+│ 评分类型      │ 单一重要性   │ Hub+Authority│
+│ 是否与查询相关│ 否           │ 是           │
+│ 计算开销      │ 大（全网）   │ 小（子图）   │
+│ 实用性        │ 高（Google） │ 低（主题漂移）│
+│ 主题敏感性    │ 弱           │ 强（子图）   │
+└──────────────┴──────────────┴──────────────┘
+
+HITS的问题：
+- 主题漂移 (Topic Drift)：子图中可能包含不相关但链接紧密的网页
+- 容易被作弊：创建链接农场人为提高Hub/Authority分数
+- 在线计算：每次查询都要构建子图并迭代
+        </div>
+    </div>
+
+    <!-- ====== SALSA ====== -->
+    <div class="card">
+        <h2>SALSA 算法</h2>
+        <div class="code">
+SALSA (Stochastic Approach for Link-Structure Analysis)：
+PageRank和HITS的折中方案，由Lempel和Moran在2000年提出
+
+核心思想：
+- 像HITS一样区分Hub和Authority
+- 像PageRank一样使用随机游走
+- 在二部图上进行随机游走
+
+二部图构建：
+原始图 → 拆分为两个图
+┌─────────────────────────────────────────────┐
+│  Hub图：只保留出边关系                       │
+│  p → q (p有链接到q)                         │
+│  转换为：p的出边邻居之间在Hub图中有边        │
+│                                             │
+│  Authority图：只保留入边关系                 │
+│  q → p (p有链接到q)                         │
+│  转换为：q的入边邻居之间在Authority图中有边  │
+└─────────────────────────────────────────────┘
+
+随机游走过程：
+在Hub图上的随机游走 → 计算Hub分数
+在Authority图上的随机游走 → 计算Authority分数
+
+示例：
+原始图：
+  A → B, C
+  D → B, E
+  F → C, E
+
+Hub二部图（通过出边相连）：
+  B的入边邻居：A, D
+  C的入边邻居：A, F
+  E的入边邻居：D, F
+
+Authority图（入边邻居之间有边）：
+  A-D（都链接到B）
+  A-F（都链接到C）
+  D-F（都链接到E）
+
+SALSA vs HITS：
+┌──────────────┬──────────────┬──────────────┐
+│ 特性          │ HITS         │ SALSA        │
+├──────────────┼──────────────┼──────────────┤
+│ 图结构        │ 原始图       │ 二部图       │
+│ 稳定性        │ 不稳定       │ 更稳定       │
+│ 主题漂移      │ 严重         │ 较轻         │
+│ 抗作弊        │ 弱           │ 较强         │
+│ 计算复杂度    │ 低           │ 中等         │
+└──────────────┴──────────────┴──────────────┘
+        </div>
+    </div>
+
+    <!-- ====== Topic-Sensitive PageRank ====== -->
+    <div class="card">
+        <h2>Topic-Sensitive PageRank</h2>
+        <div class="code">
+Topic-Sensitive PageRank (TSPR)：
+在标准PageRank基础上引入主题信息
+
+核心思想：
+- 不是均匀随机跳转，而是跳转到与主题相关的页面
+- 预计算多个PageRank向量（每个主题一个）
+- 根据查询的主题选择对应的PageRank向量
+
+实现步骤：
+┌─────────────────────────────────────────────┐
+│  1. 定义一组主题（如ODP的16个顶级类别）      │
+│     Computers, Arts, Business, Science...   │
+│                                             │
+│  2. 对每个主题t：                            │
+│     a. 找到属于该主题的种子页面集合 S_t      │
+│     b. 随机跳转只跳到 S_t 中的页面           │
+│     c. 计算PR_t = PageRank(S_t)             │
+│                                             │
+│  3. 对于查询q：                              │
+│     a. 分析查询的主题分布 [w1, w2, ..., wk]  │
+│     b. 最终PR = w1×PR_1 + w2×PR_2 + ...    │
+│     c. 用这个混合PR排序搜索结果              │
+└─────────────────────────────────────────────┘
+
+示例：
+查询："Python机器学习"
+主题分析：
+  Computers: 0.6
+  Science: 0.3
+  Education: 0.1
+
+最终PR = 0.6 × PR_Computers + 0.3 × PR_Science + 0.1 × PR_Education
+
+优点：
+- 结果更符合查询的主题
+- 同一页面在不同主题下有不同的PR值
+- 减少结果中的不相关内容
+
+实际应用：
+- Google使用类似的多信号排序
+- 现代搜索引擎已将PageRank作为数百个信号之一
+- 学术搜索引擎(CiteSeer)使用引用分析代替链接分析
+
+链接分析的现代演变：
+┌─────────────────────────────────────────────┐
+│  早期（1998-2005）：                         │
+│  PageRank是核心排序信号                      │
+│                                             │
+│  中期（2005-2015）：                         │
+│  PageRank + 内容质量 + 用户行为信号          │
+│  PageRank权重逐渐降低                        │
+│                                             │
+│  现代（2015-至今）：                         │
+│  深度学习端到端排序                          │
+│  PageRank作为特征之一输入机器学习模型        │
+│  BERT/Transformer理解查询和文档语义          │
+│  链接信号仍然重要但不再是决定性的            │
+└─────────────────────────────────────────────┘
+        </div>
+        <div class="note">PageRank是搜索引擎历史上最重要的算法之一，开创了链接分析时代。现代搜索引擎将其作为机器学习排序模型的一个特征，而非唯一的排序依据。</div>
+    </div>
+
+    <!-- 总结：链接分析算法利用网页间的链接关系评估重要性。PageRank通过随机游走模型计算全局重要性，
+    是Google的核心算法。HITS区分Hub和Authority两种角色，但存在主题漂移问题。
+    SALSA在二部图上随机游走，结合了两者的优点。Topic-Sensitive PageRank引入主题信息，
+    根据查询主题选择对应的排序信号。现代搜索引擎将链接分析作为机器学习排序模型的特征之一。 -->
+</body>
+</html>

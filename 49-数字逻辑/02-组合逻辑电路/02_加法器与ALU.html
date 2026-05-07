@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>加法器与ALU</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f5f7fa; color: #333; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 15px; margin-bottom: 30px; }
+        h2 { color: #2980b9; margin: 25px 0 10px; border-left: 4px solid #3498db; padding-left: 12px; }
+        h3 { color: #8e44ad; margin: 15px 0 8px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: center; }
+        th { background: #3498db; color: #fff; }
+        tr:nth-child(even) { background: #ecf0f1; }
+        .formula { background: #f9f9f9; border-left: 4px solid #e67e22; padding: 10px 15px; margin: 10px 0; font-family: 'Consolas', monospace; }
+        .note { background: #fef9e7; border-left: 4px solid #f1c40f; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        .important { background: #fdedec; border-left: 4px solid #e74c3c; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        ul, ol { margin-left: 25px; margin-bottom: 10px; }
+        li { margin-bottom: 5px; }
+        .block-diagram { text-align: center; margin: 15px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; font-family: monospace; font-size: 1.1em; line-height: 2; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>加法器与ALU</h1>
+
+        <!-- 半加器 -->
+        <div class="card">
+            <h2>一、半加器（Half Adder）</h2>
+            <p>半加器是最简单的加法电路，将两个一位二进制数相加，产生和（Sum）与进位（Carry）。</p>
+
+            <h3>1.1 真值表</h3>
+            <table>
+                <tr><th>A</th><th>B</th><th>S（和）</th><th>C（进位）</th></tr>
+                <tr><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+                <tr><td>0</td><td>1</td><td>1</td><td>0</td></tr>
+                <tr><td>1</td><td>0</td><td>1</td><td>0</td></tr>
+                <tr><td>1</td><td>1</td><td>0</td><td>1</td></tr>
+            </table>
+
+            <h3>1.2 逻辑表达式</h3>
+            <div class="formula">
+                S = A ⊕ B（异或）<br>
+                C = A · B（与）
+            </div>
+
+            <div class="note">
+                <strong>局限性：</strong>半加器无法处理来自低位的进位输入，只能用于最低位的加法。
+            </div>
+        </div>
+
+        <!-- 全加器 -->
+        <div class="card">
+            <h2>二、全加器（Full Adder）</h2>
+            <p>全加器能处理三个输入：两个加数 A、B 和来自低位的进位 C<sub>in</sub>。</p>
+
+            <h3>2.1 真值表</h3>
+            <table>
+                <tr><th>A</th><th>B</th><th>C<sub>in</sub></th><th>S（和）</th><th>C<sub>out</sub>（进位）</th></tr>
+                <tr><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+                <tr><td>0</td><td>0</td><td>1</td><td>1</td><td>0</td></tr>
+                <tr><td>0</td><td>1</td><td>0</td><td>1</td><td>0</td></tr>
+                <tr><td>0</td><td>1</td><td>1</td><td>0</td><td>1</td></tr>
+                <tr><td>1</td><td>0</td><td>0</td><td>1</td><td>0</td></tr>
+                <tr><td>1</td><td>0</td><td>1</td><td>0</td><td>1</td></tr>
+                <tr><td>1</td><td>1</td><td>0</td><td>0</td><td>1</td></tr>
+                <tr><td>1</td><td>1</td><td>1</td><td>1</td><td>1</td></tr>
+            </table>
+
+            <h3>2.2 逻辑表达式</h3>
+            <div class="formula">
+                S = A ⊕ B ⊕ C<sub>in</sub><br>
+                C<sub>out</sub> = A·B + (A⊕B)·C<sub>in</sub><br>
+                也可写为：C<sub>out</sub> = A·B + A·C<sub>in</sub> + B·C<sub>in</sub>
+            </div>
+
+            <h3>2.3 全加器的实现</h3>
+            <ul>
+                <li>用两个半加器和一个或门实现：S = HA1.S ⊕ C<sub>in</sub>，C<sub>out</sub> = HA1.C + HA2.C</li>
+                <li>用与非门实现（考试可能涉及）</li>
+            </ul>
+        </div>
+
+        <!-- 行波进位加法器 -->
+        <div class="card">
+            <h2>三、行波进位加法器（Ripple Carry Adder）</h2>
+            <p>将多个全加器级联，低位的C<sub>out</sub>接高位的C<sub>in</sub>，实现多位加法。</p>
+
+            <h3>3.1 4位行波进位加法器结构</h3>
+            <div class="block-diagram">
+                A₃B₃ ── [FA₃] ── S₃<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↑ C₃<br>
+                A₂B₂ ── [FA₂] ── S₂<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↑ C₂<br>
+                A₁B₁ ── [FA₁] ── S₁<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↑ C₁<br>
+                A₀B₀ ── [FA₀] ── S₀<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↑ C₀=0
+            </div>
+
+            <h3>3.2 特点分析</h3>
+            <ul>
+                <li><strong>优点</strong>：结构简单，易于实现</li>
+                <li><strong>缺点</strong>：进位信号逐级传递，速度慢</li>
+                <li><strong>延迟</strong>：n位加法器需要 n × t<sub>FA</sub> 的时间</li>
+            </ul>
+
+            <div class="important">
+                <strong>关键问题：</strong>进位传播延迟是限制加法器速度的主要因素。对于32位加法器，最坏情况进位需要传播32级全加器的延迟。
+            </div>
+        </div>
+
+        <!-- 超前进位加法器 -->
+        <div class="card">
+            <h2>四、超前进位加法器（Carry Lookahead Adder / CLA）</h2>
+            <p>通过提前计算所有进位信号，消除行波进位的串行延迟。</p>
+
+            <h3>4.1 基本思想</h3>
+            <p>定义两个辅助变量：</p>
+            <ul>
+                <li><strong>生成（Generate）</strong>：G<sub>i</sub> = A<sub>i</sub> · B<sub>i</sub>（本位能自己产生进位）</li>
+                <li><strong>传播（Propagate）</strong>：P<sub>i</sub> = A<sub>i</sub> ⊕ B<sub>i</sub>（本位能传播来自低位的进位）</li>
+            </ul>
+
+            <h3>4.2 超前进位公式</h3>
+            <div class="formula">
+                C₀ = 输入进位（通常为0）<br>
+                C₁ = G₀ + P₀·C₀<br>
+                C₂ = G₁ + P₁·G₀ + P₁·P₀·C₀<br>
+                C₃ = G₂ + P₂·G₁ + P₂·P₁·G₀ + P₂·P₁·P₀·C₀<br>
+                C₄ = G₃ + P₃·G₂ + P₃·P₂·G₁ + P₃·P₂·P₁·G₀ + P₃·P₂·P₁·P₀·C₀
+            </div>
+
+            <h3>4.3 特点</h3>
+            <ul>
+                <li><strong>优点</strong>：所有进位并行计算，速度快</li>
+                <li><strong>缺点</strong>：门数量和连线随位数指数增长</li>
+                <li><strong>实际应用</strong>：通常用分组CLA（如4位一组），在速度和复杂度之间折中</li>
+            </ul>
+        </div>
+
+        <!-- ALU -->
+        <div class="card">
+            <h2>五、算术逻辑单元（ALU）</h2>
+            <p>ALU是CPU的核心部件，能执行算术运算（加、减）和逻辑运算（与、或、非、异或）。</p>
+
+            <h3>5.1 ALU的基本结构</h3>
+            <div class="block-diagram">
+                A(n位) ──┐<br>
+                B(n位) ──┤ ALU ├── F(n位)<br>
+                操作码 ──┘&nbsp;&nbsp;&nbsp;&nbsp;├── 标志位<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└── (ZF,CF,OF,SF)
+            </div>
+
+            <h3>5.2 74181 ALU</h3>
+            <p>经典的4位ALU芯片，能执行16种算术和16种逻辑运算。</p>
+            <table>
+                <tr><th>S₃S₂S₁S₀</th><th>M=1（逻辑）</th><th>M=0（算术）</th></tr>
+                <tr><td>0000</td><td>F = A̅</td><td>F = A</td></tr>
+                <tr><td>0001</td><td>F = A̅+B̅ = (AB)̅</td><td>F = A+B</td></tr>
+                <tr><td>0010</td><td>F = A̅B</td><td>F = A+B̅</td></tr>
+                <tr><td>0011</td><td>F = 0</td><td>F = 减1（全1）</td></tr>
+                <tr><td>0110</td><td>F = A⊕B</td><td>F = A-B</td></tr>
+                <tr><td>1001</td><td>F = A⊙B</td><td>F = A+B+C<sub>in</sub></td></tr>
+                <tr><td>1100</td><td>F = A</td><td>F = A加A</td></tr>
+                <tr><td>1111</td><td>F = 1</td><td>F = A加A加1</td></tr>
+            </table>
+
+            <h3>5.3 标志位（Flags）</h3>
+            <table>
+                <tr><th>标志位</th><th>名称</th><th>含义</th></tr>
+                <tr><td>ZF</td><td>零标志</td><td>结果为0时置1</td></tr>
+                <tr><td>CF</td><td>进位标志</td><td>无符号运算溢出时置1</td></tr>
+                <tr><td>OF</td><td>溢出标志</td><td>有符号运算溢出时置1</td></tr>
+                <tr><td>SF</td><td>符号标志</td><td>结果为负时置1（等于最高位）</td></tr>
+            </table>
+        </div>
+
+        <!-- 减法实现 -->
+        <div class="card">
+            <h2>六、减法的实现</h2>
+            <p>利用补码运算，减法可以转换为加法：A - B = A + (-B) = A + B̅ + 1</p>
+
+            <h3>6.1 加减法统一电路</h3>
+            <ul>
+                <li>加一个控制信号 M：M=0做加法，M=1做减法</li>
+                <li>减法时：B通过异或门（B⊕1=B̅），进位置1</li>
+                <li>加法时：B直通（B⊕0=B），进位置0</li>
+            </ul>
+
+            <div class="note">
+                <strong>溢出判断：</strong>有符号数溢出 = C<sub>n</sub> ⊕ C<sub>n-1</sub>（最高位进位与次高位进位异或）
+            </div>
+        </div>
+
+        <!-- 总结 -->
+        <div class="card">
+            <h2>七、知识要点总结</h2>
+            <ol>
+                <li>半加器：S=A⊕B，C=AB（不考虑进位输入）</li>
+                <li>全加器：S=A⊕B⊕C<sub>in</sub>，C<sub>out</sub>=AB+(A⊕B)C<sub>in</sub></li>
+                <li>行波进位加法器：简单但慢，延迟与位数成正比</li>
+                <li>超前进位加法器：快但复杂，利用G和P并行计算进位</li>
+                <li>ALU是CPU核心，执行算术和逻辑运算</li>
+                <li>减法通过补码转化为加法实现</li>
+            </ol>
+        </div>
+
+        <!--
+            ========================================
+            文件总结：加法器与ALU
+            ========================================
+            本文件涵盖了数字电路中的算术运算部件：
+            1. 半加器和全加器的真值表与表达式
+            2. 行波进位加法器的结构与延迟分析
+            3. 超前进位加法器（CLA）的原理与公式
+            4. ALU的结构、74181芯片、标志位
+            5. 减法的补码实现与溢出判断
+
+            重点：全加器表达式、CLA原理、ALU标志位
+            考点：进位传播延迟计算、溢出判断
+            ========================================
+        -->
+    </div>
+</body>
+</html>

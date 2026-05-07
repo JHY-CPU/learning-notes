@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ANN与向量数据库</title>
+    <!-- 搜索引擎技术 - ANN与向量数据库 笔记 -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        .tag { display: inline-block; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>ANN与向量数据库</h2>
+        <p><span class="tag">向量检索</span><span class="tag">ANN</span><span class="tag">HNSW</span></p>
+        <p>近似最近邻搜索(ANN)是在高维空间中快速找到最相似向量的核心技术。</p>
+    </div>
+
+    <!-- ====== ANN问题定义 ====== -->
+    <div class="card">
+        <h2>近似最近邻 (ANN) 问题</h2>
+        <div class="code">
+精确最近邻 vs 近似最近邻：
+
+精确最近邻 (Exact NN)：
+- 遍历所有向量，计算距离
+- 时间复杂度：O(n×d)，n为向量数，d为维度
+- 百万级数据可能需要秒级响应
+- 不适合大规模实时检索
+
+近似最近邻 (ANN)：
+- 牺牲少量精度换取大幅性能提升
+- 查询时间：O(log n) 或 O(1)
+- 召回率通常 >95%
+- 适合百万到数十亿级向量
+
+距离度量：
+- 欧几里得距离：d = sqrt(Σ(ai - bi)²)
+- 余弦相似度：cos(a,b) = (a·b)/(|a|×|b|)
+- 内积：ip = a·b（用于归一化向量时等价于余弦）
+
+应用场景：
+- 语义搜索：文本嵌入向量检索
+- 图像搜索：以图搜图
+- 推荐系统：相似物品/用户
+- RAG：检索增强生成
+        </div>
+    </div>
+
+    <!-- ====== HNSW ====== -->
+    <div class="card">
+        <h2>HNSW (分层可导航小世界图)</h2>
+        <div class="code">
+HNSW 是目前最流行的ANN算法之一
+
+核心思想：构建多层跳表式的近邻图
+
+结构示意：
+Layer 3:  ●─────────────────────────────●
+Layer 2:  ●─────────●───────────●───────●
+Layer 1:  ●────●────●─────●─────●───●───●
+Layer 0:  ●──●─●──●─●──●──●──●──●──●──●──●
+           (底层包含所有节点)
+
+搜索过程：
+1. 从最高层的入口点开始
+2. 在当前层找到最近邻
+3. 下降到下一层
+4. 重复直到最底层
+5. 在最底层精细化搜索，返回Top-K
+
+参数：
+- M：每层每个节点的最大邻居数（通常16-64）
+- efConstruction：构建时的搜索范围（越大越精确，构建越慢）
+- efSearch：查询时的搜索范围（越大召回率越高，查询越慢）
+
+优势：
+- 查询时间 O(log n)
+- 支持动态增删节点
+- 高召回率（>99%）
+- 对高维数据效果好
+
+劣势：
+- 内存占用大（图结构在内存中）
+- 构建时间较长
+        </div>
+    </div>
+
+    <!-- ====== IVF ====== -->
+    <div class="card">
+        <h2>IVF (倒排文件索引)</h2>
+        <div class="code">
+IVF：基于聚类的ANN方法
+
+核心思想：
+1. 用k-means将所有向量聚类为nlist个簇
+2. 每个簇有一个中心点和一个倒排列表
+3. 查询时只搜索最近的nprobe个簇
+
+构建流程：
+┌─────────────────────────────────────────────┐
+│  向量集合                                    │
+│  v1, v2, v3, ..., vn                        │
+│         ↓ K-Means聚类                        │
+│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐      │
+│  │簇1   │ │簇2   │ │簇3   │ │簇4   │      │
+│  │c1    │ │c2    │ │c3    │ │c4    │      │
+│  │v1,v5 │ │v2,v7 │ │v3,v6 │ │v4,v8 │      │
+│  └──────┘ └──────┘ └──────┘ └──────┘      │
+└─────────────────────────────────────────────┘
+
+查询流程：
+1. 计算查询向量与所有簇中心的距离
+2. 选择最近的 nprobe 个簇
+3. 在选中簇的向量中进行精确搜索
+4. 返回 Top-K 结果
+
+IVF-PQ (乘积量化)：
+- IVF：粗粒度筛选（减少搜索范围）
+- PQ：细粒度压缩（减少内存和距离计算量）
+- 将高维向量分为m段，每段独立量化
+- 适用于超大规模（亿级）向量检索
+
+参数调优：
+- nlist：簇数量（通常sqrt(n)）
+- nprobe：搜索簇数（越大召回率越高，速度越慢）
+        </div>
+    </div>
+
+    <!-- ====== 向量数据库 ====== -->
+    <div class="card">
+        <h2>向量数据库</h2>
+        <div class="code">
+主流向量数据库对比：
+
+┌────────────┬──────────┬──────────┬────────────┐
+│ 数据库      │ 索引类型  │ 部署方式  │ 特点        │
+├────────────┼──────────┼──────────┼────────────┤
+│ Milvus     │ HNSW/IVF │ 自托管   │ 功能丰富     │
+│            │ DiskANN  │ Zilliz   │ 亿级规模     │
+├────────────┼──────────┼──────────┼────────────┤
+│ Pinecone   │ 专有索引  │ 云托管   │ 全托管易用   │
+│            │          │          │ Serverless  │
+├────────────┼──────────┼──────────┼────────────┤
+│ Qdrant     │ HNSW     │ 自托管   │ Rust高性能   │
+│            │          │ 云托管   │ 过滤能力强   │
+├────────────┼──────────┼──────────┼────────────┤
+│ Weaviate   │ HNSW     │ 自托管   │ 支持混合搜索│
+│            │          │ 云托管   │ GraphQL API │
+├────────────┼──────────┼──────────┼────────────┤
+│ Chroma     │ HNSW     │ 嵌入式   │ 轻量级       │
+│            │          │ 自托管   │ 适合原型     │
+├────────────┼──────────┼──────────┼────────────┤
+│ pgvector   │ HNSW/IVF │ PostgreSQL│ 集成SQL     │
+│            │          │ 扩展     │ 简单场景     │
+└────────────┴──────────┴──────────┴────────────┘
+
+向量数据库核心能力：
+- 向量索引：HNSW/IVF/DiskANN等
+- 混合检索：向量 + 标量过滤
+- CRUD操作：增删改查
+- 多租户：数据隔离
+- 持久化：数据持久存储
+- 分布式：水平扩展
+        </div>
+        <div class="note">选择建议：小规模原型用Chroma/pgvector，生产环境用Milvus/Qdrant，不想运维用Pinecone。</div>
+    </div>
+
+    <!-- 总结：ANN通过近似算法实现高维向量的快速检索，HNSW和IVF是最核心的两种算法。
+    向量数据库将ANN索引封装为完整的产品，支持混合检索、持久化、分布式扩展等功能，
+    是现代AI应用（RAG、推荐、语义搜索）的基础设施。 -->
+</body>
+</html>

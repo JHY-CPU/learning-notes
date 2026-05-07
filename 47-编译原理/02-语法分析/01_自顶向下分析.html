@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>自顶向下分析 - 编译原理笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", "SimSun", sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; border-bottom: 3px solid #2b6cb0; padding-bottom: 12px; margin-bottom: 30px; }
+        h2 { color: #2c5282; margin: 25px 0 12px; padding-left: 10px; border-left: 4px solid #2b6cb0; }
+        h3 { color: #2d3748; margin: 18px 0 8px; }
+        p, li { margin-bottom: 8px; }
+        ul, ol { padding-left: 25px; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 10px 14px; text-align: center; }
+        th { background: #2b6cb0; color: #fff; }
+        tr:nth-child(even) { background: #edf2f7; }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: "Consolas", monospace; color: #c53030; }
+        .diagram { background: #ebf8ff; border: 2px solid #3182ce; border-radius: 8px; padding: 20px; margin: 15px 0; text-align: center; font-family: monospace; white-space: pre; line-height: 1.6; }
+        .highlight { background: #fefcbf; border-left: 4px solid #d69e2e; padding: 12px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+        .example { background: #f0fff4; border: 1px solid #48bb78; border-radius: 6px; padding: 14px; margin: 12px 0; }
+        .tag { display: inline-block; background: #2b6cb0; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 0.85em; margin: 2px; }
+        .code-block { background: #1a202c; color: #e2e8f0; padding: 16px; border-radius: 6px; font-family: "Consolas", monospace; font-size: 0.9em; overflow-x: auto; margin: 12px 0; white-space: pre; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<!-- 自顶向下分析 -->
+<!-- 本页面介绍自顶向下语法分析方法，包括递归下降和LL(1)分析 -->
+<h1>01 - 自顶向下语法分析</h1>
+
+<!-- ====== 第一部分：语法分析概述 ====== -->
+<h2>一、语法分析概述</h2>
+<div class="card">
+    <p>语法分析（Parsing）是编译器的第二阶段，其任务是根据语言的<strong>上下文无关文法（CFG）</strong>，检查记号流是否构成合法的语法结构，并构建<strong>语法树</strong>。</p>
+
+    <h3>1.1 两种分析策略</h3>
+    <table>
+        <tr><th>策略</th><th>方向</th><th>代表方法</th><th>能力</th></tr>
+        <tr><td>自顶向下（Top-Down）</td><td>从根到叶</td><td>递归下降、LL(1)</td><td>LL文法（较受限）</td></tr>
+        <tr><td>自底向上（Bottom-Up）</td><td>从叶到根</td><td>LR、SLR、LALR</td><td>LR文法（更强大）</td></tr>
+    </table>
+
+    <h3>1.2 上下文无关文法（CFG）四元组</h3>
+    <p><code>G = (V<sub>T</sub>, V<sub>N</sub>, P, S)</code></p>
+    <ul>
+        <li><code>V<sub>T</sub></code> — 终结符集合（Token）</li>
+        <li><code>V<sub>N</sub></code> — 非终结符集合（语法变量）</li>
+        <li><code>P</code> — 产生式集合：<code>A &rarr; &alpha;</code></li>
+        <li><code>S</code> — 开始符号</li>
+    </ul>
+</div>
+
+<!-- ====== 第二部分：消除左递归 ====== -->
+<h2>二、消除左递归</h2>
+<div class="card">
+    <p>自顶向下分析无法处理<strong>直接左递归</strong>，必须先消除。</p>
+
+    <h3>2.1 直接左递归的消除</h3>
+    <p>对产生式 <code>A &rarr; A&alpha; | &beta;</code>（&beta; 不以 A 开头），转换为：</p>
+    <div class="example">
+        <p><code>A &rarr; &beta;A'</code></p>
+        <p><code>A' &rarr; &alpha;A' | &epsilon;</code></p>
+    </div>
+
+    <h3>2.2 示例</h3>
+    <div class="example">
+        <p>原文法：<code>E &rarr; E+T | T</code></p>
+        <p>消除后：</p>
+        <p><code>E &rarr; TE'</code></p>
+        <p><code>E' &rarr; +TE' | &epsilon;</code></p>
+    </div>
+
+    <h3>2.3 间接左递归的消除</h3>
+    <ol>
+        <li>对非终结符按任意顺序排列：A<sub>1</sub>, A<sub>2</sub>, ..., A<sub>n</sub></li>
+        <li>对每个 i，将 A<sub>i</sub> &rarr; A<sub>j</sub>&gamma;（j&lt;i）替换为 A<sub>i</sub> 的展开式</li>
+        <li>消除直接左递归</li>
+    </ol>
+</div>
+
+<!-- ====== 第三部分：提取左因子 ====== -->
+<h2>三、提取左因子</h2>
+<div class="card">
+    <p>当一个非终结符的多个产生式有公共前缀时，自顶向下分析需要额外的超前搜索符号。通过<strong>提取左因子</strong>消除公共前缀。</p>
+
+    <div class="example">
+        <p>原文法：<code>A &rarr; &alpha;&beta;<sub>1</sub> | &alpha;&beta;<sub>2</sub> | &gamma;</code></p>
+        <p>提取后：</p>
+        <p><code>A &rarr; &alpha;A' | &gamma;</code></p>
+        <p><code>A' &rarr; &beta;<sub>1</sub> | &beta;<sub>2</sub></code></p>
+    </div>
+</div>
+
+<!-- ====== 第四部分：FIRST和FOLLOW ====== -->
+<h2>四、FIRST 集与 FOLLOW 集</h2>
+<div class="card">
+    <h3>4.1 FIRST 集</h3>
+    <p><code>FIRST(&alpha;)</code> = 从 &alpha; 推导出的所有串的<strong>首终结符</strong>集合。若 &alpha; &rArr;* &epsilon;，则 &epsilon; &isin; FIRST(&alpha;)。</p>
+
+    <h4>计算规则：</h4>
+    <ol>
+        <li>若 X 是终结符，FIRST(X) = {X}</li>
+        <li>若 X &rarr; &epsilon; 是产生式，将 &epsilon; 加入 FIRST(X)</li>
+        <li>若 X &rarr; Y<sub>1</sub>Y<sub>2</sub>...Y<sub>k</sub>：
+            <ul>
+                <li>将 FIRST(Y<sub>1</sub>) - {&epsilon;} 加入 FIRST(X)</li>
+                <li>若 &epsilon; &isin; FIRST(Y<sub>1</sub>)，继续加入 FIRST(Y<sub>2</sub>)...</li>
+                <li>若所有 Y<sub>i</sub> 都可推出 &epsilon;，将 &epsilon; 加入 FIRST(X)</li>
+            </ul>
+        </li>
+    </ol>
+
+    <h3>4.2 FOLLOW 集</h3>
+    <p><code>FOLLOW(A)</code> = 在某些句型中紧跟在非终结符 A <strong>右边</strong>的终结符集合。若 A 可以是某句型的最右符号，则 <code>$</code>（输入结束符）&isin; FOLLOW(A)。</p>
+
+    <h4>计算规则：</h4>
+    <ol>
+        <li>将 <code>$</code> 加入 FOLLOW(S)（S为开始符号）</li>
+        <li>若有产生式 <code>A &rarr; &alpha;B&beta;</code>，将 FIRST(&beta;) - {&epsilon;} 加入 FOLLOW(B)</li>
+        <li>若有产生式 <code>A &rarr; &alpha;B</code> 或 <code>A &rarr; &alpha;B&beta;</code> 且 &epsilon; &isin; FIRST(&beta;)，将 FOLLOW(A) 加入 FOLLOW(B)</li>
+    </ol>
+
+    <h3>4.3 计算示例</h3>
+    <div class="example">
+        <p>文法：</p>
+        <p><code>E  &rarr; TE'</code></p>
+        <p><code>E' &rarr; +TE' | &epsilon;</code></p>
+        <p><code>T  &rarr; FT'</code></p>
+        <p><code>T' &rarr; *FT' | &epsilon;</code></p>
+        <p><code>F  &rarr; (E) | id</code></p>
+        <br/>
+        <p>FIRST集：FIRST(E) = FIRST(T) = FIRST(F) = {(, id}</p>
+        <p>FOLLOW集：FOLLOW(E) = FOLLOW(E') = {), $}，FOLLOW(T) = FOLLOW(T') = {+, ), $}</p>
+    </div>
+</div>
+
+<!-- ====== 第五部分：LL(1)分析 ====== -->
+<h2>五、LL(1) 分析</h2>
+<div class="card">
+    <h3>5.1 LL(1) 文法的条件</h3>
+    <p>文法 G 是 LL(1) 当且仅当对任意两个产生式 <code>A &rarr; &alpha; | &beta;</code>：</p>
+    <ol>
+        <li>FIRST(&alpha;) &cap; FIRST(&beta;) = &empty;</li>
+        <li>若 &epsilon; &isin; FIRST(&beta;)，则 FIRST(&alpha;) &cap; FOLLOW(A) = &empty;</li>
+    </ol>
+
+    <h3>5.2 LL(1) 分析表构造</h3>
+    <p>对每个产生式 <code>A &rarr; &alpha;</code>：</p>
+    <ol>
+        <li>对每个 a &isin; FIRST(&alpha;)，在 M[A, a] 中填入 <code>A &rarr; &alpha;</code></li>
+        <li>若 &epsilon; &isin; FIRST(&alpha;)，对每个 b &isin; FOLLOW(A)，在 M[A, b] 中填入 <code>A &rarr; &alpha;</code></li>
+    </ol>
+
+    <h3>5.3 LL(1) 分析表示例</h3>
+    <table>
+        <tr><th>非终结符</th><th>id</th><th>+</th><th>*</th><th>(</th><th>)</th><th>$</th></tr>
+        <tr><td><strong>E</strong></td><td>E&rarr;TE'</td><td></td><td></td><td>E&rarr;TE'</td><td></td><td></td></tr>
+        <tr><td><strong>E'</strong></td><td></td><td>E'&rarr;+TE'</td><td></td><td></td><td>E'&rarr;&epsilon;</td><td>E'&rarr;&epsilon;</td></tr>
+        <tr><td><strong>T</strong></td><td>T&rarr;FT'</td><td></td><td></td><td>T&rarr;FT'</td><td></td><td></td></tr>
+        <tr><td><strong>T'</strong></td><td></td><td>T'&rarr;&epsilon;</td><td>T'&rarr;*FT'</td><td></td><td>T'&rarr;&epsilon;</td><td>T'&rarr;&epsilon;</td></tr>
+        <tr><td><strong>F</strong></td><td>F&rarr;id</td><td></td><td></td><td>F&rarr;(E)</td><td></td><td></td></tr>
+    </table>
+</div>
+
+<!-- ====== 第六部分：递归下降分析 ====== -->
+<h2>六、递归下降分析（Recursive Descent）</h2>
+<div class="card">
+    <h3>6.1 原理</h3>
+    <p>为每个非终结符编写一个<strong>递归函数</strong>，函数体按照产生式右部的顺序调用对应函数或匹配终结符。</p>
+
+    <h3>6.2 递归下降分析器示例</h3>
+    <div class="code-block">void E()  { T(); E_prime(); }
+void E_prime() {
+    if (lookahead == '+') {
+        match('+'); T(); E_prime();
+    }
+    // else: ε 产生式，什么都不做
+}
+void T()  { F(); T_prime(); }
+void T_prime() {
+    if (lookahead == '*') {
+        match('*'); F(); T_prime();
+    }
+}
+void F() {
+    if (lookahead == 'id') {
+        match('id');
+    } else if (lookahead == '(') {
+        match('('); E(); match(')');
+    } else {
+        error("语法错误");
+    }
+}</div>
+
+    <h3>6.3 预测分析器（Predictive Parser）</h3>
+    <p>使用<strong>显式栈</strong>代替递归调用的 LL(1) 分析器：</p>
+    <div class="diagram">  输入: id + id * id $
+
+  ┌──────────────────────────────────────┐
+  │  分析栈              输入     动作    │
+  ├──────────────────────────────────────┤
+  │  $E                 id+id*id$  E→TE' │
+  │  $E'T               id+id*id$  T→FT' │
+  │  $E'T'F             id+id*id$  F→id  │
+  │  $E'T'id            id+id*id$  匹配id│
+  │  $E'T'              +id*id$    T'→ε  │
+  │  $E'                +id*id$    E'→+TE│
+  │  $E'T+              +id*id$    匹配+ │
+  │  $E'T               id*id$     ...   │
+  └──────────────────────────────────────┘</div>
+</div>
+
+</div>
+<!-- ====== 总结 ====== -->
+<!--
+本笔记总结：
+1. 自顶向下分析从开始符号出发，试图推导出输入串，构建从根到叶的语法树
+2. 必须先消除左递归（直接和间接），提取左因子消除公共前缀
+3. FIRST集表示句型的首终结符，FOLLOW集表示紧跟在非终结符后的终结符
+4. LL(1)文法要求产生式选择唯一确定，通过分析表实现O(n)分析
+5. 递归下降分析器为每个非终结符编写递归函数，直观但有栈溢出风险
+6. 预测分析器使用显式栈代替递归，避免了栈溢出问题
+7. LL(1)分析能力有限，许多常见文法不是LL(1)，需要用LR分析
+-->
+</body>
+</html>

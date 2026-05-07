@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>多元函数极值 - 多元微积分</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #d35400;
+            --accent: #e74c3c;
+            --bg: #fdfdfd;
+            --card-bg: #ffffff;
+            --border: #dfe6e9;
+            --text: #2d3436;
+            --text-light: #636e72;
+            --success: #27ae60;
+            --info: #2980b9;
+            --warning: #f39c12;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--primary);
+            font-size: 2.2rem;
+            margin-bottom: 0.5rem;
+            border-bottom: 3px solid var(--secondary);
+            padding-bottom: 0.8rem;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--text-light);
+            margin-bottom: 2rem;
+        }
+
+        h2 {
+            color: var(--secondary);
+            font-size: 1.5rem;
+            margin: 2rem 0 1rem;
+            padding-left: 0.8rem;
+            border-left: 4px solid var(--secondary);
+        }
+
+        h3 {
+            color: var(--primary);
+            font-size: 1.2rem;
+            margin: 1.2rem 0 0.6rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .formula-box {
+            background: linear-gradient(135deg, #f8f9fa, #fdebd0);
+            border-left: 4px solid var(--secondary);
+            padding: 1.2rem 1.5rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+            font-family: 'Cambria Math', 'Latin Modern Math', serif;
+        }
+
+        .formula {
+            font-size: 1.15rem;
+            text-align: center;
+            margin: 0.5rem 0;
+        }
+
+        .formula .highlight { color: var(--accent); font-weight: bold; }
+        .formula .big { font-size: 1.35rem; }
+
+        .theorem {
+            background: linear-gradient(135deg, #fef9e7, #fdebd0);
+            border: 1px solid #f0c27a;
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin: 1rem 0;
+        }
+
+        .theorem::before {
+            content: "定理";
+            background: var(--warning);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .example {
+            background: linear-gradient(135deg, #eafaf1, #d5f5e3);
+            border: 1px solid #82e0aa;
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin: 1rem 0;
+        }
+
+        .example::before {
+            content: "例题";
+            background: var(--success);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .note {
+            background: linear-gradient(135deg, #d6eaf8, #aed6f1);
+            border: 1px solid #85c1e9;
+            border-radius: 8px;
+            padding: 1rem 1.2rem;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+
+        .note::before {
+            content: "注意";
+            background: var(--info);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        th {
+            background: var(--secondary);
+            color: white;
+            padding: 0.7rem 1rem;
+            text-align: left;
+        }
+
+        td {
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:nth-child(even) td { background: #f8f9fa; }
+
+        .matrix {
+            display: inline-block;
+            border-left: 2px solid var(--text);
+            border-right: 2px solid var(--text);
+            padding: 0.3rem 0.6rem;
+            margin: 0.3rem;
+        }
+
+        .badge-max { background: #d5f5e3; color: #1e8449; padding: 2px 10px; border-radius: 12px; font-weight: bold; }
+        .badge-min { background: #d6eaf8; color: #2471a3; padding: 2px 10px; border-radius: 12px; font-weight: bold; }
+        .badge-saddle { background: #fadbd8; color: #c0392b; padding: 2px 10px; border-radius: 12px; font-weight: bold; }
+
+        .summary {
+            background: var(--primary);
+            color: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .summary h2 { color: var(--warning); border-left-color: var(--warning); }
+        .summary ul { padding-left: 1.5rem; }
+        .summary li { margin: 0.3rem 0; }
+
+        @media (max-width: 600px) {
+            body { padding: 1rem; }
+            h1 { font-size: 1.6rem; }
+        }
+    </style>
+</head>
+<body>
+
+<h1>多元函数极值</h1>
+<p class="subtitle">Extrema of Multivariable Functions &mdash; 多元微积分 · 第五节</p>
+
+<!-- ============ 一、无条件极值 ============ -->
+<h2>一、无条件极值（Critical Points）</h2>
+
+<div class="card">
+    <h3>1.1 必要条件</h3>
+    <div class="theorem">
+        <p>若 f(x, y) 在点 (a, b) 处取极值，且 f 在该点可微，则：</p>
+        <div class="formula-box">
+            <p class="formula"><span class="highlight">f<sub>x</sub>(a, b) = 0 且 f<sub>y</sub>(a, b) = 0</span></p>
+        </div>
+        <p>满足此条件的点称为<strong>驻点（临界点 / critical point）</strong>。</p>
+        <p style="margin-top:0.3rem;">推广到 n 元：∇f = <b>0</b>。</p>
+    </div>
+</div>
+
+<div class="card">
+    <h3>1.2 二阶充分条件——Hessian 矩阵</h3>
+    <div class="theorem">
+        <p>设 (a, b) 是 f 的驻点，记：</p>
+        <div class="formula-box">
+            <p class="formula">A = f<sub>xx</sub>(a,b), &nbsp; B = f<sub>xy</sub>(a,b), &nbsp; C = f<sub>yy</sub>(a,b)</p>
+            <p class="formula" style="margin-top:0.5rem;"><strong>Hessian 矩阵</strong>：</p>
+            <p class="formula">
+                <span class="matrix">
+                    H = | A &nbsp; B |<br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;| B &nbsp; C |
+                </span>
+            </p>
+            <p class="formula" style="margin-top:0.5rem;">判别式：<span class="highlight">D = AC − B² = det(H)</span></p>
+        </div>
+        <table>
+            <tr>
+                <th>条件</th>
+                <th>结论</th>
+            </tr>
+            <tr>
+                <td>D > 0 且 A > 0</td>
+                <td><span class="badge-min">极小值</span></td>
+            </tr>
+            <tr>
+                <td>D > 0 且 A < 0</td>
+                <td><span class="badge-max">极大值</span></td>
+            </tr>
+            <tr>
+                <td>D < 0</td>
+                <td><span class="badge-saddle">鞍点（非极值）</span></td>
+            </tr>
+            <tr>
+                <td>D = 0</td>
+                <td>需用其他方法判断</td>
+            </tr>
+        </table>
+    </div>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求 f(x, y) = x³ + y³ − 3xy 的极值</p>
+    <div class="formula-box">
+        <p class="formula">f<sub>x</sub> = 3x² − 3y = 0,  f<sub>y</sub> = 3y² − 3x = 0</p>
+        <p class="formula">驻点：(0, 0) 和 (1, 1)</p>
+        <p class="formula">f<sub>xx</sub> = 6x,  f<sub>xy</sub> = −3,  f<sub>yy</sub> = 6y</p>
+        <p class="formula" style="margin-top:0.5rem;">在 (0, 0)：D = 0·0 − 9 = −9 < 0 → <span class="badge-saddle">鞍点</span></p>
+        <p class="formula">在 (1, 1)：D = 6·6 − 9 = 27 > 0, A = 6 > 0 → <span class="badge-min">极小值 f(1,1) = −1</span></p>
+    </div>
+</div>
+
+<div class="note">
+    <p><strong>多元函数的 Hessian 推广：</strong></p>
+    <p>对 n 元函数 f(x₁, …, x<sub>n</sub>)，Hessian 矩阵 H 为 n×n 矩阵：</p>
+    <div class="formula-box">
+        <p class="formula">H<sub>ij</sub> = ∂²f / ∂x<sub>i</sub>∂x<sub>j</sub></p>
+        <p class="formula">H 正定 ⟹ 极小值；H 负定 ⟹ 极大值；H 不定 ⟹ 鞍点</p>
+    </div>
+</div>
+
+<!-- ============ 二、条件极值与拉格朗日乘数法 ============ -->
+<h2>二、条件极值与拉格朗日乘数法</h2>
+
+<div class="card">
+    <h3>2.1 问题描述</h3>
+    <p>求函数 f(x, y) 在约束条件 g(x, y) = 0 下的极值。</p>
+    <p style="margin-top:0.5rem;">几何意义：在曲线 g = 0 上找 f 的最值点。</p>
+</div>
+
+<div class="theorem">
+    <h3>拉格朗日乘数法（Lagrange Multipliers）</h3>
+    <p>设 f 和 g 有连续偏导数，且 ∇g ≠ <b>0</b>。若 f 在约束 g(x,y) = 0 下取极值，则存在常数 λ 使得：</p>
+    <div class="formula-box">
+        <p class="formula big"><span class="highlight">∇f = λ ∇g</span></p>
+        <p class="formula">即：</p>
+        <p class="formula">∂f/∂x = λ · ∂g/∂x</p>
+        <p class="formula">∂f/∂y = λ · ∂g/∂y</p>
+        <p class="formula">g(x, y) = 0</p>
+    </div>
+    <p style="margin-top:0.5rem;">三个方程，三个未知数 (x, y, λ)。</p>
+</div>
+
+<div class="card">
+    <h3>2.2 多个约束条件</h3>
+    <p>求 f(x, y, z) 在约束 g(x,y,z) = 0 和 h(x,y,z) = 0 下的极值：</p>
+    <div class="formula-box">
+        <p class="formula big">∇f = λ∇g + μ∇h</p>
+        <p class="formula">联立 g = 0, h = 0，共五个方程，五个未知数 (x, y, z, λ, μ)</p>
+    </div>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求 f(x, y) = x² + y² 在约束 x + y = 1 下的最小值</p>
+    <div class="formula-box">
+        <p class="formula">g(x,y) = x + y − 1 = 0</p>
+        <p class="formula">∇f = (2x, 2y), ∇g = (1, 1)</p>
+        <p class="formula">2x = λ, 2y = λ → x = y</p>
+        <p class="formula">x + y = 1 → x = y = 1/2</p>
+        <p class="formula"><span class="highlight">最小值 = (1/2)² + (1/2)² = 1/2</span></p>
+    </div>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求 xyz 在 x² + y² + z² = 12 条件下的最大值</p>
+    <div class="formula-box">
+        <p class="formula">∇f = (yz, xz, xy), ∇g = (2x, 2y, 2z)</p>
+        <p class="formula">yz = 2λx, xz = 2λy, xy = 2λz</p>
+        <p class="formula">三式相乘：x²y²z² = 8λ³xyz → 若 xyz ≠ 0：xyz = 8λ³</p>
+        <p class="formula">由对称性：x² = y² = z² = 4，即 x = y = z = 2</p>
+        <p class="formula"><span class="highlight">最大值 = 2 × 2 × 2 = 8</span></p>
+    </div>
+</div>
+
+<!-- ============ 三、拉格朗日函数 ============ -->
+<h2>三、拉格朗日函数</h2>
+
+<div class="card">
+    <h3>3.1 构造拉格朗日函数</h3>
+    <div class="formula-box">
+        <p class="formula big"><span class="highlight">L(x, y, λ) = f(x, y) − λ · g(x, y)</span></p>
+    </div>
+    <p>将条件极值问题转化为 L 的无条件极值问题：</p>
+    <div class="formula-box">
+        <p class="formula">∂L/∂x = 0 → f<sub>x</sub> = λg<sub>x</sub></p>
+        <p class="formula">∂L/∂y = 0 → f<sub>y</sub> = λg<sub>y</sub></p>
+        <p class="formula">∂L/∂λ = 0 → g = 0</p>
+    </div>
+</div>
+
+<div class="note">
+    <p><strong>拉格朗日乘数 λ 的意义：</strong></p>
+    <p>若将约束写为 g(x,y) = c，则 λ = ∂f*/∂c，其中 f* 是 f 在约束下的最优值。<br>
+    即：λ 表示约束条件的微小变化对最优值的<strong>边际影响</strong>（影子价格）。</p>
+</div>
+
+<!-- ============ 四、不等式约束 ============ -->
+<h2>四、不等式约束与 KKT 条件</h2>
+
+<div class="card">
+    <h3>4.1 Karush-Kuhn-Tucker（KKT）条件</h3>
+    <p>求 min f(x) 满足 g(x) ≤ 0, h(x) = 0：</p>
+    <div class="formula-box">
+        <p class="formula">构造：L = f(x) + λg(x) + μh(x)</p>
+        <p class="formula">KKT 条件：</p>
+        <p class="formula">① ∇<sub>x</sub>L = <b>0</b>（平稳性）</p>
+        <p class="formula">② g(x) ≤ 0, h(x) = 0（原始可行性）</p>
+        <p class="formula">③ λ ≥ 0（对偶可行性）</p>
+        <p class="formula">④ <span class="highlight">λg(x) = 0</span>（互补松弛性）</p>
+    </div>
+    <p style="margin-top:0.5rem;">互补松弛性：要么约束起作用（g = 0），要么乘数为零（λ = 0）。</p>
+</div>
+
+<div class="note">
+    <p>KKT 条件是拉格朗日乘数法在不等式约束下的推广，是最优化理论的基础，在机器学习（SVM）、经济学、工程设计中广泛应用。</p>
+</div>
+
+<!-- ============ 五、最值问题 ============ -->
+<h2>五、闭区域上的最值</h2>
+
+<div class="card">
+    <h3>5.1 求解步骤</h3>
+    <ol style="padding-left:1.5rem;">
+        <li>求区域<strong>内部</strong>的驻点（∇f = 0），计算函数值</li>
+        <li>求区域<strong>边界</strong>上的最值（参数化边界或拉格朗日乘数法）</li>
+        <li>比较所有候选点的函数值，最大者为最大值，最小者为最小值</li>
+    </ol>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求 f(x,y) = x² + 2y² − x 在圆盘 x² + y² ≤ 4 上的最大值和最小值</p>
+    <div class="formula-box">
+        <p class="formula"><strong>内部</strong>：f<sub>x</sub> = 2x − 1 = 0, f<sub>y</sub> = 4y = 0 → (1/2, 0), f = −1/4</p>
+        <p class="formula"><strong>边界</strong>：g = x² + y² − 4 = 0</p>
+        <p class="formula">∇f = λ∇g → (2x−1, 4y) = λ(2x, 2y)</p>
+        <p class="formula">若 y ≠ 0：4y = 2λy → λ = 2, 2x−1 = 4x → x = −1/2, y² = 15/4</p>
+        <p class="formula">f(−1/2, ±√(15)/2) = 1/4 + 15/2 + 1/2 = 33/4</p>
+        <p class="formula">若 y = 0：x = ±2, f(2,0) = 2, f(−2,0) = 6</p>
+        <p class="formula"><span class="highlight">最小值 = −1/4（在 (1/2, 0)），最大值 = 33/4（在 (−1/2, ±√(15)/2)）</span></p>
+    </div>
+</div>
+
+<!-- ============ 汇总 ============ -->
+<div class="summary">
+    <h2>核心要点汇总</h2>
+    <ul>
+        <li><strong>驻点</strong>：∇f = <b>0</b> 是极值的必要条件</li>
+        <li><strong>Hessian 判别</strong>：D = AC − B²，D > 0 判定极值，D < 0 为鞍点</li>
+        <li><strong>拉格朗日乘数法</strong>：∇f = λ∇g，将条件极值化为方程组</li>
+        <li><strong>拉格朗日函数</strong>：L = f − λg，对各变量和 λ 求偏导</li>
+        <li><strong>多约束</strong>：∇f = λ∇g + μ∇h</li>
+        <li><strong>闭区域最值</strong>：比较内部驻点和边界上的候选值</li>
+        <li><strong>KKT 条件</strong>：拉格朗日乘数法对不等式约束的推广</li>
+    </ul>
+</div>
+
+<!-- 总结：多元函数极值包括无条件极值（Hessian矩阵判别）和条件极值（拉格朗日乘数法），是最优化问题的数学基础 -->
+
+</body>
+</html>

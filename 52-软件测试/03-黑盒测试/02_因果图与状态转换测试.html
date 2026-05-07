@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>因果图与状态转换测试</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f5f7fa; color: #333; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 15px; margin-bottom: 30px; }
+        h2 { color: #2980b9; margin: 25px 0 10px; border-left: 4px solid #3498db; padding-left: 12px; }
+        h3 { color: #8e44ad; margin: 15px 0 8px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: center; }
+        th { background: #3498db; color: #fff; }
+        tr:nth-child(even) { background: #ecf0f1; }
+        .note { background: #fef9e7; border-left: 4px solid #f1c40f; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        .important { background: #fdedec; border-left: 4px solid #e74c3c; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        .formula { background: #f9f9f9; border-left: 4px solid #e67e22; padding: 10px 15px; margin: 10px 0; font-family: 'Consolas', monospace; }
+        ul, ol { margin-left: 25px; margin-bottom: 10px; }
+        li { margin-bottom: 5px; }
+        .state-circle { display: inline-block; width: 60px; height: 60px; border-radius: 50%; border: 2px solid #2980b9; line-height: 60px; text-align: center; font-weight: bold; margin: 5px; vertical-align: middle; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>因果图与状态转换测试</h1>
+
+        <!-- 因果图 -->
+        <div class="card">
+            <h2>一、因果图（Cause-Effect Graph）</h2>
+            <p>因果图是一种利用图解法分析输入条件（因）的各种组合以及每种组合对应的输出结果（果）的黑盒测试方法。</p>
+
+            <h3>1.1 基本符号</h3>
+            <table>
+                <tr><th>符号</th><th>名称</th><th>含义</th><th>表达式</th></tr>
+                <tr><td>∧</td><td>与（AND）</td><td>所有原因都成立，结果才成立</td><td>E = C1 ∧ C2</td></tr>
+                <tr><td>∨</td><td>或（OR）</td><td>任一原因成立，结果就成立</td><td>E = C1 ∨ C2</td></tr>
+                <tr><td>¬</td><td>非（NOT）</td><td>原因取反</td><td>E = ¬C1</td></tr>
+                <tr><td>⊕</td><td>异或（XOR）</td><td>有且仅有一个原因成立</td><td>E = C1 ⊕ C2</td></tr>
+            </table>
+
+            <h3>1.2 约束符号</h3>
+            <table>
+                <tr><th>约束</th><th>符号</th><th>含义</th></tr>
+                <tr><td>E约束（互斥）</td><td>E</td><td>原因之间最多一个成立</td></tr>
+                <tr><td>I约束（包含）</td><td>I</td><td>原因之间至少一个成立</td></tr>
+                <tr><td>O约束（唯一）</td><td>O</td><td>原因之间有且仅有一个成立</td></tr>
+                <tr><td>R约束（要求）</td><td>R</td><td>原因a成立时原因b也必须成立</td></tr>
+                <tr><td>M约束（强制）</td><td>M</td><td>结果a成立时结果b必须为假</td></tr>
+            </table>
+
+            <h3>1.3 因果图方法步骤</h3>
+            <ol>
+                <li>分析需求，识别原因（输入条件）和结果（输出）</li>
+                <li>画出因果图，标注因果关系和约束</li>
+                <li>将因果图转换为判定表</li>
+                <li>根据判定表设计测试用例</li>
+            </ol>
+
+            <h3>1.4 示例</h3>
+            <div class="formula">
+                需求：文件修改后，如果点击"保存"且文件可写，则保存文件并显示"保存成功"；
+                如果文件只读，则显示"文件只读"；如果未修改，提示"无需保存"。<br><br>
+                原因：C1=文件已修改，C2=点击保存，C3=文件可写<br>
+                结果：E1=保存文件，E2=显示成功，E3=显示只读，E4=提示无需保存<br><br>
+                因果图：<br>
+                (C1 ∧ C2 ∧ C3) → E1 ∧ E2<br>
+                (C1 ∧ C2 ∧ ¬C3) → E3<br>
+                (¬C1 ∧ C2) → E4
+            </div>
+
+            <table>
+                <tr><th>规则</th><th>R1</th><th>R2</th><th>R3</th><th>R4</th><th>R5</th></tr>
+                <tr><td>C1（文件已修改）</td><td>1</td><td>1</td><td>1</td><td>0</td><td>0</td></tr>
+                <tr><td>C2（点击保存）</td><td>1</td><td>1</td><td>0</td><td>1</td><td>0</td></tr>
+                <tr><td>C3（文件可写）</td><td>1</td><td>0</td><td>-</td><td>-</td><td>-</td></tr>
+                <tr><td>E1（保存文件）</td><td>X</td><td></td><td></td><td></td><td></td></tr>
+                <tr><td>E2（显示成功）</td><td>X</td><td></td><td></td><td></td><td></td></tr>
+                <tr><td>E3（显示只读）</td><td></td><td>X</td><td></td><td></td><td></td></tr>
+                <tr><td>E4（提示无需保存）</td><td></td><td></td><td></td><td>X</td><td></td></tr>
+            </table>
+        </div>
+
+        <!-- 状态转换测试 -->
+        <div class="card">
+            <h2>二、状态转换测试（State Transition Testing）</h2>
+            <p>基于系统的状态和状态之间的转换来设计测试用例，适合测试有状态的系统。</p>
+
+            <h3>2.1 核心概念</h3>
+            <table>
+                <tr><th>概念</th><th>说明</th></tr>
+                <tr><td>状态（State）</td><td>系统在某一时刻的条件或状况</td></tr>
+                <tr><td>转换（Transition）</td><td>从一个状态到另一个状态的变化</td></tr>
+                <tr><td>事件（Event）</td><td>触发状态转换的条件</td></tr>
+                <tr><td>动作（Action）</td><td>状态转换时执行的操作</td></tr>
+                <tr><td>初始状态</td><td>系统的起始状态</td></tr>
+            </table>
+
+            <h3>2.2 状态图示例：登录系统</h3>
+            <div style="text-align:center; margin: 15px 0;">
+                <span class="state-circle">未登录</span>
+                ──输入正确──→
+                <span class="state-circle">已登录</span>
+                ──点击退出──→
+                <span class="state-circle">未登录</span>
+                <br><br>
+                <span class="state-circle">未登录</span>
+                ──输入错误──→
+                <span class="state-circle">锁定</span>
+                ──30分钟后──→
+                <span class="state-circle">未登录</span>
+            </div>
+
+            <h3>2.3 状态转换表</h3>
+            <table>
+                <tr><th>当前状态</th><th>事件/输入</th><th>下一状态</th><th>动作</th></tr>
+                <tr><td>未登录</td><td>输入正确密码</td><td>已登录</td><td>进入主页</td></tr>
+                <tr><td>未登录</td><td>输入错误密码</td><td>未登录/锁定</td><td>提示密码错误</td></tr>
+                <tr><td>已登录</td><td>点击退出</td><td>未登录</td><td>清除会话</td></tr>
+                <tr><td>已登录</td><td>会话超时</td><td>未登录</td><td>提示超时</td></tr>
+                <tr><td>锁定</td><td>30分钟后</td><td>未登录</td><td>解锁</td></tr>
+            </table>
+
+            <h3>2.4 测试覆盖策略</h3>
+            <ul>
+                <li><strong>所有状态覆盖</strong>：每个状态至少被访问一次</li>
+                <li><strong>所有转换覆盖</strong>：每个转换至少被触发一次（推荐的最低覆盖）</li>
+                <li><strong>所有事件覆盖</strong>：每个事件至少触发一次</li>
+                <li><strong>N转换覆盖</strong>：覆盖所有长度为N的转换序列</li>
+            </ul>
+
+            <h3>2.5 测试用例设计</h3>
+            <table>
+                <tr><th>用例</th><th>步骤序列</th><th>覆盖的转换</th></tr>
+                <tr><td>TC1</td><td>未登录→正确密码→已登录→退出→未登录</td><td>正常登录+退出</td></tr>
+                <tr><td>TC2</td><td>未登录→错误密码→锁定→等待超时→未登录</td><td>错误登录+锁定+解锁</td></tr>
+                <tr><td>TC3</td><td>未登录→正确密码→已登录→超时→未登录</td><td>正常登录+会话超时</td></tr>
+            </table>
+
+            <div class="important">
+                <strong>状态测试重点：</strong><br>
+                1. 所有状态都被访问<br>
+                2. 所有转换都被触发<br>
+                3. 不可达状态的检测<br>
+                4. 死状态（无法离开的状态）的检测<br>
+                5. 非法转换的处理
+            </div>
+        </div>
+
+        <!-- 总结 -->
+        <div class="card">
+            <h2>三、知识要点总结</h2>
+            <ol>
+                <li>因果图：分析输入条件组合与输出的对应关系</li>
+                <li>因果图四步骤：识别因果→画图→转判定表→设计用例</li>
+                <li>五种约束：E互斥、I包含、O唯一、R要求、M强制</li>
+                <li>状态转换测试：基于状态和转换设计用例</li>
+                <li>最低覆盖要求：所有状态被访问，所有转换被触发</li>
+                <li>状态测试要关注不可达状态和死状态</li>
+            </ol>
+        </div>
+
+        <!--
+            ========================================
+            文件总结：因果图与状态转换测试
+            ========================================
+            本文件涵盖了两种高级黑盒测试方法：
+            1. 因果图：基本符号、约束符号、因果图转判定表
+            2. 状态转换测试：状态图、状态转换表、覆盖策略
+            3. 两种方法的测试用例设计步骤
+
+            重点：因果图转判定表、状态覆盖策略
+            考点：画因果图、设计状态测试用例
+            ========================================
+        -->
+    </div>
+</body>
+</html>

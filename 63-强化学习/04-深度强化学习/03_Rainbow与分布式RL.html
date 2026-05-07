@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rainbow与分布式RL</title>
+    <!-- 强化学习 - Rainbow与分布式RL 笔记 -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        .tag { display: inline-block; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>Rainbow与分布式RL</h2>
+        <p><span class="tag">深度强化学习</span><span class="tag">Rainbow DQN</span><span class="tag">分布式RL</span></p>
+        <p>Rainbow DQN融合了DQN的6种改进技术，分布式RL通过并行架构大幅加速训练。</p>
+    </div>
+
+    <!-- ====== DQN改进技术 ====== -->
+    <div class="card">
+        <h2>DQN的六大改进</h2>
+        <div class="code">
+Rainbow DQN (Hessel 2018) 融合了以下改进：
+
+┌──────────────────────────────────────────────────┐
+│  1. Double DQN (2015)                            │
+│     解决Q值过估计问题                             │
+│     Q_target = r + γ × Q(s', argmax_a Q(s',a))  │
+│     用在线网络选动作，目标网络评估Q值             │
+├──────────────────────────────────────────────────┤
+│  2. Prioritized Experience Replay (2015)         │
+│     优先经验回放                                  │
+│     TD误差大的经验更优先被采样                    │
+│     P(i) ∝ |δᵢ|^ω / Σ|δⱼ|^ω                    │
+├──────────────────────────────────────────────────┤
+│  3. Dueling Network (2016)                       │
+│     竞争网络架构                                  │
+│     Q(s,a) = V(s) + A(s,a) - mean_a A(s,a)     │
+│     分离状态价值和动作优势                        │
+├──────────────────────────────────────────────────┤
+│  4. Multi-step Learning (2015)                   │
+│     n-step回报                                   │
+│     G(t:t+n) = Σ γ^k × R(t+k+1) + γ^n V(s(t+n))│
+├──────────────────────────────────────────────────┤
+│  5. Distributional RL (2017)                     │
+│     分布式价值函数                                │
+│     学习回报的分布而非期望值                      │
+│     Z(s,a) = R + γZ(s',a')                      │
+├──────────────────────────────────────────────────┤
+│  6. Noisy Nets (2017)                            │
+│     噪声网络替代ε-greedy                         │
+│     y = (μ_w + σ_w ⊙ ε)×x + μ_b + σ_b ⊙ ε     │
+└──────────────────────────────────────────────────┘
+        </div>
+    </div>
+
+    <!-- ====== Double DQN ====== -->
+    <div class="card">
+        <h2>Double DQN</h2>
+        <div class="code">
+问题：标准DQN存在Q值过估计
+原因：max操作导致正偏差累积
+
+原始DQN：
+Q_target = r + γ × max_a' Q_θ'(s', a')
+使用目标网络同时选择动作和评估Q值
+
+Double DQN：
+选择动作：a* = argmax_a Q_θ(s', a')    // 在线网络
+评估Q值：Q_target = r + γ × Q_θ'(s', a*) // 目标网络
+
+效果：
+- 消除max操作引入的正偏差
+- Q值估计更准确
+- 学到的策略更好
+- 实现简单，几乎无额外开销
+        </div>
+    </div>
+
+    <!-- ====== 优先经验回放 ====== -->
+    <div class="card">
+        <h2>优先经验回放 (PER)</h2>
+        <div class="code">
+核心思想：TD误差大的经验更"令人惊讶"，更值得学习
+
+优先级计算：
+P(i) = pᵢ^ω / Σ pⱼ^ω
+其中 pᵢ = |δᵢ| + ε （基于TD误差）
+
+采样方式：
+1. SumTree数据结构实现O(log N)采样
+2. 概率正比于优先级
+
+重要性采样修正：
+因为改变了采样分布，需要修正梯度
+wᵢ = (N × P(i))^(-β)
+梯度 × wᵢ
+
+β从0.4线性增长到1（训练结束时完全修正）
+
+两种优先级方式：
+- proportional: P(i) = pᵢ / Σpⱼ
+- rank-based: P(i) = 1/rank(i)（按优先级排序）
+        </div>
+    </div>
+
+    <!-- ====== Dueling Network ====== -->
+    <div class="card">
+        <h2>Dueling Network与C51</h2>
+        <div class="code">
+Dueling Network架构：
+将Q网络分为两个流：
+- 价值流 V(s)：状态有多好
+- 优势流 A(s,a)：每个动作相对有多好
+
+Q(s,a) = V(s) + (A(s,a) - mean_a' A(s,a'))
+（减去均值使V和A的scale一致）
+
+优势：
+- 学习状态价值而不需要每个动作的估计
+- 在动作空间大时更高效
+- Q值估计更稳定
+
+C51 (Categorical DQN)：
+用离散分布表示回报
+- N个原子（通常51个），等间距分布在[Vmin, Vmax]
+- 每个原子有概率 pᵢ
+- Σ pᵢ = 1
+
+Bellman更新：将分布投影到原子网格上
+分布之间用交叉熵损失训练
+
+IQN (Implicit Quantile Networks)：
+- 学习条件分位数函数
+- 采样τ ~ U(0,1)，输出对应分位数的Q值
+- 比C51更灵活
+        </div>
+        <div class="note">C51中"51"是原子数量。分布的支撑从[Vmin, Vmax]=[-10,10]，间距=0.4。IQN进一步改进为连续分位数表示。</div>
+    </div>
+
+    <!-- ====== Rainbow组合效果 ====== -->
+    <div class="card">
+        <h2>Rainbow组合效果分析</h2>
+        <div class="code">
+消融实验（Atari 57游戏平均）：
+
+单独改进 vs DQN基线的改进幅度：
+┌─────────────────────────┬──────────┐
+│ 改进                    │ 相对提升 │
+├─────────────────────────┼──────────┤
+│ Double DQN              │ +49%     │
+│ PER                     │ +93%     │
+│ Dueling                 │ +74%     │
+│ Multi-step (n=3)        │ +130%    │
+│ Distributional (C51)    │ +132%    │
+│ Noisy Nets              │ +111%    │
+├─────────────────────────┼──────────┤
+│ Rainbow (全部组合)       │ +166%    │
+└─────────────────────────┴──────────┘
+
+关键发现：
+- 每个组件都有正向贡献
+- 组合效果不是简单的加法
+- 某些组件之间有互补效应
+- Distributional + Multi-step 组合特别有效
+- Rainbow在57个Atari游戏中有42个达到或超过人类表现
+        </div>
+    </div>
+
+    <!-- ====== 分布式RL ====== -->
+    <div class="card">
+        <h2>分布式强化学习</h2>
+        <div class="code">
+为什么需要分布式RL：
+- 单个环境采集数据慢
+- 经验数据相关性高
+- GPU利用率低
+
+核心思想：
+多个actor并行采集数据，共享学习
+
+Ape-X (Horgan 2018)：
+- N个actor（数百个），各自独立与环境交互
+- 共享一个经验回放缓冲区（分布式优先）
+- 共享一个学习器（learner）
+- Actor异步地发送经验、获取最新策略
+
+架构：
+┌─────────────────────────────────────┐
+│           Central Learner          │
+│  (从共享buffer采样，训练网络)       │
+└─────────────┬───────────────────────┘
+              │ 共享参数和优先级
+    ┌─────────┼─────────┐
+    ↓         ↓         ↓
+┌───────┐ ┌───────┐ ┌───────┐
+│Actor 1│ │Actor 2│ │Actor N│
+│(采集)  │ │(采集)  │ │(采集)  │
+└───────┘ └───────┘ └───────┘
+
+优势：
+- 数据采集速度线性扩展
+- 探索多样性增加（不同actor有略微不同的策略）
+- Ape-X在Atari上仅用数小时达到之前数天的效果
+        </div>
+    </div>
+
+    <!-- ====== IMPALA ====== -->
+    <div class="card">
+        <h2>IMPALA (Importance Weighted Actor-Learner)</h2>
+        <div class="code">
+IMPALA (Espeholt 2018)：
+解决off-policy分布式学习的问题
+
+问题：Actor采集数据时的策略 ≠ 当前学习的策略
+→ 数据是off-policy的
+
+解决：V-trace（修正off-policy偏差）
+
+V-trace目标：
+Vs = V(s) + Σ γ^i × c̄ × ρ̄ × δᵢ
+
+其中：
+ρ(s,a) = π(a|s) / μ(a|s)  （目标/行为策略比）
+ρ̄ = min(ρ, ρ̅)            （截断的重要性比率）
+c̄ = min(c, ρ̅)            （截断的trace系数）
+δ = ρ(s,a) × (r + γV(s') - V(s))  // 修正的TD误差
+
+关键特性：
+- ρ̅截断限制方差
+- Actor完全异步运行
+- Learner连续训练
+- 适合大规模分布式部署
+
+IMPALA vs Ape-X：
+┌────────────┬──────────┬──────────┐
+│            │ Ape-X    │ IMPALA   │
+├────────────┼──────────┼──────────┤
+│ Buffer     │ 集中式   │ 流式     │
+│ 数据新鲜度 │ 较旧     │ 较新     │
+│ Off-policy │ PER修正  │ V-trace  │
+│ 适用       │ 单机多核 │ 多机集群 │
+│ 复杂度     │ 中等     │ 较高     │
+└────────────┴──────────┴──────────┘
+        </div>
+        <div class="note">IMPALA的V-trace是分布式off-policy学习的关键技术，DeepMind用它训练了大型3D游戏中的智能体。</div>
+    </div>
+
+    <!-- 总结：Rainbow DQN融合了Double DQN、PER、Dueling、Multi-step、Distributional、Noisy Nets六种改进。
+    分布式RL通过并行actor加速数据采集，Ape-X用集中式优先回放，IMPALA用V-trace处理off-policy问题。 -->
+</body>
+</html>

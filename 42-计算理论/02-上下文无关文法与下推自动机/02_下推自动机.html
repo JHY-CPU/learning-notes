@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>下推自动机 (PDA)</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.7; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; border-bottom: 3px solid #3182ce; padding-bottom: 12px; margin-bottom: 30px; }
+        h2 { color: #2c5282; margin: 25px 0 12px; padding-left: 10px; border-left: 4px solid #3182ce; }
+        h3 { color: #2d3748; margin: 15px 0 8px; }
+        p, li { margin-bottom: 8px; }
+        ul, ol { padding-left: 25px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: "Consolas", monospace; font-size: 0.95em; color: #c53030; }
+        pre { background: #1a202c; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; margin: 10px 0; font-size: 0.9em; }
+        pre code { background: none; color: inherit; padding: 0; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 10px 14px; text-align: center; }
+        th { background: #3182ce; color: #fff; }
+        tr:nth-child(even) { background: #f7fafc; }
+        .tag { display: inline-block; padding: 3px 10px; border-radius: 15px; font-size: 0.8em; font-weight: bold; margin: 2px; }
+        .tag-blue { background: #bee3f8; color: #2a4365; }
+        .tag-green { background: #c6f6d5; color: #22543d; }
+        .tag-yellow { background: #fefcbf; color: #744210; }
+        .stack-viz { display: flex; flex-direction: column; align-items: center; gap: 2px; margin: 15px auto; }
+        .stack-cell { background: #bee3f8; border: 2px solid #3182ce; border-radius: 6px; padding: 8px 30px; font-family: monospace; font-weight: bold; font-size: 1.1em; min-width: 80px; text-align: center; }
+        .stack-cell.top { background: #3182ce; color: #fff; }
+        .stack-base { background: #e2e8f0; border: 2px solid #a0aec0; border-radius: 6px; padding: 8px 30px; color: #718096; font-size: 0.9em; min-width: 80px; text-align: center; }
+        .pda-diagram { background: #ebf8ff; border-radius: 10px; padding: 20px; margin: 15px 0; text-align: center; }
+        .step-table { margin: 10px auto; }
+        .step-table td { font-family: monospace; }
+        .theorem { background: #f0fff4; border-left: 5px solid #38a169; padding: 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <h1>下推自动机 (PDA)</h1>
+
+    <!-- ====== PDA定义 ====== -->
+    <div class="card">
+        <h2>一、下推自动机的定义</h2>
+        <p>PDA是带有<strong>栈存储</strong>的有限自动机，是识别上下文无关语言的计算模型。</p>
+        <p>PDA是一个七元组 <code>P = (Q, Σ, Γ, δ, q₀, Z₀, F)</code>：</p>
+        <ul>
+            <li><strong>Q</strong> — 有穷状态集合</li>
+            <li><strong>Σ</strong> — 有穷输入字母表</li>
+            <li><strong>Γ</strong> — 有穷栈字母表</li>
+            <li><strong>δ</strong> — 转移函数：<code>δ: Q × (Σ ∪ {ε}) × Γ → P(Q × Γ*)</code></li>
+            <li><strong>q₀</strong> — 初始状态</li>
+            <li><strong>Z₀</strong> — 初始栈底符号</li>
+            <li><strong>F</strong> — 接受状态集合</li>
+        </ul>
+
+        <h3>PDA转移的含义</h3>
+        <p>δ(q, a, X) 包含 (p, γ) 表示：</p>
+        <ul>
+            <li>当前状态为 q</li>
+            <li>读入输入符号 a（或 ε 不读入）</li>
+            <li>栈顶符号为 X</li>
+            <li>转移到状态 p，弹出 X，压入串 γ</li>
+        </ul>
+    </div>
+
+    <!-- ====== 栈操作 ====== -->
+    <div class="card">
+        <h2>二、栈操作详解</h2>
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; text-align: center;">
+            <div>
+                <h3>压栈 (Push)</h3>
+                <div class="stack-viz">
+                    <div class="stack-cell top">a</div>
+                    <div class="stack-cell">b</div>
+                    <div class="stack-base">底</div>
+                </div>
+                <p>δ(q, x, b) → (p, ab)</p>
+                <p style="font-size:0.85em; color:#718096;">弹出b，压入ab</p>
+            </div>
+            <div>
+                <h3>弹栈 (Pop)</h3>
+                <div class="stack-viz">
+                    <div class="stack-cell top">b</div>
+                    <div class="stack-base">底</div>
+                </div>
+                <p>δ(q, x, a) → (p, ε)</p>
+                <p style="font-size:0.85em; color:#718096;">弹出a，不压入</p>
+            </div>
+            <div>
+                <h3>替换 (Replace)</h3>
+                <div class="stack-viz">
+                    <div class="stack-cell top">c</div>
+                    <div class="stack-cell">b</div>
+                    <div class="stack-base">底</div>
+                </div>
+                <p>δ(q, x, a) → (p, cb)</p>
+                <p style="font-size:0.85em; color:#718096;">弹出a，压入cb</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 接受方式 ====== -->
+    <div class="card">
+        <h2>三、PDA的两种接受方式</h2>
+        <table>
+            <thead><tr><th>接受方式</th><th>条件</th><th>特点</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td><strong>终态接受</strong></td>
+                    <td>输入读完后，当前状态 ∈ F</td>
+                    <td>栈内容不限</td>
+                </tr>
+                <tr>
+                    <td><strong>空栈接受</strong></td>
+                    <td>输入读完后，栈为空</td>
+                    <td>当前状态不限</td>
+                </tr>
+            </tbody>
+        </table>
+        <div class="theorem">
+            <p><strong>定理：</strong>终态接受和空栈接受是等价的。对任意终态接受的PDA，可构造等价的空栈接受PDA，反之亦然。</p>
+        </div>
+    </div>
+
+    <!-- ====== 示例：接受{0ⁿ1ⁿ} ====== -->
+    <div class="card">
+        <h2>四、经典示例：PDA接受 {0ⁿ1ⁿ | n ≥ 0}</h2>
+        <h3>设计思路</h3>
+        <ol>
+            <li>读到 0 时，往栈里压入一个标记（如 X）</li>
+            <li>读到 1 时，从栈中弹出一个标记</li>
+            <li>输入读完且栈为空（只剩底符号），则接受</li>
+        </ol>
+
+        <h3>形式化描述</h3>
+        <pre><code>P = (Q, Σ, Γ, δ, q₀, Z₀, F)
+Q = {q₀, q₁, q₂}
+Σ = {0, 1}
+Γ = {X, Z₀}
+F = {q₂}
+Z₀ = Z₀  # 栈底标记
+
+# 转移函数
+δ(q₀, 0, Z₀) = {(q₀, XZ₀)}   # 读0，栈底时压X
+δ(q₀, 0, X)  = {(q₀, XX)}     # 读0，栈顶X时再压X
+δ(q₀, 1, X)  = {(q₁, ε)}      # 读1，弹出X，进入q₁
+δ(q₁, 1, X)  = {(q₁, ε)}      # 读1，继续弹出X
+δ(q₁, ε, Z₀) = {(q₂, Z₀)}     # 栈空（只剩底），接受</code></pre>
+
+        <h3>输入 "0011" 的运行过程</h3>
+        <table class="step-table">
+            <thead><tr><th>步骤</th><th>状态</th><th>输入剩余</th><th>栈（顶在左）</th><th>操作</th></tr></thead>
+            <tbody>
+                <tr><td>1</td><td>q₀</td><td>0011</td><td>Z₀</td><td>读0，压X</td></tr>
+                <tr><td>2</td><td>q₀</td><td>011</td><td>XZ₀</td><td>读0，压X</td></tr>
+                <tr><td>3</td><td>q₀</td><td>11</td><td>XXZ₀</td><td>读1，弹X→q₁</td></tr>
+                <tr><td>4</td><td>q₁</td><td>1</td><td>XZ₀</td><td>读1，弹X</td></tr>
+                <tr><td>5</td><td>q₁</td><td>ε</td><td>Z₀</td><td>ε-转移，接受</td></tr>
+                <tr><td colspan="5" style="color:#38a169; font-weight:bold;">接受！</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- ====== PDA与CFG的等价性 ====== -->
+    <div class="card">
+        <h2>五、PDA与CFG的等价性</h2>
+        <div class="theorem">
+            <p><strong>定理：</strong>一个语言是上下文无关的，当且仅当存在某个PDA接受它。</p>
+        </div>
+
+        <h3>CFG → PDA（模拟最左推导）</h3>
+        <ol>
+            <li>栈顶是终结符且匹配输入：弹出，读入</li>
+            <li>栈顶是变量 A：非确定地选择一条产生式 A→α，弹出A，压入α</li>
+            <li>输入读完且栈只剩底符号：接受</li>
+        </ol>
+
+        <h3>PDA → CFG（构造等价文法）</h3>
+        <ol>
+            <li>变量 A<sub>pq</sub> 表示"从状态p（栈空）到状态q（栈空）的计算"</li>
+            <li>将PDA的栈操作编码为产生式规则</li>
+            <li>起始变量 = A<sub>q₀q<sub>f</sub></sub>（从初始状态到某个接受状态）</li>
+        </ol>
+    </div>
+
+    <!-- ====== 确定性PDA ====== -->
+    <div class="card">
+        <h2>六、确定性PDA (DPDA)</h2>
+        <p>DPDA要求对每组 (q, a, X)，δ(q, a, X) 至多包含<strong>一个</strong>元素，且若 δ(q, ε, X) 非空则 δ(q, a, X) 必须为空。</p>
+
+        <table>
+            <thead><tr><th>特性</th><th>NFA vs DFA</th><th>PDA vs DPDA</th></tr></thead>
+            <tbody>
+                <tr><td>等价性</td><td>等价</td><td><strong>不等价</strong></td></tr>
+                <tr><td>语言类</td><td>正则语言</td><td>DPDA语言 ⊊ CFL</td></tr>
+                <tr><td>例</td><td>—</td><td>{wwᴿ}是DPDA语言，{ww}不是</td></tr>
+            </tbody>
+        </table>
+        <p><span class="tag tag-yellow">注意</span> DPDA接受的语言类 = <strong>确定性上下文无关语言</strong> (DCFL)，是CFL的真子集。</p>
+    </div>
+
+</div>
+
+<!--
+========================================
+  笔记总结
+========================================
+本文件涵盖下推自动机的核心知识：
+
+1. PDA定义：七元组 (Q, Σ, Γ, δ, q₀, Z₀, F)
+   - 比DFA/NFA多了栈存储
+   - 转移函数：δ: Q × (Σ∪{ε}) × Γ → P(Q × Γ*)
+
+2. 两种接受方式：
+   - 终态接受：输入读完后状态 ∈ F
+   - 空栈接受：输入读完后栈为空
+   - 两者等价，可互相转换
+
+3. 栈操作：push、pop、replace
+   - 栈提供了无穷的记忆能力
+   - 可以计数、匹配嵌套结构
+
+4. 经典示例：{0^n 1^n}
+   - 读0时压栈，读1时弹栈
+   - 最终栈空则接受
+
+5. PDA ⟺ CFG 的等价性：
+   - 语言是CFL ⇔ 存在PDA接受它
+   - CFG→PDA：模拟最左推导
+   - PDA→CFG：变量表示栈变化
+
+6. 确定性PDA (DPDA)：
+   - DPDA接受的语言 ⊊ CFL
+   - 不等价！（区别于DFA=NFA）
+========================================
+-->
+</body>
+</html>

@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- DMA与中断系统 - 嵌入式系统笔记 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DMA与中断系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f5f7fa; color: #2c3e50; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 40px; }
+        h1 { font-size: 28px; color: #1a5276; border-bottom: 3px solid #2980b9; padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 22px; color: #2980b9; margin: 28px 0 14px; border-left: 4px solid #2980b9; padding-left: 12px; }
+        h3 { font-size: 18px; color: #34495e; margin: 20px 0 10px; }
+        p { margin: 8px 0; text-indent: 2em; }
+        ul, ol { margin: 10px 0 10px 2em; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: left; }
+        th { background: #2980b9; color: #fff; }
+        tr:nth-child(even) { background: #f0f4f8; }
+        .note { background: #eaf2f8; border-left: 4px solid #2980b9; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .key-point { background: #fef9e7; border-left: 4px solid #f39c12; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        code { background: #ecf0f1; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>DMA与中断系统</h1>
+
+    <!-- 一、DMA概述 -->
+    <h2>一、DMA（直接存储器访问）概述</h2>
+    <p>DMA（Direct Memory Access）是一种无需CPU参与即可在内存和外设之间直接传输数据的硬件机制。它极大地减轻了CPU的数据搬运负担，提高了系统整体效率。</p>
+
+    <h3>1.1 DMA的工作原理</h3>
+    <p>传统的数据传输方式需要CPU逐字节地从外设读取再写入内存（或反向），这会占用大量CPU时间。DMA控制器接管了这个任务，让CPU可以专注于计算。</p>
+
+    <h3>1.2 DMA vs CPU传输</h3>
+    <table>
+        <tr><th>维度</th><th>CPU传输</th><th>DMA传输</th></tr>
+        <tr><td>CPU占用</td><td>全程参与</td><td>仅配置和完成中断</td></tr>
+        <tr><td>传输速度</td><td>受指令执行速度限制</td><td>硬件速率，接近总线速度</td></tr>
+        <tr><td>适合场景</td><td>少量数据</td><td>大批量数据</td></tr>
+        <tr><td>功耗</td><td>CPU频繁唤醒</td><td>CPU可休眠</td></tr>
+        <tr><td>实时性</td><td>受中断延迟影响</td><td>确定性传输</td></tr>
+    </table>
+
+    <!-- 二、DMA通道与架构 -->
+    <h2>二、DMA通道与架构</h2>
+
+    <h3>2.1 STM32 DMA架构</h3>
+    <p>STM32系列通常有2个DMA控制器（DMA1和DMA2），每个控制器有多个独立通道，可以同时进行不同的数据传输。</p>
+    <table>
+        <tr><th>控制器</th><th>通道数</th><th>特点</th></tr>
+        <tr><td>DMA1</td><td>7个通道</td><td>连接常用外设（SPI/I2C/UART/TIM/ADC）</td></tr>
+        <tr><td>DMA2</td><td>5个通道</td><td>连接高级外设（SDIO/存储器到存储器）</td></tr>
+    </table>
+
+    <h3>2.2 通道映射</h3>
+    <p>每个DMA通道与特定外设关联，由硬件固定映射。例如STM32F1中：</p>
+    <ul>
+        <li>DMA1 Channel 1：ADC1</li>
+        <li>DMA1 Channel 2：SPI1_RX / TIM4_CH3</li>
+        <li>DMA1 Channel 3：SPI1_TX / TIM4_CH1</li>
+        <li>DMA1 Channel 4：USART1_TX / TIM4_CH2</li>
+        <li>DMA1 Channel 5：USART1_RX</li>
+    </ul>
+
+    <div class="note">
+        <strong>注意：</strong>STM32F4/H7等较新系列使用通道请求多路复用器（DMAMUX），不再有固定通道映射，任何通道可以连接任何外设，灵活性更高。
+    </div>
+
+    <!-- 三、DMA传输模式 -->
+    <h2>三、DMA传输模式</h2>
+
+    <h3>3.1 传输方向</h3>
+    <table>
+        <tr><th>模式</th><th>源</th><th>目标</th><th>应用场景</th></tr>
+        <tr><td>外设到内存</td><td>外设寄存器</td><td>SRAM</td><td>ADC采样、UART接收</td></tr>
+        <tr><td>内存到外设</td><td>SRAM</td><td>外设寄存器</td><td>UART发送、DAC输出</td></tr>
+        <tr><td>内存到内存</td><td>SRAM</td><td>SRAM</td><td>数据搬运、图像处理</td></tr>
+    </table>
+
+    <h3>3.2 传输模式</h3>
+    <table>
+        <tr><th>模式</th><th>说明</th><th>适用场景</th></tr>
+        <tr><td>正常模式（Normal）</td><td>传输指定数量数据后停止</td><td>单次数据传输</td></tr>
+        <tr><td>循环模式（Circular）</td><td>传输完成后自动重新开始</td><td>ADC连续采样、音频播放</td></tr>
+    </table>
+
+    <h3>3.3 数据宽度</h3>
+    <ul>
+        <li><strong>字节（8位）：</strong>适合UART、SPI字节传输</li>
+        <li><strong>半字（16位）：</strong>适合12位ADC、16位外设</li>
+        <li><strong>字（32位）：</strong>适合32位数据传输、内存拷贝</li>
+    </ul>
+
+    <h3>3.4 双缓冲模式</h3>
+    <p>双缓冲模式使用两个内存缓冲区交替接收数据，一个缓冲区正在被DMA填充时，CPU可以处理另一个缓冲区的数据。</p>
+    <div class="key-point">
+        <strong>双缓冲优势：</strong><br>
+        - 消除数据处理和数据采集之间的竞争<br>
+        - 实现连续无间断的数据流<br>
+        - 特别适合音频采集、高速ADC、图像捕获等场景<br>
+        - DMA半传输完成和传输完成中断分别对应两个缓冲区
+    </div>
+
+    <!-- 四、NVIC中断系统 -->
+    <h2>四、NVIC（嵌套向量中断控制器）</h2>
+    <p>NVIC是ARM Cortex-M内核的核心组件，负责管理和调度所有中断请求。它支持嵌套中断、动态优先级配置和低延迟响应。</p>
+
+    <h3>4.1 NVIC核心特性</h3>
+    <ul>
+        <li><strong>嵌套中断：</strong>高优先级中断可以打断正在执行的低优先级中断</li>
+        <li><strong>向量表：</strong>每个中断源有独立的中断向量（处理函数地址）</li>
+        <li><strong>低延迟：</strong>从中断触发到执行第一条ISR指令仅需12个时钟周期</li>
+        <li><strong>优先级可配置：</strong>支持2~8位优先级配置位</li>
+        <li><strong>尾链（Tail-chaining）：</strong>连续中断之间无需出栈入栈，6个周期即可响应</li>
+        <li><strong>晚到（Late-arrival）：</strong>高优先级中断在低优先级中断入栈期间到达，无需二次入栈</li>
+    </ul>
+
+    <h3>4.2 优先级分组</h3>
+    <p>中断优先级分为抢占优先级和子优先级。优先级寄存器的位可以在这两者之间分配。</p>
+    <table>
+        <tr><th>分组</th><th>抢占位</th><th>子优先级位</th><th>说明</th></tr>
+        <tr><td>NVIC_PRIORITYGROUP_0</td><td>0</td><td>4</td><td>无抢占，16个子优先级</td></tr>
+        <tr><td>NVIC_PRIORITYGROUP_1</td><td>1</td><td>3</td><td>2个抢占，8个子优先级</td></tr>
+        <tr><td>NVIC_PRIORITYGROUP_2</td><td>2</td><td>2</td><td>4个抢占，4个子优先级</td></tr>
+        <tr><td>NVIC_PRIORITYGROUP_3</td><td>3</td><td>1</td><td>8个抢占，2个子优先级</td></tr>
+        <tr><td>NVIC_PRIORITYGROUP_4</td><td>4</td><td>0</td><td>16个抢占，无子优先级</td></tr>
+    </table>
+
+    <div class="note">
+        <strong>优先级规则：</strong><br>
+        1. 数值越小优先级越高（0为最高优先级）<br>
+        2. 抢占优先级高的可以打断低的<br>
+        3. 抢占优先级相同时，子优先级高的先响应，但不能嵌套<br>
+        4. 两者都相同时，按中断号排优先级
+    </div>
+
+    <!-- 五、中断延迟分析 -->
+    <h2>五、中断延迟分析</h2>
+    <p>中断延迟是从中断事件发生到中断处理程序开始执行之间的时间，是实时系统的关键指标。</p>
+
+    <h3>5.1 延迟组成</h3>
+    <table>
+        <tr><th>阶段</th><th>说明</th><th>典型周期数</th></tr>
+        <tr><td>中断信号同步</td><td>将异步中断信号同步到时钟域</td><td>1~2</td></tr>
+        <tr><td>当前指令完成</td><td>等待当前指令执行完毕（最长LDM/STM）</td><td>1~16</td></tr>
+        <tr><td>入栈（Stack Push）</td><td>将8个寄存器压入堆栈</td><td>8</td></tr>
+        <tr><td>向量提取</td><td>从向量表读取ISR地址</td><td>1</td></tr>
+        <tr><td>取指</td><td>读取ISR第一条指令</td><td>1~2</td></tr>
+    </table>
+
+    <div class="key-point">
+        <strong>中断响应总延迟：</strong><br>
+        最佳情况：约12个时钟周期<br>
+        最差情况：约12 + 16 = 28个时钟周期（多周期指令）<br><br>
+        在72MHz时钟下：<br>
+        最佳延迟 = 12 / 72MHz ≈ 0.167μs<br>
+        最差延迟 = 28 / 72MHz ≈ 0.389μs
+    </div>
+
+    <h3>5.2 尾链与晚到优化</h3>
+    <ul>
+        <li><strong>尾链（Tail-chaining）：</strong>当处理完一个中断后立即有另一个挂起的中断，处理器跳过出栈再入栈的过程，仅用6个周期直接进入下一个ISR</li>
+        <li><strong>晚到（Late-arrival）：</strong>在低优先级中断入栈过程中，更高优先级中断到达，处理器直接服务高优先级中断，入栈的数据仍然有效</li>
+    </ul>
+
+    <!-- 六、ISR最佳实践 -->
+    <h2>六、ISR（中断服务程序）最佳实践</h2>
+
+    <h3>6.1 ISR编写原则</h3>
+    <ol>
+        <li><strong>尽量简短：</strong>只做必要的事（清除标志、读取数据、设置标志），复杂处理放到主循环</li>
+        <li><strong>避免阻塞：</strong>不要在ISR中调用<code>HAL_Delay()</code>、等待信号量等阻塞操作</li>
+        <li><strong>保护共享数据：</strong>使用volatile变量或关中断保护临界区</li>
+        <li><strong>清除中断标志：</strong>必须清除中断标志位，否则会反复进入中断</li>
+        <li><strong>注意堆栈使用：</strong>ISR使用主堆栈（MSP），避免使用过多局部变量</li>
+    </ol>
+
+    <h3>6.2 中断与RTOS协作</h3>
+    <div class="key-point">
+        <strong>FreeRTOS中的中断使用规则：</strong><br>
+        - 中断安全API以"FromISR"结尾，如<code>xSemaphoreGiveFromISR()</code><br>
+        - 在中断中使用<code>portYIELD_FROM_ISR()</code>触发上下文切换<br>
+        - 优先级高于<code>configMAX_SYSCALL_INTERRUPT_PRIORITY</code>的中断不能调用FreeRTOS API<br>
+        - 典型模式：ISR中发送信号量/队列，任务等待后处理
+    </div>
+
+    <h3>6.3 DMA+中断联合使用示例</h3>
+    <div class="key-point">
+        <pre>
+// ADC + DMA + 中断 实现连续采样
+#define ADC_BUF_SIZE 100
+uint16_t adcBuffer[ADC_BUF_SIZE];
+
+// 配置ADC使用DMA
+hadc1.Init.DMAContinuousRequests = ENABLE;
+HAL_ADC_Start_DMA(&hadc1, (uint32_t*)adcBuffer, ADC_BUF_SIZE);
+
+// DMA传输完成中断回调
+void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef* hadc) {
+    // 处理后半部分缓冲区数据（双缓冲场景）
+    dataReady = 1;  // 设置标志，通知主循环处理
+}
+
+// DMA半传输完成中断回调
+void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef* hadc) {
+    // 处理前半部分缓冲区数据
+    halfDataReady = 1;
+}
+        </pre>
+    </div>
+
+</div>
+
+<!--
+========================================
+  文件总结
+========================================
+  主题：DMA与中断系统
+  内容概要：
+    1. DMA原理 - 无需CPU参与的直接数据搬运
+    2. DMA通道架构 - DMA1/DMA2多通道，通道映射，DMAMUX
+    3. DMA传输模式 - 方向/正常循环/数据宽度/双缓冲
+    4. NVIC中断系统 - 嵌套中断、优先级分组、向量表
+    5. 中断延迟 - 12~28周期，尾链和晚到优化
+    6. ISR最佳实践 - 简短、不阻塞、清除标志、中断安全API
+  重点知识：
+    - DMA四种传输方向：外设→内存、内存→外设、内存→内存
+    - 双缓冲模式消除采集与处理的竞争
+    - NVIC优先级：数值越小越高，分组配置抢占和子优先级
+    - 中断响应最佳12周期，尾链6周期
+    - FreeRTOS中断安全API以FromISR结尾
+========================================
+-->
+</body>
+</html>

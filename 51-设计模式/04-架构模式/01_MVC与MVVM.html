@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MVC与MVVM架构模式</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f5f7fa; color: #333; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 15px; margin-bottom: 30px; }
+        h2 { color: #2980b9; margin: 25px 0 10px; border-left: 4px solid #3498db; padding-left: 12px; }
+        h3 { color: #8e44ad; margin: 15px 0 8px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: center; }
+        th { background: #3498db; color: #fff; }
+        tr:nth-child(even) { background: #ecf0f1; }
+        .note { background: #fef9e7; border-left: 4px solid #f1c40f; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        .important { background: #fdedec; border-left: 4px solid #e74c3c; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        ul, ol { margin-left: 25px; margin-bottom: 10px; }
+        li { margin-bottom: 5px; }
+        pre { background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 8px; overflow-x: auto; font-size: 0.9em; margin: 10px 0; }
+        pre .comment { color: #7f8c8d; }
+        pre .keyword { color: #e74c3c; }
+        pre .string { color: #f39c12; }
+        .arch-box { display: inline-block; padding: 10px 20px; margin: 5px; border-radius: 8px; font-weight: bold; text-align: center; }
+        .arch-visual { text-align: center; margin: 15px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>MVC与MVVM架构模式</h1>
+
+        <!-- MVC -->
+        <div class="card">
+            <h2>一、MVC模式</h2>
+            <p>MVC（Model-View-Controller）将应用分为三个相互协作的组件，是最经典的软件架构模式。</p>
+
+            <h3>1.1 三个组件</h3>
+            <table>
+                <tr><th>组件</th><th>职责</th><th>特点</th></tr>
+                <tr><td>Model（模型）</td><td>数据和业务逻辑</td><td>不依赖View和Controller，独立变化</td></tr>
+                <tr><td>View（视图）</td><td>用户界面展示</td><td>从Model获取数据显示，不处理业务逻辑</td></tr>
+                <tr><td>Controller（控制器）</td><td>接收用户输入，协调M和V</td><td>处理用户交互，更新Model，选择View</td></tr>
+            </table>
+
+            <h3>1.2 数据流向</h3>
+            <div class="arch-visual">
+                <svg width="400" height="200" viewBox="0 0 400 200">
+                    <rect x="20" y="70" width="100" height="50" rx="8" fill="#3498db" stroke="#2c3e50" stroke-width="2"/>
+                    <text x="70" y="100" text-anchor="middle" fill="white" font-size="14">Model</text>
+                    <rect x="150" y="10" width="100" height="50" rx="8" fill="#2ecc71" stroke="#2c3e50" stroke-width="2"/>
+                    <text x="200" y="40" text-anchor="middle" fill="white" font-size="14">View</text>
+                    <rect x="280" y="70" width="100" height="50" rx="8" fill="#e74c3c" stroke="#2c3e50" stroke-width="2"/>
+                    <text x="330" y="100" text-anchor="middle" fill="white" font-size="14">Controller</text>
+                    <text x="200" y="170" text-anchor="middle" font-size="12" fill="#666">用户 → Controller → Model → View → 用户</text>
+                    <!-- Arrows -->
+                    <path d="M120,95 L150,45" stroke="#2c3e50" stroke-width="2" marker-end="url(#arrow)"/>
+                    <path d="M250,45 L280,80" stroke="#2c3e50" stroke-width="2" marker-end="url(#arrow)"/>
+                    <path d="M380,80 Q400,120 330,120" stroke="#2c3e50" stroke-width="2" marker-end="url(#arrow)"/>
+                    <defs><marker id="arrow" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto"><polygon points="0 0, 10 3.5, 0 7" fill="#2c3e50"/></marker></defs>
+                </svg>
+            </div>
+
+            <h3>1.3 JavaScript实现</h3>
+<pre><span class="comment">// Model：数据和业务逻辑</span>
+<span class="keyword">class</span> TodoModel {
+    <span class="keyword">constructor</span>() {
+        <span class="keyword">this</span>.todos = [];
+        <span class="keyword">this</span>.listeners = [];
+    }
+    add(text) {
+        <span class="keyword">this</span>.todos.push({ id: Date.now(), text, done: <span class="keyword">false</span> });
+        <span class="keyword">this</span>.notify();
+    }
+    toggle(id) {
+        <span class="keyword">const</span> todo = <span class="keyword">this</span>.todos.find(t => t.id === id);
+        <span class="keyword">if</span> (todo) todo.done = !todo.done;
+        <span class="keyword">this</span>.notify();
+    }
+    subscribe(fn) { <span class="keyword">this</span>.listeners.push(fn); }
+    notify() { <span class="keyword">this</span>.listeners.forEach(fn => fn(<span class="keyword">this</span>.todos)); }
+}
+
+<span class="comment">// View：只负责渲染</span>
+<span class="keyword">class</span> TodoView {
+    <span class="keyword">constructor</span>(container) {
+        <span class="keyword">this</span>.container = container;
+    }
+    render(todos) {
+        <span class="keyword">this</span>.container.innerHTML = todos.map(t =>
+            `<div class="${t.done ? 'done' : ''}">${t.text}</div>`
+        ).join(<span class="string">''</span>);
+    }
+}
+
+<span class="comment">// Controller：协调M和V</span>
+<span class="keyword">class</span> TodoController {
+    <span class="keyword">constructor</span>(model, view) {
+        <span class="keyword">this</span>.model = model;
+        <span class="keyword">this</span>.view = view;
+        model.subscribe(todos => view.render(todos));
+    }
+    addTodo(text) { <span class="keyword">this</span>.model.add(text); }
+    toggleTodo(id) { <span class="keyword">this</span>.model.toggle(id); }
+}</pre>
+        </div>
+
+        <!-- MVP -->
+        <div class="card">
+            <h2>二、MVP模式</h2>
+            <p>MVP（Model-View-Presenter）是MVC的变体，View和Model完全隔离，通过Presenter通信。</p>
+
+            <h3>2.1 与MVC的区别</h3>
+            <table>
+                <tr><th>对比</th><th>MVC</th><th>MVP</th></tr>
+                <tr><td>View与Model</td><td>View可直接读取Model</td><td>View与Model完全隔离</td></tr>
+                <tr><td>通信方式</td><td>Controller协调</td><td>Presenter双向通信</td></tr>
+                <tr><td>View被动性</td><td>相对主动</td><td>完全被动（Passive View）</td></tr>
+                <tr><td>可测试性</td><td>中等</td><td>更好（View可Mock）</td></tr>
+            </table>
+
+            <h3>2.2 数据流向</h3>
+            <div class="arch-visual" style="font-family: monospace;">
+                用户操作 → View → Presenter → Model<br>
+                Model → Presenter → View（更新界面）<br>
+                <strong>View和Model之间没有直接依赖</strong>
+            </div>
+        </div>
+
+        <!-- MVVM -->
+        <div class="card">
+            <h2>三、MVVM模式</h2>
+            <p>MVVM（Model-View-ViewModel）通过数据绑定实现View和ViewModel的自动同步，是Vue、Angular等框架的核心。</p>
+
+            <h3>3.1 三个组件</h3>
+            <table>
+                <tr><th>组件</th><th>职责</th><th>对应框架</th></tr>
+                <tr><td>Model</td><td>数据和业务逻辑</td><td>API服务、数据层</td></tr>
+                <tr><td>View</td><td>用户界面（HTML模板）</td><td>Vue模板、Angular模板</td></tr>
+                <tr><td>ViewModel</td><td>暴露数据和命令给View，双向绑定</td><td>Vue实例、Angular Component</td></tr>
+            </table>
+
+            <h3>3.2 核心：数据绑定</h3>
+            <div class="arch-visual" style="font-family: monospace;">
+                View ←──双向数据绑定──→ ViewModel ←──→ Model<br><br>
+                View变化 ──自动同步──→ ViewModel数据<br>
+                ViewModel数据变化 ──自动同步──→ View更新
+            </div>
+
+            <h3>3.3 Vue.js MVVM示例</h3>
+<pre><span class="comment">&lt;!-- View：模板 --&gt;</span>
+&lt;div id=<span class="string">"app"</span>&gt;
+    &lt;input v-model=<span class="string">"message"</span>&gt;  <span class="comment">&lt;!-- 双向绑定 --&gt;</span>
+    &lt;p&gt;{{ message }}&lt;/p&gt;       <span class="comment">&lt;!-- 单向绑定 --&gt;</span>
+    &lt;button @click=<span class="string">"reverse"</span>&gt;反转&lt;/button&gt;
+&lt;/div&gt;
+
+<span class="comment">// ViewModel：Vue实例</span>
+<span class="keyword">const</span> app = Vue.createApp({
+    <span class="comment">// data暴露给View的数据</span>
+    data() {
+        <span class="keyword">return</span> { message: <span class="string">'Hello MVVM'</span> };
+    },
+    <span class="comment">// methods暴露给View的命令</span>
+    methods: {
+        reverse() {
+            <span class="keyword">this</span>.message = <span class="keyword">this</span>.message.split(<span class="string">''</span>).reverse().join(<span class="string">''</span>);
+        }
+    }
+}).mount(<span class="string">'#app'</span>);</pre>
+
+            <h3>3.4 简易双向绑定实现原理</h3>
+<pre><span class="comment">// 简化的数据劫持 + 发布订阅</span>
+<span class="keyword">function</span> defineReactive(obj, key, val) {
+    <span class="keyword">const</span> dep = []; <span class="comment">// 订阅者列表</span>
+
+    Object.defineProperty(obj, key, {
+        get() {
+            <span class="comment">// 收集依赖（Watcher）</span>
+            <span class="keyword">if</span> (Dep.target) dep.push(Dep.target);
+            <span class="keyword">return</span> val;
+        },
+        set(newVal) {
+            <span class="keyword">if</span> (newVal === val) <span class="keyword">return</span>;
+            val = newVal;
+            <span class="comment">// 通知所有订阅者更新</span>
+            dep.forEach(watcher => watcher.update());
+        }
+    });
+}
+
+<span class="comment">// Vue 3 使用 Proxy 替代 Object.defineProperty</span>
+<span class="keyword">const</span> reactive = (obj) => <span class="keyword">new</span> Proxy(obj, {
+    get(target, key) {
+        track(target, key); <span class="comment">// 收集依赖</span>
+        <span class="keyword">return</span> target[key];
+    },
+    set(target, key, value) {
+        target[key] = value;
+        trigger(target, key); <span class="comment">// 触发更新</span>
+        <span class="keyword">return true</span>;
+    }
+});</pre>
+        </div>
+
+        <!-- 对比总结 -->
+        <div class="card">
+            <h2>四、MVC / MVP / MVVM 对比</h2>
+            <table>
+                <tr><th>特性</th><th>MVC</th><th>MVP</th><th>MVVM</th></tr>
+                <tr><td>View-Model通信</td><td>Controller协调</td><td>Presenter双向</td><td>数据绑定自动</td></tr>
+                <tr><td>View被动性</td><td>较主动</td><td>被动</td><td>被动（自动同步）</td></tr>
+                <tr><td>耦合度</td><td>较高</td><td>较低</td><td>最低</td></tr>
+                <tr><td>可测试性</td><td>中等</td><td>好</td><td>好</td></tr>
+                <tr><td>适用场景</td><td>后端框架</td><td>Android开发</td><td>前端SPA框架</td></tr>
+                <tr><td>代表框架</td><td>Spring MVC, Express</td><td>Android MVP</td><td>Vue, Angular, React+</td></tr>
+            </table>
+
+            <div class="important">
+                <strong>核心区别：</strong><br>
+                MVC：用户 → Controller → Model → View<br>
+                MVP：用户 → View → Presenter → Model → Presenter → View<br>
+                MVVM：View ↔（数据绑定）↔ ViewModel ↔ Model
+            </div>
+        </div>
+
+        <!-- 总结 -->
+        <div class="card">
+            <h2>五、知识要点总结</h2>
+            <ol>
+                <li>MVC：Model-View-Controller，最经典的分层架构</li>
+                <li>MVP：View和Model完全隔离，Presenter负责通信</li>
+                <li>MVVM：数据绑定实现View和ViewModel自动同步</li>
+                <li>Vue双向绑定原理：数据劫持 + 发布订阅模式</li>
+                <li>Vue 2用Object.defineProperty，Vue 3用Proxy</li>
+                <li>选择依据：团队、项目规模、框架生态</li>
+            </ol>
+        </div>
+
+        <!--
+            ========================================
+            文件总结：MVC与MVVM
+            ========================================
+            本文件涵盖了前端/后端架构模式：
+            1. MVC模式：Model/View/Controller的职责与数据流
+            2. MVP模式：Presenter作为中间人，View完全被动
+            3. MVVM模式：数据绑定，ViewModel自动化同步
+            4. Vue双向绑定实现原理（数据劫持+发布订阅）
+            5. 三种架构模式的对比与适用场景
+
+            重点：MVVM双向绑定原理、三者区别
+            考点：数据流向、框架对应的架构模式
+            ========================================
+        -->
+    </div>
+</body>
+</html>

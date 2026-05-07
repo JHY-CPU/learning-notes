@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HDFS与MapReduce</title>
+    <!-- 大数据技术 - HDFS与MapReduce 笔记 -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        pre { background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; }
+        .tag { display: inline-block; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <!-- ====== 标题卡片 ====== -->
+    <div class="card">
+        <h2>HDFS与MapReduce</h2>
+        <p><span class="tag">大数据</span><span class="tag">Hadoop</span><span class="tag">分布式存储</span></p>
+        <p>Hadoop分布式文件系统(HDFS)与MapReduce编程范式是大数据生态的基石。</p>
+    </div>
+
+    <!-- ====== HDFS架构 ====== -->
+    <div class="card">
+        <h2>HDFS架构</h2>
+        <p>HDFS（Hadoop Distributed File System）采用主从架构（Master-Slave），专为大规模数据集设计。</p>
+        <div class="code">
+核心组件：
+┌─────────────────────────────────────────────┐
+│              HDFS 架构                       │
+│                                             │
+│  NameNode (主节点)                           │
+│  ├── 管理文件系统命名空间 (Namespace)          │
+│  ├── 维护文件到数据块的映射                    │
+│  ├── 记录每个数据块的位置信息                  │
+│  └── 处理客户端的文件操作请求                  │
+│                                             │
+│  DataNode (从节点)                           │
+│  ├── 存储实际的数据块 (Block)                 │
+│  ├── 执行数据的读写操作                       │
+│  ├── 向NameNode汇报心跳和块报告               │
+│  └── 执行数据的复制和校验                     │
+└─────────────────────────────────────────────┘
+        </div>
+        <div class="note">HDFS默认块大小为128MB（Hadoop 2.x+），远大于普通文件系统的4KB，减少寻址开销。</div>
+    </div>
+
+    <!-- ====== NameNode与DataNode ====== -->
+    <div class="card">
+        <h2>NameNode与DataNode详解</h2>
+        <div class="code">
+NameNode 元数据管理：
+- FsImage：文件系统元数据的完整快照
+- EditLog：记录所有文件系统的变更操作
+- Secondary NameNode：定期合并FsImage和EditLog（非热备！）
+
+DataNode 数据管理：
+- 数据块默认3副本（可配置）
+- 副本放置策略：机架感知
+  第1副本：客户端所在节点
+  第2副本：不同机架的节点
+  第3副本：与第2副本同机架的不同节点
+- 定期向NameNode发送心跳（默认3秒）
+
+高可用方案（HDFS HA）：
+- Active/Standby NameNode
+- 使用ZooKeeper进行故障切换
+- 共享EditLog（QJM：Quorum Journal Manager）
+        </div>
+    </div>
+
+    <!-- ====== MapReduce编程范式 ====== -->
+    <div class="card">
+        <h2>MapReduce编程范式</h2>
+        <p>MapReduce是一种分布式计算框架，将计算分为Map和Reduce两个阶段。</p>
+        <div class="code">
+MapReduce 执行流程：
+Input → Split → Map → Shuffle → Reduce → Output
+
+1. Input Split：将输入数据切分为多个分片
+2. Map阶段：对每个分片并行执行Map函数
+   输入：&lt;key1, value1&gt;
+   输出：&lt;key2, value2&gt;（中间结果）
+3. Shuffle阶段（核心）：
+   - Partition：按Key分区
+   - Sort：对Key排序
+   - Combiner：本地预聚合（可选）
+   - Copy：从Map节点拉取数据到Reduce节点
+4. Reduce阶段：对每个Key的值列表进行聚合
+   输入：&lt;key2, [value2, ...]&gt;
+   输出：&lt;key3, value3&gt;
+5. Output：将结果写入HDFS
+        </div>
+        <div class="note">WordCount是MapReduce的经典示例：Map将每行拆分为单词(word,1)，Reduce对每个单词的计数求和。</div>
+    </div>
+
+    <!-- ====== YARN资源管理 ====== -->
+    <div class="card">
+        <h2>YARN资源管理</h2>
+        <p>YARN（Yet Another Resource Negotiator）是Hadoop的资源管理层，将资源管理和任务调度分离。</p>
+        <div class="code">
+YARN 架构：
+┌──────────────────────────────────────────┐
+│  ResourceManager (全局资源管理器)          │
+│  ├── Scheduler：资源调度（FIFO/Capacity/Fair）│
+│  └── ApplicationMaster：管理应用生命周期    │
+│                                          │
+│  NodeManager (节点管理器)                  │
+│  ├── 管理单个节点的资源                     │
+│  ├── 启动和监控Container                   │
+│  └── 向ResourceManager汇报资源使用          │
+│                                          │
+│  ApplicationMaster                        │
+│  ├── 每个应用一个AM                        │
+│  ├── 向ResourceManager申请资源              │
+│  └── 与NodeManager通信启动任务              │
+│                                          │
+│  Container（资源容器）                      │
+│  ├── 封装某个节点的CPU/内存资源              │
+│  └── 任务在Container中执行                 │
+└──────────────────────────────────────────┘
+        </div>
+        <div class="note">YARN支持多种计算框架：MapReduce、Spark、Flink、Tez等，实现了计算框架与资源管理的解耦。</div>
+    </div>
+
+    <!-- ====== HDFS读写流程 ====== -->
+    <div class="card">
+        <h2>HDFS读写流程</h2>
+        <div class="code">
+写入流程 (HDFS Write)：
+1. 客户端向NameNode请求写入文件
+2. NameNode检查权限和文件是否存在，返回可写入的DataNode列表
+3. 客户端将数据写入第一个DataNode（Pipeline方式）
+4. 数据以Packet为单位在Pipeline中传输
+5. 每个DataNode收到数据后写入本地磁盘并转发给下一个
+6. 确认信息沿Pipeline反向传回客户端
+7. 客户端关闭文件，NameNode提交元数据
+
+读取流程 (HDFS Read)：
+1. 客户端向NameNode请求读取文件
+2. NameNode返回数据块的位置信息（按距离排序）
+3. 客户端选择最近的DataNode直接读取数据
+4. 读取完一个块后，校验数据完整性
+5. 如果读取失败，尝试读取副本
+6. 关闭连接
+        </div>
+    </div>
+
+    <!-- 总结：HDFS提供了高吞吐量的分布式文件存储，MapReduce提供了简单的并行计算模型，YARN统一管理集群资源。
+    三者共同构成了Hadoop大数据处理的核心框架，适用于离线批处理场景。 -->
+</body>
+</html>

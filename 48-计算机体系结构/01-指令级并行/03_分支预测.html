@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分支预测 - 计算机体系结构</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.7;
+        }
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        h1 {
+            text-align: center;
+            font-size: 2.2em;
+            background: linear-gradient(90deg, #f7971e, #ffd200);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f7971e;
+        }
+        h2 {
+            color: #f7971e;
+            font-size: 1.5em;
+            margin: 30px 0 15px;
+            padding-left: 10px;
+            border-left: 4px solid #ffd200;
+        }
+        h3 {
+            color: #ffcf8a;
+            font-size: 1.2em;
+            margin: 20px 0 10px;
+        }
+        .section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 25px;
+            margin-bottom: 25px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+        }
+        .state-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 15px 0;
+        }
+        .state-table th, .state-table td {
+            border: 1px solid #f7971e;
+            padding: 10px 12px;
+            text-align: center;
+        }
+        .state-table th {
+            background: rgba(247, 151, 30, 0.3);
+            color: #ffd200;
+        }
+        .state-table tr:nth-child(even) {
+            background: rgba(255, 255, 255, 0.03);
+        }
+        .code-block {
+            background: #1a1a2e;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 15px 0;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            border-left: 3px solid #f7971e;
+            color: #ffd200;
+        }
+        .diagram {
+            text-align: center;
+            background: #0d1117;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            font-family: 'Consolas', monospace;
+            color: #f7971e;
+            font-size: 0.85em;
+            line-height: 1.4;
+            white-space: pre;
+        }
+        .highlight {
+            color: #ffd200;
+            font-weight: bold;
+        }
+        .note {
+            background: rgba(247, 151, 30, 0.1);
+            border-left: 4px solid #f7971e;
+            padding: 12px 15px;
+            margin: 15px 0;
+            border-radius: 0 8px 8px 0;
+        }
+        ul, ol {
+            margin-left: 25px;
+            margin-bottom: 10px;
+        }
+        li {
+            margin-bottom: 6px;
+        }
+        .tag {
+            display: inline-block;
+            background: rgba(247, 151, 30, 0.3);
+            color: #ffcf8a;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.8em;
+            margin: 3px;
+        }
+        .comparison-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin: 15px 0;
+        }
+        .comparison-card {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            padding: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .comparison-card h4 {
+            color: #f7971e;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>分支预测（Branch Prediction）</h1>
+
+        <!-- 第一部分：分支预测的必要性 -->
+        <div class="section">
+            <h2>一、为什么需要分支预测</h2>
+            <p>在流水线处理器中，分支指令的执行结果（是否跳转、跳转目标地址）通常在流水线的较后阶段才能确定。但处理器需要提前知道下一条指令的地址来持续填充流水线。</p>
+
+            <h3>1.1 分支带来的问题</h3>
+            <div class="diagram">
+流水线遇到分支指令时的困境：
+
+取指 → 译码 → 执行 → 访存 → 写回
+ BEQ  ▲
+       │
+       分支结果在执行阶段才确定
+       但此时已经有 2 条指令进入流水线
+       它们可能是不该执行的！
+
+没有分支预测：必须等待分支结果 → 流水线停顿（Stall）
+有分支预测：提前猜测分支方向 → 继续执行（可能需要取消错误指令）</div>
+
+            <h3>1.2 分支对性能的影响</h3>
+            <ul>
+                <li>典型程序中分支指令占 <span class="highlight">15%-25%</span></li>
+                <li>其中约 <span class="highlight">60%-70%</span> 是条件分支</li>
+                <li>5 级流水线中，一个错误预测浪费 2-3 个周期</li>
+                <li>现代超标量处理器中，错误预测惩罚可达 15-20 个周期</li>
+            </ul>
+
+            <div class="note">
+                <strong>性能公式：</strong>有效 CPI = 理想 CPI + 分支频率 × 错误预测率 × 预测错误惩罚
+            </div>
+        </div>
+
+        <!-- 第二部分：静态分支预测 -->
+        <div class="section">
+            <h2>二、静态分支预测</h2>
+            <p>静态预测在编译时或硬件设计时确定预测策略，不依赖运行时信息。</p>
+
+            <h3>2.1 常见静态预测策略</h3>
+            <table class="state-table">
+                <thead>
+                    <tr>
+                        <th>策略</th>
+                        <th>规则</th>
+                        <th>准确率</th>
+                        <th>适用场景</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><strong>总是不跳转</strong></td>
+                        <td>预测所有分支为 not-taken</td>
+                        <td>~40-60%</td>
+                        <td>简单处理器</td>
+                    </tr>
+                    <tr>
+                        <td><strong>总是跳转</strong></td>
+                        <td>预测所有分支为 taken</td>
+                        <td>~40-60%</td>
+                        <td>较少使用</td>
+                    </tr>
+                    <tr>
+                        <td><strong>向后跳转预测跳转</strong></td>
+                        <td>PC 偏移 < 0 时预测 taken</td>
+                        <td>~65-85%</td>
+                        <td>循环结构（for/while）</td>
+                    </tr>
+                    <tr>
+                        <td><strong>向前跳转预测不跳转</strong></td>
+                        <td>PC 偏移 > 0 时预测 not-taken</td>
+                        <td>~60-70%</td>
+                        <td>if-else 结构</td>
+                    </tr>
+                    <tr>
+                        <td><strong>BTFN（向后 taken，向前 not-taken）</strong></td>
+                        <td>组合上述两者</td>
+                        <td>~65-75%</td>
+                        <td>MIPS R4000 等早期处理器</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <h3>2.2 编译器辅助静态预测</h3>
+            <div class="code-block">
+// GCC 编译器提示（分支概率标注）
+if (__builtin_expect(condition, 1)) {
+    // 编译器将此分支排列在"fall-through"路径
+    // 减少预测失败时的指令 cache 未命中
+    likely_path();
+} else {
+    // 将此代码放在较远的位置
+    unlikely_path();
+}
+
+// 编译器使用 profile-guided optimization (PGO)
+// 运行时收集分支统计数据，指导代码布局
+gcc -fprofile-generate program.c   # 收集信息
+gcc -fprofile-use program.c        # 使用信息优化</div>
+        </div>
+
+        <!-- 第三部分：动态分支预测 -->
+        <div class="section">
+            <h2>三、动态分支预测</h2>
+            <p>动态预测利用程序运行时的行为历史来做出预测，准确率远高于静态预测。</p>
+
+            <h3>3.1 1 位饱和计数器</h3>
+            <div class="diagram">
+最简单的动态预测器：记录上一次分支结果
+
+状态转换：
+  ┌──────────────────────┐
+  │                      │
+  ▼    分支 taken        │
+Not Taken ──────────────▶ Taken
+  ▲                      │
+  │    分支 not-taken    │
+  └──────────────────────┘
+
+问题：循环中预测准确率仅 50%！
+原因：循环退出时的最后一次分支与之前相反</div>
+
+            <h3>3.2 2 位饱和计数器（核心预测机制）</h3>
+            <p>2 位计数器是经典且广泛使用的预测器，提供"迟滞"效果，避免偶发的分支方向改变导致频繁误预测。</p>
+
+            <div class="diagram">
+四种状态：
+
+  Strongly       Weakly         Weakly         Strongly
+  Not Taken     Not Taken       Taken          Taken
+    (00)          (01)           (10)            (11)
+      │             │              │               │
+      │  not-taken  │   not-taken  │    taken      │
+      └─────────────┘              └───────────────┘
+           │                              │
+           │          taken               │    not-taken
+           └──────────────────────────────┘
+           │                              │
+           ▼    not-taken                 ▼    taken
+      ┌────┴────┐                   ┌────┴────┐
+      │  (01)   │                   │  (11)   │
+      └─────────┘                   └─────────┘
+
+规则：
+  - 预测分支方向：看最高位（0=Not Taken, 1=Taken）
+  - 分支 taken：计数器 +1（不超过 3）
+  - 分支 not-taken：计数器 -1（不低于 0）
+
+循环示例：for(i=0; i<10; i++)  → 前 9 次 taken，最后 1 次 not-taken
+  首次循环：Strongly Not Taken → 预测错误 → Weakly Not Taken
+  后续循环：逐渐变为 Strongly Taken（状态 11）
+  循环退出：Strongly Taken → 预测错误 → Weakly Taken
+  下次循环：Weakly Taken → 预测正确 → Strongly Taken
+  → 最终准确率：90/100 = 90%（2位计数器相比1位大幅改善）</div>
+
+            <h3>3.3 2 位计数器实现（Verilog 示例）</h3>
+            <div class="code-block">
+module saturating_counter_2bit(
+    input  wire clk,
+    input  wire rst,
+    input  wire branch_taken,    // 分支实际结果
+    output wire prediction       // 预测结果（最高位）
+);
+    reg [1:0] counter;
+
+    always @(posedge clk or posedge rst) begin
+        if (rst)
+            counter &lt;= 2'b01;    // 初始状态：Weakly Not Taken
+        else if (branch_taken &amp;&amp; counter &lt; 2'b11)
+            counter &lt;= counter + 1;
+        else if (!branch_taken &amp;&amp; counter &gt; 2'b00)
+            counter &lt;= counter - 1;
+    end
+
+    assign prediction = counter[1];  // 最高位为预测结果
+endmodule</div>
+        </div>
+
+        <!-- 第四部分：高级分支预测器 -->
+        <div class="section">
+            <h2>四、高级分支预测技术</h2>
+
+            <h3>4.1 两级自适应预测器</h3>
+            <div class="diagram">
+两级结构：
+
+第一级：分支历史寄存器（BHR）
+  ┌─────────────────────────────┐
+  │ 记录最近 N 次分支的 taken/not-taken │
+  │ 例如 N=4: BHR = 1011             │
+  │  表示：taken, not-taken, taken, taken │
+  └──────────────┬──────────────┘
+                 │
+第二级：模式历史表（PHT）
+  ┌──────────────▼──────────────┐
+  │  用 BHR 作为索引查表            │
+  │  每个表项是一个 2 位计数器        │
+  │  PHT[1011] → 预测结果            │
+  └─────────────────────────────┘
+
+优势：能学习不同分支模式的规律</div>
+
+            <h3>4.2 GShare 预测器</h3>
+            <div class="code-block">
+// GShare：全局历史与 PC 地址异或
+// 避免多个分支映射到同一 PHT 表项
+
+index = (Global_History_Register XOR PC[bits]) mod PHT_size
+
+// 示例：PHT 大小 = 256 项，GHR = 8 位
+GHR = 8'b10110010  // 全局分支历史
+PC  = 8'b01001100  // 程序计数器低 8 位
+index = 8'b10110010 XOR 8'b01001100 = 8'b11111110 = 254
+prediction = PHT[254]  // 查表获取 2 位计数器值</div>
+
+            <h3>4.3 分支目标缓冲区（BTB）</h3>
+            <div class="diagram">
+BTB 结构（Branch Target Buffer）：
+
+┌──────────────────────────────────────────────────────┐
+│                    Branch Target Buffer              │
+├───────┬──────────────┬──────────────────┬────────────┤
+│ Valid │   Tag (PC)   │  Target Address  │ Prediction │
+├───────┼──────────────┼──────────────────┼────────────┤
+│   1   │  0x400500    │    0x400600      │    11      │
+│   1   │  0x400520    │    0x400540      │    00      │
+│   0   │     —        │       —          │    —       │
+│   1   │  0x400540    │    0x400500      │    10      │
+└───────┴──────────────┴──────────────────┴────────────┘
+
+工作流程：
+  1. 取指阶段：用 PC 的低位索引 BTB
+  2. 如果 Tag 匹配且 Valid=1 → BTB 命中
+  3. 使用 Prediction 字段预测分支方向
+  4. 如果预测 taken → 用 Target Address 作为下一条 PC
+  5. 如果预测 not-taken → PC + 4（正常顺序）
+
+功能：同时解决"是否跳转"和"跳到哪里"两个问题</div>
+
+            <h3>4.4 现代预测器对比</h3>
+            <table class="state-table">
+                <thead>
+                    <tr>
+                        <th>预测器</th>
+                        <th>特点</th>
+                        <th>典型准确率</th>
+                        <th>应用场景</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>2-bit 饱和计数器</td>
+                        <td>简单，每个分支独立计数</td>
+                        <td>85-90%</td>
+                        <td>早期 RISC 处理器</td>
+                    </tr>
+                    <tr>
+                        <td>GShare</td>
+                        <td>全局历史 + PC 异或索引</td>
+                        <td>92-95%</td>
+                        <td>Alpha 21264</td>
+                    </tr>
+                    <tr>
+                        <td>Tournament</td>
+                        <td>多种预测器竞争选择</td>
+                        <td>94-96%</td>
+                        <td>Alpha 21264, POWER</td>
+                    </tr>
+                    <tr>
+                        <td>TAGE</td>
+                        <td>多级历史长度表，Tag 匹配</td>
+                        <td>96-98%</td>
+                        <td>现代 x86、ARM 处理器</td>
+                    </tr>
+                    <tr>
+                        <td>Perceptron</td>
+                        <td>神经网络预测，权重学习</td>
+                        <td>95-97%</td>
+                        <td>AMD Zen, Samsung Exynos</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 第五部分：推测执行 -->
+        <div class="section">
+            <h2>五、推测执行（Speculative Execution）</h2>
+            <p>推测执行基于分支预测的结果，在分支结果确定之前就开始执行预测路径上的指令。</p>
+
+            <h3>5.1 推测执行流程</h3>
+            <div class="diagram">
+流水线中的推测执行：
+
+时间轴 →
+取指:  BEQ  ADD  SUB  AND  OR   ← 取指阶段就按预测方向继续
+译码:       ADD  SUB  AND  OR
+执行:  BEQ  ADD  SUB  AND  OR   ← BEQ 执行结果出来
+访存:            SUB  AND  OR
+写回:                 AND  OR
+
+情况 A：预测正确
+  BEQ 结果 = taken，确实应该跳转
+  → ADD, SUB 正常提交（Commit/Retire）
+  → 无需任何回滚
+
+情况 B：预测错误
+  BEQ 结果 = not-taken，不应该跳转
+  → 清空（Flush）ADD, SUB, AND, OR 的结果
+  → 从正确的路径重新取指
+  → 预测错误惩罚 = 被清空的指令数</div>
+
+            <h3>5.2 推测执行的数据结构支持</h3>
+            <ul>
+                <li><strong>重排序缓冲区（ROB）</strong>：保存推测执行的指令结果，直到确认提交</li>
+                <li><strong>检查点机制</strong>：在分支处保存处理器状态快照</li>
+                <li><strong>历史缓冲区</strong>：记录推测执行期间的内存写操作</li>
+            </ul>
+
+            <h3>5.3 推测执行的安全问题</h3>
+            <div class="note">
+                <strong>Spectre 漏洞（2018）：</strong>攻击者通过训练分支预测器使其做出错误预测，利用推测执行泄露敏感数据。推测执行虽然会被回滚，但其副作用（如缓存状态变化）可以被侧信道攻击观察到。
+                <br><br>
+                <strong>缓解措施：</strong>
+                <ul>
+                    <li>序列化指令（lfence）阻断推测执行</li>
+                    <li>Retpoline 技术替换间接分支</li>
+                    <li>硬件级预测器隔离（IBRS、STIBP）</li>
+                    <li>微码更新限制推测执行范围</li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- 第六部分：分支预测在现代处理器中的应用 -->
+        <div class="section">
+            <h2>六、现代处理器的分支预测实现</h2>
+            <table class="state-table">
+                <thead>
+                    <tr>
+                        <th>处理器</th>
+                        <th>预测器类型</th>
+                        <th>BTB 大小</th>
+                        <th>预测准确率</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Intel Alder Lake (12代)</td>
+                        <td>TAGE-like + BTB</td>
+                        <td>~12K 条目</td>
+                        <td>>97%</td>
+                    </tr>
+                    <tr>
+                        <td>AMD Zen 4</td>
+                        <td>TAGE + Perceptron</td>
+                        <td>~8K 条目</td>
+                        <td>>96%</td>
+                    </tr>
+                    <tr>
+                        <td>Apple M2 (Avalanche)</td>
+                        <td>自研预测器</td>
+                        <td>~6K 条目</td>
+                        <td>>97%</td>
+                    </tr>
+                    <tr>
+                        <td>ARM Cortex-X4</td>
+                        <td>TAGE-like</td>
+                        <td>~6K 条目</td>
+                        <td>>96%</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="note">
+                <strong>趋势：</strong>现代处理器的分支预测准确率已经超过 96%，进一步提升的空间有限。研究重点转向降低预测错误惩罚（更浅的流水线、更快的恢复机制）以及间接分支和多目标分支的预测。
+            </div>
+        </div>
+
+        <!-- 总结 -->
+        <div class="section">
+            <h2>总结</h2>
+            <p>分支预测是现代处理器提升指令级并行性的关键技术。从简单的静态预测到复杂的 TAGE、Perceptron 预测器，预测准确率从 60% 提升到了 97% 以上。推测执行进一步隐藏了分支延迟，但也引入了安全风险（Spectre/Meltdown）。理解分支预测机制对于编写高性能代码和进行处理器设计都至关重要。</p>
+            <div style="margin-top: 15px;">
+                <span class="tag">Branch Prediction</span>
+                <span class="tag">2-bit Saturating Counter</span>
+                <span class="tag">BTB</span>
+                <span class="tag">GShare</span>
+                <span class="tag">TAGE</span>
+                <span class="tag">Speculative Execution</span>
+                <span class="tag">Spectre</span>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
+<!--
+    文件：03_分支预测.html
+    主题：分支预测
+    内容概要：
+        1. 分支预测的必要性 - 流水线中的分支冒险问题
+        2. 静态分支预测 - BTFN、编译器辅助预测
+        3. 动态分支预测 - 1位/2位饱和计数器的状态机详解
+        4. 高级预测技术 - 两级自适应、GShare、BTB、TAGE、Perceptron
+        5. 推测执行 - 流程、数据结构支持、Spectre 安全问题
+        6. 现代处理器中的分支预测实现与对比
+    所属课程：48-计算机体系结构 / 01-指令级并行
+-->

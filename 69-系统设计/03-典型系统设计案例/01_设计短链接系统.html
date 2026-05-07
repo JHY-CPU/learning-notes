@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>设计短链接系统</title>
+    <!-- 系统设计 - 短链接系统 笔记 -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        .tag { display: inline-block; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>设计短链接系统</h2>
+        <p><span class="tag">系统设计</span><span class="tag">短链接</span><span class="tag">URL</span></p>
+        <p>将长URL转换为短链接，重定向到原始URL。</p>
+    </div>
+
+    <div class="card">
+        <h2>需求分析</h2>
+        <div class="code">
+功能需求：
+- 给定长URL，生成短链接
+- 访问短链接，重定向到原始URL
+- 短链接可自定义（可选）
+- 短链接有过期时间（可选）
+- 点击统计（可选）
+
+非功能需求：
+- 高可用：99.99%
+- 低延迟：重定向 < 100ms
+- 短链接不可预测
+
+容量估算（每日1亿次创建）：
+- 写QPS：100M / 86400 ≈ 1160/s
+- 读QPS：读写比100:1 → 116000/s
+- 存储5年：100M × 365 × 5 × 500B ≈ 9TB
+- 缓存：20%的热点URL → 内存约2TB
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>短码生成方案</h2>
+        <div class="code">
+Base62编码：
+字符集：[a-z, A-Z, 0-9] 共62个字符
+7位Base62 = 62^7 ≈ 3.5万亿种组合
+
+方案1：哈希截断
+short_code = md5(long_url)[:7]
+优点：相同URL得到相同短码
+缺点：哈希冲突，需要检查数据库
+
+方案2：自增ID + Base62
+ID: 10000 → Base62: "2bI"
+优点：简单无冲突
+缺点：可预测（递增），暴露URL数量
+
+方案3：预生成 + 分发
+预先生成随机短码池
+各应用服务器从池中获取
+优点：高性能，不可预测
+缺点：需要管理短码池
+
+方案4：Snowflake ID
+分布式ID生成器，保证唯一
+再Base62编码
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>架构设计</h2>
+        <div class="code">
+┌─────────────────────────────────────────────┐
+│  客户端 → CDN → 负载均衡 → 应用服务器         │
+│                           ↓                  │
+│                     缓存(Redis)               │
+│                           ↓                  │
+│                     数据库(MySQL分库分表)      │
+│                           ↓                  │
+│                     分析(Kafka → Spark)       │
+└─────────────────────────────────────────────┘
+
+写入流程：
+1. 检查URL是否已存在（缓存/数据库）
+2. 生成短码
+3. 存入数据库（短码 → 长URL）
+4. 写入缓存
+5. 返回短链接
+
+读取流程：
+1. 从缓存查找短码 → 长URL
+2. 缓存未命中 → 查数据库 → 回写缓存
+3. 301/302重定向到长URL
+4. 异步记录访问日志
+
+数据库分片：
+- 按短码哈希分片
+- 64个分片，每分片约150GB(5年)
+
+缓存策略：
+- Redis集群
+- LRU淘汰
+- 热点URL自动缓存
+
+301 vs 302重定向：
+- 301永久：浏览器缓存，减少服务器压力
+- 302临时：每次经过服务器，利于统计
+        </div>
+    </div>
+
+    <!-- 总结：短链接系统核心是短码生成（Base62编码）和快速重定向（缓存+数据库）。
+    需要处理哈希冲突、分库分表、缓存策略等工程问题。
+    302重定向利于统计，301重定向利于性能。 -->
+</body>
+</html>

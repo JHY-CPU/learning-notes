@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- 着色模型 - 计算机图形学笔记 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>着色模型</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f5f7fa; color: #2c3e50; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 40px; }
+        h1 { font-size: 28px; color: #1a5276; border-bottom: 3px solid #2980b9; padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 22px; color: #2980b9; margin: 28px 0 14px; border-left: 4px solid #2980b9; padding-left: 12px; }
+        h3 { font-size: 18px; color: #34495e; margin: 20px 0 10px; }
+        p { margin: 8px 0; text-indent: 2em; }
+        ul, ol { margin: 10px 0 10px 2em; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: left; }
+        th { background: #2980b9; color: #fff; }
+        tr:nth-child(even) { background: #f0f4f8; }
+        .note { background: #eaf2f8; border-left: 4px solid #2980b9; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .key-point { background: #fef9e7; border-left: 4px solid #f39c12; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        code { background: #ecf0f1; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>着色模型</h1>
+
+    <!-- 一、光照基础 -->
+    <h2>一、光照基础</h2>
+    <p>着色模型计算物体表面每个点的颜色，模拟光与材质的交互效果。</p>
+
+    <h3>1.1 光的分量</h3>
+    <table>
+        <tr><th>分量</th><th>英文</th><th>特点</th></tr>
+        <tr><td>环境光</td><td>Ambient</td><td>来自四面八方的间接光照</td></tr>
+        <tr><td>漫反射</td><td>Diffuse</td><td>光线均匀向各方向散射</td></tr>
+        <tr><td>镜面反射</td><td>Specular</td><td>光线沿反射方向集中反射</td></tr>
+    </table>
+
+    <!-- 二、Lambert漫反射 -->
+    <h2>二、Lambert漫反射模型</h2>
+    <p>Lambert模型描述理想漫反射表面的光照效果，光强与入射角的余弦成正比。</p>
+
+    <div class="key-point">
+        <strong>漫反射公式：</strong><br>
+        <code>I_diffuse = Kd × I_light × max(0, N · L)</code><br><br>
+        Kd = 漫反射系数（材质颜色）<br>
+        I_light = 光源强度<br>
+        N = 表面法线（单位向量）<br>
+        L = 光源方向（单位向量）
+    </div>
+
+    <div class="note">
+        <strong>Lambert余弦定律：</strong>表面接收到的光能与入射角的余弦成正比。当光线垂直照射时接收到最多光能。
+    </div>
+
+    <!-- 三、Phong模型 -->
+    <h2>三、Phong着色模型</h2>
+    <p>Phong模型是经典的局部光照模型，结合环境光、漫反射和镜面反射三种分量。</p>
+
+    <h3>3.1 Phong反射方程</h3>
+    <div class="key-point">
+        <code>I = Ka × Ia + Kd × Id × max(0, N·L) + Ks × Is × max(0, R·V)^n</code><br><br>
+        Ka, Kd, Ks = 环境光、漫反射、镜面反射系数<br>
+        Ia, Id, Is = 环境光、漫反射光、镜面反射光强度<br>
+        R = 反射方向 = 2(N·L)N - L<br>
+        V = 观察方向<br>
+        n = 光泽度指数（shininess）
+    </div>
+
+    <h3>3.2 光泽度指数的影响</h3>
+    <table>
+        <tr><th>n值</th><th>效果</th><th>材质示例</th></tr>
+        <tr><td>1-10</td><td>高光范围大，柔和</td><td>粗糙塑料</td></tr>
+        <tr><td>20-50</td><td>中等高光</td><td>光滑塑料</td></tr>
+        <tr><td>100+</td><td>高光尖锐，接近镜面</td><td>金属、镜子</td></tr>
+    </table>
+
+    <!-- 四、Blinn-Phong模型 -->
+    <h2>四、Blinn-Phong模型</h2>
+    <p>Blinn-Phong是Phong模型的改进版，使用半程向量替代反射向量，计算效率更高。</p>
+
+    <h3>4.1 半程向量</h3>
+    <div class="key-point">
+        <strong>半程向量（Halfway Vector）：</strong><br>
+        <code>H = normalize(L + V)</code><br><br>
+        <strong>Blinn-Phong镜面反射：</strong><br>
+        <code>I_specular = Ks × Is × max(0, N·H)^n</code>
+    </div>
+
+    <h3>4.2 Phong vs Blinn-Phong</h3>
+    <table>
+        <tr><th>维度</th><th>Phong</th><th>Blinn-Phong</th></tr>
+        <tr><td>计算</td><td>反射向量R与V点积</td><td>半程向量H与N点积</td></tr>
+        <tr><td>效率</td><td>需要计算R</td><td>直接计算H，更高效</td></tr>
+        <tr><td>效果</td><td>高光较为集中</td><td>高光更自然</td></tr>
+        <tr><td>应用</td><td>传统渲染</td><td>OpenGL默认、游戏引擎</td></tr>
+    </table>
+
+    <!-- 五、着色频率 -->
+    <h2>五、着色频率（Shading Frequency）</h2>
+
+    <table>
+        <tr><th>频率</th><th>方法</th><th>特点</th></tr>
+        <tr><td>Flat Shading</td><td>每三角形计算一次</td><td>面片感明显，计算最少</td></tr>
+        <tr><td>Gouraud Shading</td><td>每顶点计算，片段间插值</td><td>较平滑，但高光可能失真</td></tr>
+        <tr><td>Phong Shading</td><td>每片段计算，法线插值</td><td>最平滑，计算量最大</td></tr>
+    </table>
+
+    <div class="note">
+        <strong>注意：</strong>Phong着色（Shading）指的是逐片段计算光照，与Phong模型（Model）是不同的概念。Phong着色可以使用任何光照模型。
+    </div>
+
+    <!-- 六、纹理映射 -->
+    <h2>六、纹理映射（Texture Mapping）</h2>
+    <p>纹理映射将2D图像（纹理）贴到3D模型表面，增加表面细节而不增加几何复杂度。</p>
+
+    <h3>6.1 纹理坐标</h3>
+    <ul>
+        <li><strong>UV坐标：</strong>(u,v) ∈ [0,1]²，定义纹理上的采样位置</li>
+        <li>每个顶点关联一个UV坐标</li>
+        <li>三角形内部的UV通过重心坐标插值</li>
+    </ul>
+
+    <h3>6.2 纹理过滤</h3>
+    <table>
+        <tr><th>方法</th><th>说明</th><th>效果</th></tr>
+        <tr><td>最近邻（Nearest）</td><td>取最近的纹素</td><td>像素化，快速</td></tr>
+        <tr><td>双线性（Bilinear）</td><td>4个纹素插值</td><td>平滑</td></tr>
+        <tr><td>三线性（Trilinear）</td><td>双线性 + Mipmap层间插值</td><td>最平滑</td></tr>
+    </table>
+
+    <h3>6.3 Mipmap</h3>
+    <div class="key-point">
+        <strong>Mipmap：</strong>预先计算纹理的多级分辨率版本，每级分辨率减半。<br>
+        解决远处纹理采样的走样（Aliasing）问题。<br>
+        额外存储空间增加33%。
+    </div>
+
+    <h3>6.4 纹理寻址模式</h3>
+    <table>
+        <tr><th>模式</th><th>说明</th></tr>
+        <tr><td>Wrap / Repeat</td><td>重复纹理</td></tr>
+        <tr><td>Clamp / Edge</td><td>使用边缘像素填充</td></tr>
+        <tr><td>Mirror</td><td>镜像重复</td></tr>
+        <tr><td>Border</td><td>使用指定边界色</td></tr>
+    </table>
+
+</div>
+
+<!--
+========================================
+  文件总结
+========================================
+  主题：着色模型
+  内容概要：
+    1. Lambert漫反射 - I = Kd × I × max(0, N·L)
+    2. Phong模型 - 环境+漫反射+镜面反射，R·V计算高光
+    3. Blinn-Phong - 半程向量H替代R，N·H计算高光
+    4. 着色频率 - Flat/Gouraud/Phong Shading
+    5. 纹理映射 - UV坐标、纹理过滤、Mipmap
+  重点知识：
+    - Phong方程：I = Ka×Ia + Kd×Id×(N·L) + Ks×Is×(R·V)^n
+    - Blinn-Phong用半程向量H=normalize(L+V)替代反射向量R
+    - Phong着色是逐片段计算，不是Phong模型
+    - Mipmap解决远处纹理走样，额外增加33%存储
+    - 纹理坐标(u,v)通过重心坐标插值到片段
+========================================
+-->
+</body>
+</html>

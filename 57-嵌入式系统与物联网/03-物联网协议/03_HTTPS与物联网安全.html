@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- HTTPS与物联网安全 - 物联网协议笔记 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTTPS与物联网安全</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f5f7fa; color: #2c3e50; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 40px; }
+        h1 { font-size: 28px; color: #1a5276; border-bottom: 3px solid #2980b9; padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 22px; color: #2980b9; margin: 28px 0 14px; border-left: 4px solid #2980b9; padding-left: 12px; }
+        h3 { font-size: 18px; color: #34495e; margin: 20px 0 10px; }
+        p { margin: 8px 0; text-indent: 2em; }
+        ul, ol { margin: 10px 0 10px 2em; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: left; }
+        th { background: #2980b9; color: #fff; }
+        tr:nth-child(even) { background: #f0f4f8; }
+        .note { background: #eaf2f8; border-left: 4px solid #2980b9; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .key-point { background: #fef9e7; border-left: 4px solid #f39c12; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        code { background: #ecf0f1; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>HTTPS与物联网安全</h1>
+
+    <!-- 一、物联网安全概述 -->
+    <h2>一、物联网安全挑战</h2>
+    <p>物联网设备通常资源受限、部署分散、长期无人值守，面临的安全威胁比传统IT设备更加严峻。安全必须从设备端到云端全链路考虑。</p>
+
+    <h3>1.1 主要安全威胁</h3>
+    <table>
+        <tr><th>威胁类别</th><th>具体威胁</th><th>影响</th></tr>
+        <tr><td>通信安全</td><td>窃听、中间人攻击、重放攻击</td><td>数据泄露、伪造指令</td></tr>
+        <tr><td>设备安全</td><td>固件提取、调试接口攻击、侧信道攻击</td><td>知识产权泄露、密钥提取</td></tr>
+        <tr><td>网络安全</td><td>DDoS攻击（如Mirai僵尸网络）</td><td>服务中断、设备被控</td></tr>
+        <tr><td>数据安全</td><td>数据篡改、隐私泄露</td><td>信任破坏、合规风险</td></tr>
+    </table>
+
+    <h3>1.2 安全架构层次</h3>
+    <div class="key-point">
+        <strong>物联网安全分层：</strong><br>
+        - <strong>设备层：</strong>安全启动、硬件安全模块（HSM/TPM）、安全存储<br>
+        - <strong>通信层：</strong>TLS/DTLS加密、证书认证<br>
+        - <strong>云端层：</strong>设备身份管理、访问控制、安全监控<br>
+        - <strong>应用层：</strong>数据加密、访问审计、固件签名验证
+    </div>
+
+    <!-- 二、TLS/SSL for IoT -->
+    <h2>二、TLS/SSL（传输层安全）</h2>
+    <p>TLS是互联网上最广泛使用的加密协议，在TCP之上提供加密、认证和完整性保护。MQTT、HTTP等协议都依赖TLS保障传输安全。</p>
+
+    <h3>2.1 TLS握手过程</h3>
+    <ol>
+        <li><strong>ClientHello：</strong>客户端发送支持的TLS版本、密码套件列表、客户端随机数</li>
+        <li><strong>ServerHello：</strong>服务器选择密码套件，发送服务器随机数</li>
+        <li><strong>Certificate：</strong>服务器发送其X.509证书</li>
+        <li><strong>ServerKeyExchange：</strong>服务器发送密钥交换参数（ECDHE等）</li>
+        <li><strong>CertificateRequest：</strong>（可选）服务器要求客户端证书</li>
+        <li><strong>CertificateVerify：</strong>客户端验证服务器证书，发送客户端证书</li>
+        <li><strong>密钥计算：</strong>双方使用预主密钥计算会话密钥</li>
+        <li><strong>Finished：</strong>双方发送加密的Finished消息，握手完成</li>
+    </ol>
+
+    <h3>2.2 IoT适用的密码套件</h3>
+    <table>
+        <tr><th>密码套件</th><th>密钥交换</th><th>对称加密</th><th>适用场景</th></tr>
+        <tr><td>TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256</td><td>ECDHE</td><td>AES-128-GCM</td><td>推荐，高效安全</td></tr>
+        <tr><td>TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256</td><td>ECDHE</td><td>AES-128-GCM</td><td>RSA证书兼容性好</td></tr>
+        <tr><td>TLS_PSK_WITH_AES_128_CCM</td><td>预共享密钥</td><td>AES-128-CCM</td><td>资源极受限设备</td></tr>
+    </table>
+
+    <div class="note">
+        <strong>IoT TLS优化：</strong><br>
+        - 使用ECC（椭圆曲线）而非RSA：密钥更短（256位ECC ≈ 3072位RSA）<br>
+        - 使用预共享密钥（PSK）：跳过证书验证，减少计算和带宽<br>
+        - TLS会话恢复：减少握手开销<br>
+        - 推荐TLS 1.2+，TLS 1.3更优（更少握手往返）
+    </div>
+
+    <!-- 三、DTLS -->
+    <h2>三、DTLS（数据报传输层安全）</h2>
+    <p>DTLS是TLS的UDP版本，为基于UDP的协议（如CoAP）提供加密保护。由于UDP不可靠、无序，DTLS需要额外处理丢包和乱序。</p>
+
+    <h3>3.1 DTLS vs TLS</h3>
+    <table>
+        <tr><th>特性</th><th>TLS</th><th>DTLS</th></tr>
+        <tr><td>传输层</td><td>TCP</td><td>UDP</td></tr>
+        <tr><td>可靠性</td><td>TCP保证</td><td>DTLS自己处理</td></tr>
+        <tr><td>握手</td><td>顺序可靠</td><td>需处理丢包和重传</td></tr>
+        <tr><td>加密方式</td><td>流加密</td><td>块加密（添加sequence number防重放）</td></tr>
+        <tr><td>适用协议</td><td>MQTT、HTTPS</td><td>CoAP、LwM2M</td></tr>
+    </table>
+
+    <h3>3.2 DTLS防重放攻击</h3>
+    <div class="key-point">
+        <strong>重放攻击防护：</strong><br>
+        DTLS在每个记录中包含一个sequence number，并使用滑动窗口检测重复记录。<br>
+        接收方维护一个位图窗口，记录已接收的sequence number范围。收到超出窗口范围的记录时，更新窗口；收到窗口内的重复记录时，丢弃。
+    </div>
+
+    <!-- 四、证书管理 -->
+    <h2>四、证书与密钥管理</h2>
+
+    <h3>4.1 X.509证书体系</h3>
+    <p>X.509是公钥证书的标准格式，用于在TLS中验证通信双方的身份。</p>
+    <ul>
+        <li><strong>根CA证书：</strong>自签名，预置在设备或操作系统中</li>
+        <li><strong>中间CA证书：</strong>由根CA签发，可以有多级</li>
+        <li><strong>设备证书：</strong>由CA签发，包含设备的公钥和身份信息</li>
+    </ul>
+
+    <h3>4.2 证书配置方式</h3>
+    <table>
+        <tr><th>方式</th><th>说明</th><th>优点</th><th>缺点</th></tr>
+        <tr><td>工厂预置</td><td>生产时烧录到设备</td><td>安全可靠</td><td>不可更换</td></tr>
+        <tr><td>引导配置</td><td>首次上电从服务器获取</td><td>灵活</td><td>首次连接不安全</td></tr>
+        <tr><td>证书更新</td><td>定期更新证书</td><td>长期安全</td><td>需安全通道</td></tr>
+    </table>
+
+    <h3>4.3 证书验证流程</h3>
+    <ol>
+        <li>检查证书有效期（notBefore ~ notAfter）</li>
+        <li>验证证书链（设备证书 → 中间CA → 根CA）</li>
+        <li>检查证书吊销状态（CRL或OCSP）</li>
+        <li>验证Subject Alternative Name匹配服务器域名</li>
+        <li>检查证书扩展（Key Usage等）</li>
+    </ol>
+
+    <!-- 五、固件安全与OTA -->
+    <h2>五、固件安全与OTA更新</h2>
+    <p>固件OTA（Over-The-Air）更新是IoT设备生命周期管理的关键能力。安全的OTA机制需要保证固件来源可信、传输加密、完整性校验。</p>
+
+    <h3>5.1 安全OTA流程</h3>
+    <ol>
+        <li><strong>固件签名：</strong>开发人员用私钥对固件镜像签名</li>
+        <li><strong>安全传输：</strong>通过TLS/HTTPS将固件下载到设备</li>
+        <li><strong>签名验证：</strong>设备用预置的公钥验证固件签名</li>
+        <li><strong>完整性校验：</strong>计算SHA-256哈希与预期值对比</li>
+        <li><strong>A/B分区切换：</strong>写入非活动分区，验证后切换启动</li>
+        <li><strong>回滚保护：</strong>版本号单调递增，拒绝旧版本</li>
+    </ol>
+
+    <div class="key-point">
+        <pre>
+// 固件验证伪代码
+int verify_firmware(uint8_t *fw_data, size_t fw_len,
+                    uint8_t *signature, size_t sig_len) {
+    // 1. 计算固件SHA-256哈希
+    uint8_t hash[32];
+    sha256(fw_data, fw_len, hash);
+
+    // 2. 用公钥验证RSA/ECDSA签名
+    if (ecdsa_verify(public_key, hash, 32, signature, sig_len) != 0) {
+        return ERR_SIGNATURE_INVALID;
+    }
+
+    // 3. 检查版本号（防回滚）
+    uint32_t new_version = get_firmware_version(fw_data);
+    uint32_t current_version = get_running_version();
+    if (new_version &lt;= current_version) {
+        return ERR_VERSION_ROLLBACK;
+    }
+
+    return SUCCESS;
+}
+        </pre>
+    </div>
+
+    <h3>5.2 A/B分区方案</h3>
+    <div class="note">
+        <strong>A/B分区机制：</strong><br>
+        Flash中划分为两个固件分区（A和B）。当前运行A分区时，OTA下载到B分区。下载完成后，重启引导到B分区。如果B分区启动失败，引导加载程序自动回退到A分区，确保设备不会变砖。
+    </div>
+
+    <!-- 六、安全启动 -->
+    <h2>六、安全启动（Secure Boot）</h2>
+    <p>安全启动确保设备只执行经过验证的固件代码，防止恶意固件的注入。它建立从硬件信任根到操作系统启动的信任链。</p>
+
+    <h3>6.1 信任链</h3>
+    <ol>
+        <li><strong>硬件信任根（Root of Trust）：</strong>芯片内不可修改的ROM代码或熔断密钥</li>
+        <li><strong>第一级引导（BL1/ROM）：</strong>验证第二级引导加载程序的签名</li>
+        <li><strong>第二级引导（BL2/U-Boot）：</strong>验证操作系统内核的签名</li>
+        <li><strong>操作系统：</strong>内核验证应用程序/驱动的签名</li>
+    </ol>
+
+    <div class="key-point">
+        <strong>安全启动失败处理：</strong><br>
+        如果任何一级签名验证失败，启动过程终止。设备可能进入恢复模式、锁定调试接口、或完全拒绝启动。具体行为取决于安全策略配置。
+    </div>
+
+    <h3>6.2 硬件安全模块</h3>
+    <table>
+        <tr><th>技术</th><th>说明</th><th>功能</th></tr>
+        <tr><td>TPM</td><td>可信平台模块</td><td>密钥存储、远程认证、安全存储</td></tr>
+        <tr><td>SE（安全元件）</td><td>独立安全芯片</td><td>密钥保护、加密运算、防物理攻击</td></tr>
+        <tr><td>TEE（可信执行环境）</td><td>隔离的安全区域</td><td>敏感数据处理、DRM</td></tr>
+        <tr><td>eFuse</td><td>一次性可编程熔断</td><td>存储根密钥哈希、安全配置锁定</td></tr>
+    </table>
+
+</div>
+
+<!--
+========================================
+  文件总结
+========================================
+  主题：HTTPS与物联网安全
+  内容概要：
+    1. 安全威胁 - 窃听、中间人、DDoS、固件提取
+    2. TLS/SSL - 握手过程、IoT密码套件、PSK优化
+    3. DTLS - TLS的UDP版本，防重放攻击
+    4. 证书管理 - X.509证书链、验证流程
+    5. OTA安全 - 固件签名、A/B分区、回滚保护
+    6. 安全启动 - 信任链、硬件安全模块
+  重点知识：
+    - 推荐ECDHE_ECDSA+AES-128-GCM密码套件
+    - ECC密钥比RSA短得多，适合资源受限设备
+    - DTLS通过sequence number + 滑动窗口防重放
+    - 安全OTA：签名→传输→验证→A/B切换→回滚保护
+    - 信任链：硬件ROM→BL→OS→应用逐级验证签名
+========================================
+-->
+</body>
+</html>

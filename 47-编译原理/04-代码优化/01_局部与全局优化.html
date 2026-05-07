@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>局部与全局代码优化 - 编译原理笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", "SimSun", sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; border-bottom: 3px solid #2b6cb0; padding-bottom: 12px; margin-bottom: 30px; }
+        h2 { color: #2c5282; margin: 25px 0 12px; padding-left: 10px; border-left: 4px solid #2b6cb0; }
+        h3 { color: #2d3748; margin: 18px 0 8px; }
+        p, li { margin-bottom: 8px; }
+        ul, ol { padding-left: 25px; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 10px 14px; text-align: center; }
+        th { background: #2b6cb0; color: #fff; }
+        tr:nth-child(even) { background: #edf2f7; }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: "Consolas", monospace; color: #c53030; }
+        .diagram { background: #ebf8ff; border: 2px solid #3182ce; border-radius: 8px; padding: 20px; margin: 15px 0; text-align: center; font-family: monospace; white-space: pre; line-height: 1.6; }
+        .highlight { background: #fefcbf; border-left: 4px solid #d69e2e; padding: 12px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+        .example { background: #f0fff4; border: 1px solid #48bb78; border-radius: 6px; padding: 14px; margin: 12px 0; }
+        .tag { display: inline-block; background: #2b6cb0; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 0.85em; margin: 2px; }
+        .code-block { background: #1a202c; color: #e2e8f0; padding: 16px; border-radius: 6px; font-family: "Consolas", monospace; font-size: 0.9em; overflow-x: auto; margin: 12px 0; white-space: pre; }
+        .before-after { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 12px 0; }
+        .before-after > div { padding: 12px; border-radius: 6px; }
+        .before { background: #fed7d7; border: 1px solid #c53030; }
+        .after { background: #c6f6d5; border: 1px solid #38a169; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<!-- 局部与全局代码优化 -->
+<!-- 本页面讨论编译器中机器无关的代码优化技术 -->
+<h1>01 - 局部与全局代码优化</h1>
+
+<!-- ====== 第一部分：优化概述 ====== -->
+<h2>一、代码优化概述</h2>
+<div class="card">
+    <p>代码优化是在保持程序语义不变的前提下，对中间代码进行等价变换，以提高目标代码的<strong>执行效率</strong>或减小<strong>代码体积</strong>。</p>
+
+    <h3>1.1 优化的分类</h3>
+    <table>
+        <tr><th>分类维度</th><th>类别</th><th>说明</th></tr>
+        <tr><td>范围</td><td>局部优化</td><td>在单个基本块内进行</td></tr>
+        <tr><td></td><td>全局优化</td><td>在函数/过程范围内进行</td></tr>
+        <tr><td></td><td>过程间优化</td><td>跨越函数边界进行</td></tr>
+        <tr><td>依赖</td><td>机器无关优化</td><td>不依赖目标机器特性</td></tr>
+        <tr><td></td><td>机器相关优化</td><td>依赖目标机器的体系结构</td></tr>
+    </table>
+
+    <h3>1.2 安全优化 vs 不安全优化</h3>
+    <ul>
+        <li><strong>安全优化</strong>：保证不改变程序语义（如常量折叠）</li>
+        <li><strong>不安全优化</strong>：可能改变浮点精度、异常行为等（如代数简化）</li>
+    </ul>
+</div>
+
+<!-- ====== 第二部分：局部优化 ====== -->
+<h2>二、局部优化（基本块内）</h2>
+<div class="card">
+    <h3>2.1 常量折叠（Constant Folding）</h3>
+    <p>在编译时计算常量表达式的值：</p>
+    <div class="before-after">
+        <div class="before"><strong>优化前：</strong><br/><code>t1 = 3 + 5</code><br/><code>t2 = t1 * 2</code></div>
+        <div class="after"><strong>优化后：</strong><br/><code>t1 = 8</code><br/><code>t2 = 16</code></div>
+    </div>
+
+    <h3>2.2 常量传播（Constant Propagation）</h3>
+    <p>用已知的常量值替换变量引用：</p>
+    <div class="before-after">
+        <div class="before"><strong>优化前：</strong><br/><code>x = 5</code><br/><code>y = x + 3</code><br/><code>z = x * y</code></div>
+        <div class="after"><strong>优化后：</strong><br/><code>x = 5</code><br/><code>y = 8</code><br/><code>z = 40</code></div>
+    </div>
+
+    <h3>2.3 代数简化（Algebraic Simplification）</h3>
+    <table>
+        <tr><th>原始表达式</th><th>简化后</th><th>规则</th></tr>
+        <tr><td><code>x + 0</code></td><td><code>x</code></td><td>恒等元</td></tr>
+        <tr><td><code>x * 1</code></td><td><code>x</code></td><td>恒等元</td></tr>
+        <tr><td><code>x * 0</code></td><td><code>0</code></td><td>零元</td></tr>
+        <tr><td><code>x * 2</code></td><td><code>x + x</code></td><td>乘法→加法</td></tr>
+        <tr><td><code>x * 8</code></td><td><code>x &lt;&lt; 3</code></td><td>乘法→移位</td></tr>
+        <tr><td><code>x - x</code></td><td><code>0</code></td><td>自消去</td></tr>
+        <tr><td><code>x / x</code></td><td><code>1</code></td><td>自消去（x≠0）</td></tr>
+        <tr><td><code>!!x</code></td><td><code>x</code></td><td>双重否定</td></tr>
+    </table>
+
+    <h3>2.4 公共子表达式消除（CSE）</h3>
+    <p>在基本块内，若表达式已计算过且变量未被修改，可复用之前的结果：</p>
+    <div class="before-after">
+        <div class="before"><strong>优化前：</strong><br/><code>a = b + c</code><br/><code>d = b + c  // 重复计算</code></div>
+        <div class="after"><strong>优化后：</strong><br/><code>a = b + c</code><br/><code>d = a</code></div>
+    </div>
+
+    <h3>2.5 死代码消除（Dead Code Elimination）</h3>
+    <p>删除计算结果从未被使用的语句：</p>
+    <div class="before-after">
+        <div class="before"><strong>优化前：</strong><br/><code>x = 10</code><br/><code>y = x + 5  // y未被使用</code><br/><code>z = x * 2</code><br/><code>return z</code></div>
+        <div class="after"><strong>优化后：</strong><br/><code>x = 10</code><br/><code>z = x * 2</code><br/><code>return z</code></div>
+    </div>
+</div>
+
+<!-- ====== 第三部分：循环优化 ====== -->
+<h2>三、循环优化</h2>
+<div class="card">
+    <h3>3.1 循环不变量外提（Loop-Invariant Code Motion, LICM）</h3>
+    <p>将循环内计算结果不变的表达式提到循环外部：</p>
+    <div class="before-after">
+        <div class="before"><strong>优化前：</strong><br/><code>for (i=0; i&lt;n; i++) {</code><br/><code>  t = a * b;  // 不依赖i</code><br/><code>  c[i] = t + i;</code><br/><code>}</code></div>
+        <div class="after"><strong>优化后：</strong><br/><code>t = a * b;</code><br/><code>for (i=0; i&lt;n; i++) {</code><br/><code>  c[i] = t + i;</code><br/><code>}</code></div>
+    </div>
+
+    <h3>3.2 归纳变量强度削弱（Induction Variable Strength Reduction）</h3>
+    <p>用开销小的运算替换开销大的运算：</p>
+    <div class="before-after">
+        <div class="before"><strong>优化前：</strong><br/><code>for (i=0; i&lt;n; i++) {</code><br/><code>  a[i] = i * 4;  // 每次乘法</code><br/><code>}</code></div>
+        <div class="after"><strong>优化后：</strong><br/><code>t = 0;</code><br/><code>for (i=0; i&lt;n; i++) {</code><br/><code>  a[t] = t;  // 加法替代乘法</code><br/><code>  t = t + 4;</code><br/><code>}</code></div>
+    </div>
+
+    <h3>3.3 循环展开（Loop Unrolling）</h3>
+    <p>减少循环控制开销，增加指令级并行：</p>
+    <div class="before-after">
+        <div class="before"><strong>优化前：</strong><br/><code>for (i=0; i&lt;4; i++)</code><br/><code>  sum += a[i];</code></div>
+        <div class="after"><strong>完全展开：</strong><br/><code>sum += a[0];</code><br/><code>sum += a[1];</code><br/><code>sum += a[2];</code><br/><code>sum += a[3];</code></div>
+    </div>
+
+    <h3>3.4 循环交换与循环分块</h3>
+    <ul>
+        <li><strong>循环交换</strong>：交换嵌套循环的顺序，改善缓存局部性</li>
+        <li><strong>循环分块（Tiling）</strong>：将大循环拆分为小块，适应缓存大小</li>
+    </ul>
+</div>
+
+<!-- ====== 第四部分：全局优化 ====== -->
+<h2>四、全局优化</h2>
+<div class="card">
+    <h3>4.1 全局公共子表达式消除</h3>
+    <p>跨基本块识别相同的表达式计算：</p>
+    <div class="diagram">  B1: a = b + c
+      │
+  ┌───┴───┐
+  ▼       ▼
+B2: ...   B3: ...
+  │       │
+  └───┬───┘
+      ▼
+B4: d = b + c  ← 在B1中已计算，可在B4中复用</div>
+
+    <h3>4.2 复制传播（Copy Propagation）</h3>
+    <p>用赋值的右值替换对左值的后续引用：</p>
+    <div class="before-after">
+        <div class="before"><code>x = y</code><br/><code>z = x + 1</code></div>
+        <div class="after"><code>x = y</code><br/><code>z = y + 1</code></div>
+    </div>
+
+    <h3>4.3 代码移动（Code Motion）</h3>
+    <p>将不变表达式移到支配其所有使用点的最早位置。</p>
+
+    <div class="highlight">
+        <strong>支配关系（Dominance）</strong>：基本块 d 支配基本块 n，当且仅当从入口到 n 的每条路径都经过 d。记作 d dom n。
+    </div>
+</div>
+
+<!-- ====== 第五部分：优化的度量 ====== -->
+<h2>五、优化效果的度量</h2>
+<div class="card">
+    <table>
+        <tr><th>度量</th><th>说明</th><th>典型优化</th></tr>
+        <tr><td>执行时间</td><td>程序运行总时间</td><td>所有优化</td></tr>
+        <tr><td>指令数</td><td>执行的指令总数</td><td>死代码消除、CSE</td></tr>
+        <tr><td>缓存命中率</td><td>数据/指令缓存的命中比例</td><td>循环分块、数据布局</td></tr>
+        <tr><td>寄存器压力</td><td>同时活跃的变量数</td><td>寄存器分配优化</td></tr>
+        <tr><td>代码体积</td><td>生成代码的总字节数</td><td>内联决策</td></tr>
+    </table>
+
+    <div class="highlight">
+        <strong>注意</strong>：不同优化之间可能存在冲突（如循环展开增加代码体积），编译器需要根据优化级别（O1/O2/O3）平衡各种指标。
+    </div>
+</div>
+
+</div>
+<!-- ====== 总结 ====== -->
+<!--
+本笔记总结：
+1. 代码优化分为局部(基本块内)、全局(函数范围)和过程间优化三个层次
+2. 局部优化包括常量折叠、常量传播、代数简化、CSE和死代码消除
+3. 循环优化是性能提升最大的方向，包括LICM、强度削弱、循环展开、循环分块
+4. 全局公共子表达式消除和复制传播跨越基本块边界进行优化
+5. 支配关系是全局优化的基础概念，用于确定代码移动的安全位置
+6. 优化需要在执行时间、代码体积、编译时间等指标间做权衡
+7. 现代编译器(GCC/LLVM)的-O2级别通常提供最佳的性能/体积平衡
+-->
+</body>
+</html>

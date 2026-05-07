@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>类型推断与Hindley-Milner</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.7; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #6b46c1; border-bottom: 3px solid #805ad5; padding-bottom: 12px; margin-bottom: 30px; }
+        h2 { color: #553c9a; margin: 25px 0 12px; padding-left: 10px; border-left: 4px solid #805ad5; }
+        h3 { color: #2d3748; margin: 15px 0 8px; }
+        p, li { margin-bottom: 8px; }
+        ul, ol { padding-left: 25px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        code { background: #f3e8ff; padding: 2px 6px; border-radius: 4px; font-family: "Consolas", monospace; font-size: 0.95em; color: #6b46c1; }
+        pre { background: #1a202c; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; margin: 10px 0; font-size: 0.9em; }
+        pre code { background: none; color: inherit; padding: 0; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 10px 14px; text-align: center; }
+        th { background: #805ad5; color: #fff; }
+        tr:nth-child(even) { background: #faf5ff; }
+        .tag { display: inline-block; padding: 3px 10px; border-radius: 15px; font-size: 0.8em; font-weight: bold; margin: 2px; }
+        .tag-purple { background: #e9d8fd; color: #553c9a; }
+        .tag-blue { background: #bee3f8; color: #2a4365; }
+        .tag-green { background: #c6f6d5; color: #22543d; }
+        .theorem { background: #faf5ff; border-left: 5px solid #805ad5; padding: 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+        .example { background: #f3e8ff; border-radius: 8px; padding: 15px; margin: 12px 0; }
+        .unify-step { display: flex; align-items: center; gap: 10px; margin: 8px 0; padding: 8px 12px; background: #faf5ff; border-radius: 6px; font-family: monospace; }
+        .unify-step .arrow { color: #805ad5; font-weight: bold; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <h1>类型推断与Hindley-Milner系统</h1>
+
+    <!-- ====== HM系统概述 ====== -->
+    <div class="card">
+        <h2>一、Hindley-Milner类型系统概述</h2>
+        <p>Hindley-Milner (HM) 类型系统是ML家族语言（ML, OCaml, Haskell）的基础，也是许多现代类型系统的灵感来源。</p>
+
+        <h3>核心特性</h3>
+        <ul>
+            <li><strong>多态类型：</strong>支持参数多态（泛型）</li>
+            <li><strong>类型推断：</strong>完全自动推断，无需类型注解</li>
+            <li><strong>let-多态：</strong>let绑定获得多态类型</li>
+            <li><strong>主类型：</strong>每个表达式有最通用的类型</li>
+        </ul>
+
+        <h3>类型语法</h3>
+        <pre><code>类型 τ ::= α          -- 类型变量 (如 a, b, c)
+          | T          -- 基础类型 (如 Int, Bool)
+          | τ₁ → τ₂   -- 函数类型
+          | ∀α. τ      -- 多态类型 (type scheme)</code></pre>
+    </div>
+
+    <!-- ====== HM类型规则 ====== -->
+    <div class="card">
+        <h2>二、HM类型规则</h2>
+
+        <h3>推断规则</h3>
+        <div class="example">
+            <pre><code>-- 变量（实例化多态类型）
+(x : ∀α. τ) ∈ Γ
+────────────────────
+Γ ⊢ x : τ[β/α]       -- 用新类型变量替换
+
+-- 常量
+────────────
+Γ ⊢ n : Int
+
+────────────
+Γ ⊢ True : Bool
+
+-- 函数应用
+Γ ⊢ e₁ : τ₁ → τ₂    Γ ⊢ e₂ : τ₁
+───────────────────────────────────
+Γ ⊢ e₁ e₂ : τ₂
+
+-- λ抽象
+Γ, x : τ₁ ⊢ e : τ₂
+──────────────────────
+Γ ⊢ λx. e : τ₁ → τ₂
+
+-- let绑定（引入let-多态）
+Γ ⊢ e₁ : τ₁    Γ, x : Gen(Γ, τ₁) ⊢ e₂ : τ₂
+──────────────────────────────────────────────
+Γ ⊢ let x = e₁ in e₂ : τ₂</code></pre>
+        </div>
+
+        <div class="theorem">
+            <p><strong>关键：</strong>let-多态使得 <code>let id = λx. x in (id 5, id True)</code> 合法。每次使用 <code>id</code> 时，它的类型被<strong>重新实例化</strong>为新变量。</p>
+        </div>
+    </div>
+
+    <!-- ====== 合一算法 ====== -->
+    <div class="card">
+        <h2>三、合一算法 (Unification)</h2>
+        <p>合一算法是HM类型推断的核心——它找到使两个类型相等的<strong>最通用替换</strong>。</p>
+
+        <h3>合一的定义</h3>
+        <p>对类型 τ₁ 和 τ₂，找到替换 θ 使得 θ(τ₁) = θ(τ₂)。</p>
+
+        <h3>算法</h3>
+        <pre><code>def unify(t1, t2):
+    if t1 == t2:
+        return {}                          -- 相同类型，空替换
+    if is_type_var(t1) and t1 not in free_vars(t2):
+        return {t1: t2}                    -- 替换变量
+    if is_type_var(t2) and t2 not in free_vars(t1):
+        return {t2: t1}                    -- 替换变量
+    if is_function(t1) and is_function(t2):
+        # t1 = a→b, t2 = c→d
+        s1 = unify(t1.arg, t2.arg)
+        s2 = unify(apply(s1, t1.ret), apply(s1, t2.ret))
+        return compose(s2, s1)
+    raise TypeError(f"Cannot unify {t1} and {t2}")</code></pre>
+
+        <h3>示例：推断 id 5 的类型</h3>
+        <div class="example">
+            <p><strong>表达式：</strong><code>(λx. x) 5</code></p>
+            <div class="unify-step"><span class="arrow">1.</span> 给 λx.x 分配类型 α → α</div>
+            <div class="unify-step"><span class="arrow">2.</span> 5 的类型是 Int</div>
+            <div class="unify-step"><span class="arrow">3.</span> 应用规则：α → α 应用于 Int，需要 α = Int</div>
+            <div class="unify-step"><span class="arrow">4.</span> 合一：α ~ Int，替换 θ = {α ↦ Int}</div>
+            <div class="unify-step"><span class="arrow">5.</span> 结果类型：<strong>Int</strong></div>
+        </div>
+
+        <h3>更复杂的示例：推断 λf. λx. f (f x) 的类型</h3>
+        <div class="example">
+            <div class="unify-step"><span class="arrow">1.</span> 设 f : α, x : β, 表达式 f (f x)</div>
+            <div class="unify-step"><span class="arrow">2.</span> f x 中 f 需要是 β → γ，所以 α = β → γ</div>
+            <div class="unify-step"><span class="arrow">3.</span> f (f x) 中外层 f 需要是 γ → δ，所以 α = γ → δ</div>
+            <div class="unify-step"><span class="arrow">4.</span> 合一：β → γ = γ → δ，得 β = γ, γ = δ</div>
+            <div class="unify-step"><span class="arrow">5.</span> 所以 β = γ = δ，α = β → β</div>
+            <div class="unify-step"><span class="arrow">6.</span> 最终类型：<strong>(β → β) → β → β</strong>（多态！）</div>
+        </div>
+    </div>
+
+    <!-- ====== Occurs检查 ====== -->
+    <div class="card">
+        <h2>四、Occurs Check（出现检查）</h2>
+        <p>合一算法中必须检查：不能将类型变量替换为包含自身的类型。</p>
+
+        <div class="example">
+            <pre><code>-- 尝试合一 α 和 α → Int
+-- 如果允许 α = α → Int，会导致无限类型！
+-- α = (α→Int)→Int = ((α→Int)→Int)→Int = ... 无穷展开
+
+def occurs_check(var, typ):
+    """检查 var 是否出现在 typ 的自由变量中"""
+    return var in free_type_variables(typ)
+
+# 合一失败示例
+unify(α, α → Int)
+# occurs_check(α, α→Int) = True
+# → TypeError: "Cannot construct infinite type: α ~ α → Int"</code></pre>
+        </div>
+
+        <p>没有occurs check会导致无限递归类型，这是非法的（在标准HM中）。</p>
+    </div>
+
+    <!-- ====== HM的局限性 ====== -->
+    <div class="card">
+        <h2>五、HM系统的局限与扩展</h2>
+
+        <table>
+            <thead><tr><th>局限</th><th>描述</th><th>扩展方案</th></tr></thead>
+            <tbody>
+                <tr><td>无高阶多态</td><td>不能写 <code>∀f. f Int</code></td><td>System F (显式类型抽象)</td></tr>
+                <tr><td>无子类型</td><td>不能表达继承关系</td><td>带子类型的HM</td></tr>
+                <tr><td>无递归类型</td><td>不能表达自引用类型</td><td>μ类型或隐式递归</td></tr>
+                <tr><td>无类型类</td><td>不能表达约束 (Eq a =>)</td><td>HM + 类型类 (Haskell)</td></tr>
+                <tr><td>单相性</td><td>let参数不能用于不同用途</td><td>MLF, Quick Look (GHC 9.0+)</td></tr>
+            </tbody>
+        </table>
+
+        <h3>Haskell对HM的扩展</h3>
+        <pre><code>-- Haskell类型类（对HM的扩展）
+class Eq a where
+    (==) :: a -> a -> Bool
+
+-- 约束多态
+elem :: Eq a => a -> [a] -> Bool
+elem _ [] = False
+elem x (y:ys) = x == y || elem x ys
+
+-- GADTs（广义代数数据类型）
+data Expr a where
+    Lit  :: Int -> Expr Int
+    Bool :: Bool -> Expr Bool
+    Add  :: Expr Int -> Expr Int -> Expr Int
+    If   :: Expr Bool -> Expr a -> Expr a -> Expr a</code></pre>
+    </div>
+
+</div>
+
+<!--
+========================================
+  笔记总结
+========================================
+本文件涵盖Hindley-Milner类型推断系统：
+
+1. HM类型系统特性：
+   - 支持参数多态（泛型）
+   - 完全自动类型推断
+   - let-多态：let绑定可获得多态类型
+   - 每个表达式有唯一的"主类型"
+
+2. HM类型规则：
+   - 变量实例化、函数应用、λ抽象
+   - let规则引入let-多态（Gen函数泛化类型）
+
+3. 合一算法 (Unification)：
+   - 类型推断的核心算法
+   - 找到使两个类型相等的最通用替换
+   - 处理类型变量、函数类型、基础类型
+
+4. Occurs Check：
+   - 防止无限递归类型
+   - 合一时必须检查：不能将α替换为含α的类型
+
+5. HM的局限与扩展：
+   - 无高阶多态（→ System F）
+   - 无类型类（→ Haskell扩展）
+   - 无子类型（→ 带子类型的HM）
+   - 现代语言（Haskell, Rust, TypeScript）都受HM启发
+========================================
+-->
+</body>
+</html>

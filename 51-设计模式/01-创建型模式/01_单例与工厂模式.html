@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>单例与工厂模式</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f5f7fa; color: #333; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 15px; margin-bottom: 30px; }
+        h2 { color: #2980b9; margin: 25px 0 10px; border-left: 4px solid #3498db; padding-left: 12px; }
+        h3 { color: #8e44ad; margin: 15px 0 8px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: center; }
+        th { background: #3498db; color: #fff; }
+        tr:nth-child(even) { background: #ecf0f1; }
+        .note { background: #fef9e7; border-left: 4px solid #f1c40f; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        .important { background: #fdedec; border-left: 4px solid #e74c3c; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        ul, ol { margin-left: 25px; margin-bottom: 10px; }
+        li { margin-bottom: 5px; }
+        pre { background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 8px; overflow-x: auto; font-size: 0.9em; margin: 10px 0; }
+        pre .comment { color: #7f8c8d; }
+        pre .keyword { color: #e74c3c; }
+        pre .type { color: #3498db; }
+        pre .string { color: #f39c12; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>单例与工厂模式</h1>
+
+        <!-- 创建型模式概述 -->
+        <div class="card">
+            <h2>一、创建型模式概述</h2>
+            <p>创建型模式关注对象的创建过程，将对象的创建与使用分离，提高系统的灵活性和可维护性。</p>
+            <table>
+                <tr><th>模式</th><th>核心意图</th><th>关键点</th></tr>
+                <tr><td>单例模式</td><td>确保一个类只有一个实例</td><td>全局访问点</td></tr>
+                <tr><td>工厂方法</td><td>定义创建对象的接口，让子类决定实例化哪个类</td><td>延迟实例化</td></tr>
+                <tr><td>抽象工厂</td><td>创建一系列相关对象</td><td>产品族</td></tr>
+            </table>
+        </div>
+
+        <!-- 单例模式 -->
+        <div class="card">
+            <h2>二、单例模式（Singleton）</h2>
+
+            <h3>2.1 意图</h3>
+            <p>确保一个类只有一个实例，并提供一个全局访问点。</p>
+
+            <h3>2.2 JavaScript实现</h3>
+<pre><span class="comment">// 方法一：闭包实现</span>
+<span class="keyword">const</span> Singleton = (<span class="keyword">function</span>() {
+    <span class="keyword">let</span> instance;
+
+    <span class="keyword">function</span> createInstance() {
+        <span class="keyword">return</span> {
+            data: <span class="string">'单例数据'</span>,
+            getData() { <span class="keyword">return</span> <span class="keyword">this</span>.data; }
+        };
+    }
+
+    <span class="keyword">return</span> {
+        getInstance() {
+            <span class="keyword">if</span> (!instance) {
+                instance = createInstance();
+            }
+            <span class="keyword">return</span> instance;
+        }
+    };
+})();
+
+<span class="comment">// 使用</span>
+<span class="keyword">const</span> a = Singleton.getInstance();
+<span class="keyword">const</span> b = Singleton.getInstance();
+console.log(a === b); <span class="comment">// true</span></pre>
+
+<pre><span class="comment">// 方法二：ES6 Class实现</span>
+<span class="keyword">class</span> Database {
+    <span class="keyword">static</span> #instance = <span class="keyword">null</span>;
+
+    <span class="keyword">constructor</span>(url) {
+        <span class="keyword">if</span> (Database.#instance) {
+            <span class="keyword">throw new</span> Error(<span class="string">'请使用 getInstance()'</span>);
+        }
+        <span class="keyword">this</span>.url = url;
+        <span class="keyword">this</span>.connection = <span class="keyword">null</span>;
+    }
+
+    <span class="keyword">static</span> getInstance(url) {
+        <span class="keyword">if</span> (!Database.#instance) {
+            Database.#instance = <span class="keyword">new</span> Database(url);
+        }
+        <span class="keyword">return</span> Database.#instance;
+    }
+
+    query(sql) {
+        console.log(`执行: ${sql}`);
+    }
+}</pre>
+
+            <h3>2.3 适用场景</h3>
+            <ul>
+                <li>数据库连接池、线程池</li>
+                <li>日志记录器（Logger）</li>
+                <li>应用配置管理</li>
+                <li>缓存管理器</li>
+                <li>事件总线（Event Bus）</li>
+            </ul>
+
+            <div class="important">
+                <strong>注意事项：</strong>单例模式可能导致代码耦合度高、难以测试。在现代开发中，更推荐使用依赖注入（DI）容器来管理单例。
+            </div>
+        </div>
+
+        <!-- 工厂方法 -->
+        <div class="card">
+            <h2>三、工厂方法模式（Factory Method）</h2>
+
+            <h3>3.1 意图</h3>
+            <p>定义一个创建对象的接口，让子类决定实例化哪个类。工厂方法让类的实例化推迟到子类。</p>
+
+            <h3>3.2 JavaScript实现</h3>
+<pre><span class="comment">// 产品接口</span>
+<span class="keyword">class</span> Button {
+    render() { <span class="keyword">throw new</span> Error(<span class="string">'子类必须实现'</span>); }
+    onClick() { <span class="keyword">throw new</span> Error(<span class="string">'子类必须实现'</span>); }
+}
+
+<span class="comment">// 具体产品</span>
+<span class="keyword">class</span> WindowsButton <span class="keyword">extends</span> Button {
+    render() { console.log(<span class="string">'渲染Windows按钮'</span>); }
+    onClick() { console.log(<span class="string">'Windows按钮点击'</span>); }
+}
+
+<span class="keyword">class</span> MacButton <span class="keyword">extends</span> Button {
+    render() { console.log(<span class="string">'渲染Mac按钮'</span>); }
+    onClick() { console.log(<span class="string">'Mac按钮点击'</span>); }
+}
+
+<span class="comment">// 创建者（工厂）</span>
+<span class="keyword">class</span> Dialog {
+    <span class="comment">// 工厂方法</span>
+    createButton() { <span class="keyword">throw new</span> Error(<span class="string">'子类必须实现'</span>); }
+
+    render() {
+        <span class="keyword">const</span> button = <span class="keyword">this</span>.createButton();
+        button.render();
+        button.onClick();
+    }
+}
+
+<span class="comment">// 具体创建者</span>
+<span class="keyword">class</span> WindowsDialog <span class="keyword">extends</span> Dialog {
+    createButton() { <span class="keyword">return new</span> WindowsButton(); }
+}
+
+<span class="keyword">class</span> MacDialog <span class="keyword">extends</span> Dialog {
+    createButton() { <span class="keyword">return new</span> MacButton(); }
+}
+
+<span class="comment">// 使用</span>
+<span class="keyword">const</span> os = <span class="string">'windows'</span>;
+<span class="keyword">const</span> dialog = os === <span class="string">'windows'</span>
+    ? <span class="keyword">new</span> WindowsDialog()
+    : <span class="keyword">new</span> MacDialog();
+dialog.render();</pre>
+        </div>
+
+        <!-- 抽象工厂 -->
+        <div class="card">
+            <h2>四、抽象工厂模式（Abstract Factory）</h2>
+
+            <h3>4.1 意图</h3>
+            <p>提供一个创建一系列相关或相互依赖对象的接口，而无需指定它们具体的类。</p>
+
+            <h3>4.2 JavaScript实现</h3>
+<pre><span class="comment">// 抽象工厂</span>
+<span class="keyword">class</span> UIFactory {
+    createButton() { <span class="keyword">throw new</span> Error(<span class="string">'子类必须实现'</span>); }
+    createInput() { <span class="keyword">throw new</span> Error(<span class="string">'子类必须实现'</span>); }
+    createCheckbox() { <span class="keyword">throw new</span> Error(<span class="string">'子类必须实现'</span>); }
+}
+
+<span class="comment">// 具体工厂 - Material风格</span>
+<span class="keyword">class</span> MaterialFactory <span class="keyword">extends</span> UIFactory {
+    createButton() {
+        <span class="keyword">return</span> { style: <span class="string">'material'</span>, type: <span class="string">'button'</span>, render() {
+            console.log(<span class="string">'Material风格按钮（有阴影效果）'</span>);
+        }};
+    }
+    createInput() {
+        <span class="keyword">return</span> { style: <span class="string">'material'</span>, type: <span class="string">'input'</span>, render() {
+            console.log(<span class="string">'Material风格输入框（下划线）'</span>);
+        }};
+    }
+}
+
+<span class="comment">// 具体工厂 - Ant风格</span>
+<span class="keyword">class</span> AntFactory <span class="keyword">extends</span> UIFactory {
+    createButton() {
+        <span class="keyword">return</span> { style: <span class="string">'ant'</span>, type: <span class="string">'button'</span>, render() {
+            console.log(<span class="string">'Ant Design风格按钮'</span>);
+        }};
+    }
+    createInput() {
+        <span class="keyword">return</span> { style: <span class="string">'ant'</span>, type: <span class="string">'input'</span>, render() {
+            console.log(<span class="string">'Ant Design风格输入框'</span>);
+        }};
+    }
+}
+
+<span class="comment">// 使用：切换整个UI风格只需换工厂</span>
+<span class="keyword">function</span> buildUI(factory) {
+    <span class="keyword">const</span> button = factory.createButton();
+    <span class="keyword">const</span> input = factory.createInput();
+    button.render();
+    input.render();
+}
+
+buildUI(<span class="keyword">new</span> MaterialFactory());
+buildUI(<span class="keyword">new</span> AntFactory());</pre>
+
+            <h3>4.3 工厂方法 vs 抽象工厂</h3>
+            <table>
+                <tr><th>对比</th><th>工厂方法</th><th>抽象工厂</th></tr>
+                <tr><td>产品数量</td><td>一个产品</td><td>一族相关产品</td></tr>
+                <tr><td>扩展方式</td><td>添加新的创建者子类</td><td>添加新的工厂类</td></tr>
+                <tr><td>适用场景</td><td>创建单一产品，具体类型运行时决定</td><td>创建一系列产品，需要保证兼容性</td></tr>
+            </table>
+        </div>
+
+        <!-- 总结 -->
+        <div class="card">
+            <h2>五、知识要点总结</h2>
+            <ol>
+                <li>单例模式：一个类一个实例，全局访问点</li>
+                <li>工厂方法：延迟实例化到子类，创建单一产品</li>
+                <li>抽象工厂：创建一族相关产品，保证产品兼容性</li>
+                <li>三者都遵循开闭原则（对扩展开放，对修改关闭）</li>
+                <li>现代JS/TS中，模块系统天然提供单例；依赖注入替代工厂</li>
+            </ol>
+        </div>
+
+        <!--
+            ========================================
+            文件总结：单例与工厂模式
+            ========================================
+            本文件涵盖了三种创建型设计模式：
+            1. 单例模式：闭包实现和Class私有字段实现
+            2. 工厂方法模式：定义创建接口，子类决定产品类型
+            3. 抽象工厂模式：创建一族相关产品
+            4. 工厂方法与抽象工厂的对比
+
+            重点：各模式的JavaScript代码实现
+            考点：模式选择、适用场景
+            ========================================
+        -->
+    </div>
+</body>
+</html>

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PPO与TRPO</title>
+    <!-- 强化学习 - PPO与TRPO 笔记 -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        .tag { display: inline-block; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>PPO与TRPO</h2>
+        <p><span class="tag">强化学习</span><span class="tag">策略梯度</span><span class="tag">PPO</span></p>
+        <p>TRPO和PPO通过约束策略更新幅度来提高训练稳定性，是当前最流行的策略梯度算法。</p>
+    </div>
+
+    <!-- ====== TRPO动机 ====== -->
+    <div class="card">
+        <h2>TRPO动机：信任区域</h2>
+        <div class="code">
+问题：策略梯度的步长敏感
+- 步长太大：策略崩溃，性能急剧下降
+- 步长太小：收敛极慢
+
+直觉：限制每次策略更新的幅度
+- 新策略不应与旧策略相差太远
+- 在"信任区域"内优化
+
+TRPO (Schulman 2015)：
+最大化目标函数，约束KL散度：
+
+maximize E[ π_θ(a|s) / π_θ_old(a|s) × A(s,a) ]
+subject to E[ KL(π_θ_old || π_θ) ] ≤ δ
+
+- π_θ_old：旧策略（采集数据的策略）
+- π_θ：新策略（要优化的策略）
+- δ：KL散度约束（通常0.01~0.05）
+        </div>
+    </div>
+
+    <!-- ====== TRPO详解 ====== -->
+    <div class="card">
+        <h2>TRPO算法细节</h2>
+        <div class="code">
+核心组件：
+
+1. 重要性采样目标函数：
+L(θ) = E[ π_θ(a|s) / π_θ_old(a|s) × A(s,a) ]
+= E[ r(θ) × A(s,a) ]
+其中 r(θ) = π_θ(a|s) / π_θ_old(a|s)
+
+2. KL散度约束：
+KL(π_θ_old || π_θ) = E[ log(π_θ_old(a|s)) - log(π_θ(a|s)) ]
+
+3. 求解方式：共轭梯度 + 线搜索
+   a) 计算目标函数梯度 g = ∇L(θ)
+   b) 用共轭梯度近似求解 H⁻¹g （H是Fisher信息矩阵）
+   c) 更新步长 step = √(2δ / (gᵀ H⁻¹ g)) × H⁻¹g
+   d) 线搜索：逐步减小步长直到满足KL约束
+
+TRPO的问题：
+- 需要计算Fisher信息矩阵（二阶梯度）
+- 共轭梯度实现复杂
+- 线搜索增加计算开销
+- 实现困难
+
+→ PPO的出现就是为了简化TRPO
+        </div>
+    </div>
+
+    <!-- ====== PPO ====== -->
+    <div class="card">
+        <h2>PPO (Proximal Policy Optimization)</h2>
+        <div class="code">
+PPO (Schulman 2017)：
+TRPO的简化版本，只用一阶梯度
+
+PPO-Clip目标函数：
+L^CLIP(θ) = E[ min( r(θ)×A, clip(r(θ), 1-ε, 1+ε)×A ) ]
+
+其中：
+- r(θ) = π_θ(a|s) / π_θ_old(a|s)  重要性采样比率
+- ε：裁剪参数（通常0.1~0.2）
+- clip(r, 1-ε, 1+ε)：将r限制在[1-ε, 1+ε]区间
+
+直觉解析：
+当 A > 0（好动作）：
+  - 想增大 r(θ)（增大动作概率）
+  - 但clip在 1+ε 截断
+  - 有效梯度只在 r < 1+ε 时非零
+
+当 A < 0（坏动作）：
+  - 想减小 r(θ)
+  - 但clip在 1-ε 截断
+  - 有效梯度只在 r > 1-ε 时非零
+
+结果：r(θ)被限制在[1-ε, 1+ε]附近
+→ 策略更新幅度被限制 → 类似TRPO的信任区域
+        </div>
+        <div class="note">PPO不需要计算Fisher矩阵或共轭梯度，用简单的裁剪操作实现了类似TRPO的效果。ChatGPT的RLHF阶段使用的就是PPO。</div>
+    </div>
+
+    <!-- ====== PPO实现细节 ====== -->
+    <div class="card">
+        <h2>PPO实现细节</h2>
+        <div class="code">
+PPO完整算法流程：
+
+初始化策略参数 θ，值函数参数 φ
+
+for iteration = 1, 2, ...:
+    1. 用当前策略 π_θ 采集 N 条轨迹
+    2. 计算每步的优势估计 A_t（使用GAE）
+    3. 保存旧策略 π_θ_old ← π_θ
+
+    4. for epoch = 1, ..., K:    // 多个epoch复用数据
+        for each minibatch:
+            // 策略损失
+            r_t = π_θ(a_t|s_t) / π_θ_old(a_t|s_t)
+            L_clip = min(r_t × A_t, clip(r_t, 1-ε, 1+ε) × A_t)
+
+            // 值函数损失
+            L_vf = (V_φ(s_t) - V_target)²
+
+            // 熵奖励（鼓励探索）
+            L_entropy = -Σ π_θ(a|s) × log π_θ(a|s)
+
+            // 总损失
+            L = -L_clip + c1 × L_vf - c2 × L_entropy
+
+            梯度下降更新 θ, φ
+
+关键超参数：
+- ε (clip range): 0.1~0.2
+- K (epochs): 3~10
+- Minibatch size: 64~256
+- c1 (vf coeff): 0.5~1.0
+- c2 (entropy coeff): 0.01~0.05
+- GAE λ: 0.95
+- γ: 0.99
+        </div>
+    </div>
+
+    <!-- ====== PPO-Clip推导 ====== -->
+    <div class="card">
+        <h2>PPO-Clip 目标函数推导</h2>
+        <div class="code">
+目标：限制策略更新，让 π_θ 不要偏离 π_θ_old 太远
+
+TRPO的做法：加KL散度约束
+PPO的做法：直接在目标函数中裁剪
+
+未裁剪的目标：
+J(θ) = E[ r(θ) × A ]
+
+问题：如果 r(θ) 变化太大，可能导致策略崩溃
+
+PPO-Clip的解决：
+L = E[ min( r(θ)×A, clip(r(θ), 1-ε, 1+ε)×A ) ]
+
+当 A > 0（增大该动作概率有利）：
+  L = min( r × A, (1+ε) × A )
+  → r ≤ 1+ε 时 L = r×A（正常梯度）
+  → r > 1+ε 时 L = (1+ε)×A（梯度为0，停止增大）
+
+当 A < 0（减小该动作概率有利）：
+  L = min( r × A, (1-ε) × A )
+  → r ≥ 1-ε 时 L = r×A（正常梯度）
+  → r < 1-ε 时 L = (1-ε)×A（梯度为0，停止减小）
+
+效果：对好的动作，最多增大(1+ε)倍
+      对坏的动作，最多减小到(1-ε)倍
+        </div>
+    </div>
+
+    <!-- ====== PPO vs 其他算法 ====== -->
+    <div class="card">
+        <h2>PPO vs 其他算法</h2>
+        <div class="code">
+┌─────────┬──────────┬───────────┬──────────────┐
+│         │ REINFORCE│ TRPO      │ PPO          │
+├─────────┼──────────┼───────────┼──────────────┤
+│ 稳定性  │ 低       │ 高        │ 高           │
+│ 实现    │ 简单     │ 复杂      │ 简单         │
+│ 梯度    │ 一阶     │ 二阶      │ 一阶         │
+│ 样本效率│ 低       │ 高        │ 高           │
+│ 数据复用│ 无       │ 少量      │ 多epoch      │
+│ 调参难度│ 低       │ 中等      │ 低           │
+│ 适用    │ 简单任务 │ 复杂任务  │ 各种任务     │
+└─────────┴──────────┴───────────┴──────────────┘
+
+PPO的成功应用：
+- OpenAI Five（Dota 2，1v1击败世界冠军）
+- ChatGPT / InstructGPT（RLHF阶段）
+- 机器人控制（多种连续控制任务）
+- 游戏AI（多种Atari/棋类游戏）
+        </div>
+        <div class="note">PPO是目前最广泛使用的策略梯度算法，在工业界被大量采用。其核心优势在于实现简单、稳定性好、超参数敏感度低。</div>
+    </div>
+
+    <!-- 总结：TRPO通过KL散度约束和二阶优化实现稳定策略更新，PPO通过裁剪目标函数用一阶梯度实现了类似效果。
+    PPO-Clip是最流行的变体，核心是 min(r*A, clip(r,1-ε,1+ε)*A)。ChatGPT和OpenAI Five都使用PPO。 -->
+</body>
+</html>

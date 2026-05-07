@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拉普拉斯变换 - 级数与变换</title>
+    <style>
+        :root {
+            --primary: #2c3e50;
+            --secondary: #2980b9;
+            --accent: #e74c3c;
+            --bg: #fdfdfd;
+            --card-bg: #ffffff;
+            --border: #dfe6e9;
+            --text: #2d3436;
+            --text-light: #636e72;
+            --success: #27ae60;
+            --info: #2980b9;
+            --warning: #f39c12;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 2rem;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: var(--primary);
+            font-size: 2.2rem;
+            margin-bottom: 0.5rem;
+            border-bottom: 3px solid var(--secondary);
+            padding-bottom: 0.8rem;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: var(--text-light);
+            margin-bottom: 2rem;
+        }
+
+        h2 {
+            color: var(--secondary);
+            font-size: 1.5rem;
+            margin: 2rem 0 1rem;
+            padding-left: 0.8rem;
+            border-left: 4px solid var(--secondary);
+        }
+
+        h3 {
+            color: var(--primary);
+            font-size: 1.2rem;
+            margin: 1.2rem 0 0.6rem;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin: 1rem 0;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .formula-box {
+            background: linear-gradient(135deg, #f8f9fa, #d6eaf8);
+            border-left: 4px solid var(--secondary);
+            padding: 1.2rem 1.5rem;
+            margin: 1rem 0;
+            border-radius: 0 8px 8px 0;
+            font-family: 'Cambria Math', 'Latin Modern Math', serif;
+        }
+
+        .formula {
+            font-size: 1.15rem;
+            text-align: center;
+            margin: 0.5rem 0;
+        }
+
+        .formula .highlight { color: var(--accent); font-weight: bold; }
+        .formula .big { font-size: 1.35rem; }
+
+        .definition {
+            background: linear-gradient(135deg, #d6eaf8, #aed6f1);
+            border: 1px solid #85c1e9;
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin: 1rem 0;
+        }
+
+        .definition::before {
+            content: "定义";
+            background: var(--info);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .theorem {
+            background: linear-gradient(135deg, #fef9e7, #fdebd0);
+            border: 1px solid #f0c27a;
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin: 1rem 0;
+        }
+
+        .theorem::before {
+            content: "性质";
+            background: var(--warning);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .example {
+            background: linear-gradient(135deg, #eafaf1, #d5f5e3);
+            border: 1px solid #82e0aa;
+            border-radius: 8px;
+            padding: 1.2rem;
+            margin: 1rem 0;
+        }
+
+        .example::before {
+            content: "例题";
+            background: var(--success);
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        .note {
+            background: linear-gradient(135deg, #f4ecf7, #ebdef0);
+            border: 1px solid #c39bd3;
+            border-radius: 8px;
+            padding: 1rem 1.2rem;
+            margin: 1rem 0;
+            font-size: 0.95rem;
+        }
+
+        .note::before {
+            content: "注意";
+            background: #8e44ad;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            font-weight: bold;
+            margin-right: 0.5rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 1rem 0;
+        }
+
+        th {
+            background: var(--secondary);
+            color: white;
+            padding: 0.7rem 1rem;
+            text-align: left;
+        }
+
+        td {
+            padding: 0.6rem 1rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        tr:nth-child(even) td { background: #f8f9fa; }
+
+        .step-list {
+            list-style: none;
+            counter-reset: step;
+            padding-left: 0;
+        }
+
+        .step-list li {
+            counter-increment: step;
+            padding: 0.6rem 0 0.6rem 2.5rem;
+            position: relative;
+        }
+
+        .step-list li::before {
+            content: counter(step);
+            position: absolute;
+            left: 0;
+            top: 0.6rem;
+            width: 1.8rem;
+            height: 1.8rem;
+            background: var(--secondary);
+            color: white;
+            border-radius: 50%;
+            text-align: center;
+            line-height: 1.8rem;
+            font-size: 0.85rem;
+            font-weight: bold;
+        }
+
+        .summary {
+            background: var(--primary);
+            color: white;
+            border-radius: 10px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+        }
+
+        .summary h2 { color: var(--warning); border-left-color: var(--warning); }
+        .summary ul { padding-left: 1.5rem; }
+        .summary li { margin: 0.3rem 0; }
+
+        @media (max-width: 600px) {
+            body { padding: 1rem; }
+            h1 { font-size: 1.6rem; }
+        }
+    </style>
+</head>
+<body>
+
+<h1>拉普拉斯变换</h1>
+<p class="subtitle">Laplace Transform &mdash; 级数与变换 · 第三节</p>
+
+<!-- ============ 一、定义 ============ -->
+<h2>一、拉普拉斯变换的定义</h2>
+
+<div class="definition">
+    <p>函数 f(t)（t ≥ 0）的<strong>拉普拉斯变换</strong>定义为：</p>
+    <div class="formula-box">
+        <p class="formula big"><span class="highlight">F(s) = L{f(t)} = ∫<sub>0</sub><sup>∞</sup> f(t) e<sup>−st</sup> dt</span></p>
+        <p style="text-align:center; color:var(--text-light); margin-top:0.5rem;">其中 s 是复变量（通常取实部足够大的复数）</p>
+    </div>
+</div>
+
+<div class="card">
+    <h3>1.1 存在条件</h3>
+    <p>若 f(t) 满足：</p>
+    <ul style="padding-left:1.5rem;">
+        <li>在 [0, +∞) 上分段连续</li>
+        <li>为指数阶函数（即存在常数 M, a 使 |f(t)| ≤ Me<sup>at</sup>）</li>
+    </ul>
+    <p>则 L{f(t)} 在 Re(s) > a 时存在。</p>
+</div>
+
+<!-- ============ 二、基本变换表 ============ -->
+<h2>二、常用拉普拉斯变换表</h2>
+
+<table>
+    <tr>
+        <th>f(t), t ≥ 0</th>
+        <th>F(s) = L{f(t)}</th>
+        <th>条件</th>
+    </tr>
+    <tr>
+        <td>1</td>
+        <td>1/s</td>
+        <td>s > 0</td>
+    </tr>
+    <tr>
+        <td>t<sup>n</sup></td>
+        <td>n! / s<sup>n+1</sup></td>
+        <td>s > 0, n ∈ ℕ</td>
+    </tr>
+    <tr>
+        <td>t<sup>a</sup></td>
+        <td>Γ(a+1) / s<sup>a+1</sup></td>
+        <td>s > 0, a > −1</td>
+    </tr>
+    <tr>
+        <td>e<sup>at</sup></td>
+        <td>1 / (s − a)</td>
+        <td>s > a</td>
+    </tr>
+    <tr>
+        <td>sin(ωt)</td>
+        <td>ω / (s² + ω²)</td>
+        <td>s > 0</td>
+    </tr>
+    <tr>
+        <td>cos(ωt)</td>
+        <td>s / (s² + ω²)</td>
+        <td>s > 0</td>
+    </tr>
+    <tr>
+        <td>e<sup>at</sup>sin(ωt)</td>
+        <td>ω / ((s−a)² + ω²)</td>
+        <td>s > a</td>
+    </tr>
+    <tr>
+        <td>e<sup>at</sup>cos(ωt)</td>
+        <td>(s−a) / ((s−a)² + ω²)</td>
+        <td>s > a</td>
+    </tr>
+    <tr>
+        <td>t · e<sup>at</sup></td>
+        <td>1 / (s−a)²</td>
+        <td>s > a</td>
+    </tr>
+    <tr>
+        <td>δ(t) （单位脉冲）</td>
+        <td>1</td>
+        <td>所有 s</td>
+    </tr>
+    <tr>
+        <td>u(t) （单位阶跃）</td>
+        <td>1/s</td>
+        <td>s > 0</td>
+    </tr>
+</table>
+
+<!-- ============ 三、基本性质 ============ -->
+<h2>三、基本性质</h2>
+
+<div class="theorem">
+    <h3>3.1 线性性质</h3>
+    <div class="formula-box">
+        <p class="formula big">L{af(t) + bg(t)} = <span class="highlight">aF(s) + bG(s)</span></p>
+    </div>
+</div>
+
+<div class="theorem">
+    <h3>3.2 位移性质（频移）</h3>
+    <div class="formula-box">
+        <p class="formula big">L{e<sup>at</sup> f(t)} = <span class="highlight">F(s − a)</span></p>
+    </div>
+</div>
+
+<div class="theorem">
+    <h3>3.3 延迟性质（时移）</h3>
+    <div class="formula-box">
+        <p class="formula big">L{f(t − a) u(t − a)} = <span class="highlight">e<sup>−as</sup> F(s)</span></p>
+        <p style="text-align:center; color:var(--text-light);">其中 u(t−a) 是单位阶跃函数</p>
+    </div>
+</div>
+
+<div class="theorem">
+    <h3>3.4 微分性质（关键性质）</h3>
+    <div class="formula-box">
+        <p class="formula">L{f′(t)} = <span class="highlight">sF(s) − f(0)</span></p>
+        <p class="formula">L{f″(t)} = <span class="highlight">s²F(s) − sf(0) − f′(0)</span></p>
+        <p class="formula">L{f<sup>(n)</sup>(t)} = s<sup>n</sup>F(s) − s<sup>n−1</sup>f(0) − … − f<sup>(n−1)</sup>(0)</p>
+    </div>
+    <p style="margin-top:0.5rem;"><strong>这就是拉普拉斯变换能将微分方程化为代数方程的核心原因。</strong></p>
+</div>
+
+<div class="theorem">
+    <h3>3.5 积分性质</h3>
+    <div class="formula-box">
+        <p class="formula">L{∫<sub>0</sub><sup>t</sup> f(τ) dτ} = <span class="highlight">F(s) / s</span></p>
+    </div>
+</div>
+
+<!-- ============ 四、卷积定理 ============ -->
+<h2>四、卷积定理（Convolution Theorem）</h2>
+
+<div class="definition">
+    <p><strong>卷积</strong>的定义：</p>
+    <div class="formula-box">
+        <p class="formula big">(f * g)(t) = ∫<sub>0</sub><sup>t</sup> f(τ) g(t − τ) dτ</p>
+    </div>
+</div>
+
+<div class="theorem">
+    <h3>卷积定理</h3>
+    <div class="formula-box">
+        <p class="formula big">L{f * g} = <span class="highlight">F(s) · G(s)</span></p>
+        <p class="formula">即：L<sup>−1</sup>{F(s)G(s)} = (f * g)(t)</p>
+    </div>
+    <p style="margin-top:0.5rem;">卷积定理将 s 域中的乘法转化为 t 域中的卷积积分。</p>
+</div>
+
+<div class="note">
+    <p><strong>卷积的性质：</strong></p>
+    <ul style="padding-left:1.5rem;">
+        <li>交换律：f * g = g * f</li>
+        <li>结合律：(f * g) * h = f * (g * h)</li>
+        <li>分配律：f * (g + h) = f * g + f * h</li>
+    </ul>
+</div>
+
+<!-- ============ 五、逆变换 ============ -->
+<h2>五、拉普拉斯逆变换</h2>
+
+<div class="card">
+    <h3>5.1 逆变换定义</h3>
+    <div class="formula-box">
+        <p class="formula big">f(t) = L<sup>−1</sup>{F(s)} = (1/2πi) ∫<sub>γ−i∞</sub><sup>γ+i∞</sup> F(s) e<sup>st</sup> ds</p>
+    </div>
+    <p>实际计算中，通常利用变换表和部分分式展开，而非直接计算复积分。</p>
+</div>
+
+<div class="card">
+    <h3>5.2 部分分式展开法</h3>
+    <p>将 F(s) 分解为简单分式的和，逐项查表求逆变换。</p>
+    <div class="formula-box">
+        <p class="formula">F(s) = N(s)/D(s)，其中 deg(N) < deg(D)</p>
+        <p class="formula">对 D(s) 的每个因式展开：</p>
+        <p class="formula">1/(s−a) → e<sup>at</sup></p>
+        <p class="formula">1/(s−a)² → t·e<sup>at</sup></p>
+        <p class="formula">1/(s²+ω²) → (1/ω)sin(ωt)</p>
+        <p class="formula">s/(s²+ω²) → cos(ωt)</p>
+    </div>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求 F(s) = (s+3) / (s² + 2s + 5) 的逆变换</p>
+    <div class="formula-box">
+        <p class="formula">分母配方：s² + 2s + 5 = (s+1)² + 4</p>
+        <p class="formula">分子拆分：s + 3 = (s + 1) + 2</p>
+        <p class="formula">F(s) = (s+1)/((s+1)²+4) + 2/((s+1)²+4)</p>
+        <p class="formula">第一项 → e<sup>−t</sup>cos(2t)（频移 + 余弦）</p>
+        <p class="formula">第二项 → e<sup>−t</sup>sin(2t)（频移 + 正弦，系数 2/2 = 1）</p>
+        <p class="formula"><span class="highlight">f(t) = e<sup>−t</sup>[cos(2t) + sin(2t)]</span></p>
+    </div>
+</div>
+
+<!-- ============ 六、解常微分方程 ============ -->
+<h2>六、用拉普拉斯变换解常微分方程</h2>
+
+<div class="card">
+    <h3>6.1 求解步骤</h3>
+    <ol class="step-list">
+        <li>对 ODE 两边取拉普拉斯变换，利用微分性质将导数转化为 s 的代数式</li>
+        <li>代入初始条件</li>
+        <li>求解代数方程，得到 Y(s)</li>
+        <li>对 Y(s) 取拉普拉斯逆变换，得到 y(t)</li>
+    </ol>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求解 y″ + 3y′ + 2y = 0, y(0) = 1, y′(0) = 0</p>
+    <div class="formula-box">
+        <p class="formula">取拉普拉斯变换：[s²Y − s·1 − 0] + 3[sY − 1] + 2Y = 0</p>
+        <p class="formula">(s² + 3s + 2)Y = s + 3</p>
+        <p class="formula">Y(s) = (s+3) / ((s+1)(s+2))</p>
+        <p class="formula">部分分式：Y = 2/(s+1) − 1/(s+2)</p>
+        <p class="formula"><span class="highlight">y(t) = 2e<sup>−t</sup> − e<sup>−2t</sup></span></p>
+    </div>
+</div>
+
+<div class="example">
+    <p><strong>例：</strong>求解 y″ + y = sin(t), y(0) = 0, y′(0) = 0</p>
+    <div class="formula-box">
+        <p class="formula">s²Y + Y = 1/(s²+1)</p>
+        <p class="formula">Y = 1/((s²+1)²)</p>
+        <p class="formula">由卷积定理或查表：<span class="highlight">y(t) = (1/2)[sin(t) − t·cos(t)]</span></p>
+    </div>
+</div>
+
+<div class="note">
+    <p><strong>拉普拉斯变换的优势：</strong></p>
+    <ul style="padding-left:1.5rem;">
+        <li>自动处理初始条件，无需额外确定积分常数</li>
+        <li>将微分方程转化为代数方程，大幅简化求解</li>
+        <li>特别适用于分段函数和脉冲函数驱动的系统</li>
+        <li>在控制理论、信号处理、电路分析中是标准工具</li>
+    </ul>
+</div>
+
+<!-- ============ 汇总 ============ -->
+<div class="summary">
+    <h2>核心要点汇总</h2>
+    <ul>
+        <li><strong>定义</strong>：F(s) = ∫₀<sup>∞</sup> f(t)e<sup>−st</sup> dt</li>
+        <li><strong>微分性质</strong>：L{f′(t)} = sF(s) − f(0)，这是解 ODE 的关键</li>
+        <li><strong>频移</strong>：L{e<sup>at</sup>f(t)} = F(s−a)；<strong>时移</strong>：L{f(t−a)u(t−a)} = e<sup>−as</sup>F(s)</li>
+        <li><strong>卷积定理</strong>：L{f*g} = F(s)·G(s)</li>
+        <li><strong>解 ODE 流程</strong>：取变换 → 代入初始条件 → 解代数方程 → 逆变换</li>
+        <li><strong>常用变换</strong>：1↔1/s, e<sup>at</sup>↔1/(s−a), sin↔ω/(s²+ω²), cos↔s/(s²+ω²)</li>
+    </ul>
+</div>
+
+<!-- 总结：拉普拉斯变换通过积分将时域函数映射到复频域，其微分性质将微分方程转化为代数方程，是工程和物理中解常微分方程的强大工具 -->
+
+</body>
+</html>

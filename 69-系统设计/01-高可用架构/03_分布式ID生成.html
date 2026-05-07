@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分布式ID生成 - 系统设计笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; line-height: 1.8; }
+        .container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
+        h1 { color: #58a6ff; font-size: 2em; border-bottom: 2px solid #30363d; padding-bottom: 12px; margin-bottom: 28px; }
+        h2 { color: #79c0ff; font-size: 1.5em; margin: 32px 0 16px; border-left: 4px solid #58a6ff; padding-left: 12px; }
+        h3 { color: #d2a8ff; font-size: 1.2em; margin: 24px 0 12px; }
+        p { margin: 10px 0; }
+        ul, ol { margin: 10px 0 10px 24px; }
+        li { margin: 6px 0; }
+        code { background: #161b22; color: #ff7b72; padding: 2px 8px; border-radius: 4px; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.9em; }
+        pre { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; overflow-x: auto; margin: 16px 0; }
+        pre code { background: none; color: #c9d1d9; padding: 0; }
+        .note { background: #161b22; border-left: 4px solid #58a6ff; padding: 16px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .warning { background: #161b22; border-left: 4px solid #f0883e; padding: 16px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #30363d; padding: 10px 14px; text-align: left; }
+        th { background: #161b22; color: #58a6ff; }
+        tr:nth-child(even) { background: #161b22; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>分布式ID生成</h1>
+
+    <h2>一、分布式ID需求</h2>
+    <ul>
+        <li><strong>全局唯一：</strong>分布式环境下不重复</li>
+        <li><strong>趋势递增：</strong>便于数据库索引（B+树插入性能）</li>
+        <li><strong>信息安全：</strong>不暴露业务信息（如订单量）</li>
+        <li><strong>高可用：</strong>ID生成服务不能成为单点故障</li>
+        <li><strong>高性能：</strong>低延迟、高吞吐（每秒数万+）</li>
+    </ul>
+
+    <h2>二、UUID</h2>
+    <pre><code>// 标准 UUID v4（随机）
+String id = UUID.randomUUID().toString();
+// 例：550e8400-e29b-41d4-a716-446655440000</code></pre>
+    <table>
+        <tr><th>优点</th><th>缺点</th></tr>
+        <tr>
+            <td>本地生成，无网络开销<br>实现简单</td>
+            <td>36 字符，占用空间大<br>无序，导致索引性能差（B+树分裂）<br>不可读，无法从ID看出生成时间</td>
+        </tr>
+    </table>
+    <div class="warning">
+        <strong>不推荐：</strong>UUID 不具备趋势递增特性，在数据库主键场景下会导致严重的页分裂问题。适合做唯一标识但不适合做数据库主键。
+    </div>
+
+    <h2>三、Snowflake 雪花算法</h2>
+
+    <h3>1. 位结构（64位）</h3>
+    <pre><code>┌─────┬──────────────────┬────────────┬──────────────────┐
+│ 符号 │   41位时间戳       │  10位机器ID  │    12位序列号      │
+│  1b │   timestamp(ms)   │ worker+dc  │   sequence(0-4095)│
+└─────┴──────────────────┴────────────┴──────────────────┘
+  63    62              22 21        12 11                  0</code></pre>
+    <ul>
+        <li><strong>符号位（1位）：</strong>固定为0，保证正数</li>
+        <li><strong>时间戳（41位）：</strong>毫秒级，可用约 69 年（2^41 / (365*24*3600*1000)）</li>
+        <li><strong>机器ID（10位）：</strong>可部署 1024 个节点（5位数据中心 + 5位工作机器）</li>
+        <li><strong>序列号（12位）：</strong>同一毫秒内可生成 4096 个ID</li>
+    </ul>
+
+    <h3>2. Java 实现</h3>
+    <pre><code>public class SnowflakeIdGenerator {
+    private final long epoch = 1609459200000L; // 2021-01-01
+    private final long workerIdBits = 5L;
+    private final long datacenterIdBits = 5L;
+    private final long sequenceBits = 12L;
+
+    private final long maxWorkerId = -1L ^ (-1L << workerIdBits);
+    private final long maxDatacenterId = -1L ^ (-1L << datacenterIdBits);
+
+    private final long workerIdShift = sequenceBits;
+    private final long datacenterIdShift = sequenceBits + workerIdBits;
+    private final long timestampLeftShift = sequenceBits + workerIdBits + datacenterIdBits;
+    private final long sequenceMask = -1L ^ (-1L << sequenceBits);
+
+    private long workerId;
+    private long datacenterId;
+    private long sequence = 0L;
+    private long lastTimestamp = -1L;
+
+    public synchronized long nextId() {
+        long timestamp = System.currentTimeMillis();
+        if (timestamp < lastTimestamp) {
+            throw new RuntimeException("时钟回拨");
+        }
+        if (timestamp == lastTimestamp) {
+            sequence = (sequence + 1) & sequenceMask;
+            if (sequence == 0) {
+                timestamp = waitNextMillis(lastTimestamp);
+            }
+        } else {
+            sequence = 0L;
+        }
+        lastTimestamp = timestamp;
+        return ((timestamp - epoch) << timestampLeftShift)
+             | (datacenterId << datacenterIdShift)
+             | (workerId << workerIdShift)
+             | sequence;
+    }
+}</code></pre>
+
+    <h3>3. 时钟回拨问题</h3>
+    <div class="warning">
+        <strong>核心问题：</strong>NTP 时间同步可能导致时钟回拨，如果回拨超过序列号可承载范围，会导致ID重复。
+    </div>
+    <ul>
+        <li><strong>方案一：</strong>检测到回拨后抛出异常，拒绝服务（简单但影响可用性）</li>
+        <li><strong>方案二：</strong>等待时钟追上（回拨小的时候可行）</li>
+        <li><strong>方案三：</strong>使用美团 Leaf 的方式，在ZK中记录时间戳，发现回拨切换workerId</li>
+        <li><strong>方案四：</strong>预留几位作为回拨序列号</li>
+    </ul>
+
+    <h2>四、数据库自增方案</h2>
+
+    <h3>1. 单机自增（不推荐分布式）</h3>
+    <pre><code>AUTO_INCREMENT -- MySQL 自增主键</code></pre>
+    <p>问题：单点瓶颈，ID可预测（安全隐患）。</p>
+
+    <h3>2. 号段模式（Leaf-segment）</h3>
+    <pre><code>-- 数据库表
+CREATE TABLE id_alloc (
+    biz_tag VARCHAR(128) PRIMARY KEY,  -- 业务标识
+    max_id  BIGINT NOT NULL,           -- 当前最大ID
+    step    INT NOT NULL,              -- 步长
+    update_time TIMESTAMP
+);
+
+-- 应用启动时批量获取一个号段
+UPDATE id_alloc SET max_id = max_id + step WHERE biz_tag = 'order';
+-- 应用在内存中分配 [max_id - step + 1, max_id]</code></pre>
+    <pre><code>数据库只分配号段边界 → 应用内存分配具体ID → 号段用完再取下一个
+┌────────┐      step=1000       ┌──────────────────┐
+│  DB    │ ──────────────────→ │ App 内存号段缓存   │
+│max_id  │                     │ [1001 ~ 2000]     │
+└────────┘                     └──────────────────┘</code></pre>
+    <ul>
+        <li><strong>双Buffer优化：</strong>预加载下一个号段，避免当前号段耗尽时的阻塞</li>
+        <li><strong>优点：</strong>数据库压力小（每step次才访问一次），趋势递增</li>
+        <li><strong>缺点：</strong>服务重启后号段浪费，ID不连续</li>
+    </ul>
+
+    <h2>五、Redis INCR</h2>
+    <pre><code># 原子自增
+INCR order:id           # 返回 1, 2, 3...
+INCRBY order:id 100     # 批量获取</code></pre>
+    <ul>
+        <li>性能好（Redis 内存操作）</li>
+        <li>需要持久化策略（AOF/RDB）防止ID回退</li>
+        <li>可以结合日期生成：日期 + Redis自增序号</li>
+    </ul>
+
+    <h2>六、美团 Leaf 方案</h2>
+    <p>Leaf 是美团开源的分布式ID生成方案，结合了号段模式和Snowflake模式。</p>
+    <ul>
+        <li><strong>Leaf-segment：</strong>基于DB号段 + 双Buffer，适合不需要严格时间序的场景</li>
+        <li><strong>Leaf-snowflake：</strong>基于ZK持久顺序节点分配workerId，解决时钟回拨检测问题</li>
+    </ul>
+
+    <h2>七、方案对比</h2>
+    <table>
+        <tr><th>方案</th><th>有序性</th><th>性能</th><th>可用性</th><th>适用场景</th></tr>
+        <tr><td>UUID</td><td>无序</td><td>极高</td><td>极高</td><td>非主键标识</td></tr>
+        <tr><td>Snowflake</td><td>趋势递增</td><td>极高</td><td>依赖时钟</td><td>高并发通用场景</td></tr>
+        <tr><td>DB号段</td><td>趋势递增</td><td>高</td><td>依赖DB</td><td>中等并发</td></tr>
+        <tr><td>Redis INCR</td><td>严格递增</td><td>高</td><td>依赖Redis</td><td>需要连续ID</td></tr>
+        <tr><td>Leaf</td><td>趋势递增</td><td>极高</td><td>高</td><td>大型分布式系统</td></tr>
+    </table>
+
+    <div class="note">
+        <strong>面试要点：</strong>Snowflake是面试高频考点，需要清楚41+10+12的位分配。时钟回拨是Snowflake的核心问题，需要说出至少2种解决方案。号段模式（Leaf-segment）的核心优势是减少数据库访问频率，双Buffer消除取号阻塞。
+    </div>
+
+    <!-- 总结：分布式ID需满足全局唯一、趋势递增、高可用高性能；Snowflake（41+10+12位）是最常用方案但需处理时钟回拨；号段模式减少数据库访问频率适合中等并发；Redis方案简单但需防回退；美团Leaf综合号段和Snowflake是企业级方案 -->
+</div>
+</body>
+</html>

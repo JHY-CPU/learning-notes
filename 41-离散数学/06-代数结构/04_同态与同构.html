@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>同态与同构</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; font-size: 2em; margin-bottom: 10px; border-bottom: 3px solid #2b6cb0; padding-bottom: 10px; }
+        h2 { color: #2c5282; margin: 25px 0 10px; border-left: 4px solid #3182ce; padding-left: 12px; }
+        h3 { color: #2d3748; margin: 15px 0 8px; }
+        .note { background: #ebf8ff; border-left: 4px solid #3182ce; padding: 12px 16px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+        .theorem { background: #f0fff4; border: 1px solid #68d391; padding: 14px 18px; margin: 15px 0; border-radius: 8px; }
+        .theorem::before { content: "定理"; font-weight: bold; color: #276749; }
+        .example { background: #fffff0; border: 1px solid #ecc94b; padding: 14px 18px; margin: 15px 0; border-radius: 8px; }
+        .example::before { content: "例题"; font-weight: bold; color: #975a16; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 8px 12px; text-align: center; }
+        th { background: #2b6cb0; color: white; }
+        tr:nth-child(even) { background: #edf2f7; }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; }
+        .graph-demo { display: flex; justify-content: center; margin: 20px 0; }
+        .graph-demo svg { border: 1px solid #e2e8f0; border-radius: 8px; background: white; }
+        .summary { background: #faf5ff; border: 2px solid #805ad5; padding: 18px; margin: 30px 0; border-radius: 10px; }
+        .summary h2 { border-left-color: #805ad5; color: #553c9a; }
+        .formula { text-align: center; font-size: 1.15em; background: #edf2f7; padding: 12px; margin: 12px 0; border-radius: 8px; font-family: 'Cambria Math', serif; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<h1>同态与同构</h1>
+<p style="text-align:center; color:#718096;">离散数学 · 代数结构 · 第4节</p>
+
+<!-- ==================== 1. 同态 ==================== -->
+<h2>1. 同态映射 (Homomorphism)</h2>
+
+<h3>1.1 定义</h3>
+<div class="note">
+    设 (G, *) 和 (H, ∘) 是两个代数系统。映射 φ: G → H 称为<strong>同态映射</strong>，若对任意 a, b ∈ G：<br>
+    <div class="formula">φ(a * b) = φ(a) ∘ φ(b)</div>
+    即：先运算再映射 = 先映射再运算（<strong>保持运算结构</strong>）。
+</div>
+
+<h3>1.2 同态的类型</h3>
+<table>
+    <tr><th>类型</th><th>条件</th><th>性质</th></tr>
+    <tr><td>同态 (Homomorphism)</td><td>φ(a*b) = φ(a)∘φ(b)</td><td>保持运算</td></tr>
+    <tr><td>单同态 (Monomorphism)</td><td>同态 + 单射</td><td>保持运算且一一对应到像</td></tr>
+    <tr><td>满同态 (Epimorphism)</td><td>同态 + 满射</td><td>保持运算且映满 H</td></tr>
+    <tr><td>同构 (Isomorphism)</td><td>同态 + 双射</td><td>结构完全相同</td></tr>
+    <tr><td>自同态 (Endomorphism)</td><td>G=H 的同态</td><td>映射到自身</td></tr>
+    <tr><td>自同构 (Automorphism)</td><td>G=H 的同构</td><td>结构的对称性</td></tr>
+</table>
+
+<!-- 同态示意 -->
+<div class="graph-demo">
+    <svg width="500" height="220" viewBox="0 0 500 220">
+        <text x="250" y="20" text-anchor="middle" font-size="14" font-weight="bold">群同态示例: φ: Z → Zₙ, φ(x) = x mod n</text>
+        <!-- Z -->
+        <rect x="20" y="40" width="160" height="160" rx="10" fill="#ebf8ff" stroke="#3182ce" stroke-width="2"/>
+        <text x="100" y="60" text-anchor="middle" font-size="13" font-weight="bold">Z (整数加法群)</text>
+        <text x="50" y="90" text-anchor="middle" font-size="12">..., -2, -1</text>
+        <text x="50" y="115" text-anchor="middle" font-size="12">0, 1, 2</text>
+        <text x="50" y="140" text-anchor="middle" font-size="12">3, 4, 5</text>
+        <text x="50" y="165" text-anchor="middle" font-size="12">6, 7, 8</text>
+        <text x="130" y="90" text-anchor="middle" font-size="11" fill="#e53e3e">→ 0</text>
+        <text x="130" y="115" text-anchor="middle" font-size="11" fill="#e53e3e">→ 0, 1, 2</text>
+        <text x="130" y="140" text-anchor="middle" font-size="11" fill="#e53e3e">→ 0, 1, 2</text>
+        <text x="130" y="165" text-anchor="middle" font-size="11" fill="#e53e3e">→ 0, 1, 2</text>
+        <!-- 箭头 -->
+        <line x1="185" y1="90" x2="260" y2="90" stroke="#e53e3e" stroke-width="2" marker-end="url(#arrow)"/>
+        <line x1="185" y1="115" x2="260" y2="115" stroke="#38a169" stroke-width="2"/>
+        <line x1="185" y1="140" x2="260" y2="140" stroke="#3182ce" stroke-width="2"/>
+        <!-- Z_n -->
+        <rect x="270" y="40" width="160" height="160" rx="10" fill="#f0fff4" stroke="#38a169" stroke-width="2"/>
+        <text x="350" y="60" text-anchor="middle" font-size="13" font-weight="bold">Z₃ (模3加法群)</text>
+        <circle cx="350" cy="100" r="16" fill="#bee3f8" stroke="#3182ce" stroke-width="2"/>
+        <text x="350" y="105" text-anchor="middle" font-size="14">0</text>
+        <circle cx="310" cy="150" r="16" fill="#c6f6d5" stroke="#38a169" stroke-width="2"/>
+        <text x="310" y="155" text-anchor="middle" font-size="14">1</text>
+        <circle cx="390" cy="150" r="16" fill="#fbd38d" stroke="#d69e2e" stroke-width="2"/>
+        <text x="390" y="155" text-anchor="middle" font-size="14">2</text>
+    </svg>
+</div>
+
+<div class="example">
+    <strong>例：</strong>φ: (Z, +) → (Zₙ, +ₙ)，φ(x) = x mod n。<br>
+    验证：φ(a+b) = (a+b) mod n = (a mod n + b mod n) mod n = φ(a) +ₙ φ(b) ✓<br>
+    这是满同态，核 ker(φ) = nZ = {..., -2n, -n, 0, n, 2n, ...}。
+</div>
+
+<!-- ==================== 2. 核与像 ==================== -->
+<h2>2. 同态的核与像</h2>
+
+<h3>2.1 定义</h3>
+<div class="note">
+    设 φ: G → H 是群同态。<br>
+    <strong>像 (Image)：</strong>Im(φ) = {φ(g) : g ∈ G} ⊆ H<br>
+    <strong>核 (Kernel)：</strong>ker(φ) = {g ∈ G : φ(g) = e_H} ⊆ G<br>
+    其中 e_H 是 H 的单位元。
+</div>
+
+<h3>2.2 基本性质</h3>
+<div class="theorem">
+    设 φ: G → H 是群同态，则：
+    <ul style="margin-left:20px;">
+        <li>φ(e_G) = e_H（单位元映射到单位元）</li>
+        <li>φ(g⁻¹) = (φ(g))⁻¹（逆元映射到逆元）</li>
+        <li>ker(φ) 是 G 的<strong>正规子群</strong></li>
+        <li>Im(φ) 是 H 的<strong>子群</strong></li>
+        <li>φ 是单射 ⟺ ker(φ) = {e_G}</li>
+        <li>|G| = |ker(φ)| · |Im(φ)|（当 G 有限时）</li>
+    </ul>
+</div>
+
+<!-- ==================== 3. 商群与自然同态 ==================== -->
+<h2>3. 商结构与自然同态</h2>
+
+<h3>3.1 商群</h3>
+<div class="note">
+    设 N 是群 G 的正规子群。<strong>商群</strong> G/N = {gN : g ∈ G}，运算定义为：<br>
+    <div class="formula">(aN) · (bN) = (ab)N</div>
+    单位元是 N，(gN)⁻¹ = g⁻¹N。
+</div>
+
+<h3>3.2 自然同态</h3>
+<div class="theorem">
+    <strong>自然同态 (Canonical/Natural Homomorphism)：</strong><br>
+    π: G → G/N，π(g) = gN<br>
+    这是满同态，ker(π) = N。
+</div>
+
+<div class="example">
+    (Z, +) 中，nZ 是正规子群。<br>
+    Z/nZ = {0+nZ, 1+nZ, ..., (n-1)+nZ} ≅ Zₙ<br>
+    自然同态 π: Z → Zₙ，π(x) = x mod n。
+</div>
+
+<!-- ==================== 4. 同构定理 ==================== -->
+<h2>4. 同构定理 (Isomorphism Theorems)</h2>
+
+<h3>4.1 第一同构定理</h3>
+<div class="theorem">
+    <strong>第一同构定理 (商同构定理)：</strong><br>
+    设 φ: G → H 是群同态，则：<br>
+    <div class="formula">G / ker(φ) ≅ Im(φ)</div>
+    即：G 模掉核同构于像。<br><br>
+    更精确地，存在同构 ψ: G/ker(φ) → Im(φ)，ψ(g·ker(φ)) = φ(g)。
+</div>
+
+<div class="example">
+    φ: Z → Zₙ, φ(x) = x mod n。<br>
+    ker(φ) = nZ，Im(φ) = Zₙ。<br>
+    由第一同构定理：Z/nZ ≅ Zₙ ✓
+</div>
+
+<h3>4.2 第二同构定理 (钻石定理)</h3>
+<div class="theorem">
+    <strong>第二同构定理：</strong><br>
+    设 H 是 G 的子群，N 是 G 的正规子群，则：<br>
+    <div class="formula">HN / N ≅ H / (H ∩ N)</div>
+    其中 HN = {hn : h ∈ H, n ∈ N}。
+</div>
+
+<h3>4.3 第三同构定理</h3>
+<div class="theorem">
+    <strong>第三同构定理：</strong><br>
+    设 N ⊆ K ⊆ G，N 和 K 都是 G 的正规子群，则：<br>
+    <div class="formula">(G/N) / (K/N) ≅ G/K</div>
+</div>
+
+<!-- 同构定理关系图 -->
+<div class="graph-demo">
+    <svg width="300" height="250" viewBox="0 0 300 250">
+        <text x="150" y="18" text-anchor="middle" font-size="14" font-weight="bold">同构定理示意</text>
+        <!-- G -->
+        <rect x="100" y="35" width="100" height="35" rx="8" fill="#bee3f8" stroke="#3182ce" stroke-width="2"/>
+        <text x="150" y="58" text-anchor="middle" font-size="14" font-weight="bold">G</text>
+        <!-- H, N -->
+        <rect x="40" y="105" width="80" height="30" rx="6" fill="#c6f6d5" stroke="#38a169" stroke-width="2"/>
+        <text x="80" y="125" text-anchor="middle" font-size="13">H</text>
+        <rect x="180" y="105" width="80" height="30" rx="6" fill="#fbd38d" stroke="#d69e2e" stroke-width="2"/>
+        <text x="220" y="125" text-anchor="middle" font-size="13">N ◁ G</text>
+        <!-- HN, H∩N -->
+        <rect x="40" y="175" width="80" height="30" rx="6" fill="#e9d8fd" stroke="#805ad5" stroke-width="2"/>
+        <text x="80" y="195" text-anchor="middle" font-size="12">HN</text>
+        <rect x="180" y="175" width="80" height="30" rx="6" fill="#fed7d7" stroke="#e53e3e" stroke-width="2"/>
+        <text x="220" y="195" text-anchor="middle" font-size="12">H∩N</text>
+        <!-- G/N, G/K -->
+        <rect x="100" y="140" width="100" height="30" rx="6" fill="#ebf8ff" stroke="#2b6cb0" stroke-width="2"/>
+        <text x="150" y="160" text-anchor="middle" font-size="12">G/N</text>
+        <!-- 箭头 -->
+        <line x1="80" y1="70" x2="80" y2="105" stroke="#2d3748" stroke-width="1.5"/>
+        <line x1="220" y1="70" x2="220" y2="105" stroke="#2d3748" stroke-width="1.5"/>
+        <line x1="80" y1="135" x2="80" y2="175" stroke="#2d3748" stroke-width="1.5"/>
+        <line x1="220" y1="135" x2="220" y2="175" stroke="#2d3748" stroke-width="1.5"/>
+        <line x1="150" y1="70" x2="150" y2="140" stroke="#2d3748" stroke-width="1.5"/>
+        <line x1="150" y1="170" x2="80" y2="175" stroke="#a0aec0" stroke-width="1" stroke-dasharray="5"/>
+        <line x1="150" y1="170" x2="220" y2="175" stroke="#a0aec0" stroke-width="1" stroke-dasharray="5"/>
+        <text x="150" y="230" text-anchor="middle" font-size="11" fill="#718096">第一定理: G/ker(φ) ≅ Im(φ)</text>
+        <text x="150" y="247" text-anchor="middle" font-size="11" fill="#718096">第二定理: HN/N ≅ H/(H∩N)</text>
+    </svg>
+</div>
+
+<!-- ==================== 5. 同构 ==================== -->
+<h2>5. 同构 (Isomorphism)</h2>
+
+<h3>5.1 定义与意义</h3>
+<div class="note">
+    两个代数系统 (G, *) 和 (H, ∘) <strong>同构</strong>，记 G ≅ H，若存在双射同态 φ: G → H。<br><br>
+    同构意味着两个系统在结构上<strong>完全相同</strong>——只是元素的"名字"不同。<br>
+    同构的系统有相同的乘法表（只是重命名行列）。
+</div>
+
+<h3>5.2 同构不变量</h3>
+<p>若 G ≅ H，则它们共享以下性质（同构不变量）：</p>
+<table>
+    <tr><th>不变量</th><th>说明</th></tr>
+    <tr><td>阶 |G|</td><td>元素个数相同</td></tr>
+    <tr><td>交换性</td><td>G 交换 ⟺ H 交换</td></tr>
+    <tr><td>循环性</td><td>G 循环 ⟺ H 循环</td></tr>
+    <tr><td>子群格结构</td><td>子群的偏序结构相同</td></tr>
+    <tr><td>元素阶的分布</td><td>各阶元素个数相同</td></tr>
+    <tr><td>中心 |Z(G)|</td><td>中心大小相同</td></tr>
+</table>
+
+<h3>5.3 Cayley 定理</h3>
+<div class="theorem">
+    <strong>Cayley 定理：</strong>每个群 G 都同构于某个置换群。<br>
+    即：G ≅ Sₙ 的某个子群（n = |G|）。<br>
+    这说明置换群是所有群的"原型"。
+</div>
+
+<!-- ==================== 6. 自同构群 ==================== -->
+<h2>6. 自同构群</h2>
+
+<div class="note">
+    群 G 的所有自同构的集合 Aut(G) 在映射复合下构成群，称为<strong>自同构群</strong>。<br>
+    Aut(G) 衡量了 G 的"对称性"。
+</div>
+
+<table>
+    <tr><th>群 G</th><th>Aut(G)</th><th>说明</th></tr>
+    <tr><td>Zₙ</td><td>U(n)（模n乘法群）</td><td>φ(k): x→kx, k与n互素</td></tr>
+    <tr><td>Z</td><td>{id, neg} ≅ Z₂</td><td>只有恒等和取反</td></tr>
+    <tr><td>S₃</td><td>S₃</td><td>内自同构群 Inn(S₃) = S₃</td></tr>
+    <tr><td>V₄ (Klein四元群)</td><td>S₃</td><td>3个非单位元可任意置换</td></tr>
+</table>
+
+<h3>6.1 内自同构</h3>
+<div class="note">
+    对 g ∈ G，映射 φ_g: x → gxg⁻¹ 称为<strong>内自同构</strong>。<br>
+    所有内自同构构成 Inn(G) ◁ Aut(G)。<br>
+    <strong>第一同构定理应用：</strong>G/Z(G) ≅ Inn(G)。
+</div>
+
+<!-- ==================== 总结 ==================== -->
+<div class="summary">
+    <h2>本节总结</h2>
+    <ul style="margin-left:20px;">
+        <li><strong>同态：</strong>φ(a*b) = φ(a)∘φ(b)，保持运算结构的映射</li>
+        <li><strong>核与像：</strong>ker(φ) 是正规子群，Im(φ) 是子群；单射 ⟺ ker={e}</li>
+        <li><strong>第一同构定理：</strong>G/ker(φ) ≅ Im(φ) — 最核心的同构定理</li>
+        <li><strong>第二同构定理：</strong>HN/N ≅ H/(H∩N)</li>
+        <li><strong>第三同构定理：</strong>(G/N)/(K/N) ≅ G/K</li>
+        <li><strong>同构：</strong>G ≅ H 意味着结构完全相同；Cayley定理：每个群同构于置换群</li>
+        <li><strong>自同构群：</strong>Aut(G) 衡量对称性；内自同构 Inn(G) ≅ G/Z(G)</li>
+    </ul>
+</div>
+
+<!--
+    本文件总结：
+    - 主题：同态与同构
+    - 内容：同态定义与类型(单/满/同构/自同态)、核与像的性质、商群与自然同态、三个同构定理、Cayley定理、自同构群
+    - 可视化：Z→Zn同态图、同构定理关系图
+    - 关键公式：G/ker(φ)≅Im(φ), HN/N≅H/(H∩N), (G/N)/(K/N)≅G/K
+    - 适用：离散数学代数结构课程复习与参考
+-->
+
+</div>
+</body>
+</html>

@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>架构决策记录 ADR - 技术写作笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; line-height: 1.8; }
+        .container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
+        h1 { color: #58a6ff; font-size: 2em; border-bottom: 2px solid #30363d; padding-bottom: 12px; margin-bottom: 28px; }
+        h2 { color: #79c0ff; font-size: 1.5em; margin: 32px 0 16px; border-left: 4px solid #58a6ff; padding-left: 12px; }
+        h3 { color: #d2a8ff; font-size: 1.2em; margin: 24px 0 12px; }
+        p { margin: 10px 0; }
+        ul, ol { margin: 10px 0 10px 24px; }
+        li { margin: 6px 0; }
+        code { background: #161b22; color: #ff7b72; padding: 2px 8px; border-radius: 4px; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.9em; }
+        pre { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; overflow-x: auto; margin: 16px 0; }
+        pre code { background: none; color: #c9d1d9; padding: 0; }
+        .note { background: #161b22; border-left: 4px solid #58a6ff; padding: 16px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .warning { background: #161b22; border-left: 4px solid #f0883e; padding: 16px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #30363d; padding: 10px 14px; text-align: left; }
+        th { background: #161b22; color: #58a6ff; }
+        tr:nth-child(even) { background: #161b22; }
+        .adr-block { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 20px; margin: 16px 0; }
+        .adr-block h3 { color: #7ee787; margin-top: 0; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>架构决策记录 (ADR - Architecture Decision Record)</h1>
+
+    <h2>一、什么是 ADR</h2>
+    <p>ADR 是记录重要架构决策的轻量级文档。它捕捉每个决策的上下文、选项、选择和后果，形成团队的架构知识库。</p>
+    <ul>
+        <li><strong>起源：</strong>Michael Nygard 在 2011 年提出，被 ThoughtWorks 技术雷达推荐</li>
+        <li><strong>核心理念：</strong>决策比设计图更重要——记录"为什么"比"是什么"更有价值</li>
+        <li><strong>形式：</strong>Markdown 文件，按编号存放在版本控制仓库中</li>
+    </ul>
+
+    <h2>二、什么时候写 ADR</h2>
+    <table>
+        <tr><th>应该写 ADR 的场景</th><th>不需要写 ADR 的场景</th></tr>
+        <tr><td>选择编程语言/框架</td><td>命名规范等已有明确标准的</td></tr>
+        <tr><td>选择数据库类型</td><td>纯实现层面的细节</td></tr>
+        <tr><td>微服务拆分策略</td><td>临时方案/快速修复</td></tr>
+        <tr><td>API 设计风格（REST vs gRPC）</td><td>已被团队标准覆盖的决策</td></tr>
+        <tr><td>消息队列选型</td><td>明显的唯一选项</td></tr>
+        <tr><td>安全/认证方案</td><td></td></tr>
+        <tr><td>部署/基础设施方案</td><td></td></tr>
+    </table>
+
+    <h2>三、ADR 模板</h2>
+    <pre><code># ADR-{编号}: {标题}
+
+## 状态
+{提议 | 已接受 | 已弃用 | 被取代（附指向新ADR的链接）}
+
+## 日期
+{YYYY-MM-DD}
+
+## 背景（Context）
+{描述驱动这个决策的技术/业务背景，包括：
+- 面临的问题或约束
+- 相关的业务需求
+- 技术环境限制}
+
+## 决策（Decision）
+{清晰地陈述做出的决策，一句话总结}
+
+## 备选方案（Alternatives Considered）
+### 方案A: {名称}
+- 优点: ...
+- 缺点: ...
+
+### 方案B: {名称}
+- 优点: ...
+- 缺点: ...
+
+## 后果（Consequences）
+{描述采纳此决策后的正面和负面影响：
+- 获得了什么能力
+- 放弃了什么可能性
+- 团队需要做什么调整
+- 长期影响}
+
+## 参考资料
+{相关链接、文档、会议纪要}</code></pre>
+
+    <h2>四、ADR 示例</h2>
+    <div class="adr-block">
+        <h3>ADR-007: 选择 PostgreSQL 作为主数据库</h3>
+
+        <p><strong>状态：</strong>已接受</p>
+        <p><strong>日期：</strong>2024-03-15</p>
+
+        <p><strong>背景：</strong><br>
+        订单系统需要关系型数据库存储订单、支付和库存数据。团队预计日订单量将达到 100 万级，
+        需要强一致性保证（ACID）。同时需要支持 JSON 字段存储灵活的商品属性。团队已有 MySQL 运维经验。</p>
+
+        <p><strong>决策：</strong><br>
+        选择 PostgreSQL 15 作为主数据库。</p>
+
+        <p><strong>备选方案：</strong></p>
+        <table>
+            <tr><th>方案</th><th>优点</th><th>缺点</th></tr>
+            <tr><td>MySQL 8.0</td><td>团队熟悉；运维经验丰富</td><td>JSON 支持弱；缺少原生部分索引</td></tr>
+            <tr><td>PostgreSQL 15</td><td>JSONB 强大；部分索引；CTE 优化好</td><td>团队需学习；复制方案不同</td></tr>
+            <tr><td>TiDB</td><td>水平扩展；兼容 MySQL 协议</td><td>运维复杂；成本高；团队无经验</td></tr>
+        </table>
+
+        <p><strong>后果：</strong></p>
+        <ul>
+            <li>正面：利用 JSONB 存储灵活的商品规格，减少表结构变更；部分索引提升查询性能</li>
+            <li>负面：团队需要 2 周 PostgreSQL 培训；需建立新的备份/监控方案</li>
+            <li>后续：需要制定 PostgreSQL 运维手册（见 ADR-008）</li>
+        </ul>
+    </div>
+
+    <h2>五、ADR 与 RFC 的关系</h2>
+    <pre><code>时间线：
+RFC（征求意见）          ADR（决策记录）
+    │                        │
+    ▼                        ▼
+┌──────────┐            ┌──────────┐
+│ 提出方案  │ ──讨论──→ │ 记录结果  │
+│ 征求意见  │            │ 已成定论  │
+│ 尚未决定  │            │ 团队共识  │
+└──────────┘            └──────────┘
+
+关系：
+- RFC 是决策前的讨论过程
+- ADR 是决策后的记录结果
+- RFC 达成共识后 → 产出 ADR
+- ADR 是版本化的、不可变的历史记录</code></pre>
+    <ul>
+        <li><strong>RFC (Request For Comments)：</strong>用于提出新方案，征求团队意见，是一个"提议"</li>
+        <li><strong>ADR：</strong>记录已做出的决策，是一个"结论"</li>
+        <li>可以将 RFC 转化为 ADR，也可以直接写 ADR（对于无需广泛讨论的小决策）</li>
+    </ul>
+
+    <h2>六、ADR 管理实践</h2>
+
+    <h3>1. 目录结构</h3>
+    <pre><code>docs/
+  adr/
+    0001-use-microservices-architecture.md
+    0002-adopt-rest-api-convention.md
+    0003-use-kafka-for-async-messaging.md
+    0004-choose-postgresql-over-mysql.md
+    0005-implement-jwt-authentication.md
+    README.md  ← ADR 索引目录</code></pre>
+
+    <h3>2. 状态管理</h3>
+    <ul>
+        <li><strong>Proposed（提议）：</strong>刚提出，等待讨论</li>
+        <li><strong>Accepted（已接受）：</strong>团队已同意并采纳</li>
+        <li><strong>Deprecated（已弃用）：</strong>不再推荐使用，但可能仍在生产中</li>
+        <li><strong>Superseded（被取代）：</strong>被新 ADR 替代，附指向新 ADR 的链接</li>
+    </ul>
+
+    <h3>3. 最佳实践</h3>
+    <ul>
+        <li><strong>不可变性：</strong>一旦 Accepted，不要修改内容。如果决策变化，创建新的 ADR 来取代</li>
+        <li><strong>简洁：</strong>理想长度 1-2 页，最多不超过 5 页</li>
+        <li><strong>及时：</strong>决策做出后尽快记录，趁记忆清晰</li>
+        <li><strong>版本控制：</strong>ADR 文件提交到 Git，参与 Code Review</li>
+        <li><strong>定期回顾：</strong>季度回顾 ADR，标记已过时的决策</li>
+    </ul>
+
+    <div class="note">
+        <strong>核心价值：</strong>ADR 解决了"我们当初为什么这么设计"这个问题。新人入职可以通过 ADR 理解架构演进的历史；老成员也不会因为时间久远而忘记决策原因。它是团队的架构记忆。
+    </div>
+
+    <!-- 总结：ADR是记录重要架构决策的轻量级文档，核心是记录WHY；标准模板包含状态、背景、决策、备选方案和后果；RFC是决策前的讨论过程，ADR是决策后的记录；ADR应保持不可变，决策变化创建新ADR；管理要点：版本控制、及时记录、定期回顾、保持简洁 -->
+</div>
+</body>
+</html>

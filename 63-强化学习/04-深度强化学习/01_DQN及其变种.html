@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DQN及其变种</title>
+    <!-- 强化学习 - DQN 笔记 -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        .tag { display: inline-block; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>DQN及其变种</h2>
+        <p><span class="tag">深度强化学习</span><span class="tag">DQN</span><span class="tag">Atari</span></p>
+        <p>DQN将深度神经网络与Q-Learning结合，开创了深度强化学习时代。</p>
+    </div>
+
+    <!-- ====== DQN ====== -->
+    <div class="card">
+        <h2>DQN (Deep Q-Network)</h2>
+        <div class="code">
+DQN（Mnih et al. 2015, DeepMind）：
+用深度神经网络逼近Q函数：Q(s, a; θ)
+
+核心创新：
+┌─────────────────────────────────────────────┐
+│  1. 经验回放 (Experience Replay)             │
+│  - 将(s, a, r, s')存入回放缓冲区D            │
+│  - 训练时随机采样小批量                       │
+│  - 打破数据相关性，提高样本效率               │
+│  - 数据可重复利用                             │
+│                                             │
+│  2. 目标网络 (Target Network)                │
+│  - 维护一个延迟更新的网络Q(s,a;θ⁻)           │
+│  - 目标值 y = r + γ × max_a Q(s',a;θ⁻)    │
+│  - 每C步同步 θ⁻ ← θ                         │
+│  - 稳定训练，防止目标值振荡                   │
+└─────────────────────────────────────────────┘
+
+损失函数：
+L(θ) = E[(y - Q(s, a; θ))²]
+y = r + γ × max_a' Q(s', a'; θ⁻)
+
+网络架构（Atari）：
+输入：84×84×4 堆叠灰度帧
+Conv(32,8,4) → Conv(64,4,2) → Conv(64,3,1)
+→ FC(512) → 输出: Q值（每个动作一个输出）
+
+DQN训练流程：
+1. 初始化经验回放D和两个网络(θ, θ⁻)
+2. 观察状态s
+3. ε-greedy选择动作a
+4. 执行a，观察r, s'
+5. 存储(s,a,r,s')到D
+6. 从D采样batch
+7. 计算目标y = r + γ max Q(s',a';θ⁻)
+8. 梯度下降更新θ
+9. 每C步同步θ⁻ ← θ
+        </div>
+    </div>
+
+    <!-- ====== Double DQN ====== -->
+    <div class="card">
+        <h2>Double DQN</h2>
+        <div class="code">
+DQN的问题：Q值过高估计 (Overestimation)
+
+原因：max操作会选择被噪声高估的动作
+max_a Q(s',a) ≥ E[Q(s',a*)]（真实最优值）
+
+Double DQN（van Hasselt 2016）：
+解耦动作选择和价值评估
+
+DQN目标：
+y = r + γ × max_a Q(s', a; θ⁻)
+
+Double DQN目标：
+y = r + γ × Q(s', argmax_a Q(s', a; θ); θ⁻)
+                 ↑ 用θ选动作    ↑ 用θ⁻评价值
+
+效果：减少Q值过高估计，更稳定的学习
+        </div>
+    </div>
+
+    <!-- ====== Dueling DQN ====== -->
+    <div class="card">
+        <h2>Dueling DQN</h2>
+        <div class="code">
+Dueling DQN（Wang et al. 2016）：
+将Q值分解为状态价值和优势函数
+
+┌─────────────────────────────────────────────┐
+│  普通DQN：                                   │
+│  输入 → 网络 → Q(s, a1), Q(s, a2), ...      │
+│                                             │
+│  Dueling DQN：                               │
+│  输入 → 共享网络 → 分为两个流                 │
+│              ├→ V(s)    状态价值流            │
+│              └→ A(s,a)  优势函数流            │
+│                                             │
+│  Q(s,a) = V(s) + A(s,a) - mean_a(A(s,a))   │
+│                           ↑                  │
+│                      可辨识性约束              │
+└─────────────────────────────────────────────┘
+
+优势：
+- 在很多状态下，不需要精确知道每个动作的Q值
+- 只需知道哪个状态好(V值)即可
+- 优势流只需要关注动作差异
+- 在Atari游戏中效果更好
+        </div>
+    </div>
+
+    <!-- ====== 更多变种 ====== -->
+    <div class="card">
+        <h2>DQN家族更多变种</h2>
+        <div class="code">
+Prioritized Experience Replay (PER)：
+- TD误差大的转移优先回放
+- 使用优先级采样 + 重要性采样权重
+- 提高样本效率
+
+NoisyNet：
+- 在网络权重上加参数化噪声
+- 替代ε-greedy探索
+- 噪声随学习减小（自适应探索）
+
+Rainbow DQN：
+- 集成6种改进：Double, Dueling, PER,
+  多步学习, 分布式RL, NoisyNet
+- 在Atari上大幅超越DQN
+
+分布式RL (C51/QR-DQN/IQN)：
+- 不只估计期望Q值
+- 而是估计Q值的完整分布
+- 对风险敏感决策更有效
+
+离线RL (Offline RL / Batch RL)：
+- 从固定数据集学习，不与环境交互
+- Conservative Q-Learning (CQL)
+- 适用：医疗、自动驾驶等不能随意探索的领域
+
+DQN vs 策略梯度：
+┌──────────┬──────────────┬──────────────────┐
+│          │ DQN          │ 策略梯度(A3C/PPO) │
+├──────────┼──────────────┼──────────────────┤
+│ 动作空间  │ 离散         │ 连续/离散         │
+│ 样本效率  │ 高(回放)     │ 低                │
+│ 稳定性    │ 中等         │ 高(PPO)           │
+│ 实现      │ 中等         │ 中等              │
+└──────────┴──────────────┴──────────────────┘
+        </div>
+        <div class="note">离散动作空间优先考虑DQN系，连续动作空间用PPO/SAC。Rainbow DQN是离散DQN的集大成者。</div>
+    </div>
+
+    <!-- 总结：DQN通过经验回放和目标网络将Q-Learning扩展到深度神经网络，
+    Double DQN解决过高估计，Dueling DQN将Q值分解为状态价值和优势函数。
+    Rainbow集成了多种改进，是离散动作空间的最强DQN变体。 -->
+</body>
+</html>

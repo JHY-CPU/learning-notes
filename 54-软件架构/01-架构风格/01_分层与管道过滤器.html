@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- 分层与管道过滤器架构风格 - 软件架构笔记 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分层与管道过滤器架构</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f5f7fa; color: #2c3e50; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 40px; }
+        h1 { font-size: 28px; color: #1a5276; border-bottom: 3px solid #2980b9; padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 22px; color: #2980b9; margin: 28px 0 14px; border-left: 4px solid #2980b9; padding-left: 12px; }
+        h3 { font-size: 18px; color: #34495e; margin: 20px 0 10px; }
+        p { margin: 8px 0; text-indent: 2em; }
+        ul, ol { margin: 10px 0 10px 2em; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: left; }
+        th { background: #2980b9; color: #fff; }
+        tr:nth-child(even) { background: #f0f4f8; }
+        .note { background: #eaf2f8; border-left: 4px solid #2980b9; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .key-point { background: #fef9e7; border-left: 4px solid #f39c12; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        code { background: #ecf0f1; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; font-size: 14px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>分层架构与管道-过滤器架构</h1>
+
+    <!-- 一、架构风格概述 -->
+    <h2>一、架构风格概述</h2>
+    <p>架构风格（Architectural Style）是对系统结构和组织方式的分类和抽象，为软件架构设计提供了可复用的模式和约束。</p>
+
+    <div class="note">
+        <strong>架构风格的作用：</strong>定义组件的类型、连接方式、数据流向和集成策略，帮助架构师做出一致的设计决策。
+    </div>
+
+    <!-- 二、分层架构 -->
+    <h2>二、分层架构（Layered Architecture）</h2>
+    <p>分层架构将系统划分为若干层次，每层只与其相邻的层交互，是最广泛使用的架构风格之一。</p>
+
+    <h3>2.1 经典分层模型</h3>
+    <table>
+        <tr><th>层次</th><th>职责</th><th>典型技术</th></tr>
+        <tr><td>表示层（Presentation）</td><td>用户界面、输入验证、页面展示</td><td>HTML/CSS/JS、React、Vue</td></tr>
+        <tr><td>业务逻辑层（Business）</td><td>业务规则、流程编排、领域逻辑</td><td>Spring Service、.NET Service</td></tr>
+        <tr><td>持久化层（Persistence）</td><td>数据访问、ORM映射、查询处理</td><td>Hibernate、MyBatis、JPA</td></tr>
+        <tr><td>数据层（Database）</td><td>数据存储、管理</td><td>MySQL、PostgreSQL、MongoDB</td></tr>
+    </table>
+
+    <h3>2.2 分层原则</h3>
+    <ul>
+        <li><strong>严格分层：</strong>每层只能访问其直接下层</li>
+        <li><strong>松散分层：</strong>允许跳层访问（性能优化场景）</li>
+        <li><strong>层间通信：</strong>通过定义良好的接口（API）交互</li>
+        <li><strong>单向依赖：</strong>上层依赖下层，下层不依赖上层</li>
+    </ul>
+
+    <h3>2.3 优缺点分析</h3>
+    <table>
+        <tr><th>优点</th><th>缺点</th></tr>
+        <tr><td>关注点分离，职责清晰</td><td>层次过多导致性能开销</td></tr>
+        <tr><td>可替换性强，层内可独立修改</td><td>并非所有系统都适合分层</td></tr>
+        <tr><td>利于团队分工和测试</td><td>可能导致"污水池"反模式</td></tr>
+        <tr><td>复用性好，层可跨项目复用</td><td>某些场景需要穿透多层，效率低</td></tr>
+    </table>
+
+    <div class="key-point">
+        <strong>"污水池"反模式：</strong>某一层仅仅是简单的转发调用，没有添加任何价值，导致不必要的复杂性。解决方案：合并无意义的层，或在层中增加有价值的逻辑。
+    </div>
+
+    <!-- 三、管道-过滤器架构 -->
+    <h2>三、管道-过滤器架构（Pipe-and-Filter）</h2>
+    <p>管道-过滤器架构将系统组织为一系列过滤器（Filter）通过管道（Pipe）连接的处理流水线，每个过滤器对输入数据进行处理后输出。</p>
+
+    <h3>3.1 核心组件</h3>
+    <ul>
+        <li><strong>过滤器（Filter）：</strong>独立的数据处理组件，接收输入、处理数据、产生输出</li>
+        <li><strong>管道（Pipe）：</strong>连接过滤器的数据传输通道</li>
+        <li><strong>数据流：</strong>数据从源经过多个过滤器流向目的地</li>
+    </ul>
+
+    <h3>3.2 过滤器特性</h3>
+    <ul>
+        <li>过滤器之间相互独立，不共享状态</li>
+        <li>每个过滤器完成单一的数据转换任务</li>
+        <li>过滤器可以复用和重新组合</li>
+        <li>支持增量处理和流式处理</li>
+    </ul>
+
+    <h3>3.3 典型应用</h3>
+    <table>
+        <tr><th>应用场景</th><th>示例</th></tr>
+        <tr><td>Unix Shell</td><td><code>cat file.txt | grep "keyword" | sort | uniq</code></td></tr>
+        <tr><td>编译器</td><td>词法分析 → 语法分析 → 语义分析 → 代码生成</td></tr>
+        <tr><td>数据处理</td><td>ETL管道：提取 → 转换 → 加载</td></tr>
+        <tr><td>图像处理</td><td>滤镜链：灰度化 → 模糊 → 边缘检测</td></tr>
+        <tr><td>Web中间件</td><td>请求 → 认证 → 日志 → 业务处理 → 响应</td></tr>
+    </table>
+
+    <h3>3.4 优缺点</h3>
+    <table>
+        <tr><th>优点</th><th>缺点</th></tr>
+        <tr><td>高内聚低耦合，易复用</td><td>不适合交互式应用</td></tr>
+        <tr><td>支持并行处理</td><td>数据格式转换开销</td></tr>
+        <tr><td>易于理解和维护</td><td>错误处理困难</td></tr>
+        <tr><td>可动态重组处理流程</td><td>不适合共享数据场景</td></tr>
+    </table>
+
+    <!-- 四、仓库架构 -->
+    <h2>四、仓库架构风格（Repository Style）</h2>
+    <p>仓库架构以一个中央数据存储（Repository）为核心，所有子系统通过中央存储进行数据交换和通信。</p>
+
+    <h3>4.1 两种变体</h3>
+    <table>
+        <tr><th>变体</th><th>控制方式</th><th>特点</th></tr>
+        <tr><td>数据库系统</td><td>由输入数据流驱动</td><td>子系统独立运行，响应数据变化</td></tr>
+        <tr><td>黑板系统</td><td>由中央存储驱动</td><td>适合不确定的推理过程，如AI系统</td></tr>
+    </table>
+
+    <h3>4.2 黑板架构组件</h3>
+    <ul>
+        <li><strong>黑板（Blackboard）：</strong>中央数据存储，存放问题求解过程中的所有数据</li>
+        <li><strong>知识源（Knowledge Source）：</strong>独立的专业模块，监控黑板并贡献解决方案</li>
+        <li><strong>控制组件：</strong>协调知识源的激活和执行顺序</li>
+    </ul>
+
+    <div class="note">
+        <strong>典型应用：</strong>语音识别、模式识别、自然语言处理等需要多领域知识协同的问题求解系统。
+    </div>
+
+</div>
+
+<!--
+========================================
+  文件总结
+========================================
+  主题：分层架构与管道-过滤器架构
+  内容概要：
+    1. 分层架构 - 四层模型（表示/业务/持久化/数据），严格分层vs松散分层
+    2. 管道-过滤器 - Filter+Pipe组件，数据流处理，Unix管道、编译器流水线
+    3. 仓库架构 - 中央数据存储，数据库系统vs黑板系统
+  重点知识：
+    - 分层架构的"污水池"反模式及解决方案
+    - 过滤器的特性：独立、无状态、可复用、可组合
+    - 仓库架构的两种变体：数据库系统和黑板系统
+    - 各架构风格的适用场景和优缺点对比
+========================================
+-->
+</body>
+</html>

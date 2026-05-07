@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>故障转移与冗余</title>
+    <!-- 系统设计 - 高可用架构 笔记 -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        .tag { display: inline-block; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>故障转移与冗余</h2>
+        <p><span class="tag">系统设计</span><span class="tag">高可用</span><span class="tag">故障转移</span></p>
+        <p>高可用架构通过冗余和故障转移确保系统持续可用。</p>
+    </div>
+
+    <div class="card">
+        <h2>冗余模式</h2>
+        <div class="code">
+Active-Passive (主备模式)：
+- 主节点处理所有请求，备节点待命
+- 主节点故障时切换到备节点
+- 简单但浪费50%资源
+- 适合：数据库主从复制
+
+Active-Active (双活模式)：
+- 多个节点同时处理请求
+- 共享受理负载
+- 资源利用率高
+- 需要处理数据一致性
+- 适合：无状态服务
+
+多活部署：
+- 同城双活：两个机房，低延迟同步
+- 异地多活：多地部署，数据最终一致
+- 单元化架构：按用户分片，各单元独立
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>故障转移机制</h2>
+        <div class="code">
+健康检查 (Health Check)：
+- 心跳检测：定期发送心跳包
+- HTTP健康检查：GET /health → 200
+- TCP端口检查：能否建立连接
+- 超时判定：连续N次失败判定为故障
+
+故障转移流程：
+1. 检测到主节点故障
+2. 选举新的主节点（Raft/ZooKeeper）
+3. 更新DNS/VIP指向新主
+4. 客户端重连到新主
+5. 数据同步（如有延迟）
+
+熔断器 (Circuit Breaker)：
+┌──────────────────────────────────────┐
+│  CLOSED → 失败率超阈值 → OPEN        │
+│  OPEN → 超时 → HALF_OPEN             │
+│  HALF_OPEN → 成功 → CLOSED           │
+│  HALF_OPEN → 失败 → OPEN             │
+└──────────────────────────────────────┘
+
+关键指标：
+- 可用性 = MTBF / (MTBF + MTTR)
+- 99.9% → 年停机8.76小时
+- 99.99% → 年停机52.6分钟
+- 99.999% → 年停机5.26分钟
+        </div>
+    </div>
+
+    <!-- 总结：高可用架构通过冗余（主备/双活）和故障转移（健康检查/自动切换）保证系统可用性。
+    熔断器防止故障级联传播。可用性目标决定了架构复杂度和成本。 -->
+</body>
+</html>

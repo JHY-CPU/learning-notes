@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSD原理与FTL</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f5f7fa; color: #333; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 15px; margin-bottom: 30px; }
+        h2 { color: #2980b9; margin: 25px 0 10px; border-left: 4px solid #3498db; padding-left: 12px; }
+        h3 { color: #8e44ad; margin: 15px 0 8px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: center; }
+        th { background: #3498db; color: #fff; }
+        tr:nth-child(even) { background: #ecf0f1; }
+        .formula { background: #f9f9f9; border-left: 4px solid #e67e22; padding: 10px 15px; margin: 10px 0; font-family: 'Consolas', monospace; }
+        .note { background: #fef9e7; border-left: 4px solid #f1c40f; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        .important { background: #fdedec; border-left: 4px solid #e74c3c; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        ul, ol { margin-left: 25px; margin-bottom: 10px; }
+        li { margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>SSD原理与FTL</h1>
+
+        <!-- NAND Flash -->
+        <div class="card">
+            <h2>一、NAND Flash基础</h2>
+            <p>NAND Flash是一种非易失性存储器，数据以电荷形式存储在浮栅晶体管中，是SSD的核心存储介质。</p>
+
+            <h3>1.1 存储结构层次</h3>
+            <table>
+                <tr><th>层次</th><th>说明</th><th>典型大小</th></tr>
+                <tr><td>Cell（存储单元）</td><td>存储一个/多个bit的浮栅晶体管</td><td>1 bit (SLC) / 2 bit (MLC) / 3 bit (TLC) / 4 bit (QLC)</td></tr>
+                <tr><td>Page（页）</td><td>读写的最小单位</td><td>4KB / 8KB / 16KB</td></tr>
+                <tr><td>Block（块）</td><td>擦除的最小单位，包含多个Page</td><td>128~512 Pages（256Pages×16KB = 4MB常见）</td></tr>
+                <tr><td>Plane</td><td>包含多个Block，可并行操作</td><td>多个Block</td></tr>
+                <tr><td>Die</td><td>包含1~2个Plane</td><td>-</td></tr>
+            </table>
+
+            <h3>1.2 SLC/MLC/TLC/QLC对比</h3>
+            <table>
+                <tr><th>类型</th><th>每Cell比特数</th><th>电压状态</th><th>寿命(P/E cycles)</th><th>速度</th><th>成本</th></tr>
+                <tr><td>SLC</td><td>1</td><td>2</td><td>50,000~100,000</td><td>最快</td><td>最高</td></tr>
+                <tr><td>MLC</td><td>2</td><td>4</td><td>3,000~10,000</td><td>快</td><td>中等</td></tr>
+                <tr><td>TLC</td><td>3</td><td>8</td><td>500~3,000</td><td>较慢</td><td>较低</td></tr>
+                <tr><td>QLC</td><td>4</td><td>16</td><td>100~1,000</td><td>最慢</td><td>最低</td></tr>
+            </table>
+
+            <div class="note">
+                <strong>关键特性：</strong>NAND Flash的读写以Page为单位，但擦除必须以Block为单位。不能原地更新（In-place Update），必须先擦除再写入，这称为"异地更新"（Out-of-place Update）。
+            </div>
+        </div>
+
+        <!-- 读写擦除 -->
+        <div class="card">
+            <h2>二、读写与擦除操作</h2>
+
+            <h3>2.1 操作粒度</h3>
+            <table>
+                <tr><th>操作</th><th>单位</th><th>耗时</th><th>备注</th></tr>
+                <tr><td>读（Read）</td><td>Page</td><td>25~100 μs</td><td>最快的闪存操作</td></tr>
+                <tr><td>写/编程（Program）</td><td>Page</td><td>200~900 μs</td><td>只能将1写为0</td></tr>
+                <tr><td>擦除（Erase）</td><td>Block</td><td>1~5 ms</td><td>将整块清为全1</td></tr>
+            </table>
+
+            <h3>2.2 写放大（Write Amplification）</h3>
+            <p>由于NAND Flash的擦除粒度远大于写入粒度，实际写入闪存的数据量远大于主机请求写入的数据量。</p>
+            <div class="formula">
+                写放大系数（WAF）= 实际写入闪存的数据量 / 主机写入数据量<br>
+                WAF >= 1，理想情况下 WAF = 1
+            </div>
+
+            <h3>2.3 磨损不均</h3>
+            <p>每个Block有有限的擦写次数（P/E Cycles），如果某些Block被频繁擦写，会提前失效。</p>
+        </div>
+
+        <!-- FTL -->
+        <div class="card">
+            <h2>三、闪存转换层（FTL）</h2>
+            <p>FTL（Flash Translation Layer）是SSD固件中的核心模块，位于文件系统和闪存之间，负责管理闪存的读写、磨损均衡和垃圾回收。</p>
+
+            <h3>3.1 地址映射</h3>
+            <p>FTL维护逻辑地址（LBA）到物理地址（PBA）的映射表，实现逻辑块到物理块的转换。</p>
+
+            <table>
+                <tr><th>映射粒度</th><th>优点</th><th>缺点</th></tr>
+                <tr><td>页级映射</td><td>灵活，写放大小</td><td>映射表大（占用DRAM）</td></tr>
+                <tr><td>块级映射</td><td>映射表小</td><td>写放大严重（更新一页需搬移整块）</td></tr>
+                <tr><td>混合映射</td><td>折中方案</td><td>实现复杂</td></tr>
+            </table>
+
+            <h3>3.2 磨损均衡（Wear Leveling）</h3>
+            <p>确保所有Block的擦写次数大致均匀，避免部分Block过早磨损。</p>
+            <ul>
+                <li><strong>动态磨损均衡</strong>：写入时选择擦写次数少的Block</li>
+                <li><strong>静态磨损均衡</strong>：定期搬移冷数据到高磨损Block，释放低磨损Block给热数据</li>
+            </ul>
+
+            <h3>3.3 垃圾回收（Garbage Collection / GC）</h3>
+            <p>回收无效数据占用的空间，合并有效数据到新Block，擦除旧Block。</p>
+
+            <div class="formula">
+                GC流程：<br>
+                1. 选择牺牲块（Victim Block）—— 通常选有效页最少的块<br>
+                2. 将牺牲块中的有效页复制到新块<br>
+                3. 擦除牺牲块<br>
+                4. 更新FTL映射表
+            </div>
+
+            <div class="important">
+                <strong>GC开销：</strong><br>
+                - 前台GC：阻塞用户I/O，延迟高但可预测<br>
+                - 后台GC：空闲时执行，不阻塞I/O但可能突然触发导致延迟抖动<br>
+                - GC导致写放大：搬移有效页时产生额外写入
+            </div>
+        </div>
+
+        <!-- SSD vs HDD -->
+        <div class="card">
+            <h2>四、SSD vs HDD对比</h2>
+            <table>
+                <tr><th>特性</th><th>HDD</th><th>SSD</th></tr>
+                <tr><td>存储介质</td><td>磁性盘片</td><td>NAND Flash</td></tr>
+                <tr><td>随机读延迟</td><td>5~10 ms</td><td>0.05~0.1 ms</td></tr>
+                <tr><td>顺序读带宽</td><td>100~200 MB/s</td><td>500~7000 MB/s (NVMe)</td></tr>
+                <tr><td>IOPS</td><td>75~200</td><td>10,000~1,000,000</td></tr>
+                <tr><td>抗震性</td><td>差（机械部件）</td><td>好（无运动部件）</td></tr>
+                <tr><td>功耗</td><td>高（6~15W）</td><td>低（2~5W）</td></tr>
+                <tr><td>寿命</td><td>机械磨损</td><td>闪存擦写次数有限</td></tr>
+                <tr><td>单位成本</td><td>低</td><td>高（持续下降）</td></tr>
+                <tr><td>容量</td><td>大（可达20TB+）</td><td>中等（可达8TB+）</td></tr>
+            </table>
+        </div>
+
+        <!-- 总结 -->
+        <div class="card">
+            <h2>五、知识要点总结</h2>
+            <ol>
+                <li>NAND Flash：页读写、块擦除，不能原地更新</li>
+                <li>SLC/MLC/TLC/QLC：容量越大，寿命越短，速度越慢</li>
+                <li>FTL三大功能：地址映射、磨损均衡、垃圾回收</li>
+                <li>写放大（WAF）是SSD性能优化的核心问题</li>
+                <li>GC选择有效页最少的块作为牺牲块</li>
+                <li>SSD随机性能远超HDD，但有寿命限制</li>
+            </ol>
+        </div>
+
+        <!--
+            ========================================
+            文件总结：SSD原理与FTL
+            ========================================
+            本文件涵盖了固态硬盘的核心技术：
+            1. NAND Flash存储结构（Cell/Page/Block/Die）
+            2. SLC/MLC/TLC/QLC的对比
+            3. 读写擦除操作的粒度和耗时
+            4. FTL：地址映射、磨损均衡、垃圾回收
+            5. 写放大（WAF）的概念
+            6. SSD与HDD的对比
+
+            重点：FTL功能、GC流程、写放大
+            考点：闪存特性、磨损均衡策略
+            ========================================
+        -->
+    </div>
+</body>
+</html>

@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>方差分析ANOVA</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; font-size: 2em; margin-bottom: 10px; border-bottom: 3px solid #2b6cb0; padding-bottom: 10px; }
+        .subtitle { text-align: center; color: #718096; margin-bottom: 30px; }
+        h2 { color: #2c5282; font-size: 1.4em; margin: 25px 0 12px; padding-left: 12px; border-left: 4px solid #3182ce; }
+        h3 { color: #2d3748; font-size: 1.15em; margin: 18px 0 8px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px 25px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .formula { background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 6px; padding: 12px 18px; margin: 10px 0; font-size: 1.05em; text-align: center; font-family: 'Times New Roman', serif; }
+        .formula-inline { background: #ebf8ff; padding: 2px 8px; border-radius: 4px; font-family: 'Times New Roman', serif; }
+        .example { background: #f0fff4; border-left: 4px solid #48bb78; border-radius: 0 6px 6px 0; padding: 15px 18px; margin: 12px 0; }
+        .example-title { font-weight: bold; color: #276749; margin-bottom: 6px; }
+        .note { background: #fffff0; border-left: 4px solid #ecc94b; border-radius: 0 6px 6px 0; padding: 12px 18px; margin: 12px 0; }
+        .note-title { font-weight: bold; color: #975a16; }
+        .step { background: #faf5ff; border-left: 4px solid #805ad5; border-radius: 0 6px 6px 0; padding: 10px 18px; margin: 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 8px 12px; text-align: center; }
+        th { background: #bee3f8; color: #2a4365; }
+        tr:nth-child(even) { background: #f7fafc; }
+        ul, ol { margin-left: 25px; margin-bottom: 8px; }
+        li { margin-bottom: 4px; }
+        .tag { display: inline-block; background: #c3dafe; color: #3c366b; padding: 2px 10px; border-radius: 12px; font-size: 0.85em; margin: 3px; }
+        .summary-box { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; border-radius: 10px; padding: 20px 25px; margin-top: 30px; }
+        .summary-box h2 { color: #fff; border-left-color: #fff; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>方差分析（ANOVA）</h1>
+    <p class="subtitle">参数估计与假设检验 · 单因素方差分析</p>
+
+    <!-- ==================== 基本思想 ==================== -->
+    <h2>一、方差分析的基本思想</h2>
+
+    <div class="card">
+        <h3>1. 问题背景</h3>
+        <p>设有 k 个不同水平（处理/组），每个水平下有 nᵢ 个观测，判断各组均值是否有显著差异。</p>
+        <p style="margin-top:8px;">原假设 H₀：μ₁ = μ₂ = ... = μₖ（所有组均值相等）</p>
+        <p>备择假设 H₁：至少有一对均值不相等</p>
+    </div>
+
+    <div class="card">
+        <h3>2. 核心思想：变异分解</h3>
+        <p>总变异 = 组间变异 + 组内变异：</p>
+        <div class="formula">
+            SS<sub>T</sub> = SS<sub>B</sub> + SS<sub>W</sub>
+        </div>
+        <ul>
+            <li>SS<sub>T</sub>（总平方和）：所有观测值与总均值的偏差平方和</li>
+            <li>SS<sub>B</sub>（组间平方和）：各组均值与总均值的偏差平方和（反映处理效应）</li>
+            <li>SS<sub>W</sub>（组内平方和）：各观测值与其组均值的偏差平方和（反映随机误差）</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 数学模型 ==================== -->
+    <h2>二、单因素方差分析模型</h2>
+
+    <div class="card">
+        <h3>1. 数学模型</h3>
+        <div class="formula">
+            X<sub>ij</sub> = μ + αᵢ + ε<sub>ij</sub>
+        </div>
+        <ul>
+            <li>X<sub>ij</sub>：第 i 组的第 j 个观测值</li>
+            <li>μ：总体均值</li>
+            <li>αᵢ = μᵢ - μ：第 i 组的处理效应</li>
+            <li>ε<sub>ij</sub> ~ N(0,σ²)：随机误差，相互独立</li>
+        </ul>
+        <p style="margin-top:8px;">H₀：α₁ = α₂ = ... = αₖ = 0（无处理效应）</p>
+    </div>
+
+    <div class="card">
+        <h3>2. 平方和公式</h3>
+        <p>设总样本数 N = Σnᵢ，总均值 x̄ = ΣΣx<sub>ij</sub>/N，各组均值 x̄<sub>i</sub>：</p>
+        <div class="formula">
+            SS<sub>T</sub> = Σᵢ Σⱼ (x<sub>ij</sub> - x̄)²&nbsp;&nbsp;&nbsp;&nbsp;（总平方和，df = N-1）
+        </div>
+        <div class="formula">
+            SS<sub>B</sub> = Σᵢ nᵢ(x̄<sub>i</sub> - x̄)²&nbsp;&nbsp;&nbsp;&nbsp;（组间平方和，df = k-1）
+        </div>
+        <div class="formula">
+            SS<sub>W</sub> = Σᵢ Σⱼ (x<sub>ij</sub> - x̄<sub>i</sub>)²&nbsp;&nbsp;&nbsp;&nbsp;（组内平方和/误差，df = N-k）
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>3. 均方与 F 检验</h3>
+        <div class="formula">
+            MS<sub>B</sub> = SS<sub>B</sub> / (k-1)&nbsp;&nbsp;&nbsp;&nbsp;（组间均方 = 处理均方）
+        </div>
+        <div class="formula">
+            MS<sub>W</sub> = SS<sub>W</sub> / (N-k)&nbsp;&nbsp;&nbsp;&nbsp;（组内均方 = 误差均方）
+        </div>
+        <div class="formula">
+            F = MS<sub>B</sub> / MS<sub>W</sub>&nbsp;&nbsp;&nbsp;&nbsp;~ F(k-1, N-k)&nbsp;&nbsp;在 H₀ 成立时
+        </div>
+        <p style="margin-top:8px;">判断：若 F > F<sub>α</sub>(k-1, N-k)，则拒绝 H₀，认为各组均值有显著差异。</p>
+    </div>
+
+    <!-- ==================== ANOVA表 ==================== -->
+    <h2>三、方差分析表</h2>
+
+    <div class="card">
+        <table>
+            <tr>
+                <th>变异来源</th><th>平方和 SS</th><th>自由度 df</th><th>均方 MS</th><th>F 值</th>
+            </tr>
+            <tr>
+                <td>组间（处理）</td><td>SS<sub>B</sub></td><td>k-1</td><td>MS<sub>B</sub>=SS<sub>B</sub>/(k-1)</td><td>MS<sub>B</sub>/MS<sub>W</sub></td>
+            </tr>
+            <tr>
+                <td>组内（误差）</td><td>SS<sub>W</sub></td><td>N-k</td><td>MS<sub>W</sub>=SS<sub>W</sub>/(N-k)</td><td>—</td>
+            </tr>
+            <tr>
+                <td><strong>总计</strong></td><td>SS<sub>T</sub></td><td>N-1</td><td>—</td><td>—</td>
+            </tr>
+        </table>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 1：单因素方差分析</div>
+        <p>三种饲料对猪增重的影响，数据如下（单位：kg）。检验三种饲料效果是否有显著差异（α=0.05）。</p>
+        <div class="step">
+            饲料A：51, 50, 49, 52, 48（n₁=5, x̄₁=50）<br>
+            饲料B：55, 53, 54, 52, 56（n₂=5, x̄₂=54）<br>
+            饲料C：48, 47, 49, 50, 46（n₃=5, x̄₃=48）<br><br>
+            总均值 x̄ = (250+270+240)/15 = 50.67<br><br>
+            SS<sub>B</sub> = 5(50-50.67)² + 5(54-50.67)² + 5(48-50.67)² = 2.22+55.56+35.56 = <strong>93.33</strong><br>
+            SS<sub>W</sub> = Σ(x-x̄<sub>i</sub>)² = (1+0+1+4+4)+(1+1+0+4+4)+(4+9+1+0+4) = <strong>34.00</strong><br>
+            SS<sub>T</sub> = 93.33+34.00 = 127.33<br><br>
+            MS<sub>B</sub> = 93.33/2 = 46.67<br>
+            MS<sub>W</sub> = 34.00/12 = 2.83<br>
+            <strong>F = 46.67/2.83 = 16.49</strong><br><br>
+            F<sub>0.05</sub>(2,12) = 3.89<br>
+            16.49 > 3.89 → <strong>拒绝 H₀</strong>，三种饲料效果有显著差异。
+        </div>
+    </div>
+
+    <!-- ==================== 事后检验 ==================== -->
+    <h2>四、事后多重比较（Post-Hoc Tests）</h2>
+
+    <div class="card">
+        <h3>为什么需要事后检验？</h3>
+        <p>ANOVA 的 F 检验只告诉我们"至少有一对均值不同"，但不告诉具体哪对不同。若 F 检验显著，需用事后检验进行两两比较。</p>
+    </div>
+
+    <div class="card">
+        <h3>常用方法</h3>
+        <table>
+            <tr><th>方法</th><th>全称</th><th>适用场景</th><th>控制指标</th></tr>
+            <tr><td>LSD</td><td>最小显著差异法</td><td>组数少，初步探索</td><td>不控制族错误率</td></tr>
+            <tr><td>Bonferroni</td><td>邦弗朗尼校正</td><td>通用，保守</td><td>族错误率 ≤ α</td></tr>
+            <tr><td>Tukey HSD</td><td>Tukey诚实显著差异</td><td>各组样本量相等</td><td>族错误率 = α</td></tr>
+            <tr><td>Scheffe</td><td>谢弗法</td><td>任意对比，最保守</td><td>族错误率 = α</td></tr>
+            <tr><td>Duncan</td><td>Duncan多重极差</td><td>组数较多</td><td>较宽松</td></tr>
+        </table>
+        <div class="note">
+            <span class="note-title">Bonferroni 校正原理：</span> 若做 m 次两两比较，将显著性水平调整为 α/m。例如 α=0.05，k=3 组需比较 C(3,2)=3 次，每次用 α'=0.05/3=0.0167。
+        </div>
+    </div>
+
+    <!-- ==================== ANOVA前提 ==================== -->
+    <h2>五、ANOVA 的前提条件与检验</h2>
+
+    <div class="card">
+        <h3>三大前提</h3>
+        <table>
+            <tr><th>前提</th><th>含义</th><th>检验方法</th></tr>
+            <tr><td>独立性</td><td>各组观测值相互独立</td><td>实验设计保证</td></tr>
+            <tr><td>正态性</td><td>各组数据服从正态分布</td><td>Shapiro-Wilk检验、Q-Q图</td></tr>
+            <tr><td>方差齐性</td><td>各组方差相等</td><td>Levene检验、Bartlett检验</td></tr>
+        </table>
+        <p style="margin-top:8px;">违反正态性：可使用非参数方法（Kruskal-Wallis检验）</p>
+        <p>违反方差齐性：可使用Welch ANOVA</p>
+    </div>
+
+    <!-- ==================== 效应量 ==================== -->
+    <h2>六、效应量</h2>
+
+    <div class="card">
+        <h3>η²（Eta Squared）</h3>
+        <div class="formula">
+            η² = SS<sub>B</sub> / SS<sub>T</sub>
+        </div>
+        <p style="margin-top:8px;">表示组间变异占总变异的比例（解释力度）。</p>
+        <table>
+            <tr><th>η² 值</th><th>效应大小</th></tr>
+            <tr><td>0.01</td><td>小效应</td></tr>
+            <tr><td>0.06</td><td>中效应</td></tr>
+            <tr><td>0.14</td><td>大效应</td></tr>
+        </table>
+        <p style="margin-top:8px;">例题1中：η² = 93.33/127.33 = 0.73（大效应，饲料因素解释了73%的变异）</p>
+    </div>
+
+    <div class="summary-box">
+        <h2>本节总结</h2>
+        <ul>
+            <li><strong>核心思想</strong>：总变异 = 组间变异 + 组内变异，SS<sub>T</sub> = SS<sub>B</sub> + SS<sub>W</sub></li>
+            <li><strong>F 检验</strong>：F = MS<sub>B</sub> / MS<sub>W</sub> ~ F(k-1, N-k)，判断组间差异是否显著</li>
+            <li><strong>方差分析表</strong>：列出 SS、df、MS、F 值</li>
+            <li><strong>事后检验</strong>：ANOVA 显著后进行两两比较（Tukey、Bonferroni 等）</li>
+            <li><strong>前提条件</strong>：独立性、正态性、方差齐性</li>
+            <li><strong>效应量</strong>：η² = SS<sub>B</sub>/SS<sub>T</sub>，衡量实际差异大小</li>
+        </ul>
+    </div>
+</div>
+</body>
+</html>
+<!-- 本文件涵盖：方差分析基本思想、单因素ANOVA数学模型、平方和分解公式、F检验、方差分析表、事后多重比较方法（LSD/Bonferroni/Tukey/Scheffe）、ANOVA前提条件、效应量η²，共1道完整计算例题 -->

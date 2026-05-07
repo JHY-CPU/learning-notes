@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>联邦学习架构</title>
+    <!-- 联邦学习与隐私计算 - 联邦学习架构 笔记 -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        .tag { display: inline-block; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>联邦学习架构</h2>
+        <p><span class="tag">隐私计算</span><span class="tag">联邦学习</span><span class="tag">FedAvg</span></p>
+        <p>联邦学习在不共享原始数据的前提下，多方协作训练机器学习模型。</p>
+    </div>
+
+    <!-- ====== 联邦学习分类 ====== -->
+    <div class="card">
+        <h2>联邦学习分类</h2>
+        <div class="code">
+┌─────────────────────────────────────────────┐
+│  横向联邦学习 (Horizontal FL)                 │
+│  特征相同，样本不同                           │
+│  同一地区不同银行的用户数据                    │
+│  ┌──────┐ ┌──────┐ ┌──────┐                │
+│  │ 银行A │ │ 银行B │ │ 银行C │                │
+│  │ 特征1 │ │ 特征1 │ │ 特征1 │                │
+│  │ 特征2 │ │ 特征2 │ │ 特征2 │                │
+│  │ 样本1-100│样本101-200│样本201-300│         │
+│  └──────┘ └──────┘ └──────┘                │
+│                                             │
+│  纵向联邦学习 (Vertical FL)                   │
+│  样本相同，特征不同                           │
+│  银行和电商对同一用户的互补数据                │
+│  ┌──────┐ ┌──────┐                         │
+│  │ 银行  │ │ 电商  │                         │
+│  │收入   │ │购买记录│                         │
+│  │信用   │ │浏览历史│                         │
+│  │用户1-1000 │ 用户1-1000 │                  │
+│  └──────┘ └──────┘                         │
+│                                             │
+│  联邦迁移学习                                │
+│  样本和特征都不同                             │
+│  通过迁移学习桥接不同数据分布                  │
+└─────────────────────────────────────────────┘
+        </div>
+    </div>
+
+    <!-- ====== FedAvg ====== -->
+    <div class="card">
+        <h2>FedAvg算法</h2>
+        <div class="code">
+FedAvg (Federated Averaging)：
+横向联邦学习的基础算法
+
+流程：
+┌─────────────────────────────────────────────┐
+│  Server:                                    │
+│  1. 初始化全局模型 w0                        │
+│  2. 每轮：                                   │
+│     a. 随机选择K个客户端                     │
+│     b. 发送当前全局模型 wk                   │
+│     c. 收集各客户端的本地更新                 │
+│     d. 加权平均：wk+1 = Σ(nk/n) × wk_local │
+│                                             │
+│  Client k:                                  │
+│  1. 接收全局模型                             │
+│  2. 用本地数据训练E个epoch                   │
+│  3. 返回本地模型参数                          │
+└─────────────────────────────────────────────┘
+
+通信效率优化：
+- 梯度压缩：量化、稀疏化
+- 本地多轮训练：减少通信频率
+- 异步更新：不等所有客户端
+- 模型压缩：蒸馏、剪枝
+
+Non-IID数据挑战：
+- 各客户端数据分布不同（非独立同分布）
+- 导致本地模型偏向本地数据
+- 解决方案：
+  FedProx：添加正则项约束本地模型
+  SCAFFOLD：使用控制变量校正偏差
+  FedBN：保留本地BatchNorm参数
+        </div>
+    </div>
+
+    <!-- ====== 实际挑战 ====== -->
+    <div class="card">
+        <h2>实际挑战与应用</h2>
+        <div class="code">
+挑战：
+┌─────────────────────────────────────────────┐
+│  1. 数据异构性(Non-IID)                      │
+│  2. 通信瓶颈：大量模型参数传输                │
+│  3. 客户端掉线：部分客户端不可用              │
+│  4. 安全威胁：                               │
+│     - 梯度攻击：从梯度反推训练数据            │
+│     - 拜占庭攻击：恶意客户端发送错误更新      │
+│     - 后门攻击：植入后门触发器                │
+│  5. 隐私保护：                               │
+│     - 模型更新也可能泄露信息                  │
+│     - 需结合差分隐私/安全聚合                 │
+└─────────────────────────────────────────────┘
+
+应用案例：
+- 键盘预测：Google Gboard
+  各手机本地训练输入预测模型，只上传更新
+- 医疗：多医院联合训练诊断模型
+  患者数据不出医院
+- 金融：多银行联合风控
+  各银行数据不出本地
+- 个性化推荐：设备端模型个性化
+  苹果的Core ML on-device learning
+
+框架：
+- FATE (微众银行)：工业级联邦学习平台
+- PySyft (OpenMined)：Python联邦学习库
+- FLUTE (Microsoft)：联邦学习测试平台
+- TFF (TensorFlow Federated)：Google框架
+        </div>
+        <div class="note">联邦学习解决数据孤岛问题，但需要结合差分隐私/安全聚合等技术才能真正保护隐私。</div>
+    </div>
+
+    <!-- 总结：联邦学习通过在客户端本地训练、服务器聚合的方式实现隐私保护的协作学习。
+    FedAvg是基础算法，Non-IID和通信效率是主要挑战。实际应用中需要结合差分隐私等技术增强安全性。 -->
+</body>
+</html>

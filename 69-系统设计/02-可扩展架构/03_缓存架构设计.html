@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>缓存架构设计 - 系统设计笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; line-height: 1.8; }
+        .container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
+        h1 { color: #58a6ff; font-size: 2em; border-bottom: 2px solid #30363d; padding-bottom: 12px; margin-bottom: 28px; }
+        h2 { color: #79c0ff; font-size: 1.5em; margin: 32px 0 16px; border-left: 4px solid #58a6ff; padding-left: 12px; }
+        h3 { color: #d2a8ff; font-size: 1.2em; margin: 24px 0 12px; }
+        p { margin: 10px 0; }
+        ul, ol { margin: 10px 0 10px 24px; }
+        li { margin: 6px 0; }
+        code { background: #161b22; color: #ff7b72; padding: 2px 8px; border-radius: 4px; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.9em; }
+        pre { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; overflow-x: auto; margin: 16px 0; }
+        pre code { background: none; color: #c9d1d9; padding: 0; }
+        .note { background: #161b22; border-left: 4px solid #58a6ff; padding: 16px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .warning { background: #161b22; border-left: 4px solid #f0883e; padding: 16px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #30363d; padding: 10px 14px; text-align: left; }
+        th { background: #161b22; color: #58a6ff; }
+        tr:nth-child(even) { background: #161b22; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>缓存架构设计</h1>
+
+    <h2>一、缓存读写策略</h2>
+
+    <h3>1. Cache Aside（旁路缓存）—— 最常用</h3>
+    <pre><code>读流程：
+  应用 → 查缓存 → 命中 → 返回
+              ↓ 未命中
+         查数据库 → 写入缓存 → 返回
+
+写流程：
+  应用 → 更新数据库 → 删除缓存（不是更新缓存！）</code></pre>
+    <div class="note">
+        <strong>为什么删除缓存而不是更新缓存？</strong>
+        <ul>
+            <li>写操作不一定紧跟读，更新缓存可能浪费（缓存了冷数据）</li>
+            <li>并发写场景下，更新缓存可能导致数据不一致：A更新DB后，B更新DB，B删缓存，A删缓存 → 缓存已删，下次读取正确值</li>
+        </ul>
+    </div>
+    <div class="warning">
+        <strong>延迟双删：</strong>更新DB后删缓存，sleep一段时间（如500ms）再删一次，防止"删缓存→其他线程读旧值写入缓存"的时序问题。
+    </div>
+
+    <h3>2. Read/Write Through（读写穿透）</h3>
+    <pre><code>读：应用 → 缓存（缓存负责查DB并填充自身） → 返回
+写：应用 → 缓存（缓存负责同步写DB） → 返回
+
+缓存层充当代理，应用不直接访问数据库</code></pre>
+    <ul>
+        <li>应用层简单，缓存层承担数据同步责任</li>
+        <li>典型实现：Guava Cache、应用内嵌缓存</li>
+        <li>不适合分布式场景（缓存和DB绑定紧密）</li>
+    </ul>
+
+    <h3>3. Write Behind（异步写回）</h3>
+    <pre><code>写：应用 → 缓存（立即返回） → 异步批量写DB
+                         延迟写入</code></pre>
+    <ul>
+        <li>写入性能极高（只写内存）</li>
+        <li>风险：缓存宕机导致数据丢失</li>
+        <li>典型应用：Linux Page Cache、MySQL Buffer Pool</li>
+    </ul>
+
+    <h3>4. 策略对比</h3>
+    <table>
+        <tr><th>策略</th><th>一致性</th><th>写性能</th><th>复杂度</th><th>适用场景</th></tr>
+        <tr><td>Cache Aside</td><td>最终一致</td><td>中等</td><td>低</td><td>通用场景（首选）</td></tr>
+        <tr><td>Read/Write Through</td><td>强一致</td><td>中等</td><td>中</td><td>嵌入式缓存</td></tr>
+        <tr><td>Write Behind</td><td>弱一致</td><td>极高</td><td>高</td><td>写密集、可容忍丢失</td></tr>
+    </table>
+
+    <h2>二、缓存经典问题</h2>
+
+    <h3>1. 缓存穿透（Cache Penetration）</h3>
+    <p><strong>问题：</strong>查询不存在的数据，缓存和数据库都没有，每次请求都打到数据库。</p>
+    <pre><code>攻击请求 → 缓存 miss → 数据库 miss → 不写缓存 → 下次还打到DB
+ id=-1, id=99999999...</code></pre>
+    <p><strong>解决方案：</strong></p>
+    <ul>
+        <li><strong>缓存空值：</strong>查不到也缓存一个 null/TTL短的空对象（简单有效）</li>
+        <li><strong>布隆过滤器（Bloom Filter）：</strong>在缓存前加一层，快速判断 key 是否存在</li>
+    </ul>
+    <pre><code>// 布隆过滤器
+请求 → Bloom Filter 判断 → 不存在 → 直接返回
+                        → 可能存在 → 查缓存/DB
+
+特点：可能误判（不存在判为存在），但不会漏判（存在判为不存在）
+     节省内存（1亿数据只需约120MB，误判率1%）</code></pre>
+
+    <h3>2. 缓存击穿（Cache Breakdown）</h3>
+    <p><strong>问题：</strong>热 key 过期的瞬间，大量并发请求同时穿透到数据库。</p>
+    <pre><code>热 key "product:123" 过期
+  ↓
+1000个并发请求同时 miss → 全部打到数据库 → 数据库压力骤增</code></pre>
+    <p><strong>解决方案：</strong></p>
+    <ul>
+        <li><strong>互斥锁：</strong>只有一个线程去查DB重建缓存，其他线程等待或返回旧值</li>
+        <li><strong>逻辑过期：</strong>缓存不设TTL，数据中存一个逻辑过期时间，过期后异步更新，先返回旧值</li>
+        <li><strong>热 key 永不过期：</strong>定时任务异步刷新热 key</li>
+    </ul>
+    <pre><code>// 互斥锁方案（Redis SETNX）
+public Object getWithMutex(String key) {
+    Object value = redis.get(key);
+    if (value != null) return value;
+    // 尝试获取锁
+    if (redis.setNX("lock:" + key, "1", 10s)) {
+        try {
+            value = db.query(key);
+            redis.set(key, value, 30min);
+        } finally {
+            redis.del("lock:" + key);
+        }
+    } else {
+        Thread.sleep(50);
+        return getWithMutex(key); // 重试
+    }
+    return value;
+}</code></pre>
+
+    <h3>3. 缓存雪崩（Cache Avalanche）</h3>
+    <p><strong>问题：</strong>大量 key 同时过期，或 Redis 集群宕机，导致数据库压力骤增。</p>
+    <p><strong>解决方案：</strong></p>
+    <ul>
+        <li><strong>随机 TTL：</strong>过期时间加随机值，避免同时过期（如 30min + random(0, 10min)）</li>
+        <li><strong>多级缓存：</strong>本地缓存 → Redis → 数据库</li>
+        <li><strong>Redis 高可用：</strong>哨兵/集群模式，避免单点故障</li>
+        <li><strong>限流降级：</strong>数据库层面加限流保护，触发降级返回默认值</li>
+    </ul>
+
+    <h2>三、Redis 集群架构</h2>
+
+    <h3>1. 主从复制</h3>
+    <pre><code>┌──────────┐     异步复制      ┌──────────┐
+│  Master  │ ────────────────→ │  Slave   │
+│  (读写)   │                  │  (只读)   │
+└──────────┘                  └──────────┘
+问题：主从延迟、主宕机需手动切换</code></pre>
+
+    <h3>2. 哨兵模式（Sentinel）</h3>
+    <pre><code>┌─────────┐ ┌─────────┐ ┌─────────┐
+│Sentinel1│ │Sentinel2│ │Sentinel3│   监控+自动故障转移
+└────┬────┘ └────┬────┘ └────┬────┘
+     │          │          │
+     ▼          ▼          ▼
+┌──────────┐  ┌──────────┐  ┌──────────┐
+│ Master   │→ │ Slave-1  │→ │ Slave-2  │
+└──────────┘  └──────────┘  └──────────┘
+主宕机 → 哨兵投票 → 选新主 → 通知客户端</code></pre>
+
+    <h3>3. Redis Cluster</h3>
+    <pre><code>┌──────────┐  ┌──────────┐  ┌──────────┐
+│ Node 1   │  │ Node 2   │  │ Node 3   │
+│slot 0-5460│ │5461-10922│ │10923-16383│
+│ Master   │  │ Master   │  │ Master   │
+│  ↓ Slave │  │  ↓ Slave │  │  ↓ Slave │
+└──────────┘  └──────────┘  └──────────┘
+
+16384 个哈希槽，key 通过 CRC16(key) % 16384 路由
+无中心节点，Gossip 协议通信</code></pre>
+
+    <h2>四、多级缓存架构</h2>
+    <pre><code>请求 → CDN缓存 → Nginx本地缓存 → 应用进程缓存 → Redis → DB
+        (静态)    (Lua/shared dict) (Caffeine/Guava)
+
+各级缓存特点：
+CDN:  边缘节点，适合静态资源，秒级
+Nginx: 本地热点数据，微秒级
+进程:  零网络开销，纳秒级，容量小
+Redis: 集中缓存，毫秒级，容量大</code></pre>
+
+    <h2>五、缓存数据一致性方案对比</h2>
+    <table>
+        <tr><th>方案</th><th>一致性级别</th><th>复杂度</th><th>说明</th></tr>
+        <tr><td>先更新DB再删缓存</td><td>最终一致</td><td>低</td><td>Cache Aside 标准方案</td></tr>
+        <tr><td>延迟双删</td><td>更高一致</td><td>低</td><td>防并发导致的短暂不一致</td></tr>
+        <tr><td>订阅 Binlog</td><td>最终一致</td><td>中</td><td>Canal 监听变更异步删缓存</td></tr>
+        <tr><td>分布式事务</td><td>强一致</td><td>高</td><td>性能损耗大，一般不推荐</td></tr>
+    </table>
+
+    <div class="note">
+        <strong>面试要点：</strong>Cache Aside 是首选方案，写操作一定是"更新DB + 删除缓存"（不是更新缓存）。穿透用布隆过滤器、击穿用互斥锁、雪崩用随机TTL+多级缓存。Redis Cluster 的 16384 个哈希槽是经典考点。
+    </div>
+
+    <!-- 总结：Cache Aside 是最常用的缓存读写策略，写操作删除缓存而非更新；三大缓存问题——穿透（不存在的key，用布隆过滤器）、击穿（热key过期，用互斥锁）、雪崩（大量key同时过期，用随机TTL+多级缓存）；Redis集群架构分主从/哨兵/Cluster三种；多级缓存（CDN→Nginx→进程→Redis→DB）是高性能架构的关键 -->
+</div>
+</body>
+</html>

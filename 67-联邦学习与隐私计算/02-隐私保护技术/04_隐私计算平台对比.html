@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>隐私计算平台对比</title>
+    <!-- 联邦学习与隐私计算 - 平台对比 笔记 -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        .tag { display: inline-block; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>隐私计算平台对比</h2>
+        <p><span class="tag">FATE</span><span class="tag">PaddleFL</span><span class="tag">TFF</span><span class="tag">PySyft</span></p>
+        <p>主流开源联邦学习和隐私计算平台的功能特性、架构设计和适用场景对比分析。</p>
+    </div>
+
+    <!-- ====== FATE ====== -->
+    <div class="card">
+        <h2>FATE (Federated AI Technology Enabler)</h2>
+        <div class="code">
+背景：微众银行 (WeBank) 于2019年开源，工业级联邦学习平台
+定位：企业级横向/纵向联邦学习，金融领域深度优化
+
+架构：
+┌─────────────────────────────────────────────────────┐
+│  FATE Architecture                                   │
+│                                                     │
+│  ┌─────────────────────────────────────────────┐   │
+│  │  FATE Flow (任务编排层)                      │   │
+│  │  - DAG任务调度                               │   │
+│  │  - 生命周期管理                              │   │
+│  │  - 数据/模型管理                             │   │
+│  └─────────────┬───────────────────────────────┘   │
+│                │                                    │
+│  ┌─────────────▼───────────────────────────────┐   │
+│  │  FATE FederatedML (算法层)                   │   │
+│  │  - HFL: FedAvg, FedProx, FedSTG             │   │
+│  │  - VFL: SecureBoost, SecureLR, SecureNN     │   │
+│  │  - 安全协议: PSI, HE, SecretShare           │   │
+│  │  - 特征工程: 标准化, 分箱, 采样              │   │
+│  └─────────────┬───────────────────────────────┘   │
+│                │                                    │
+│  ┌─────────────▼───────────────────────────────┐   │
+│  │  FATE Federation (通信层)                    │   │
+│  │  - 跨方安全通信                              │   │
+│  │  - 代理/网关管理                             │   │
+│  │  - 传输协议适配                              │   │
+│  └─────────────┬───────────────────────────────┘   │
+│                │                                    │
+│  ┌─────────────▼───────────────────────────────┐   │
+│  │  EggRoll / Spark (计算引擎)                  │   │
+│  │  - 分布式计算                                │   │
+│  │  - 存储管理                                  │   │
+│  └─────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────┘
+
+核心特性：
+- 完整的VFL支持：SecureBoost, SecureLR, SecureNN
+- 同态加密：集成Paillier/BFV
+- PSI：多种隐私集合求交算法
+- 模型评估：支持联邦AUC/KS等指标
+- 模型管理：版本管理、模型转换
+- 企业级：Web UI、REST API、权限管理
+
+支持算法：
+┌─────────────────────────────────────────────────────┐
+│  横向联邦：                                          │
+│  FedAvg, FedProx, FedSGD, FedSTG,                  │
+│  联邦矩阵分解, 联邦Poisson回归                       │
+│                                                     │
+│  纵向联邦：                                          │
+│  SecureBoost (HeteroXGB), SecureLR,                │
+│  SecureNN, HeteroKMeans, HeteroPearson              │
+│                                                     │
+│  安全协议：                                          │
+│  Paillier HE, SPDZ MPC, OT-based PSI,             │
+│  DH-based PSI, ECDH-PSI                             │
+│                                                     │
+│  特征工程：                                          │
+│  联邦特征选择, 联邦特征标准化,                      │
+│  联邦分箱, 联邦采样                                  │
+└─────────────────────────────────────────────────────┘
+
+适用场景：
+- 金融风控：银行+互联网联合建模
+- 信贷评估：多方数据联合信用评分
+- 精准营销：跨平台用户画像
+- 医疗研究：多医院联合疾病研究
+
+优势：VFL算法丰富、工业级稳定性、金融场景经验丰富
+劣势：部署复杂、文档偏少、社区相对较小
+        </div>
+    </div>
+
+    <!-- ====== PaddleFL ====== -->
+    <div class="card">
+        <h2>PaddleFL</h2>
+        <div class="code">
+背景：百度 (Baidu) 基于PaddlePaddle开发的联邦学习框架
+定位：与深度学习紧密集成，支持多种FL范式
+
+架构：
+┌─────────────────────────────────────────────────────┐
+│  PaddleFL Architecture                               │
+│                                                     │
+│  ┌─────────────────────────────────────────────┐   │
+│  │  Python API Layer                            │   │
+│  │  - FL Strategy定义                           │   │
+│  │  - 编译时/运行时策略配置                      │   │
+│  └─────────────┬───────────────────────────────┘   │
+│                │                                    │
+│  ┌─────────────▼───────────────────────────────┐   │
+│  │  FL Compiler / Trainer                       │   │
+│  │  - MPC Trainer: 安全多方计算                  │   │
+│  │  - FL Trainer: 联邦训练                      │   │
+│  │  - 编译时优化: 计算图转换                    │   │
+│  └─────────────┬───────────────────────────────┘   │
+│                │                                    │
+│  ┌─────────────▼───────────────────────────────┐   │
+│  │  PaddlePaddle (底层引擎)                     │   │
+│  │  - 自动微分                                  │   │
+│  │  - GPU加速                                   │   │
+│  │  - 动态图/静态图                             │   │
+│  └─────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────┘
+
+核心特性：
+┌─────────────────────────────────────────────────────┐
+│  1. 两种训练模式：                                   │
+│     编译时FL (Compile-time)：                       │
+│     - 训练前定义联邦策略                            │
+│     - 适合研究和原型开发                            │
+│     - 灵活配置通信模式                              │
+│                                                     │
+│     MPC (Multi-Party Computation)：                 │
+│     - 基于秘密分享和OT                              │
+│     - 支持联邦推理                                  │
+│     - ABY3协议实现                                  │
+│                                                     │
+│  2. 支持的联邦策略：                                 │
+│     - DPSGD (差分隐私SGD)                          │
+│     - SecureNN (安全神经网络)                       │
+│     - FL with MPC                                   │
+│     - 主动学习联邦                                  │
+│                                                     │
+│  3. 与PaddlePaddle深度集成：                         │
+│     - 共用计算图和执行引擎                          │
+│     - GPU加速训练                                   │
+│     - 丰富的深度学习模型库                          │
+└─────────────────────────────────────────────────────┘
+
+支持算法：
+- 横向FL：FedAvg, FedProx, DPSGD
+- MPC：ABY3三方计算, SecureNN
+- 安全推理：Encrypted inference
+- 差分隐私：DP-SGD, DP-FedAvg
+
+适用场景：
+- NLP联合训练：多方文本数据联合建模
+- CV联合训练：多方图像数据联邦学习
+- 推荐系统：跨平台推荐模型
+- 知识图谱：联邦知识融合
+
+优势：与PaddlePaddle无缝集成、GPU加速、MPC支持
+劣势：主要支持HFL、VFL支持有限、社区较小
+        </div>
+    </div>
+
+    <!-- ====== TensorFlow Federated ====== -->
+    <div class="card">
+        <h2>TensorFlow Federated (TFF)</h2>
+        <div class="code">
+背景：Google 开发的联邦学习框架
+定位：学术研究和实验的首选，与TensorFlow生态紧密集成
+
+架构：
+┌─────────────────────────────────────────────────────┐
+│  TFF Architecture                                    │
+│                                                     │
+│  ┌─────────────────────────────────────────────┐   │
+│  │  TFF Learning API (高层API)                  │   │
+│  │  - tff.learning.build_federated_averaging()  │   │
+│  │  - Keras模型 → 联邦学习                      │   │
+│  │  - 开箱即用的FL算法                          │   │
+│  └─────────────┬───────────────────────────────┘   │
+│                │                                    │
+│  ┌─────────────▼───────────────────────────────┐   │
+│  │  TFF Federated Core (底层API)                │   │
+│  │  - 联邦计算定义语言                          │   │
+│  │  - @tff.federated_computation                │   │
+│  │  - 联邦数据类型 (FederatedType)              │   │
+│  └─────────────┬───────────────────────────────┘   │
+│                │                                    │
+│  ┌─────────────▼───────────────────────────────┐   │
+│  │  TensorFlow Runtime                          │   │
+│  │  - 图执行引擎                                │   │
+│  │  - XLA编译优化                               │   │
+│  └─────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────┘
+
+核心特性：
+┌─────────────────────────────────────────────────────┐
+│  1. 声明式联邦计算：                                 │
+│     @tff.federated_computation                      │
+│     def federated_mean(values):                     │
+│         return tff.federated_mean(values)           │
+│     → 自动处理序列化、通信、聚合                    │
+│                                                     │
+│  2. 丰富的内置算法：                                 │
+│     - FedAvg, FedSGD                                │
+│     - FedProx (带正则化)                            │
+│     - FedReD (带正则化的个性化)                     │
+│     - 压缩联邦平均                                  │
+│                                                     │
+│  3. 仿真环境：                                       │
+│     - 在单机上模拟多客户端FL                        │
+│     - 适合算法研究和验证                            │
+│     - tff.simulation.* 模块                        │
+│                                                     │
+│  4. 与TensorFlow生态集成：                           │
+│     - 直接使用Keras模型                             │
+│     - TF数据管道                                   │
+│     - TensorBoard可视化                            │
+│                                                     │
+│  5. 可扩展性：                                       │
+│     - 自定义聚合策略                                │
+│     - 自定义客户端选择策略                          │
+│     - 自定义通信优化                                │
+└─────────────────────────────────────────────────────┘
+
+TFF编程范式：
+┌─────────────────────────────────────────────────────┐
+│  TFF使用函数式编程和类型化中间表示                    │
+│                                                     │
+│  示例代码：                                          │
+│  import tensorflow_federated as tff                 │
+│                                                     │
+│  # 定义Keras模型                                    │
+│  def create_keras_model():                          │
+│      return tf.keras.Sequential([...])              │
+│                                                     │
+│  # 包装为TFF模型                                    │
+│  def model_fn():                                    │
+│      keras_model = create_keras_model()             │
+│      return tff.learning.models.from_keras_model(   │
+│          keras_model,                               │
+│          input_spec=...,                            │
+│          loss=tf.keras.losses.SparseCategorical...) │
+│                                                     │
+│  # 构建联邦训练过程                                  │
+│  iterative_process = tff.learning.algorithms.build_ │
+│      weighted_fed_avg(model_fn, ...)                │
+│                                                     │
+│  # 执行联邦训练                                      │
+│  state = iterative_process.initialize()             │
+│  for round_num in range(num_rounds):                │
+│      result = iterative_process.next(state, data)   │
+│      state = result.state                           │
+└─────────────────────────────────────────────────────┘
+
+适用场景：
+- 学术研究：快速原型和实验
+- 算法验证：在仿真环境中测试FL算法
+- 教学培训：联邦学习入门
+- 移动端FL：Gboard等应用场景
+
+优势：Google生态、学术友好、声明式编程、仿真方便
+劣势：主要支持HFL、VFL支持弱、生产部署需额外工作
+        </div>
+    </div>
+
+    <!-- ====== PySyft ====== -->
+    <div class="card">
+        <h2>PySyft (OpenMined)</h2>
+        <div class="code">
+背景：OpenMined社区维护的隐私保护机器学习库
+定位：隐私保护ML的通用框架，支持多种后端
+
+架构：
+┌─────────────────────────────────────────────────────┐
+│  PySyft Architecture                                 │
+│                                                     │
+│  ┌─────────────────────────────────────────────┐   │
+│  │  PySyft Python API                           │   │
+│  │  - Tensor抽象                                │   │
+│  │  - 隐私运算接口                              │   │
+│  │  - 数据所有者/数据科学家角色                  │   │
+│  └─────────────┬───────────────────────────────┘   │
+│                │                                    │
+│  ┌─────────────▼───────────────────────────────┐   │
+│  │  Privacy Primitives                          │   │
+│  │  - 差分隐私 (DP)                             │   │
+│  │  - 安全多方计算 (SMPC)                       │   │
+│  │  - 同态加密 (HE)                             │   │
+│  │  - 联邦学习 (FL)                             │   │
+│  └─────────────┬───────────────────────────────┘   │
+│                │                                    │
+│  ┌─────────────▼───────────────────────────────┐   │
+│  │  Backend Adapters                            │   │
+│  │  - PyTorch Backend                           │   │
+│  │  - TensorFlow Backend (syft-tf)             │   │
+│  │  - JAX Backend (syft-jax)                   │   │
+│  │  - NumPy Backend                             │   │
+│  └─────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────┘
+
+核心特性：
+┌─────────────────────────────────────────────────────┐
+│  1. 统一的隐私计算接口：                             │
+│     将DP、SMPC、HE统一到Tensor运算接口中             │
+│     用户无需关心底层隐私技术细节                    │
+│                                                     │
+│  2. 数据网格 (Data Grid)：                          │
+│     - Duet：点对点安全数据协作                      │
+│     - 数据科学家无需直接访问数据                    │
+│     - 通过远程运算API操作数据                       │
+│                                                     │
+│  3. 多后端支持：                                     │
+│     - PyTorch：主力后端                             │
+│     - TensorFlow：通过插件支持                      │
+│     - JAX：高性能计算后端                           │
+│                                                     │
+│  4. 隐私保护原语：                                   │
+│     - DP：Laplace/Gaussian噪声机制                 │
+│     - SMPC：Additive Secret Sharing                │
+│     - HE：集成TenSEAL等HE库                        │
+│     - FL：联邦平均，联邦SGD                        │
+│                                                     │
+│  5. 可扩展架构：                                     │
+│     - 插件式后端                                    │
+│     - 自定义隐私协议                                │
+│     - 社区驱动开发                                  │
+└─────────────────────────────────────────────────────┘
+
+PySyft编程示例：
+┌─────────────────────────────────────────────────────┐
+│  import syft as sy                                  │
+│  import torch                                       │
+│                                                     │
+│  # 创建数据所有者虚拟机                              │
+│  domain = sy.orchestra.launch(name="hospital")      │
+│  domain_client = domain.client                      │
+│                                                     │
+│  # 上传私有数据（实际数据不离开）                    │
+│  private_data = sy.Tensor(torch.randn(100, 10))    │
+│  private_data_ptr = private_data.send(domain_client)│
+│                                                     │
+│  # 远程计算                                          │
+│  result_ptr = private_data_ptr.mean()               │
+│  result = result_ptr.get()  # 获取结果              │
+│                                                     │
+│  # 差分隐私                                          │
+│  private_data = private_data.private(               │
+│      min_val=0, max_val=1, data_subjects=["patient"]│
+│  )                                                   │
+│  dp_result = private_data.mean().dp(sigma=0.1)      │
+└─────────────────────────────────────────────────────┘
+
+适用场景：
+- 医疗AI：医院间联合研究
+- 金融分析：多方安全数据分析
+- 学术研究：隐私保护ML研究
+- 数据协作：数据不出域的合作
+
+优势：多后端支持、社区活跃、隐私原语丰富、易学易用
+劣势：生产级稳定性不如FATE、大规模部署能力有限
+        </div>
+    </div>
+
+    <!-- ====== 综合对比 ====== -->
+    <div class="card">
+        <h2>四大平台综合对比</h2>
+        <div class="code">
+维度对比：
+┌──────────────┬──────────┬──────────┬──────────┬──────────┐
+│ 维度          │ FATE     │ PaddleFL │ TFF      │ PySyft   │
+├──────────────┼──────────┼──────────┼──────────┼──────────┤
+│ 开发方        │ 微众银行  │ 百度     │ Google   │ OpenMined│
+│ 底层框架      │ 自研     │ PaddlePd │ TF       │ PyTorch  │
+│ HFL支持      │ ★★★★★  │ ★★★★   │ ★★★★★  │ ★★★★   │
+│ VFL支持      │ ★★★★★  │ ★★      │ ★        │ ★★      │
+│ MPC支持      │ ★★★★   │ ★★★★★  │ ★        │ ★★★★   │
+│ HE支持       │ ★★★★   │ ★★★     │ ★★       │ ★★★     │
+│ DP支持       │ ★★★     │ ★★★★   │ ★★★★   │ ★★★★★  │
+│ 生产就绪     │ ★★★★★  │ ★★★★   │ ★★★     │ ★★★     │
+│ 学术友好     │ ★★★     │ ★★★     │ ★★★★★  │ ★★★★   │
+│ 文档质量     │ ★★★     │ ★★★     │ ★★★★★  │ ★★★★   │
+│ 社区活跃度   │ ★★★     │ ★★      │ ★★★★★  │ ★★★★   │
+│ 部署复杂度    │ 高       │ 中       │ 低(仿真) │ 低       │
+│ 学习曲线      │ 陡       │ 中       │ 平缓     │ 平缓     │
+└──────────────┴──────────┴──────────┴──────────┴──────────┘
+
+选型建议：
+┌─────────────────────────────────────────────────────┐
+│  场景：企业级生产部署                                │
+│  推荐：FATE                                         │
+│  理由：工业级稳定性，完整VFL支持，金融案例丰富       │
+│                                                     │
+│  场景：深度学习联邦训练                              │
+│  推荐：PaddleFL                                     │
+│  理由：与PaddlePaddle集成，GPU加速，MPC支持         │
+│                                                     │
+│  场景：学术研究和算法创新                            │
+│  推荐：TFF                                          │
+│  理由：声明式编程，仿真方便，Google学术支持          │
+│                                                     │
+│  场景：隐私保护ML原型开发                            │
+│  推荐：PySyft                                       │
+│  理由：多后端，隐私原语丰富，社区活跃               │
+│                                                     │
+│  场景：跨平台/异构环境                               │
+│  推荐：PySyft                                       │
+│  理由：支持PyTorch/TF/JAX，通用性最强              │
+│                                                     │
+│  场景：快速验证FL算法                                │
+│  推荐：TFF                                          │
+│  理由：几行代码即可搭建FL实验，学术文献最多          │
+└─────────────────────────────────────────────────────┘
+
+技术路线对比：
+┌─────────────────────────────────────────────────────┐
+│  FATE路线：工业部署 → 安全协议 → 算法库 → 可视化   │
+│  重点：稳定、安全、合规                              │
+│                                                     │
+│  PaddleFL路线：深度学习 → FL扩展 → MPC集成         │
+│  重点：DL与FL结合、高性能                           │
+│                                                     │
+│  TFF路线：仿真研究 → 算法扩展 → 逐步生产化         │
+│  重点：学术创新、算法验证                            │
+│                                                     │
+│  PySyft路线：隐私原语 → 统一接口 → 生态扩展        │
+│  重点：通用隐私保护、开发者友好                      │
+└─────────────────────────────────────────────────────┘
+        </div>
+        <div class="note">选择平台应根据具体场景：生产部署选FATE，深度学习集成选PaddleFL，学术研究选TFF，隐私保护通用需求选PySyft。实践中可组合使用多个平台。</div>
+    </div>
+
+    <!-- 总结：FATE是企业级联邦学习平台，VFL支持最强；PaddleFL与PaddlePaddle集成，MPC支持好；
+    TFF是学术研究首选，声明式编程友好；PySyft多后端支持，隐私原语丰富。
+    选型需根据应用场景、团队技术栈和性能需求综合考量。 -->
+</body>
+</html>

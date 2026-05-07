@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <!-- 代码质量度量 - 软件过程与管理笔记 -->
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>代码质量度量</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f5f7fa; color: #2c3e50; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; background: #fff; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 40px; }
+        h1 { font-size: 28px; color: #1a5276; border-bottom: 3px solid #2980b9; padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 22px; color: #2980b9; margin: 28px 0 14px; border-left: 4px solid #2980b9; padding-left: 12px; }
+        h3 { font-size: 18px; color: #34495e; margin: 20px 0 10px; }
+        p { margin: 8px 0; text-indent: 2em; }
+        ul, ol { margin: 10px 0 10px 2em; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: left; }
+        th { background: #2980b9; color: #fff; }
+        tr:nth-child(even) { background: #f0f4f8; }
+        .note { background: #eaf2f8; border-left: 4px solid #2980b9; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .key-point { background: #fef9e7; border-left: 4px solid #f39c12; padding: 14px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        code { background: #ecf0f1; padding: 2px 6px; border-radius: 4px; font-family: 'Consolas', monospace; font-size: 14px; }
+        .tag { display: inline-block; background: #2980b9; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 12px; margin: 2px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>代码质量度量</h1>
+
+    <!-- 一、SonarQube质量模型 -->
+    <h2>一、SonarQube质量模型</h2>
+    <p>SonarQube是最广泛使用的代码质量管理平台，其质量模型由五个维度构成，提供可量化的质量指标。</p>
+
+    <h3>1.1 五大质量维度</h3>
+    <table>
+        <tr><th>维度</th><th>度量指标</th><th>目标</th><th>说明</th></tr>
+        <tr><td>可靠性 (Reliability)</td><td>Bug数量和等级</td><td>0 Bugs</td><td>可能导致运行时错误的代码问题</td></tr>
+        <tr><td>安全性 (Security)</td><td>漏洞数量和等级</td><td>0 Vulnerabilities</td><td>可能被攻击者利用的安全弱点</td></tr>
+        <tr><td>可维护性 (Maintainability)</td><td>代码异味(Code Smells)</td><td>技术债务比 &lt;5%</td><td>影响维护效率的代码问题</td></tr>
+        <tr><td>覆盖率 (Coverage)</td><td>测试覆盖率</td><td>≥80%</td><td>被单元测试覆盖的代码比例</td></tr>
+        <tr><td>重复度 (Duplications)</td><td>重复代码比例</td><td>≤3-5%</td><td>重复出现的代码块比例</td></tr>
+    </table>
+
+    <h3>1.2 质量门 (Quality Gate)</h3>
+    <div class="note">
+        <strong>SonarQube Quality Gate 标准配置：</strong><br><br>
+        - 新代码覆盖率 ≥ 80%<br>
+        - 新代码重复度 ≤ 3%<br>
+        - 新代码无Blocker/Critical级别Bug<br>
+        - 新代码无Blocker/Critical级别漏洞<br>
+        - 新代码维护性评级 = A<br>
+        - 技术债务比 ≤ 5%<br><br>
+        <strong>"修复泄漏"原则：</strong>Quality Gate聚焦于新代码，而非历史遗留问题。确保新的代码质量不退化，历史问题逐步修复。
+    </div>
+
+    <!-- 二、技术债务 -->
+    <h2>二、技术债务 (Technical Debt)</h2>
+    <p>技术债务是软件开发中为追求短期速度而做出的权宜之计，需要在未来"偿还"（即重构或修复）。</p>
+
+    <h3>2.1 技术债务分类</h3>
+    <table>
+        <tr><th>类型</th><th>成因</th><th>修复成本</th><th>示例</th></tr>
+        <tr><td>鲁莽/刻意</td><td>"我们没时间做好设计"</td><td>高</td><td>硬编码配置、跳过测试</td></tr>
+        <tr><td>谨慎/刻意</td><td>"先发布，后面再重构"</td><td>中</td><td>快速原型未重构</td></tr>
+        <tr><td>鲁莽/无意</td><td>"什么是分层架构？"</td><td>高</td><td>缺乏设计模式知识</td></tr>
+        <tr><td>谨慎/无意</td><td>"现在才知道应该怎么做"</td><td>低</td><td>经验积累后的认知迭代</td></tr>
+    </table>
+
+    <h3>2.2 技术债务比率 (TDR)</h3>
+    <p>技术债务比率 = 修复所有问题所需时间 / 开发整个项目所需时间</p>
+    <ul>
+        <li>TDR &lt; 5%：健康</li>
+        <li>TDR 5-10%：需关注</li>
+        <li>TDR 10-20%：需制定还债计划</li>
+        <li>TDR &gt; 20%：严重，需优先处理</li>
+    </ul>
+
+    <!-- 三、代码异味 -->
+    <h2>三、代码异味 (Code Smells)</h2>
+    <p>代码异味是代码中可能表明更深层问题的表面特征。它们不直接导致Bug，但降低可维护性。</p>
+
+    <h3>3.1 常见代码异味</h3>
+    <table>
+        <tr><th>异味类型</th><th>描述</th><th>影响</th><th>修复方法</th></tr>
+        <tr><td>过长方法</td><td>方法超过40-60行</td><td>难以理解和测试</td><td>提取方法（Extract Method）</td></tr>
+        <tr><td>过大的类</td><td>类承担过多职责</td><td>违反单一职责原则</td><td>提取类（Extract Class）</td></tr>
+        <tr><td>重复代码</td><td>相似代码在多处出现</td><td>修改需要同步多处</td><td>提取公共方法/基类</td></tr>
+        <tr><td>过长参数列表</td><td>方法参数超过3-4个</td><td>调用困难，易出错</td><td>引入参数对象</td></tr>
+        <tr><td>魔术数字</td><td>未解释的数字常量</td><td>含义不明</td><td>提取为命名常量</td></tr>
+        <tr><td>深度嵌套</td><td>if/for嵌套超过3层</td><td>认知复杂度高</td><td>提前返回、策略模式</td></tr>
+        <tr><td>过大的继承层次</td><td>继承层级超过3-4层</td><td>脆弱基类问题</td><td>组合替代继承</td></tr>
+        <tr><td>临时字段</td><td>类中有仅特定情况使用的字段</td><td>类职责不清晰</td><td>提取到专用类</td></tr>
+    </table>
+
+    <!-- 四、认知复杂度 -->
+    <h2>四、认知复杂度 (Cognitive Complexity)</h2>
+    <p>认知复杂度是SonarSource提出的新度量标准，相比圈复杂度(Cyclomatic Complexity)更贴合人类阅读代码的实际困难。</p>
+
+    <h3>4.1 认知复杂度 vs 圈复杂度</h3>
+    <table>
+        <tr><th>维度</th><th>圈复杂度</th><th>认知复杂度</th></tr>
+        <tr><td>计算方式</td><td>线性独立路径数</td><td>人类理解难度评分</td></tr>
+        <tr><td>逻辑运算符</td><td>每个+1</td><td>连续同一运算符不累加</td></tr>
+        <tr><td>嵌套</td><td>不额外惩罚</td><td>每层嵌套+1增量</td></tr>
+        <tr><td>递归</td><td>不特殊处理</td><td>额外加分</td></tr>
+        <tr><td>方法调用</td><td>不计入</td><td>线性结构不加分</td></tr>
+        <tr><td>适用场景</td><td>测试路径覆盖</td><td>可维护性和可读性</td></tr>
+    </table>
+
+    <h3>4.2 建议阈值</h3>
+    <ul>
+        <li>单个函数：认知复杂度 ≤ 15</li>
+        <li>单个类：平均认知复杂度 ≤ 25</li>
+        <li>复杂度 0-5：简单，易理解</li>
+        <li>复杂度 6-10：中等，可接受</li>
+        <li>复杂度 11-15：较复杂，考虑重构</li>
+        <li>复杂度 &gt;15：复杂，必须重构</li>
+    </ul>
+
+    <!-- 五、可维护性指数 -->
+    <h2>五、可维护性指数 (Maintainability Index)</h2>
+    <p>可维护性指数是一个综合评分（0-100），综合考虑了圈复杂度、代码行数和Halstead量度。</p>
+
+    <h3>5.1 计算公式</h3>
+    <div class="note">
+        <strong>Visual Studio的可维护性指数公式：</strong><br><br>
+        MI = MAX(0, (171 - 5.2 × ln(HV) - 0.23 × CC - 16.2 × ln(LOC)) × 100 / 171)<br><br>
+        其中：<br>
+        - HV = Halstead Volume（代码量）<br>
+        - CC = Cyclomatic Complexity（圈复杂度）<br>
+        - LOC = Lines of Code（代码行数）<br><br>
+        评分标准：<br>
+        - 20-100：良好（绿色）<br>
+        - 10-19：中等（黄色）<br>
+        - 0-9：差（红色），需要重构
+    </div>
+
+    <!-- 六、度量实践 -->
+    <h2>六、代码质量度量实践</h2>
+
+    <h3>6.1 CI/CD集成</h3>
+    <div class="note">
+        <strong>SonarQube CI集成配置：</strong><br><br>
+        # GitLab CI示例<br>
+        sonarqube-check:<br>
+        &nbsp;&nbsp;stage: test<br>
+        &nbsp;&nbsp;image: sonarsource/sonar-scanner-cli:latest<br>
+        &nbsp;&nbsp;script:<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;- sonar-scanner \<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dsonar.projectKey=my-project \<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dsonar.sources=. \<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dsonar.host.url=$SONAR_HOST \<br>
+        &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-Dsonar.login=$SONAR_TOKEN<br>
+        &nbsp;&nbsp;allow_failure: false<br>
+    </div>
+
+    <h3>6.2 度量指标看板</h3>
+    <table>
+        <tr><th>指标</th><th>数据源</th><th>关注频率</th><th>行动阈值</th></tr>
+        <tr><td>技术债务比</td><td>SonarQube</td><td>每Sprint</td><td>> 5%需制定还债计划</td></tr>
+        <tr><td>测试覆盖率</td><td>SonarQube / JaCoCo</td><td>每次提交</td><td>< 80%阻断合并</td></tr>
+        <tr><td>代码重复度</td><td>SonarQube</td><td>每Sprint</td><td>> 5%需重构</td></tr>
+        <tr><td>认知复杂度</td><td>SonarQube</td><td>代码审查时</td><td>> 15需重构</td></tr>
+        <tr><td>代码审查参与率</td><td>Git平台</td><td>每月</td><td>< 80%需关注</td></tr>
+        <tr><td>Bug逃逸率</td><td>Jira/Bugzilla</td><td>每Sprint</td><td>> 10%需改进测试</td></tr>
+    </table>
+
+    <div class="key-point">
+        <strong>度量的陷阱：</strong>度量指标是手段而非目的。"一旦指标成为目标，它就不再是好指标"（Goodhart定律）。关注趋势而非绝对值，关注改进方向而非分数排名。避免将度量指标与个人绩效挂钩。
+    </div>
+
+</div>
+
+<!--
+========================================
+  文件总结
+========================================
+  主题：代码质量度量
+  内容概要：
+    1. SonarQube五大维度 - 可靠性/安全性/可维护性/覆盖率/重复度
+    2. 技术债务 - 四种分类(Martin Fowler矩阵)、TDR计算
+    3. 代码异味 - 八种常见异味及修复方法
+    4. 认知复杂度 vs 圈复杂度 - 前者更符合人类理解难度
+    5. 可维护性指数 - 综合评分公式和阈值
+  重点知识：
+    - Quality Gate聚焦"修复泄漏"（新代码质量）
+    - 技术债务比率TDR > 20%需立即处理
+    - 认知复杂度比圈复杂度更适合度量可读性
+    - Goodhart定律：指标不应与绩效直接挂钩
+========================================
+-->
+</body>
+</html>

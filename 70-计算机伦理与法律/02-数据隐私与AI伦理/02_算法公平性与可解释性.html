@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>算法公平性与可解释性 - 计算机伦理与法律笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; line-height: 1.8; }
+        .container { max-width: 960px; margin: 0 auto; padding: 40px 24px; }
+        h1 { color: #58a6ff; font-size: 2em; border-bottom: 2px solid #30363d; padding-bottom: 12px; margin-bottom: 28px; }
+        h2 { color: #79c0ff; font-size: 1.5em; margin: 32px 0 16px; border-left: 4px solid #58a6ff; padding-left: 12px; }
+        h3 { color: #d2a8ff; font-size: 1.2em; margin: 24px 0 12px; }
+        p { margin: 10px 0; }
+        ul, ol { margin: 10px 0 10px 24px; }
+        li { margin: 6px 0; }
+        code { background: #161b22; color: #ff7b72; padding: 2px 8px; border-radius: 4px; font-family: 'Consolas', 'Courier New', monospace; font-size: 0.9em; }
+        pre { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 16px; overflow-x: auto; margin: 16px 0; }
+        pre code { background: none; color: #c9d1d9; padding: 0; }
+        .note { background: #161b22; border-left: 4px solid #58a6ff; padding: 16px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        .warning { background: #161b22; border-left: 4px solid #f0883e; padding: 16px; margin: 16px 0; border-radius: 0 8px 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid #30363d; padding: 10px 14px; text-align: left; }
+        th { background: #161b22; color: #58a6ff; }
+        tr:nth-child(even) { background: #161b22; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>算法公平性与可解释性</h1>
+
+    <h2>一、机器学习中的偏见</h2>
+
+    <h3>1. 偏见来源</h3>
+    <table>
+        <tr><th>来源</th><th>说明</th><th>案例</th></tr>
+        <tr><td>历史偏见</td><td>训练数据反映了社会历史中的不平等</td><td>招聘数据中男性比例远高于女性，模型学到了性别偏见</td></tr>
+        <tr><td>表示偏见</td><td>某些群体在数据中代表性不足</td><td>人脸识别训练集缺乏深肤色样本，识别准确率下降</td></tr>
+        <tr><td>测量偏见</td><td>特征本身带有系统性偏差</td><td>用逮捕率代替犯罪率，不同社区的执法力度差异</td></tr>
+        <tr><td>聚合偏见</td><td>用一个模型服务所有群体</td><td>医疗模型在不同种族群体上表现差异大</td></tr>
+        <tr><td>部署偏见</td><td>模型在与训练不同的环境中使用</td><td>城市 A 训练的犯罪预测模型用于城市 B</td></tr>
+    </table>
+
+    <h3>2. 经典案例</h3>
+    <ul>
+        <li><strong>COMPAS 累犯预测：</strong>美国法院使用的累犯风险评估系统，被发现对黑人被告的假阳性率显著高于白人（ProPublica 调查，2016）</li>
+        <li><strong>Amazon 招聘工具：</strong>对包含"女性"关键词的简历自动降分，因为训练数据中历史录用者多为男性</li>
+        <li><strong>信用卡审批算法：</strong>Apple Card 被指控给予女性更低的信用额度</li>
+    </ul>
+
+    <h2>二、公平性度量</h2>
+
+    <h3>1. 主要公平性定义</h3>
+    <pre><code>群体公平性（Group Fairness）：
+┌─────────────────────────────────────────────────┐
+│  人口均等 (Demographic Parity)                    │
+│  P(Ŷ=1|A=0) = P(Ŷ=1|A=1)                        │
+│  不同群体获得正预测的比例相同                        │
+├─────────────────────────────────────────────────┤
+│  机会均等 (Equalized Odds)                        │
+│  P(Ŷ=1|A=0,Y=y) = P(Ŷ=1|A=1,Y=y) for y∈{0,1}   │
+│  不同群体的 TPR 和 FPR 分别相同                    │
+├─────────────────────────────────────────────────┤
+│  预测均等 (Predictive Parity)                     │
+│  P(Y=1|Ŷ=1,A=0) = P(Y=1|Ŷ=1,A=1)               │
+│  不同群体的精确率相同                              │
+└─────────────────────────────────────────────────┘</code></pre>
+
+    <h3>2. 公平性的不可能三角</h3>
+    <div class="warning">
+        <strong>Impossibility Theorem（Chouldechova, 2017）：</strong>当基率（base rate）在不同群体间不同时，不可能同时满足以下三个条件：1）预测均等 2）机会均等 3）整体校准。必须做出权衡取舍。
+    </div>
+
+    <h3>3. 个体公平性</h3>
+    <pre><code>// 个体公平性定义（Dwork et al., 2012）
+// 相似的个体应获得相似的预测结果
+d(f(x), f(y)) ≤ L · d(x, y)
+
+// 问题：如何定义"相似"？
+// 不同度量标准导致不同的公平性判断</code></pre>
+
+    <h2>三、偏见缓解方法</h2>
+
+    <h3>1. 预处理（Pre-processing）</h3>
+    <ul>
+        <li><strong>重采样：</strong>对少数群体过采样或多数群体欠采样</li>
+        <li><strong>重加权：</strong>给少数群体样本更高权重</li>
+        <li><strong>数据增强：</strong>生成合成数据平衡群体表示</li>
+        <li><strong>去偏嵌入：</strong>在词嵌入中移除性别/种族方向</li>
+    </ul>
+
+    <h3>2. 处理中（In-processing）</h3>
+    <ul>
+        <li><strong>公平约束优化：</strong>在损失函数中加入公平性约束项</li>
+        <li><strong>对抗去偏：</strong>使用对抗网络去除敏感属性信息</li>
+        <li><strong>正则化：</strong>惩罚模型对敏感属性的依赖</li>
+    </ul>
+
+    <h3>3. 后处理（Post-processing）</h3>
+    <ul>
+        <li><strong>阈值调整：</strong>对不同群体使用不同的决策阈值</li>
+        <li><strong>校准：</strong>确保不同群体的预测概率具有相同含义</li>
+    </ul>
+
+    <h2>四、可解释性（Explainable AI / XAI）</h2>
+
+    <h3>1. 为什么需要可解释性</h3>
+    <ul>
+        <li><strong>信任：</strong>用户需要理解 AI 的决策依据</li>
+        <li><strong>合规：</strong>GDPR 第 22 条——数据主体有权获得关于自动化决策的解释</li>
+        <li><strong>调试：</strong>发现模型的错误推理和偏见</li>
+        <li><strong>公平性审计：</strong>检查模型是否使用了不当特征</li>
+    </ul>
+
+    <h3>2. 模型可解释性分类</h3>
+    <pre><code>┌──────────────────┬──────────────────┐
+│  本质可解释模型    │  事后解释方法      │
+│  (Intrinsically  │  (Post-hoc       │
+│   Interpretable) │   Explanation)   │
+├──────────────────┼──────────────────┤
+│  线性回归         │  SHAP            │
+│  决策树           │  LIME            │
+│  逻辑回归         │  注意力可视化      │
+│  规则列表         │  梯度分析         │
+│  GAM             │  反事实解释       │
+└──────────────────┴──────────────────┘</code></pre>
+
+    <h3>3. SHAP（SHapley Additive exPlanations）</h3>
+    <pre><code>// 基于博弈论 Shapley 值
+// 每个特征的贡献 = 该特征在所有特征子集中的边际贡献的加权平均
+
+φ_i = Σ [|S|!(M-|S|-1)!/M!] × [f(S∪{i}) - f(S)]
+
+// 直观理解：
+// 将每个特征视为"玩家"，预测值视为"总收益"
+// SHAP 值公平分配每个特征对预测的贡献
+
+// Python 使用
+import shap
+explainer = shap.TreeExplainer(model)
+shap_values = explainer.shap_values(X_test)
+shap.summary_plot(shap_values, X_test)  # 全局特征重要性
+shap.force_plot(explainer.expected_value, shap_values[0], X_test.iloc[0])  # 单条预测解释</code></pre>
+    <ul>
+        <li><strong>优点：</strong>理论上唯一满足公平分配公理（效率性、对称性、虚拟性、可加性）的方法</li>
+        <li><strong>缺点：</strong>计算成本高（指数级子集数量），需要近似算法</li>
+    </ul>
+
+    <h3>4. LIME（Local Interpretable Model-agnostic Explanations）</h3>
+    <pre><code>// 核心思想：在局部用简单模型近似复杂模型
+// 对单条预测，在其邻域内生成扰动样本
+// 用可解释模型（如线性回归）拟合这些样本
+
+解释 = argmin_g L(f, g, π_x) + Ω(g)
+// f: 原始模型, g: 简单模型, π_x: 邻域权重, Ω: 复杂度惩罚
+
+// Python 使用
+import lime
+explainer = lime.lime_tabular.LimeTabularExplainer(X_train)
+exp = explainer.explain_instance(X_test[0], model.predict_proba)
+exp.show_in_notebook()</code></pre>
+    <ul>
+        <li><strong>优点：</strong>模型无关（任何模型都能用），局部解释直观</li>
+        <li><strong>缺点：</strong>不稳定（随机采样导致结果波动），只解释局部</li>
+    </ul>
+
+    <h2>五、算法审计</h2>
+
+    <h3>1. 审计流程</h3>
+    <pre><code>1. 定义审计目标 → 确定保护群体和公平性指标
+2. 数据审计   → 检查训练数据的代表性和偏差
+3. 模型审计   → 测试不同群体的性能差异
+4. 结果审计   → 分析决策结果的分布差异
+5. 报告与建议 → 提出改进方案和监控机制</code></pre>
+
+    <h3>2. 法律框架</h3>
+    <table>
+        <tr><th>法规</th><th>地区</th><th>相关条款</th></tr>
+        <tr><td>GDPR</td><td>欧盟</td><td>第22条：自动化决策的解释权</td></tr>
+        <tr><td>AI Act</td><td>欧盟</td><td>高风险AI系统的透明度和可审计性要求</td></tr>
+        <tr><td>EEOC 指南</td><td>美国</td><td>雇佣中AI工具的歧视风险</td></tr>
+        <tr><td>个人信息保护法</td><td>中国</td><td>自动化决策的透明度和拒绝权</td></tr>
+    </table>
+
+    <div class="note">
+        <strong>面试要点：</strong>算法偏见的五大来源（历史/表示/测量/聚合/部署）；SHAP 基于博弈论 Shapley 值保证公平分配；LIME 用局部线性模型近似；公平性不可能三角（预测均等、机会均等、校准无法同时满足）；GDPR 第 22 条的"解释权"。
+    </div>
+
+    <!-- 总结：ML偏见来源包括历史偏见、表示偏见等五类；公平性度量有群体公平性（人口均等、机会均等、预测均等）和个体公平性，但存在不可能三角；SHAP基于Shapley值是最理论完备的可解释性方法，LIME是模型无关的局部解释；算法审计流程五步走；GDPR和AI Act是主要法律框架 -->
+</div>
+</body>
+</html>

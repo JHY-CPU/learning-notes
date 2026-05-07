@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分布式文件系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background: #f5f7fa; color: #333; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2c3e50; border-bottom: 3px solid #3498db; padding-bottom: 15px; margin-bottom: 30px; }
+        h2 { color: #2980b9; margin: 25px 0 10px; border-left: 4px solid #3498db; padding-left: 12px; }
+        h3 { color: #8e44ad; margin: 15px 0 8px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #bdc3c7; padding: 10px 14px; text-align: center; }
+        th { background: #3498db; color: #fff; }
+        tr:nth-child(even) { background: #ecf0f1; }
+        .formula { background: #f9f9f9; border-left: 4px solid #e67e22; padding: 10px 15px; margin: 10px 0; font-family: 'Consolas', monospace; }
+        .note { background: #fef9e7; border-left: 4px solid #f1c40f; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        .important { background: #fdedec; border-left: 4px solid #e74c3c; padding: 12px; margin: 10px 0; border-radius: 4px; }
+        ul, ol { margin-left: 25px; margin-bottom: 10px; }
+        li { margin-bottom: 5px; }
+        .arch-diagram { text-align: center; margin: 15px 0; padding: 20px; background: #f8f9fa; border-radius: 8px; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>分布式文件系统</h1>
+
+        <!-- GFS架构 -->
+        <div class="card">
+            <h2>一、Google File System（GFS）</h2>
+            <p>GFS是Google在2003年发表的分布式文件系统论文中提出的设计，是大数据存储系统的奠基性工作。</p>
+
+            <h3>1.1 设计目标与假设</h3>
+            <ul>
+                <li>组件故障是常态而非异常（大量廉价服务器）</li>
+                <li>文件以大块（Chunk，64MB）存储，减少元数据开销</li>
+                <li>主要负载是大文件的追加写（Append），而非随机写</li>
+                <li>优化顺序读和追加写的带宽，而非延迟</li>
+            </ul>
+
+            <h3>1.2 架构</h3>
+            <div class="arch-diagram">
+                ┌─────────────┐<br>
+                │ Master (单点) │ ← 元数据：文件名→Chunk映射、Chunk位置<br>
+                └──────┬──────┘<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│ 元数据操作<br>
+                ┌──────┼──────┐<br>
+                ▼&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;▼<br>
+                ┌────┐ ┌────┐ ┌────┐<br>
+                │Chunk│ │Chunk│ │Chunk│ ← 数据存储在ChunkServer<br>
+                │Srv 1│ │Srv 2│ │Srv 3│<br>
+                └────┘ └────┘ └────┘
+            </div>
+
+            <h3>1.3 核心组件</h3>
+            <table>
+                <tr><th>组件</th><th>职责</th><th>特点</th></tr>
+                <tr><td>Master</td><td>存储元数据、管理Chunk租约、垃圾回收、Chunk迁移</td><td>单点（实际有Shadow备份），全部元数据存内存</td></tr>
+                <tr><td>ChunkServer</td><td>存储Chunk数据（Linux本地文件系统）</td><td>多个，定期向Master汇报心跳和Chunk状态</td></tr>
+                <tr><td>Client</td><td>向Master获取元数据，直接与ChunkServer交互读写数据</td><td>以库形式链接到应用</td></tr>
+            </table>
+
+            <h3>1.4 读写流程</h3>
+            <div class="formula">
+                读流程：<br>
+                1. Client → Master：文件名+偏移量 → Master返回Chunk句柄+副本位置<br>
+                2. Client → ChunkServer：直接读取数据（后续缓存元数据）<br><br>
+                写流程（追加）：<br>
+                1. Client → Master：获取Primary副本和副本位置<br>
+                2. Client → 所有副本：推送数据到各副本的缓存<br>
+                3. Client → Primary：发送写请求<br>
+                4. Primary → 所有Secondary：确定写入顺序，下发写命令<br>
+                5. 所有副本完成 → Primary → Client：返回成功
+            </div>
+
+            <h3>1.5 Chunk租约（Lease）</h3>
+            <ul>
+                <li>Master为每个Chunk指定一个Primary副本，授予60秒租约</li>
+                <li>Primary负责确定所有副本的写入顺序（串行化）</li>
+                <li>租约到期后可由其他副本接任</li>
+            </ul>
+        </div>
+
+        <!-- HDFS -->
+        <div class="card">
+            <h2>二、HDFS（Hadoop Distributed File System）</h2>
+            <p>HDFS是GFS的开源实现，是Hadoop生态系统的核心存储组件。</p>
+
+            <h3>2.1 架构对比GFS</h3>
+            <table>
+                <tr><th>特性</th><th>GFS</th><th>HDFS</th></tr>
+                <tr><td>主节点</td><td>Master</td><td>NameNode</td></tr>
+                <tr><td>数据节点</td><td>ChunkServer</td><td>DataNode</td></tr>
+                <tr><td>块大小</td><td>64MB</td><td>128MB（2.x默认）</td></tr>
+                <tr><td>副本数</td><td>3</td><td>3（默认）</td></tr>
+                <tr><td>写模型</td><td>追加+租约</td><td>流水线写（Pipeline）</td></tr>
+                <tr><td>元数据</td><td>单Master内存</td><td>NameNode内存+EditLog</td></tr>
+            </table>
+
+            <h3>2.2 NameNode高可用</h3>
+            <ul>
+                <li><strong>NameNode HA</strong>：Active/Standby双NameNode，通过ZKFC（ZK Failover Controller）自动故障切换</li>
+                <li><strong>共享编辑日志</strong>：使用QJM（Quorum Journal Manager）在JournalNode集群中同步EditLog</li>
+                <li><strong>Secondary NameNode</strong>：定期合并FsImage和EditLog（非热备，非HA组件）</li>
+            </ul>
+
+            <h3>2.3 副本放置策略</h3>
+            <div class="formula">
+                默认3副本放置：<br>
+                副本1：与客户端同一节点（同机架）<br>
+                副本2：不同机架的节点<br>
+                副本3：与副本2同机架的不同节点<br><br>
+                目标：平衡可靠性和带宽开销
+            </div>
+        </div>
+
+        <!-- 复制与一致性 -->
+        <div class="card">
+            <h2>三、复制与一致性</h2>
+
+            <h3>3.1 一致性模型</h3>
+            <table>
+                <tr><th>一致性级别</th><th>含义</th><th>GFS/HDFS策略</th></tr>
+                <tr><td>强一致性</td><td>所有副本同时更新</td><td>不采用（代价高）</td></tr>
+                <tr><td>顺序一致性</td><td>所有操作按全局顺序执行</td><td>Primary串行化写入</td></tr>
+                <tr><td>最终一致性</td><td>副本最终趋于一致</td><td>通过租约和流水线保证</td></tr>
+            </table>
+
+            <h3>3.2 GFS的一致性保证</h3>
+            <ul>
+                <li>文件命名空间的修改是原子的（由Master锁保证）</li>
+                <li>文件区域在成功写入后是"已定义"（Defined）的</li>
+                <li>写入失败可能导致"不一致"（Inconsistent）的区域</li>
+                <li>读者可能会读到过期数据（取决于缓存的Chunk位置信息）</li>
+            </ul>
+
+            <h3>3.3 纠删码（Erasure Coding）</h3>
+            <p>纠删码是副本策略的替代方案，在保证相同可靠性的同时大幅减少存储开销。</p>
+            <div class="formula">
+                RS(k, m) 纠删码：<br>
+                - k个数据块 + m个校验块<br>
+                - 可容忍任意m个块的故障<br>
+                - 存储开销：(k+m)/k，相比3副本的3倍大幅降低<br>
+                - 例：RS(6,3) 存储开销1.5倍，容忍3块故障
+            </div>
+
+            <div class="note">
+                <strong>纠删码 vs 副本：</strong><br>
+                副本：恢复快（直接读副本），带宽开销小，存储开销大<br>
+                纠删码：恢复慢（需要解码），CPU开销大，存储开销小<br>
+                实践中通常对热数据用副本，冷数据用纠删码（如HDFS EC、Ceph）
+            </div>
+        </div>
+
+        <!-- 总结 -->
+        <div class="card">
+            <h2>四、知识要点总结</h2>
+            <ol>
+                <li>GFS架构：单Master + 多ChunkServer，大块（64MB），3副本</li>
+                <li>GFS写模型：流水线写 + 租约机制确定Primary</li>
+                <li>HDFS：GFS开源实现，NameNode/DataNode架构</li>
+                <li>NameNode HA：Active/Standby + QJM</li>
+                <li>副本放置策略：跨机架放置，平衡可靠性和带宽</li>
+                <li>纠删码：RS(k,m)，存储开销低，适合冷数据</li>
+            </ol>
+        </div>
+
+        <!--
+            ========================================
+            文件总结：分布式文件系统
+            ========================================
+            本文件涵盖了分布式存储系统的核心内容：
+            1. GFS架构设计（Master/ChunkServer/Client）
+            2. GFS读写流程和Chunk租约机制
+            3. HDFS架构及其与GFS的对比
+            4. NameNode高可用方案（HA + QJM）
+            5. 副本放置策略
+            6. 一致性模型和纠删码
+
+            重点：GFS写流程、HDFS HA、纠删码RS(k,m)
+            考点：GFS架构分析、副本策略、一致性
+            ========================================
+        -->
+    </div>
+</body>
+</html>

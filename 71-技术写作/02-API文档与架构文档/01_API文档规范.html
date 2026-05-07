@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>API文档规范</title>
+    <!-- 技术写作 - API文档规范 笔记 -->
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f5f5f5; }
+        .card { background: white; border-radius: 8px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .card h2 { margin: 0 0 10px 0; color: #2c3e50; }
+        .code { background: #f8f9fa; padding: 10px; border-radius: 4px; font-family: monospace; font-size: 14px; border-left: 3px solid #e74c3c; margin: 10px 0; white-space: pre-wrap; }
+        .note { background: #fef9e7; border-left: 4px solid #f39c12; padding: 10px 15px; font-size: 14px; color: #7f8c8d; margin-top: 10px; }
+        .tag { display: inline-block; background: #3498db; color: white; padding: 2px 8px; border-radius: 3px; font-size: 12px; margin-right: 5px; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h2>API文档规范</h2>
+        <p><span class="tag">技术写作</span><span class="tag">API</span><span class="tag">OpenAPI</span></p>
+        <p>好的API文档是API成功的关键，OpenAPI是事实标准。</p>
+    </div>
+
+    <div class="card">
+        <h2>OpenAPI / Swagger</h2>
+        <div class="code">
+OpenAPI 3.0 规范示例：
+openapi: 3.0.3
+info:
+  title: 用户管理API
+  version: 1.0.0
+  description: 用户注册、认证和管理接口
+
+paths:
+  /users:
+    get:
+      summary: 获取用户列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+      responses:
+        '200':
+          description: 成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/User'
+
+  /users/{id}:
+    get:
+      summary: 获取用户详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 成功
+        '404':
+          description: 用户不存在
+
+components:
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+
+工具链：
+- Swagger UI：交互式文档界面
+- Redoc：美观的文档渲染
+- Swagger Codegen：自动生成客户端代码
+- Prism：Mock服务器
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>REST API文档要素</h2>
+        <div class="code">
+每个API端点应包含：
+┌─────────────────────────────────────────────┐
+│  1. HTTP方法和路径                            │
+│     GET /api/v1/users/{id}                   │
+│                                             │
+│  2. 功能描述                                  │
+│     根据ID获取用户详细信息                     │
+│                                             │
+│  3. 请求参数                                  │
+│     路径参数、查询参数、请求头、请求体         │
+│                                             │
+│  4. 请求示例                                  │
+│     curl -X GET /api/v1/users/123 \         │
+│       -H "Authorization: Bearer token"      │
+│                                             │
+│  5. 响应格式                                  │
+│     成功和失败的响应结构                       │
+│                                             │
+│  6. 响应示例                                  │
+│     {"id": "123", "name": "张三", ...}       │
+│                                             │
+│  7. 错误码说明                                │
+│     400: 参数错误                             │
+│     401: 未认证                               │
+│     404: 用户不存在                           │
+│                                             │
+│  8. 认证方式                                  │
+│     Bearer Token / API Key / OAuth2          │
+│                                             │
+│  9. 速率限制                                  │
+│     100次/分钟，超出返回429                   │
+└─────────────────────────────────────────────┘
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>认证文档与最佳实践</h2>
+        <div class="code">
+认证文档应包含：
+- 支持的认证方式
+- 获取Token的步骤
+- Token刷新机制
+- 权限范围(Scopes)说明
+- 示例代码
+
+文档最佳实践：
+┌─────────────────────────────────────────────┐
+│  - 代码优先：API变更同步更新文档               │
+│  - 版本管理：每个API版本有独立文档             │
+│  - 交互式：提供"Try it"功能                   │
+│  - 多语言示例：curl/Python/JS/Go             │
+│  - 变更日志：记录API的Breaking Changes       │
+│  - SDK文档：自动从代码生成                    │
+│  - 搜索功能：帮助开发者快速找到               │
+└─────────────────────────────────────────────┘
+
+API文档平台：
+- SwaggerHub：OpenAPI协作平台
+- ReadMe.io：开发者门户
+- Postman：API开发+文档
+- Stoplight：API设计+文档
+- Redocly：OpenAPI文档渲染
+        </div>
+        <div class="note">API文档应与代码同步维护，使用OpenAPI规范+代码生成是最可靠的方式。
+        提供交互式示例和多语言SDK能大幅提升开发者体验。</div>
+    </div>
+
+    <!-- 总结：OpenAPI是REST API文档的事实标准，Swagger UI提供交互式文档。
+    每个API端点应包含方法、参数、示例、错误码等完整信息。
+    文档应与代码同步维护，支持多语言示例和交互式体验。 -->
+</body>
+</html>

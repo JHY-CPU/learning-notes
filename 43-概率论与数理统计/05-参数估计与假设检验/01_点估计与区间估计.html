@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>点估计与区间估计</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 900px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; font-size: 2em; margin-bottom: 10px; border-bottom: 3px solid #2b6cb0; padding-bottom: 10px; }
+        .subtitle { text-align: center; color: #718096; margin-bottom: 30px; }
+        h2 { color: #2c5282; font-size: 1.4em; margin: 25px 0 12px; padding-left: 12px; border-left: 4px solid #3182ce; }
+        h3 { color: #2d3748; font-size: 1.15em; margin: 18px 0 8px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px 25px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .formula { background: #ebf8ff; border: 1px solid #bee3f8; border-radius: 6px; padding: 12px 18px; margin: 10px 0; font-size: 1.05em; text-align: center; font-family: 'Times New Roman', serif; }
+        .formula-inline { background: #ebf8ff; padding: 2px 8px; border-radius: 4px; font-family: 'Times New Roman', serif; }
+        .example { background: #f0fff4; border-left: 4px solid #48bb78; border-radius: 0 6px 6px 0; padding: 15px 18px; margin: 12px 0; }
+        .example-title { font-weight: bold; color: #276749; margin-bottom: 6px; }
+        .note { background: #fffff0; border-left: 4px solid #ecc94b; border-radius: 0 6px 6px 0; padding: 12px 18px; margin: 12px 0; }
+        .note-title { font-weight: bold; color: #975a16; }
+        .step { background: #faf5ff; border-left: 4px solid #805ad5; border-radius: 0 6px 6px 0; padding: 10px 18px; margin: 8px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 8px 12px; text-align: center; }
+        th { background: #bee3f8; color: #2a4365; }
+        tr:nth-child(even) { background: #f7fafc; }
+        ul, ol { margin-left: 25px; margin-bottom: 8px; }
+        li { margin-bottom: 4px; }
+        .summary-box { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #fff; border-radius: 10px; padding: 20px 25px; margin-top: 30px; }
+        .summary-box h2 { color: #fff; border-left-color: #fff; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>点估计与区间估计</h1>
+    <p class="subtitle">参数估计 · 最大似然估计与置信区间</p>
+
+    <!-- ==================== 点估计 ==================== -->
+    <h2>一、点估计</h2>
+
+    <div class="card">
+        <h3>1. 矩估计法</h3>
+        <p><strong>思想</strong>：用样本矩估计总体矩（用样本均值估计总体均值等）。</p>
+        <p><strong>步骤</strong>：令总体的 k 阶原点矩等于样本的 k 阶原点矩，解方程组。</p>
+        <div class="formula">
+            E(Xᵏ) = (1/n) Σ Xᵢᵏ &nbsp;&nbsp; （k = 1, 2, ..., m，m 为待估参数个数）
+        </div>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 1：矩估计</div>
+        <p>设 X ~ U(0, θ)，样本为 2.3, 1.8, 3.5, 2.1, 2.8，求 θ 的矩估计。</p>
+        <div class="step">
+            E(X) = θ/2，样本均值 x̄ = (2.3+1.8+3.5+2.1+2.8)/5 = 2.5<br>
+            令 E(X) = x̄ → θ/2 = 2.5 → <strong>θ̂ = 5</strong>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>2. 最大似然估计法（MLE）</h3>
+        <p><strong>思想</strong>：选取使观测数据出现概率最大的参数值。</p>
+        <p><strong>步骤</strong>：</p>
+        <ol>
+            <li>写出似然函数：L(θ) = ∏ f(xᵢ; θ)</li>
+            <li>取对数：ln L(θ) = Σ ln f(xᵢ; θ)</li>
+            <li>对 θ 求导并令导数为 0：d(ln L)/dθ = 0</li>
+            <li>解出 θ 即为 MLE</li>
+        </ol>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 2：最大似然估计（指数分布）</div>
+        <p>设 X ~ Exp(λ)，样本观测值为 0.5, 1.2, 0.8, 1.5，求 λ 的 MLE。</p>
+        <div class="step">
+            似然函数：L(λ) = ∏ λe^(-λxᵢ) = λⁿ · e^(-λΣxᵢ)<br>
+            对数似然：ln L = n·lnλ - λ·Σxᵢ<br>
+            求导：d(ln L)/dλ = n/λ - Σxᵢ = 0<br>
+            <strong>λ̂ = n/Σxᵢ = 1/x̄ = 4/(0.5+1.2+0.8+1.5) = 1</strong>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>3. 估计量的评价标准</h3>
+        <table>
+            <tr><th>标准</th><th>定义</th><th>说明</th></tr>
+            <tr><td>无偏性</td><td>E(θ̂) = θ</td><td>估计量的期望等于真值</td></tr>
+            <tr><td>有效性</td><td>D(θ̂₁) &lt; D(θ̂₂)</td><td>方差越小越好</td></tr>
+            <tr><td>一致性</td><td>θ̂ →ᵖ θ</td><td>n→∞ 时依概率收敛于真值</td></tr>
+        </table>
+    </div>
+
+    <!-- ==================== 区间估计 ==================== -->
+    <h2>二、区间估计（置信区间）</h2>
+
+    <div class="card">
+        <h3>1. 基本概念</h3>
+        <p><strong>置信区间</strong>：以一定的置信水平（通常 95%）包含参数真值的区间。</p>
+        <div class="formula">
+            P(θ̂_L ≤ θ ≤ θ̂_U) = 1 - α
+        </div>
+        <p style="margin-top:8px;">其中 1-α 称为置信水平（如 α=0.05 时，置信水平为 95%）。</p>
+        <p style="color:#c53030;">注意：置信区间是随机的，参数 θ 是固定的。95% 置信水平意味着：如果反复抽样构造区间，约 95% 的区间会包含真值。</p>
+    </div>
+
+    <div class="card">
+        <h3>2. 正态总体均值的置信区间</h3>
+        <table>
+            <tr><th>条件</th><th>枢轴量</th><th>置信区间</th></tr>
+            <tr>
+                <td>σ² 已知</td>
+                <td>Z = (X̄-μ)/(σ/√n) ~ N(0,1)</td>
+                <td>X̄ ± z_{α/2} · σ/√n</td>
+            </tr>
+            <tr>
+                <td>σ² 未知</td>
+                <td>t = (X̄-μ)/(S/√n) ~ t(n-1)</td>
+                <td>X̄ ± t_{α/2}(n-1) · S/√n</td>
+            </tr>
+        </table>
+        <p style="margin-top:8px;">S² = (1/(n-1))Σ(Xᵢ-X̄)² 为样本方差。</p>
+    </div>
+
+    <div class="example">
+        <div class="example-title">例题 3：均值的置信区间</div>
+        <p>从正态总体抽取 25 个样本，x̄ = 50, S = 10。求 μ 的 95% 置信区间（σ 未知）。</p>
+        <div class="step">
+            σ 未知，用 t 分布：t_{0.025}(24) ≈ 2.064<br>
+            置信区间 = x̄ ± t · S/√n = 50 ± 2.064 × 10/5<br>
+            = 50 ± 4.128<br>
+            <strong>95% CI: (45.87, 54.13)</strong>
+        </div>
+    </div>
+
+    <div class="note">
+        <span class="note-title">z 分布 vs t 分布：</span>
+        <ul>
+            <li>σ 已知：用 z 分布（标准正态）</li>
+            <li>σ 未知：用 t 分布（用 S 代替 σ，需要修正自由度）</li>
+            <li>t 分布比正态分布尾部更厚，n 越大 t 分布越接近正态</li>
+            <li>n ≥ 30 时，t 分布与正态分布差异很小</li>
+        </ul>
+    </div>
+
+    <div class="summary-box">
+        <h2>本节总结</h2>
+        <ul>
+            <li><strong>矩估计</strong>：样本矩 = 总体矩，简单但不一定最优</li>
+            <li><strong>最大似然估计（MLE）</strong>：使观测数据概率最大，具有一致性和渐近有效性</li>
+            <li><strong>评价标准</strong>：无偏性、有效性、一致性</li>
+            <li><strong>置信区间</strong>：σ 已知用 Z，σ 未知用 t 分布</li>
+            <li>95% 置信区间的含义：反复抽样构造的区间中，约 95% 包含真值</li>
+        </ul>
+    </div>
+</div>
+</body>
+</html>
+<!-- 本文件涵盖：矩估计法、最大似然估计法、估计量评价标准（无偏/有效/一致）、置信区间概念、正态总体均值的区间估计，共3道例题 -->

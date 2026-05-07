@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>形式文法与BNF</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", "PingFang SC", sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.7; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #6b46c1; border-bottom: 3px solid #805ad5; padding-bottom: 12px; margin-bottom: 30px; }
+        h2 { color: #553c9a; margin: 25px 0 12px; padding-left: 10px; border-left: 4px solid #805ad5; }
+        h3 { color: #2d3748; margin: 15px 0 8px; }
+        p, li { margin-bottom: 8px; }
+        ul, ol { padding-left: 25px; }
+        .card { background: #fff; border-radius: 10px; padding: 20px; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        code { background: #f3e8ff; padding: 2px 6px; border-radius: 4px; font-family: "Consolas", monospace; font-size: 0.95em; color: #6b46c1; }
+        pre { background: #1a202c; color: #e2e8f0; padding: 15px; border-radius: 8px; overflow-x: auto; margin: 10px 0; font-size: 0.9em; }
+        pre code { background: none; color: inherit; padding: 0; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 10px 14px; text-align: center; }
+        th { background: #805ad5; color: #fff; }
+        tr:nth-child(even) { background: #faf5ff; }
+        .tag { display: inline-block; padding: 3px 10px; border-radius: 15px; font-size: 0.8em; font-weight: bold; margin: 2px; }
+        .tag-purple { background: #e9d8fd; color: #553c9a; }
+        .tag-blue { background: #bee3f8; color: #2a4365; }
+        .tag-green { background: #c6f6d5; color: #22543d; }
+        .tag-yellow { background: #fefcbf; color: #744210; }
+        .theorem { background: #faf5ff; border-left: 5px solid #805ad5; padding: 15px; margin: 15px 0; border-radius: 0 8px 8px 0; }
+        .example { background: #f3e8ff; border-radius: 8px; padding: 15px; margin: 12px 0; }
+        .bnf-demo { background: #faf5ff; border: 2px solid #b794f4; border-radius: 10px; padding: 20px; margin: 15px 0; }
+        .bnf-rule { font-family: monospace; font-size: 1.05em; margin: 6px 0; padding: 5px 10px; background: #fff; border-radius: 5px; }
+        .bnf-rule .nt { color: #6b46c1; font-weight: bold; }
+        .bnf-rule .op { color: #e53e3e; font-weight: bold; }
+        .bnf-rule .t { color: #38a169; }
+        .derivation { font-family: monospace; line-height: 2; }
+        .derivation .step { background: #e9d8fd; padding: 2px 6px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <h1>形式文法与BNF</h1>
+
+    <!-- ====== Chomsky层级 ====== -->
+    <div class="card">
+        <h2>一、Chomsky文法层级</h2>
+        <p>诺姆·乔姆斯基在1956年提出的形式文法分类体系：</p>
+        <table>
+            <thead><tr><th>类型</th><th>名称</th><th>产生式限制</th><th>自动机等价</th></tr></thead>
+            <tbody>
+                <tr><td>类型 0</td><td>无限制文法</td><td>α → β (α至少一个变量)</td><td>图灵机</td></tr>
+                <tr><td>类型 1</td><td>上下文有关文法</td><td>αAβ → αγβ (|γ| ≥ 1)</td><td>线性有界自动机</td></tr>
+                <tr><td>类型 2</td><td><strong>上下文无关文法</strong></td><td>A → γ (A是变量)</td><td>下推自动机 (PDA)</td></tr>
+                <tr><td>类型 3</td><td>正则文法</td><td>A → aB 或 A → a</td><td>有限自动机 (DFA/NFA)</td></tr>
+            </tbody>
+        </table>
+        <p><span class="tag tag-purple">重要</span> 编程语言的语法主要使用<strong>类型2（上下文无关文法）</strong>描述。</p>
+    </div>
+
+    <!-- ====== BNF记法 ====== -->
+    <div class="card">
+        <h2>二、BNF（巴科斯-诺尔范式）</h2>
+        <p>BNF (Backus-Naur Form) 是描述上下文无关文法的标准记法。</p>
+
+        <h3>BNF基本符号</h3>
+        <table>
+            <thead><tr><th>符号</th><th>含义</th><th>示例</th></tr></thead>
+            <tbody>
+                <tr><td><code>&lt;name&gt;</code></td><td>非终结符（语法变量）</td><td><code>&lt;expression&gt;</code></td></tr>
+                <tr><td><code>::=</code></td><td>"定义为"</td><td><code>&lt;expr&gt; ::= &lt;term&gt;</code></td></tr>
+                <tr><td><code>|</code></td><td>"或者"（选择）</td><td><code>A ::= B | C</code></td></tr>
+                <tr><td>无标记的符号</td><td>终结符（字面值）</td><td><code>+</code>, <code>if</code>, <code>;</code></td></tr>
+                <tr><td><code>"..."</code></td><td>终结符（明确标记）</td><td><code>"+"</code></td></tr>
+            </tbody>
+        </table>
+
+        <div class="bnf-demo">
+            <h3>BNF示例：简单算术表达式</h3>
+            <div class="bnf-rule"><span class="nt">&lt;expression&gt;</span> <span class="op">::=</span> <span class="nt">&lt;expression&gt;</span> <span class="t">"+"</span> <span class="nt">&lt;term&gt;</span> <span class="op">|</span> <span class="nt">&lt;term&gt;</span></div>
+            <div class="bnf-rule"><span class="nt">&lt;term&gt;</span> <span class="op">::=</span> <span class="nt">&lt;term&gt;</span> <span class="t">"*"</span> <span class="nt">&lt;factor&gt;</span> <span class="op">|</span> <span class="nt">&lt;factor&gt;</span></div>
+            <div class="bnf-rule"><span class="nt">&lt;factor&gt;</span> <span class="op">::=</span> <span class="t">"("</span> <span class="nt">&lt;expression&gt;</span> <span class="t">")"</span> <span class="op">|</span> <span class="nt">&lt;number&gt;</span></div>
+            <div class="bnf-rule"><span class="nt">&lt;number&gt;</span> <span class="op">::=</span> <span class="nt">&lt;digit&gt;</span> <span class="nt">&lt;number&gt;</span> <span class="op">|</span> <span class="nt">&lt;digit&gt;</span></div>
+            <div class="bnf-rule"><span class="nt">&lt;digit&gt;</span> <span class="op">::=</span> <span class="t">"0"</span> <span class="op">|</span> <span class="t">"1"</span> <span class="op">|</span> <span class="t">"2"</span> <span class="op">|</span> ... <span class="op">|</span> <span class="t">"9"</span></div>
+        </div>
+    </div>
+
+    <!-- ====== EBNF ====== -->
+    <div class="card">
+        <h2>三、EBNF（扩展BNF）</h2>
+        <p>EBNF 添加了更多便利的语法糖：</p>
+        <table>
+            <thead><tr><th>构造</th><th>含义</th><th>BNF等价</th></tr></thead>
+            <tbody>
+                <tr><td><code>[ ... ]</code></td><td>可选（0或1次）</td><td>A ::= B | ε</td></tr>
+                <tr><td><code>{ ... }</code></td><td>重复0或多次</td><td>A ::= B A | ε</td></tr>
+                <tr><td><code>( ... )</code></td><td>分组</td><td>引入辅助非终结符</td></tr>
+                <tr><td><code>...</code></td><td>重复1或多次</td><td>A ::= B { B }</td></tr>
+            </tbody>
+        </table>
+
+        <div class="bnf-demo">
+            <h3>EBNF版本的算术表达式</h3>
+            <div class="bnf-rule"><span class="nt">expression</span> <span class="op">=</span> <span class="nt">term</span> , { <span class="t">"+"</span> , <span class="nt">term</span> } ;</div>
+            <div class="bnf-rule"><span class="nt">term</span> <span class="op">=</span> <span class="nt">factor</span> , { <span class="t">"*"</span> , <span class="nt">factor</span> } ;</div>
+            <div class="bnf-rule"><span class="nt">factor</span> <span class="op">=</span> <span class="t">"("</span> , <span class="nt">expression</span> , <span class="t">")"</span> <span class="op">|</span> <span class="nt">number</span> ;</div>
+            <div class="bnf-rule"><span class="nt">number</span> <span class="op">=</span> <span class="nt">digit</span> , { <span class="nt">digit</span> } ;</div>
+        </div>
+        <p>简洁性大幅提升，实际中更常用。</p>
+    </div>
+
+    <!-- ====== 派生（推导） ====== -->
+    <div class="card">
+        <h2>四、派生 (Derivation)</h2>
+        <p>从起始符号出发，反复应用产生式，得到终结符串的过程。</p>
+
+        <h3>最左派生示例</h3>
+        <div class="example">
+            <p><strong>输入串：</strong><code>3 + 5 * 2</code></p>
+            <div class="derivation">
+                <p><span class="step">expression</span></p>
+                <p>&#8595; expression → expression + term</p>
+                <p><span class="step">expression</span> + term</p>
+                <p>&#8595; expression → term</p>
+                <p><span class="step">term</span> + term</p>
+                <p>&#8595; term → factor</p>
+                <p><span class="step">factor</span> + term</p>
+                <p>&#8595; factor → number</p>
+                <p><span class="step">number</span> + term</p>
+                <p>&#8595; number → digit</p>
+                <p><span class="step">digit</span> + term</p>
+                <p>&#8595; digit → "3"</p>
+                <p><span class="step">3</span> + term</p>
+                <p>&#8595; term → term * factor</p>
+                <p>3 + <span class="step">term</span> * factor</p>
+                <p>&#8595; 继续展开 term → 5, factor → 2</p>
+                <p>3 + 5 * 2</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ====== 解析树与抽象语法树 ====== -->
+    <div class="card">
+        <h2>五、解析树与抽象语法树 (AST)</h2>
+
+        <h3>具体语法树 (CST / Parse Tree)</h3>
+        <p>完整保留文法的所有细节，包括括号、分隔符等。</p>
+
+        <h3>抽象语法树 (AST)</h3>
+        <p>去掉语法糖，只保留语义结构：</p>
+        <pre><code>    // 具体语法树对应 "3 + 5 * 2"
+    // AST：
+              [+]
+             /   \
+           [3]   [*]
+                /   \
+              [5]   [2]
+
+    // 编译器内部表示
+    BinOpExpr(
+        op: "+",
+        left: Literal(3),
+        right: BinOpExpr(op: "*", left: Literal(5), right: Literal(2))
+    )</code></pre>
+        <p>AST比解析树更紧凑，是编译器后续阶段（语义分析、代码生成）的输入。</p>
+    </div>
+
+    <!-- ====== 实际语言中的BNF ====== -->
+    <div class="card">
+        <h2>六、实际编程语言的文法片段</h2>
+
+        <h3>Python简化文法</h3>
+        <div class="bnf-demo">
+            <div class="bnf-rule"><span class="nt">statement</span> <span class="op">::=</span> <span class="nt">assignment</span> <span class="op">|</span> <span class="nt">if_stmt</span> <span class="op">|</span> <span class="nt">while_stmt</span> <span class="op">|</span> <span class="nt">expr_stmt</span></div>
+            <div class="bnf-rule"><span class="nt">assignment</span> <span class="op">::=</span> <span class="nt">identifier</span> <span class="t">"="</span> <span class="nt">expression</span></div>
+            <div class="bnf-rule"><span class="nt">if_stmt</span> <span class="op">::=</span> <span class="t">"if"</span> <span class="nt">expression</span> <span class="t">":"</span> <span class="nt">block</span> [ <span class="t">"else"</span> <span class="t">":"</span> <span class="nt">block</span> ]</div>
+            <div class="bnf-rule"><span class="nt">block</span> <span class="op">::=</span> <span class="nt">NEWLINE</span> <span class="nt">INDENT</span> { <span class="nt">statement</span> } <span class="nt">DEDENT</span></div>
+        </div>
+
+        <h3>JSON简化文法</h3>
+        <div class="bnf-demo">
+            <div class="bnf-rule"><span class="nt">value</span> <span class="op">::=</span> <span class="nt">object</span> <span class="op">|</span> <span class="nt">array</span> <span class="op">|</span> <span class="nt">string</span> <span class="op">|</span> <span class="nt">number</span> <span class="op">|</span> <span class="t">"true"</span> <span class="op">|</span> <span class="t">"false"</span> <span class="op">|</span> <span class="t">"null"</span></div>
+            <div class="bnf-rule"><span class="nt">object</span> <span class="op">::=</span> <span class="t">"{"</span> [ <span class="nt">pair</span> { <span class="t">","</span> <span class="nt">pair</span> } ] <span class="t">"}"</span></div>
+            <div class="bnf-rule"><span class="nt">pair</span> <span class="op">::=</span> <span class="nt">string</span> <span class="t">":"</span> <span class="nt">value</span></div>
+            <div class="bnf-rule"><span class="nt">array</span> <span class="op">::=</span> <span class="t">"["</span> [ <span class="nt">value</span> { <span class="t">","</span> <span class="nt">value</span> } ] <span class="t">"]"</span></div>
+        </div>
+    </div>
+
+</div>
+
+<!--
+========================================
+  笔记总结
+========================================
+本文件涵盖形式文法和BNF记法的核心知识：
+
+1. Chomsky文法层级：
+   - 类型0-3（无限制→上下文有关→上下文无关→正则）
+   - 编程语言主要用类型2（上下文无关文法）
+   - 每种文法类型对应一种自动机
+
+2. BNF记法：
+   - :: = 定义，| 选择
+   - <非终结符> 和终结符
+   - 描述语言语法的标准方式
+
+3. EBNF扩展：
+   - [...] 可选，{...} 重复，(...) 分组
+   - 比BNF更简洁，实际中更常用
+
+4. 派生与解析：
+   - 最左派生、最右派生
+   - 解析树（具体语法树）
+   - 抽象语法树（AST）——编译器实际使用的结构
+
+5. 实际应用：
+   - Python、JSON等语言的文法都可以用BNF/EBNF描述
+   - 词法分析器和语法分析器的理论基础
+========================================
+-->
+</body>
+</html>
