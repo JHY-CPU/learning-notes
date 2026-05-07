@@ -5,7 +5,7 @@
 - **Transformer 编码器**：由 Vaswani et al. (2017) 提出，由 N 个相同层堆叠而成，每层包含两个子层：多头自注意力 (Multi-Head Self-Attention) 和前馈神经网络 (FFN)。
 - **残差连接 (Residual Connection)**：每个子层的输出都加上其输入：$\text{LayerNorm}(x + \text{Sublayer}(x))$。残差连接使梯度可以直接流过深层的编码器堆叠。
 - **层归一化 (Layer Normalization)**：对每个样本的特征维度做归一化（均值为 0、方差为 1），代替批归一化。LayerNorm 在序列模型中更稳定，因为序列长度可变。
-- **逐位置前馈网络 (Position-wise FFN)**：由两个线性变换组成，中间使用 ReLU 激活：$\text{FFN}(x) = W_2 \cdot \max(0, W_1 x + b_1) + b_2$。内层维度通常扩展 4 倍（$d_{\text{ff}} = 4 \times d_{\text{model}}$）。
+- **逐位置前馈网络 (Position-wise FFN)**：由两个线性变换组成，原始论文使用 ReLU 激活：$\text{FFN}(x) = W_2 \cdot \max(0, W_1 x + b_1) + b_2$。内层维度通常扩展 4 倍（$d_{\text{ff}} = 4 \times d_{\text{model}}$）。现代LLM更多使用 **SwiGLU FFN**：$\text{FFN}(x) = (xW_1 \cdot \text{SiLU}(xW_3)) W_2$，即用门控线性单元(GLU)配合SiLU激活替代ReLU，被LLaMA、PaLM等模型广泛采用，效果更优。
 - **编码器的输入输出**：输入为词嵌入 + 位置编码，输出为同维度的上下文表示。编码器的输出包含每个位置整合了全序列信息的向量。
 - **Post-Norm vs Pre-Norm**：原始 Transformer 使用 Post-Norm（残差后归一化），但现代实现（如 GPT、LLaMA）更常用 Pre-Norm（残差前归一化），使训练更稳定。
 - **Dropout**：在每个子层输出、嵌入、注意力权重上应用 Dropout 防止过拟合。
@@ -26,7 +26,7 @@ $$
 X^l = \text{LayerNorm}(X' + \text{FFN}(X'))
 $$
 
-其中 $\text{FFN}(x) = \max(0, xW_1 + b_1)W_2 + b_2$。
+其中 $\text{FFN}(x) = \max(0, xW_1 + b_1)W_2 + b_2$。现代变体使用 SwiGLU：$\text{FFN}(x) = (xW_1 \cdot \text{SiLU}(xW_3))W_2 + b_2$。
 
 对于 Pre-Norm 变体：
 $$
@@ -129,3 +129,4 @@ print("编码器输出:", output.shape)      # (4, 20, 512)
 - **BERT 和 RoBERTa 的基础**：BERT 使用多层 Transformer Encoder 作为骨干网络，通过 MLM 预训练学习深度双向表示。现代 Encoder-only 模型都遵循这一架构。
 - **Encoder-Decoder 模型中的编码器**：T5、BART 等模型中的编码器与标准 Transformer Encoder 一致，负责将输入序列编码为上下文表示供解码器使用。
 - **架构演进的起点**：原始 Transformer 6 层编码器的配置已被超越——现代模型中编码器深度大幅增加（BERT-large 24 层），且 Pre-Norm、GELU 激活等改进已成为新标准。
+- **FFN 层的演进**：原始 Transformer 使用 ReLU FFN，现代LLM（LLaMA、PaLM、Mistral等）普遍采用 **SwiGLU FFN**，在计算量增加不大的情况下显著提升效果。SwiGLU引入门控机制 $\text{SwiGLU}(x) = (xW_1) \otimes \text{SiLU}(xW_3)$，让网络学会"选择性地通过"哪些信息，比简单ReLU更强大。

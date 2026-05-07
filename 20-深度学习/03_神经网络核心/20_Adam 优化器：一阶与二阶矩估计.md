@@ -13,8 +13,8 @@
 | SGD+Momentum | 否 | 是 | 标准 L2 | CV 分类/检测 |
 | AdaGrad | 是（二阶矩累加） | 否 | 独立 | 稀疏特征 |
 | RMSProp | 是（指数衰减） | 否 | 独立 | RNN，非平稳目标 |
-| Adam | 是（一阶+二阶矩） | 内置 | 耦合 | NLP/Transformer 通用首选 |
-| AdamW | 是（一阶+二阶矩） | 内置 | 解耦 | LLM 预训练/微调 |
+| Adam | 是（一阶+二阶矩） | 内置 | 无（需外部添加L2正则化） | NLP/Transformer 通用首选 |
+| AdamW | 是（一阶+二阶矩） | 内置 | 解耦（权重衰减直接作用于参数） | LLM 预训练/微调 |
 
 ## 数学推导
 
@@ -180,4 +180,4 @@ for name, opt_class, kwargs in [
 
 - **默认优化器的首选**：Adam 是目前深度学习中最常用的默认优化器。在 NLP、CV、强化学习等几乎所有领域，Adam 都是首选的起点。它对超参数（尤其是学习率）不敏感，通常 $\text{lr}=3\times10^{-4}$ 就能取得不错的效果。
 - **Transformer 的标准选择**：几乎所有 Transformer 架构（BERT、GPT、ViT）都使用 Adam 或其变体 AdamW 进行训练。Transformer 训练对优化器的稳定性要求高，Adam 的自适应特性恰好满足这一需求。
-- **局限与改进**：Adam 在某些任务（如图像分类）上的泛化性能可能不如 SGD+Momentum。这促使了 AdamW（解耦权重衰减）、RAdam（修正方差）、Nadam（引入 Nesterov 动量）等变体的出现。AdamW 已成为 NLP 领域的新标准。
+- **局限与改进**：Adam 在某些任务（如图像分类）上的泛化性能可能不如 SGD+Momentum。这促使了多种变体的出现：**AdamW**（解耦权重衰减，将权重衰减从梯度更新中分离出来，避免L2正则化被自适应学习率扭曲，已成为LLM预训练标准）；**AMSGrad**（保留历史二阶矩的最大值 $v_t = \max(v_{t-1}, v_t)$，解决Adam在某些凸优化问题上不收敛的问题）；**RAdam**（Rectified Adam，通过修正自适应学习率在训练初期的方差不稳定问题，在warmup阶段自动调整有效学习率）；**Nadam**（引入Nesterov动量，结合前瞻梯度信息加速收敛）。AdamW 已成为 NLP 领域的新标准。
