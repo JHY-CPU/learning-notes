@@ -171,7 +171,7 @@ npm run build:mp-weixin
 // manifest.json 微信小程序配置
 {
   "mp-weixin": {
-    "appid": "wx1234567890abcdef",
+    "appid": "xxxxxxxxxxxxxxxxxx
     "setting": {
       "urlCheck": true,
       "es6": true,
