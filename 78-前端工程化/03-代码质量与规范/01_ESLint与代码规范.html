@@ -1,0 +1,411 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESLint与代码规范</title>
+    <style>
+        :root { --primary: #1a73e8; --primary-light: #e8f0fe; --secondary: #34a853; --warning: #ea4335; --purple: #9c27b0; --bg: #f8f9fa; --card-bg: #ffffff; --text: #202124; --border: #dadce0; --code-bg: #f1f3f4; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { font-size: 2em; color: var(--primary); border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 1.5em; color: var(--primary); margin: 32px 0 16px; padding-left: 12px; border-left: 4px solid var(--primary); }
+        h3 { font-size: 1.2em; margin: 20px 0 10px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .highlight { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .warning { background: #fce8e6; border-left: 4px solid var(--warning); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .success { background: #e6f4ea; border-left: 4px solid var(--secondary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; font-family: 'Fira Code','Consolas',monospace; font-size: 0.9em; line-height: 1.6; margin: 12px 0; }
+        code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre code { background: none; padding: 0; }
+        ul, ol { padding-left: 24px; margin: 8px 0; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid var(--border); padding: 12px; text-align: left; }
+        th { background: var(--primary-light); font-weight: 600; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>ESLint与代码规范</h1>
+
+    <div class="highlight">
+        <strong>核心概念：</strong>ESLint是JavaScript/TypeScript的静态代码分析工具，通过可配置的规则检测代码中的问题和风格不一致。配合Prettier统一格式化，通过husky + lint-staged在Git提交时自动检查，commitlint规范提交信息，形成完整的代码质量管控体系。
+    </div>
+
+    <!-- ==================== 一、ESLint配置 ==================== -->
+    <h2>一、ESLint配置</h2>
+
+    <div class="card">
+        <h3>1.1 Flat Config（ESLint 9+）</h3>
+        <pre><code>// eslint.config.js (ESLint 9+ Flat Config)
+import js from '@eslint/js';
+import tsPlugin from '@typescript-eslint/eslint-plugin';
+import tsParser from '@typescript-eslint/parser';
+import reactPlugin from 'eslint-plugin-react';
+import reactHooksPlugin from 'eslint-plugin-react-hooks';
+
+export default [
+    // 全局忽略
+    {
+        ignores: ['dist/**', 'node_modules/**', 'coverage/**']
+    },
+
+    // 基础规则
+    js.configs.recommended,
+
+    // TypeScript配置
+    {
+        files: ['**/*.{ts,tsx}'],
+        languageOptions: {
+            parser: tsParser,
+            parserOptions: {
+                project: './tsconfig.json',
+                ecmaFeatures: { jsx: true }
+            }
+        },
+        plugins: {
+            '@typescript-eslint': tsPlugin
+        },
+        rules: {
+            ...tsPlugin.configs.recommended.rules,
+            '@typescript-eslint/no-unused-vars': ['error', {
+                argsIgnorePattern: '^_',
+                varsIgnorePattern: '^_'
+            }],
+            '@typescript-eslint/no-explicit-any': 'warn',
+            '@typescript-eslint/consistent-type-imports': 'error',
+            'no-unused-vars': 'off'  // 交给@typescript-eslint处理
+        }
+    },
+
+    // React配置
+    {
+        files: ['**/*.{jsx,tsx}'],
+        plugins: {
+            react: reactPlugin,
+            'react-hooks': reactHooksPlugin
+        },
+        rules: {
+            ...reactPlugin.configs.recommended.rules,
+            ...reactHooksPlugin.configs.recommended.rules,
+            'react/react-in-jsx-scope': 'off',  // React 17+ 不需要import React
+            'react/prop-types': 'off'  // 使用TypeScript代替
+        },
+        settings: {
+            react: { version: 'detect' }
+        }
+    }
+];</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>1.2 Legacy Config（ESLint 8及以下）</h3>
+        <pre><code>// .eslintrc.cjs
+module.exports = {
+    root: true,
+    env: {
+        browser: true,
+        node: true,
+        es2022: true
+    },
+    parser: '@typescript-eslint/parser',
+    parserOptions: {
+        ecmaVersion: 2022,
+        sourceType: 'module',
+        project: './tsconfig.json',
+        ecmaFeatures: { jsx: true }
+    },
+    extends: [
+        'eslint:recommended',
+        'plugin:@typescript-eslint/recommended',
+        'plugin:react/recommended',
+        'plugin:react-hooks/recommended',
+        'prettier'  // 必须放在最后，关闭与Prettier冲突的规则
+    ],
+    plugins: ['@typescript-eslint', 'react', 'react-hooks'],
+    rules: {
+        // 基础规则
+        'no-console': ['warn', { allow: ['warn', 'error'] }],
+        'no-debugger': 'error',
+        'no-var': 'error',
+        'prefer-const': 'error',
+        'eqeqeq': ['error', 'always'],
+
+        // TypeScript规则
+        '@typescript-eslint/no-unused-vars': ['error', {
+            argsIgnorePattern: '^_'
+        }],
+        '@typescript-eslint/no-explicit-any': 'warn',
+
+        // React规则
+        'react/react-in-jsx-scope': 'off',
+        'react/prop-types': 'off'
+    },
+    settings: {
+        react: { version: 'detect' }
+    },
+    ignorePatterns: ['dist', 'node_modules', '*.config.*']
+};</code></pre>
+    </div>
+
+    <!-- ==================== 二、常用规则 ==================== -->
+    <h2>二、ESLint常用规则</h2>
+
+    <div class="card">
+        <h3>2.1 最佳实践规则</h3>
+        <table>
+            <tr><th>规则</th><th>级别</th><th>说明</th></tr>
+            <tr><td><code>no-var</code></td><td>error</td><td>禁止使用var，使用let/const</td></tr>
+            <tr><td><code>prefer-const</code></td><td>error</td><td>不会重新赋值的变量使用const</td></tr>
+            <tr><td><code>eqeqeq</code></td><td>error</td><td>强制使用===和!==</td></tr>
+            <tr><td><code>no-unused-vars</code></td><td>error</td><td>禁止未使用的变量</td></tr>
+            <tr><td><code>no-undef</code></td><td>error</td><td>禁止未声明的变量</td></tr>
+            <tr><td><code>no-console</code></td><td>warn</td><td>禁止console.log（允许warn/error）</td></tr>
+            <tr><td><code>no-debugger</code></td><td>error</td><td>禁止debugger语句</td></tr>
+            <tr><td><code>no-alert</code></td><td>warn</td><td>禁止使用alert/confirm/prompt</td></tr>
+            <tr><td><code>no-eval</code></td><td>error</td><td>禁止使用eval</td></tr>
+            <tr><td><code>no-implied-eval</code></td><td>error</td><td>禁止隐式eval（如setTimeout("code")）</td></tr>
+            <tr><td><code>no-param-reassign</code></td><td>warn</td><td>禁止修改函数参数</td></tr>
+            <tr><td><code>no-return-await</code></td><td>warn</td><td>禁止不必要的return await</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>2.2 TypeScript专用规则</h3>
+        <table>
+            <tr><th>规则</th><th>说明</th></tr>
+            <tr><td><code>@typescript-eslint/no-explicit-any</code></td><td>限制使用any类型</td></tr>
+            <tr><td><code>@typescript-eslint/consistent-type-imports</code></td><td>强制使用import type</td></tr>
+            <tr><td><code>@typescript-eslint/no-non-null-assertion</code></td><td>禁止使用!非空断言</td></tr>
+            <tr><td><code>@typescript-eslint/ban-ts-comment</code></td><td>限制@ts-ignore等注释</td></tr>
+            <tr><td><code>@typescript-eslint/no-unnecessary-type-assertion</code></td><td>禁止不必要的类型断言</td></tr>
+            <tr><td><code>@typescript-eslint/prefer-nullish-coalescing</code></td><td>推荐使用??代替||</td></tr>
+            <tr><td><code>@typescript-eslint/prefer-optional-chain</code></td><td>推荐使用?.链式调用</td></tr>
+        </table>
+    </div>
+
+    <!-- ==================== 三、Prettier集成 ==================== -->
+    <h2>三、Prettier集成</h2>
+
+    <div class="card">
+        <h3>3.1 ESLint vs Prettier</h3>
+        <table>
+            <tr><th>工具</th><th>职责</th><th>示例</th></tr>
+            <tr><td><strong>ESLint</strong></td><td>代码质量检查</td><td>未使用变量、错误的相等比较</td></tr>
+            <tr><td><strong>Prettier</strong></td><td>代码格式化</td><td>缩进、引号、分号、换行</td></tr>
+        </table>
+        <pre><code>// .prettierrc
+{
+    "semi": true,              // 末尾分号
+    "singleQuote": true,       // 单引号
+    "tabWidth": 4,             // 缩进空格数
+    "trailingComma": "es5",    // 尾逗号
+    "printWidth": 100,         // 每行最大长度
+    "bracketSpacing": true,    // 对象括号内空格
+    "arrowParens": "always",   // 箭头函数参数括号
+    "endOfLine": "lf",         // 换行符
+    "htmlWhitespaceSensitivity": "ignore",
+    "vueIndentScriptAndStyle": false
+}
+
+// .prettierignore
+dist
+node_modules
+coverage
+*.min.js</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>3.2 ESLint + Prettier 配置</h3>
+        <pre><code>// 安装依赖
+// pnpm add -D eslint prettier eslint-config-prettier eslint-plugin-prettier
+
+// eslint.config.js (Flat Config)
+import prettierPlugin from 'eslint-plugin-prettier';
+import prettierConfig from 'eslint-config-prettier';
+
+export default [
+    // ... 其他配置
+    {
+        plugins: { prettier: prettierPlugin },
+        rules: {
+            'prettier/prettier': 'error'  // Prettier格式问题报ESLint错误
+        }
+    },
+    prettierConfig  // 关闭与Prettier冲突的ESLint规则
+];
+
+// 也可以只用eslint-config-prettier关闭冲突规则
+// 不把Prettier作为ESLint规则运行（推荐）
+// 格式化交给编辑器和prettier命令</code></pre>
+    </div>
+
+    <!-- ==================== 四、Husky + Lint-staged ==================== -->
+    <h2>四、Husky + Lint-staged</h2>
+
+    <div class="card">
+        <h3>4.1 Husky（Git Hooks）</h3>
+        <pre><code># 安装husky
+pnpm add -D husky
+
+# 初始化husky（创建.husky目录）
+pnpm exec husky init
+
+# 创建pre-commit hook
+echo "pnpm exec lint-staged" > .husky/pre-commit
+
+# 创建commit-msg hook（配合commitlint）
+echo "pnpm exec commitlint --edit \$1" > .husky/commit-msg
+
+# .husky/pre-commit 文件内容：
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+pnpm exec lint-staged</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>4.2 Lint-staged（只检查暂存文件）</h3>
+        <pre><code>// package.json
+{
+    "lint-staged": {
+        "*.{js,jsx,ts,tsx}": [
+            "eslint --fix",
+            "prettier --write"
+        ],
+        "*.{json,md,yaml,yml}": [
+            "prettier --write"
+        ],
+        "*.css": [
+            "stylelint --fix",
+            "prettier --write"
+        ]
+    }
+}
+
+// 或使用单独的配置文件 .lintstagedrc.js
+export default {
+    '*.{js,jsx,ts,tsx}': [
+        'eslint --fix --max-warnings=0',  // 0个警告
+        'prettier --write'
+    ],
+    '*.{json,md,yaml,yml,css,scss}': [
+        'prettier --write'
+    ]
+};</code></pre>
+    </div>
+
+    <div class="success">
+        <strong>工作流程：</strong>
+        <ol>
+            <li>开发者修改代码并 <code>git add</code></li>
+            <li>执行 <code>git commit</code></li>
+            <li>Husky触发 <code>pre-commit</code> hook</li>
+            <li>lint-staged只对暂存文件运行ESLint和Prettier</li>
+            <li>如果有错误，commit被阻止，修复后重新提交</li>
+            <li>Husky触发 <code>commit-msg</code> hook，commitlint检查提交信息格式</li>
+        </ol>
+    </div>
+
+    <!-- ==================== 五、Commitlint ==================== -->
+    <h2>五、Commitlint（提交信息规范）</h2>
+
+    <div class="card">
+        <h3>5.1 Conventional Commits规范</h3>
+        <pre><code># 提交信息格式：
+# &lt;type&gt;(&lt;scope&gt;): &lt;subject&gt;
+#
+# &lt;body&gt;
+#
+# &lt;footer&gt;
+
+# type类型：
+feat:     新功能
+fix:      修复bug
+docs:     文档更新
+style:    代码格式（不影响逻辑）
+refactor: 重构
+perf:     性能优化
+test:     测试相关
+build:    构建相关
+ci:       CI配置
+chore:    其他杂项
+revert:   回退
+
+# 示例：
+feat(auth): 添加微信登录功能
+fix(cart): 修复商品数量为负数的问题
+docs(readme): 更新安装说明
+refactor(api): 重构用户接口调用方式
+feat!: 支持Node.js 18+（破坏性变更）
+
+BREAKING CHANGE: 不再支持Node.js 16</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>5.2 Commitlint配置</h3>
+        <pre><code>// commitlint.config.js
+export default {
+    extends: ['@commitlint/config-conventional'],
+    rules: {
+        // type必须是以下之一
+        'type-enum': [2, 'always', [
+            'feat', 'fix', 'docs', 'style', 'refactor',
+            'perf', 'test', 'build', 'ci', 'chore', 'revert'
+        ]],
+        // subject不能为空
+        'subject-empty': [2, 'never'],
+        // type不能为空
+        'type-empty': [2, 'never'],
+        // subject最大长度
+        'subject-max-length': [2, 'always', 100],
+        // scope大小写
+        'scope-case': [2, 'always', 'lower-case']
+    }
+};</code></pre>
+    </div>
+
+    <!-- ==================== 六、完整工程化配置 ==================== -->
+    <h2>六、完整工程化配置</h2>
+
+    <div class="card">
+        <h3>6.1 package.json 配置示例</h3>
+        <pre><code>{
+    "name": "my-project",
+    "scripts": {
+        "dev": "vite",
+        "build": "tsc && vite build",
+        "lint": "eslint . --fix",
+        "lint:check": "eslint . --max-warnings=0",
+        "format": "prettier --write .",
+        "format:check": "prettier --check .",
+        "prepare": "husky"
+    },
+    "lint-staged": {
+        "*.{js,jsx,ts,tsx}": ["eslint --fix", "prettier --write"],
+        "*.{json,md,css,scss}": ["prettier --write"]
+    },
+    "devDependencies": {
+        "eslint": "^9.0.0",
+        "@typescript-eslint/eslint-plugin": "^7.0.0",
+        "@typescript-eslint/parser": "^7.0.0",
+        "eslint-plugin-react": "^7.34.0",
+        "eslint-plugin-react-hooks": "^4.6.0",
+        "eslint-config-prettier": "^9.1.0",
+        "prettier": "^3.2.0",
+        "husky": "^9.0.0",
+        "lint-staged": "^15.2.0",
+        "@commitlint/cli": "^19.0.0",
+        "@commitlint/config-conventional": "^19.0.0"
+    }
+}</code></pre>
+    </div>
+
+    <div class="highlight">
+        <strong>总结：</strong>ESLint负责代码质量检查，Prettier负责代码格式化，两者配合形成完整的代码规范。通过husky + lint-staged在Git提交时自动检查和格式化，commitlint规范提交信息格式，形成"提交即规范"的工程化体系。
+    </div>
+</div>
+<!-- 本文档总结了ESLint、Prettier、Husky、Lint-staged、Commitlint的配置和使用 -->
+</body>
+</html>

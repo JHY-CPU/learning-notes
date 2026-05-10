@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>包管理器对比</title>
+    <style>
+        :root { --primary: #1a73e8; --primary-light: #e8f0fe; --secondary: #34a853; --warning: #ea4335; --purple: #9c27b0; --bg: #f8f9fa; --card-bg: #ffffff; --text: #202124; --border: #dadce0; --code-bg: #f1f3f4; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { font-size: 2em; color: var(--primary); border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 1.5em; color: var(--primary); margin: 32px 0 16px; padding-left: 12px; border-left: 4px solid var(--primary); }
+        h3 { font-size: 1.2em; margin: 20px 0 10px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .highlight { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .warning { background: #fce8e6; border-left: 4px solid var(--warning); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .success { background: #e6f4ea; border-left: 4px solid var(--secondary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; font-family: 'Fira Code','Consolas',monospace; font-size: 0.9em; line-height: 1.6; margin: 12px 0; }
+        code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre code { background: none; padding: 0; }
+        ul, ol { padding-left: 24px; margin: 8px 0; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid var(--border); padding: 12px; text-align: left; }
+        th { background: var(--primary-light); font-weight: 600; }
+        .flow-diagram { background: var(--card-bg); border: 2px solid var(--primary); border-radius: 12px; padding: 20px; text-align: center; font-family: monospace; margin: 16px 0; white-space: pre; line-height: 1.6; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>包管理器对比</h1>
+
+    <div class="highlight">
+        <strong>核心概念：</strong>npm、yarn、pnpm是三大主流前端包管理器。npm是Node.js内置的包管理器，yarn由Facebook推出解决npm早期性能问题，pnpm通过硬链接和符号链接解决幽灵依赖问题并大幅提升安装速度。三者都需要理解node_modules结构、hoisting机制、lock file的作用以及workspace/monorepo支持。
+    </div>
+
+    <!-- ==================== 一、全方位对比 ==================== -->
+    <h2>一、全方位对比</h2>
+
+    <div class="card">
+        <h3>1.1 核心特性对比</h3>
+        <table>
+            <tr><th>特性</th><th>npm</th><th>yarn (Berry)</th><th>pnpm</th></tr>
+            <tr><td><strong>首次安装速度</strong></td><td>慢</td><td>中等</td><td>快</td></tr>
+            <tr><td><strong>缓存后安装</strong></td><td>中等</td><td>快</td><td>极快</td></tr>
+            <tr><td><strong>磁盘占用</strong></td><td>大</td><td>大（可PnP）</td><td>小（硬链接）</td></tr>
+            <tr><td><strong>幽灵依赖</strong></td><td>有</td><td>有（PnP无）</td><td>无</td></tr>
+            <tr><td><strong>node_modules结构</strong></td><td>扁平</td><td>扁平/PnP</td><td>严格</td></tr>
+            <tr><td><strong>lock文件</strong></td><td>package-lock.json</td><td>yarn.lock</td><td>pnpm-lock.yaml</td></tr>
+            <tr><td><strong>Workspace</strong></td><td>支持</td><td>支持</td><td>支持（最佳）</td></tr>
+            <tr><td><strong>安全性</strong></td><td>中等</td><td>中等</td><td>高（严格隔离）</td></tr>
+            <tr><td><strong>学习曲线</strong></td><td>低</td><td>中等</td><td>低</td></tr>
+        </table>
+    </div>
+
+    <!-- ==================== 二、node_modules结构 ==================== -->
+    <h2>二、node_modules结构</h2>
+
+    <div class="card">
+        <h3>2.1 npm/yarn的扁平化结构</h3>
+        <div class="flow-diagram">
+npm/yarn 扁平化 node_modules：
+node_modules/
+├── packageA/          ← 提升到顶层
+├── packageB/          ← 提升到顶层
+├── packageC/          ← 提升到顶层
+├── packageA/          ← 依赖也提升
+│   └── node_modules/
+│       └── lodash/    ← 版本冲突时才嵌套
+├── .package-lock.json
+└── ...
+
+问题：幽灵依赖（Phantom Dependencies）
+项目只安装了 packageA
+packageA依赖 lodash
+lodash被提升到顶层
+→ require('lodash') 能工作！（但不应该能）
+→ 如果packageA更新了lodash版本，项目可能崩溃</div>
+    </div>
+
+    <div class="card">
+        <h3>2.2 pnpm的严格结构（硬链接 + 符号链接）</h3>
+        <div class="flow-diagram">
+pnpm node_modules：
+node_modules/
+├── .pnpm/                    ← 全局内容寻址存储
+│   ├── lodash@4.17.21/
+│   │   └── node_modules/
+│   │       └── lodash/
+│   └── react@18.2.0/
+│       └── node_modules/
+│           └── react/
+├── packageA → .pnpm/packageA@1.0.0/node_modules/packageA  ← 符号链接
+├── packageB → .pnpm/packageB@2.0.0/node_modules/packageB  ← 符号链接
+└── lodash → .pnpm/lodash@4.17.21/node_modules/lodash       ← 符号链接
+
+实际文件存储在全局store中（~/.pnpm-store），
+node_modules中只有符号链接 → 磁盘占用极小
+同一版本的包只存一份 → 硬链接复用</div>
+    </div>
+
+    <div class="card">
+        <h3>2.3 yarn PnP（Plug'n'Play）</h3>
+        <div class="flow-diagram">
+yarn PnP模式：
+不创建 node_modules 目录！
+依赖信息写入 .pnp.cjs 文件
+直接从全局缓存中加载包
+
+优点：
+- 安装极快（无需复制文件）
+- 无幽灵依赖
+- 磁盘占用小
+
+缺点：
+- 需要编辑器/工具兼容PnP
+- 部分旧工具可能不兼容
+- 需要使用 yarn pnp专用的解析器</div>
+    </div>
+
+    <!-- ==================== 三、命令对比 ==================== -->
+    <h2>三、命令对比</h2>
+
+    <div class="card">
+        <h3>3.1 常用命令对照表</h3>
+        <table>
+            <tr><th>操作</th><th>npm</th><th>yarn</th><th>pnpm</th></tr>
+            <tr><td>初始化项目</td><td><code>npm init</code></td><td><code>yarn init</code></td><td><code>pnpm init</code></td></tr>
+            <tr><td>安装所有依赖</td><td><code>npm install</code></td><td><code>yarn</code></td><td><code>pnpm install</code></td></tr>
+            <tr><td>安装包</td><td><code>npm i lodash</code></td><td><code>yarn add lodash</code></td><td><code>pnpm add lodash</code></td></tr>
+            <tr><td>安装开发依赖</td><td><code>npm i -D vitest</code></td><td><code>yarn add -D vitest</code></td><td><code>pnpm add -D vitest</code></td></tr>
+            <tr><td>全局安装</td><td><code>npm i -g typescript</code></td><td><code>yarn global add typescript</code></td><td><code>pnpm add -g typescript</code></td></tr>
+            <tr><td>卸载包</td><td><code>npm uninstall lodash</code></td><td><code>yarn remove lodash</code></td><td><code>pnpm remove lodash</code></td></tr>
+            <tr><td>运行脚本</td><td><code>npm run build</code></td><td><code>yarn build</code></td><td><code>pnpm build</code></td></tr>
+            <tr><td>更新依赖</td><td><code>npm update</code></td><td><code>yarn upgrade</code></td><td><code>pnpm update</code></td></tr>
+            <tr><td>清理缓存</td><td><code>npm cache clean</code></td><td><code>yarn cache clean</code></td><td><code>pnpm store prune</code></td></tr>
+            <tr><td>查看依赖树</td><td><code>npm ls</code></td><td><code>yarn why</code></td><td><code>pnpm ls</code></td></tr>
+        </table>
+    </div>
+
+    <!-- ==================== 四、lock文件 ==================== -->
+    <h2>四、Lock文件</h2>
+
+    <div class="card">
+        <h3>4.1 什么是lock文件</h3>
+        <p>Lock文件记录了项目依赖的<strong>精确版本号</strong>和<strong>依赖树结构</strong>，确保不同环境安装的依赖完全一致：</p>
+        <ul>
+            <li><strong>npm：</strong><code>package-lock.json</code></li>
+            <li><strong>yarn：</strong><code>yarn.lock</code></li>
+            <li><strong>pnpm：</strong><code>pnpm-lock.yaml</code></li>
+        </ul>
+        <div class="warning">
+            <strong>必须提交lock文件到Git！</strong>Lock文件保证团队成员和CI/CD环境安装一致的依赖版本。不提交lock文件会导致"在我机器上能跑"的问题。
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>4.2 package.json vs lock文件</h3>
+        <pre><code>// package.json - 版本范围
+{
+    "dependencies": {
+        "lodash": "^4.17.0",  // 允许 4.x.x 的最新版本
+        "react": "~18.2.0",   // 允许 18.2.x 的最新版本
+        "axios": "1.6.0"      // 精确版本
+    }
+}
+
+// package-lock.json - 精确版本
+{
+    "packages": {
+        "node_modules/lodash": {
+            "version": "4.17.21",  // 精确版本
+            "resolved": "https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz",
+            "integrity": "sha512-..."
+        }
+    }
+}
+
+// 版本范围语法：
+// ^4.17.0  → >=4.17.0 <5.0.0（允许minor和patch更新）
+// ~4.17.0  → >=4.17.0 <4.18.0（只允许patch更新）
+// 4.17.0   → 精确版本
+// >=4.0.0  → 大于等于4.0.0
+// *        → 任意版本</code></pre>
+    </div>
+
+    <!-- ==================== 五、Workspace / Monorepo ==================== -->
+    <h2>五、Workspace / Monorepo</h2>
+
+    <div class="card">
+        <h3>5.1 npm workspace</h3>
+        <pre><code>// 根目录 package.json
+{
+    "name": "my-monorepo",
+    "private": true,
+    "workspaces": [
+        "packages/*",
+        "apps/*"
+    ]
+}
+
+// 安装所有依赖
+npm install
+
+// 给特定workspace添加依赖
+npm install lodash --workspace=packages/utils
+npm install react --workspace=apps/web
+
+// 运行特定workspace的脚本
+npm run build --workspace=packages/ui
+
+// 运行所有workspace的脚本
+npm run test --workspaces</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>5.2 pnpm workspace（推荐）</h3>
+        <pre><code>// pnpm-workspace.yaml
+packages:
+  - 'packages/*'
+  - 'apps/*'
+
+// 根目录 package.json
+{
+    "name": "my-monorepo",
+    "private": true
+}
+
+// packages/utils/package.json
+{
+    "name": "@myorg/utils",
+    "version": "1.0.0"
+}
+
+// packages/ui/package.json
+{
+    "name": "@myorg/ui",
+    "dependencies": {
+        // 使用workspace协议引用本地包
+        "@myorg/utils": "workspace:*"
+    }
+}
+
+// pnpm常用命令
+pnpm install                          // 安装所有依赖
+pnpm add lodash --filter @myorg/utils // 给特定包添加依赖
+pnpm --filter @myorg/ui run build     // 运行特定包的脚本
+pnpm -r run test                      // 递归运行所有包的脚本
+pnpm --filter './packages/*' run build // 运行packages下所有包</code></pre>
+        <div class="success">
+            <strong>pnpm workspace优势：</strong>
+            <ul>
+                <li>使用 <code>workspace:</code> 协议引用本地包，语义清晰</li>
+                <li>硬链接 + 符号链接，monorepo中依赖共享更高效</li>
+                <li>严格模式防止幽灵依赖，避免包之间的隐式依赖</li>
+                <li><code>pnpm -r</code> 命令支持依赖拓扑排序执行</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>5.3 yarn workspace</h3>
+        <pre><code>// 根目录 package.json
+{
+    "private": true,
+    "workspaces": ["packages/*"]
+}
+
+// yarn命令
+yarn install
+yarn workspace @myorg/utils add lodash
+yarn workspaces run test
+yarn workspace @myorg/ui run build</code></pre>
+    </div>
+
+    <!-- ==================== 六、性能对比 ==================== -->
+    <h2>六、性能对比</h2>
+
+    <div class="card">
+        <h3>6.1 安装速度（冷缓存 / 热缓存）</h3>
+        <table>
+            <tr><th>场景</th><th>npm</th><th>yarn</th><th>pnpm</th></tr>
+            <tr><td>冷安装（无缓存）</td><td>慢</td><td>中等</td><td>快</td></tr>
+            <tr><td>热安装（有缓存）</td><td>中等</td><td>快</td><td>极快</td></tr>
+            <tr><td>磁盘占用</td><td>大</td><td>大</td><td>小</td></tr>
+            <tr><td>Monorepo安装</td><td>慢</td><td>中等</td><td>快</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>6.2 pnpm为什么快</h3>
+        <ul>
+            <li><strong>硬链接：</strong>同一版本的包只存储一次，通过硬链接复用</li>
+            <li><strong>内容寻址存储：</strong>全局store按内容哈希存储，避免重复下载</li>
+            <li><strong>并行安装：</strong>多个包并行下载和安装</li>
+            <li><strong>增量安装：</strong>只安装变化的依赖，不动的不操作</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 七、安全对比 ==================== -->
+    <h2>七、安全与隔离</h2>
+
+    <div class="card">
+        <h3>7.1 幽灵依赖问题</h3>
+        <pre><code>// package.json - 只声明了packageA
+{
+    "dependencies": {
+        "packageA": "1.0.0"
+    }
+}
+
+// packageA内部依赖lodash
+// npm/yarn的扁平化结构会将lodash提升到顶层
+// node_modules/
+// ├── packageA/
+// └── lodash/     ← 被提升到顶层！
+
+// 你的代码：
+const lodash = require('lodash');  // 能用！但不应该能
+// 如果packageA更新了lodash版本或移除了lodash
+// 你的代码就崩溃了 → 这就是幽灵依赖
+
+// pnpm的解决方案：
+// node_modules/
+// ├── packageA/ → 符号链接
+// └── .pnpm/
+//     └── packageA@1.0.0/node_modules/lodash/
+// lodash不会出现在顶层
+// require('lodash') 会报错 → 强制你正确声明依赖</code></pre>
+    </div>
+
+    <!-- ==================== 八、选型建议 ==================== -->
+    <h2>八、选型建议</h2>
+
+    <div class="card">
+        <h3>8.1 决策指南</h3>
+        <ul>
+            <li><strong>新项目（2024+）：</strong>推荐 pnpm。速度快、磁盘省、无幽灵依赖、workspace支持好</li>
+            <li><strong>已有npm项目：</strong>可以继续用npm，或迁移pnpm（<code>pnpm import</code>）</li>
+            <li><strong>Monorepo项目：</strong>推荐 pnpm workspace 或 Turborepo + pnpm</li>
+            <li><strong>需要极致性能：</strong>pnpm 或 yarn PnP</li>
+            <li><strong>团队熟悉yarn：</strong>继续用yarn berry，开启PnP可获得类似pnpm的隔离</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>8.2 迁移到pnpm</h3>
+        <pre><code># 1. 安装pnpm
+npm install -g pnpm
+
+# 2. 删除旧的node_modules和lock文件
+rm -rf node_modules package-lock.json
+
+# 3. 安装依赖
+pnpm install
+
+# 4. 修复可能的幽灵依赖
+# pnpm会报告找不到的模块
+# 需要将这些包添加到dependencies中
+
+# 5. 更新CI/CD配置
+# 将 npm install 改为 pnpm install
+# 将 npm run build 改为 pnpm build</code></pre>
+    </div>
+
+    <div class="highlight">
+        <strong>总结：</strong>npm是Node.js内置的标准工具，生态最完善；yarn通过PnP模式提供极致安装速度和无幽灵依赖；pnpm通过硬链接+符号链接在速度、磁盘和安全性上取得最佳平衡。当前推荐新项目使用pnpm，它是Monorepo和性能敏感场景的首选。
+    </div>
+</div>
+<!-- 本文档总结了npm/yarn/pnpm包管理器的对比和选型指南 -->
+</body>
+</html>

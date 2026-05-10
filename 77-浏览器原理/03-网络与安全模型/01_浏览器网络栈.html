@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>浏览器网络栈</title>
+    <style>
+        :root { --primary: #1a73e8; --primary-light: #e8f0fe; --secondary: #34a853; --warning: #ea4335; --purple: #9c27b0; --bg: #f8f9fa; --card-bg: #ffffff; --text: #202124; --border: #dadce0; --code-bg: #f1f3f4; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { font-size: 2em; color: var(--primary); border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 1.5em; color: var(--primary); margin: 32px 0 16px; padding-left: 12px; border-left: 4px solid var(--primary); }
+        h3 { font-size: 1.2em; margin: 20px 0 10px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .highlight { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .warning { background: #fce8e6; border-left: 4px solid var(--warning); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .success { background: #e6f4ea; border-left: 4px solid var(--secondary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .purple { background: #f3e5f5; border-left: 4px solid var(--purple); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; font-family: 'Fira Code','Consolas',monospace; font-size: 0.9em; line-height: 1.6; margin: 12px 0; }
+        code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre code { background: none; padding: 0; }
+        ul, ol { padding-left: 24px; margin: 8px 0; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid var(--border); padding: 12px; text-align: left; }
+        th { background: var(--primary-light); font-weight: 600; }
+        .flow-diagram { background: var(--card-bg); border: 2px solid var(--primary); border-radius: 12px; padding: 20px; text-align: center; font-family: monospace; margin: 16px 0; white-space: pre; line-height: 1.6; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>浏览器网络栈</h1>
+
+    <div class="highlight">
+        <strong>核心概念：</strong>浏览器网络栈是从用户输入URL到页面内容加载完成的完整网络处理过程，包括DNS解析、TCP连接、TLS握手、HTTP请求/响应等关键环节。现代浏览器通过DNS预解析、连接复用、HTTP/2多路复用、资源优先级等技术大幅优化网络性能。
+    </div>
+
+    <!-- ==================== 一、整体网络请求流程 ==================== -->
+    <h2>一、整体网络请求流程</h2>
+
+    <div class="card">
+        <h3>1.1 从URL到页面的完整流程</h3>
+        <div class="flow-diagram">
+URL输入
+  ↓
+1. URL解析（URL Parser）
+  ↓
+2. DNS解析（DNS Lookup）→ IP地址
+  ↓
+3. TCP连接（TCP Handshake）→ 三次握手
+  ↓
+4. TLS握手（TLS Handshake）→ 加密通道（HTTPS）
+  ↓
+5. HTTP请求/响应（Request/Response）
+  ↓
+6. 内容解码（gzip/brotli/deflate）
+  ↓
+7. 资源解析（HTML/CSS/JS解析）
+  ↓
+页面渲染</div>
+    </div>
+
+    <div class="card">
+        <h3>1.2 浏览器网络栈架构</h3>
+        <div class="flow-diagram">
+┌─────────────────────────────────────────────┐
+│  Browser Process                              │
+│  ┌─────────────────────────────────────────┐ │
+│  │ Network Service (独立进程)                │ │
+│  │  ┌───────────────────────────────────┐  │ │
+│  │  │ Chrome Multi-Layer Cache           │  │ │
+│  │  │ HTTP Cache / Service Worker Cache  │  │ │
+│  │  └───────────────────────────────────┘  │ │
+│  │  ┌───────────────────────────────────┐  │ │
+│  │  │ HTTP/1.1 / HTTP/2 / HTTP/3 (QUIC) │  │ │
+│  │  └───────────────────────────────────┘  │ │
+│  │  ┌───────────────────────────────────┐  │ │
+│  │  │ TLS 1.2 / TLS 1.3                 │  │ │
+│  │  └───────────────────────────────────┘  │ │
+│  │  ┌───────────────────────────────────┐  │ │
+│  │  │ TCP / QUIC (UDP)                  │  │ │
+│  │  └───────────────────────────────────┘  │ │
+│  └─────────────────────────────────────────┘ │
+└─────────────────────────────────────────────┘</div>
+    </div>
+
+    <!-- ==================== 二、DNS解析 ==================== -->
+    <h2>二、DNS解析（DNS Lookup）</h2>
+
+    <div class="card">
+        <h3>2.1 DNS解析过程</h3>
+        <p>将域名转换为IP地址的过程：</p>
+        <ol>
+            <li><strong>浏览器缓存：</strong>浏览器首先检查自身的DNS缓存</li>
+            <li><strong>操作系统缓存：</strong>检查OS的DNS缓存（<code>ipconfig /displaydns</code>）</li>
+            <li><strong>hosts文件：</strong>检查 <code>/etc/hosts</code> 或 <code>C:\Windows\System32\drivers\etc\hosts</code></li>
+            <li><strong>本地DNS服务器：</strong>向ISP的DNS服务器发起查询</li>
+            <li><strong>递归查询：</strong>本地DNS服务器向根域名服务器 → 顶级域名服务器 → 权威域名服务器递归查询</li>
+        </ol>
+        <div class="flow-diagram">
+浏览器 → 浏览器缓存 → OS缓存 → hosts文件 → 本地DNS服务器
+  ↓（缓存未命中）
+本地DNS → 根DNS(.) → 顶级DNS(com) → 权威DNS(example.com) → 返回IP
+         ←────────────────────────────────────────────────────┘</div>
+    </div>
+
+    <div class="card">
+        <h3>2.2 DNS预解析（DNS Prefetch）</h3>
+        <p>DNS预解析允许浏览器在用户点击链接之前提前解析域名，减少DNS查询延迟：</p>
+        <pre><code>&lt;!-- 对页面中所有链接启用DNS预解析 --&gt;
+&lt;meta http-equiv="x-dns-prefetch-control" content="on"&gt;
+
+&lt;!-- 预解析特定域名 --&gt;
+&lt;link rel="dns-prefetch" href="//api.example.com"&gt;
+&lt;link rel="dns-prefetch" href="//cdn.example.com"&gt;
+&lt;link rel="dns-prefetch" href="//fonts.googleapis.com"&gt;
+
+&lt;!-- DNS预解析 + 预连接 --&gt;
+&lt;link rel="preconnect" href="https://api.example.com"&gt;
+&lt;!-- preconnect = DNS + TCP + TLS，比dns-prefetch更激进 --&gt;
+
+&lt;!-- JavaScript方式触发DNS预解析 --&gt;
+&lt;script&gt;
+// 创建不可见的link元素
+const link = document.createElement('link');
+link.rel = 'dns-prefetch';
+link.href = '//api.example.com';
+document.head.appendChild(link);
+&lt;/script&gt;</code></pre>
+        <div class="success">
+            <strong>DNS Prefetch vs Preconnect：</strong>
+            <ul>
+                <li><code>dns-prefetch</code>：只预解析DNS，不建立连接。开销极小</li>
+                <li><code>preconnect</code>：预解析DNS + 建立TCP连接 + TLS握手。开销较大但收益更高</li>
+                <li>对于<strong>确定会使用</strong>的域名，使用 <code>preconnect</code></li>
+                <li>对于<strong>可能使用</strong>的域名，使用 <code>dns-prefetch</code></li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ==================== 三、TCP连接 ==================== -->
+    <h2>三、TCP连接</h2>
+
+    <div class="card">
+        <h3>3.1 三次握手（Three-Way Handshake）</h3>
+        <div class="flow-diagram">
+Client                                    Server
+  │                                         │
+  │  ──── SYN (seq=x) ──────────────────→   │  1. 客户端发送SYN
+  │                                         │
+  │  ←── SYN+ACK (seq=y, ack=x+1) ─────    │  2. 服务器回复SYN+ACK
+  │                                         │
+  │  ──── ACK (ack=y+1) ────────────────→   │  3. 客户端发送ACK
+  │                                         │
+  │  ←── 连接建立，可以传输数据 ───────────→   │</div>
+        <ul>
+            <li><strong>SYN：</strong>Synchronize Sequence Numbers，同步序列号</li>
+            <li><strong>ACK：</strong>Acknowledgment，确认</li>
+            <li><strong>RTT（Round Trip Time）：</strong>一次往返时间，三次握手需要1.5个RTT</li>
+            <li>TCP Fast Open（TFO）可以在握手的同时传输数据，减少1个RTT</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>3.2 四次挥手（Four-Way Termination）</h3>
+        <div class="flow-diagram">
+Client                                    Server
+  │                                         │
+  │  ──── FIN ──────────────────────────→   │  1. 客户端发送FIN
+  │                                         │
+  │  ←── ACK ───────────────────────────    │  2. 服务器确认
+  │                                         │
+  │  ←── FIN ───────────────────────────    │  3. 服务器发送FIN
+  │                                         │
+  │  ──── ACK ──────────────────────────→   │  4. 客户端确认
+  │                                         │
+  │       连接关闭                           │</div>
+    </div>
+
+    <div class="card">
+        <h3>3.3 TCP连接复用</h3>
+        <ul>
+            <li><strong>HTTP/1.1 Keep-Alive：</strong>一个TCP连接可以发送多个HTTP请求，避免反复建立连接</li>
+            <li><strong>HTTP/1.1 管道化（Pipelining）：</strong>可以同时发送多个请求，但响应必须按顺序返回（队头阻塞）</li>
+            <li><strong>HTTP/2 多路复用（Multiplexing）：</strong>一个TCP连接上可以并行传输多个请求/响应，互不阻塞</li>
+        </ul>
+        <table>
+            <tr><th>HTTP版本</th><th>连接数</th><th>传输方式</th><th>队头阻塞</th></tr>
+            <tr><td>HTTP/1.0</td><td>每请求一个连接</td><td>串行</td><td>有</td></tr>
+            <tr><td>HTTP/1.1 + Keep-Alive</td><td>6连接/域名</td><td>串行复用</td><td>有</td></tr>
+            <tr><td>HTTP/1.1 + Pipelining</td><td>6连接/域名</td><td>管道化</td><td>有（响应级别）</td></tr>
+            <tr><td>HTTP/2</td><td>1连接</td><td>多路复用</td><td>有（TCP级别）</td></tr>
+            <tr><td>HTTP/3 (QUIC)</td><td>1连接</td><td>多路复用</td><td>无</td></tr>
+        </table>
+    </div>
+
+    <!-- ==================== 四、TLS握手 ==================== -->
+    <h2>四、TLS握手</h2>
+
+    <div class="card">
+        <h3>4.1 TLS 1.2 握手（2-RTT）</h3>
+        <div class="flow-diagram">
+Client                                          Server
+  │                                               │
+  │  ──── ClientHello ─────────────────────→      │
+  │       支持的TLS版本、加密套件列表、            │
+  │       客户端随机数(Client Random)              │
+  │                                               │
+  │  ←── ServerHello ──────────────────────       │
+  │       选定的TLS版本、加密套件、                │
+  │       服务器随机数(Server Random)、            │
+  │       服务器证书、ServerKeyExchange            │
+  │                                               │
+  │  ──── ClientKeyExchange ─────────────→        │
+  │       客户端密钥交换参数                       │
+  │  ──── ChangeCipherSpec ──────────────→        │
+  │  ──── Finished ───────────────────────→       │
+  │                                               │
+  │  ←── ChangeCipherSpec ────────────────        │
+  │  ←── Finished ────────────────────────        │
+  │                                               │
+  │       加密通信开始                              │</div>
+    </div>
+
+    <div class="card">
+        <h3>4.2 TLS 1.3 握手（1-RTT）</h3>
+        <div class="flow-diagram">
+Client                                          Server
+  │                                               │
+  │  ──── ClientHello ─────────────────────→      │
+  │       支持的TLS版本、加密套件、               │
+  │       客户端密钥共享参数(Key Share)、          │
+  │       早期数据(0-RTT, 可选)                    │
+  │                                               │
+  │  ←── ServerHello + EncryptedExtensions +      │
+  │      Certificate + CertificateVerify +        │
+  │      Finished ────────────────────────        │
+  │                                               │
+  │       加密通信开始（仅1-RTT）                   │</div>
+        <ul>
+            <li>TLS 1.3 减少了握手往返次数（2-RTT → 1-RTT）</li>
+            <li>TLS 1.3 支持 <strong>0-RTT</strong> 恢复（使用预共享密钥PSK），但有重放攻击风险</li>
+            <li>TLS 1.3 只支持前向安全（Forward Secrecy）的加密套件</li>
+            <li>TLS 1.3 移除了不安全的加密算法（RC4、DES、3DES、MD5、SHA-1等）</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>4.3 TLS优化</h3>
+        <pre><code>&lt;!-- OCSP Stapling：服务器缓存证书验证结果，客户端不需要单独验证 --&gt;
+&lt;!-- TLS Session Resumption：复用之前的TLS会话，减少握手 --&gt;
+&lt;!-- 0-RTT：TLS 1.3支持0-RTT恢复 --&gt;
+
+&lt;!-- 前端优化 --&gt;
+&lt;!-- 1. 使用 preconnect 提前完成TLS握手 --&gt;
+&lt;link rel="preconnect" href="https://api.example.com"&gt;
+
+&lt;!-- 2. 使用 HSTS 强制HTTPS，避免HTTP到HTTPS的重定向 --&gt;
+&lt;!-- HTTP响应头：Strict-Transport-Security: max-age=31536000; includeSubDomains --&gt;
+
+&lt;!-- 3. 启用 HTTP/2 + HTTPS --&gt;
+&lt;!-- HTTP/2 在实际部署中几乎都要求HTTPS --&gt;</code></pre>
+    </div>
+
+    <!-- ==================== 五、HTTP/2 ==================== -->
+    <h2>五、HTTP/2多路复用</h2>
+
+    <div class="card">
+        <h3>5.1 HTTP/2核心特性</h3>
+        <table>
+            <tr><th>特性</th><th>说明</th><th>收益</th></tr>
+            <tr><td><strong>多路复用</strong></td><td>一个TCP连接上并行传输多个流（Stream）</td><td>消除HTTP级别的队头阻塞</td></tr>
+            <tr><td><strong>头部压缩（HPACK）</strong></td><td>使用静态+动态表压缩HTTP头部</td><td>减少传输数据量</td></tr>
+            <tr><td><strong>服务器推送</strong></td><td>服务器可以主动推送资源</td><td>减少请求往返</td></tr>
+            <tr><td><strong>流优先级</strong></td><td>客户端可以指定流的依赖关系和权重</td><td>优先加载关键资源</td></tr>
+            <tr><td><strong>二进制分帧</strong></td><td>将HTTP消息分为二进制帧传输</td><td>更高效的解析和传输</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>5.2 HTTP/2帧结构</h3>
+        <div class="flow-diagram">
+HTTP/1.1:  文本协议，请求/响应以明文传输
+HTTP/2:    二进制协议，分为帧（Frame）传输
+
+帧结构：
+┌──────────────────────────────────────┐
+│ Length (24 bits)  │ Type (8 bits)     │
+├───────────────────┼──────────────────┤
+│ Flags (8 bits)    │ R (1 bit)        │
+├──────────────────────────────────────┤
+│ Stream Identifier (31 bits)          │
+├──────────────────────────────────────┤
+│ Frame Payload (variable length)      │
+└──────────────────────────────────────┘
+
+帧类型：
+- DATA：请求/响应体数据
+- HEADERS：请求/响应头部
+- PRIORITY：流优先级
+- RST_STREAM：重置流
+- SETTINGS：连接配置
+- PUSH_PROMISE：服务器推送
+- PING：连接保活
+- GOAWAY：关闭连接</div>
+    </div>
+
+    <div class="card">
+        <h3>5.3 HTTP/2的局限性 - TCP层队头阻塞</h3>
+        <p>虽然HTTP/2解决了HTTP层面的队头阻塞，但<strong>TCP层面的队头阻塞仍然存在</strong>：</p>
+        <div class="flow-diagram">
+HTTP/2多路复用：
+Stream 1: [帧1] [帧2] [帧3]
+Stream 2: [帧A] [帧B] [帧C]
+Stream 3: [帧X] [帧Y] [帧Z]
+→ 交错传输，各自独立
+
+但是！TCP要求数据按序到达：
+如果帧2丢失 → TCP等待帧2重传
+→ 帧3、帧A、帧B、帧C...全部阻塞！
+→ 这就是TCP层的队头阻塞
+
+HTTP/3 (QUIC) 的解决方案：
+每个Stream独立的可靠传输
+Stream 2的帧丢失不影响Stream 1和3</div>
+    </div>
+
+    <!-- ==================== 六、资源优先级 ==================== -->
+    <h2>六、资源优先级与提示</h2>
+
+    <div class="card">
+        <h3>6.1 浏览器资源加载优先级</h3>
+        <table>
+            <tr><th>资源类型</th><th>优先级</th><th>说明</th></tr>
+            <tr><td>HTML文档</td><td>Highest</td><td>主文档最高优先级</td></tr>
+            <tr><td>CSS（在head中）</td><td>Highest</td><td>阻塞渲染的关键CSS</td></tr>
+            <tr><td>同步JS（在head中）</td><td>High</td><td>阻塞解析的script</td></tr>
+            <tr><td>字体</td><td>Highest</td><td>首次绘制需要的字体</td></tr>
+            <tr><td>defer/async JS</td><td>Medium/Low</td><td>不阻塞渲染</td></tr>
+            <tr><td>视口内图片</td><td>Low</td><td>首屏可见图片</td></tr>
+            <tr><td>视口外图片</td><td>Lowest</td><td>懒加载图片</td></tr>
+            <tr><td>预加载资源</td><td>可设置</td><td>通过fetchpriority设置</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>6.2 Fetch Priority API</h3>
+        <pre><code>&lt;!-- 设置图片加载优先级 --&gt;
+&lt;!-- 首屏关键图片：高优先级 --&gt;
+&lt;img src="hero.webp" fetchpriority="high" alt="Hero"&gt;
+
+&lt;!-- 非关键图片：低优先级 --&gt;
+&lt;img src="below-fold.webp" fetchpriority="low" loading="lazy" alt="..."&gt;
+
+&lt;!-- CSS预加载：高优先级 --&gt;
+&lt;link rel="preload" href="critical.css" as="style" fetchpriority="high"&gt;
+
+&lt;!-- 非关键脚本：低优先级 --&gt;
+&lt;link rel="preload" href="analytics.js" as="script" fetchpriority="low"&gt;
+
+&lt;!-- JavaScript中使用 --&gt;
+&lt;script&gt;
+fetch('/api/data', { priority: 'high' });
+fetch('/api/analytics', { priority: 'low' });
+
+// 也可以通过 import() 控制模块加载优先级
+import(/* webpackFetchPriority: "high */ './critical.js');
+&lt;/script&gt;</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>6.3 Preload / Prefetch / Preconnect</h3>
+        <table>
+            <tr><th>指令</th><th>作用</th><th>时机</th><th>适用场景</th></tr>
+            <tr><td><code>preload</code></td><td>提前下载当前页面需要的资源</td><td>立即</td><td>关键CSS/JS/字体/图片</td></tr>
+            <tr><td><code>prefetch</code></td><td>提前下载下一页可能需要的资源</td><td>空闲时</td><td>下一页的资源</td></tr>
+            <tr><td><code>preconnect</code></td><td>提前建立DNS+TCP+TLS连接</td><td>立即</td><td>API服务器、CDN</td></tr>
+            <tr><td><code>dns-prefetch</code></td><td>提前解析DNS</td><td>立即</td><td>可能访问的第三方域名</td></tr>
+        </table>
+        <pre><code>&lt;!-- Preload：当前页面关键资源 --&gt;
+&lt;link rel="preload" href="critical.css" as="style"&gt;
+&lt;link rel="preload" href="main.js" as="script"&gt;
+&lt;link rel="preload" href="font.woff2" as="font" type="font/woff2" crossorigin&gt;
+&lt;link rel="preload" href="hero.webp" as="image"&gt;
+
+&lt;!-- Prefetch：下一页的资源 --&gt;
+&lt;link rel="prefetch" href="/next-page.html"&gt;
+&lt;link rel="prefetch" href="/next-page-data.json"&gt;
+
+&lt;!-- Preconnect：建立到第三方服务器的连接 --&gt;
+&lt;link rel="preconnect" href="https://api.example.com"&gt;
+&lt;link rel="preconnect" href="https://cdn.example.com" crossorigin&gt;
+
+&lt;!-- Module Preload：ES Module预加载 --&gt;
+&lt;link rel="modulepreload" href="./app.mjs"&gt;</code></pre>
+    </div>
+
+    <!-- ==================== 七、HTTP/3与QUIC ==================== -->
+    <h2>七、HTTP/3与QUIC</h2>
+
+    <div class="card">
+        <h3>7.1 HTTP/3核心改进</h3>
+        <ul>
+            <li><strong>基于UDP：</strong>使用QUIC协议代替TCP，解决TCP层队头阻塞</li>
+            <li><strong>0-RTT连接建立：</strong>QUIC内建TLS 1.3，首次连接1-RTT，恢复连接0-RTT</li>
+            <li><strong>连接迁移：</strong>使用Connection ID代替IP+Port，网络切换（如WiFi到4G）时不断连</li>
+            <li><strong>独立的流：</strong>每个流独立可靠传输，一个流的丢包不影响其他流</li>
+        </ul>
+        <div class="flow-diagram">
+HTTP/2 over TCP:
+┌─────────────────────────────┐
+│ HTTP/2 Streams (多路复用)    │
+├─────────────────────────────┤
+│ TLS 1.2/1.3 (加密)          │
+├─────────────────────────────┤
+│ TCP (可靠传输)               │  ← 队头阻塞在这里发生
+├─────────────────────────────┤
+│ IP                          │
+└─────────────────────────────┘
+
+HTTP/3 over QUIC:
+┌─────────────────────────────┐
+│ HTTP/3 Streams              │
+├─────────────────────────────┤
+│ QUIC (可靠传输 + 加密 + 流控制)│  ← 每个流独立可靠
+├─────────────────────────────┤
+│ UDP (不可靠传输)             │
+├─────────────────────────────┤
+│ IP                          │
+└─────────────────────────────┘</div>
+    </div>
+
+    <div class="card">
+        <h3>7.2 HTTP版本演进对比</h3>
+        <table>
+            <tr><th>特性</th><th>HTTP/1.1</th><th>HTTP/2</th><th>HTTP/3</th></tr>
+            <tr><td>传输层</td><td>TCP</td><td>TCP</td><td>QUIC (UDP)</td></tr>
+            <tr><td>多路复用</td><td>无</td><td>有（TCP层阻塞）</td><td>有（无阻塞）</td></tr>
+            <tr><td>头部压缩</td><td>无</td><td>HPACK</td><td>QPACK</td></tr>
+            <tr><td>加密</td><td>可选</td><td>事实要求HTTPS</td><td>强制加密</td></tr>
+            <tr><td>连接建立</td><td>1.5RTT + 1RTT(TLS)</td><td>1.5RTT + 1RTT(TLS)</td><td>0-1RTT</td></tr>
+            <tr><td>连接迁移</td><td>不支持</td><td>不支持</td><td>支持</td></tr>
+        </table>
+    </div>
+
+    <!-- ==================== 八、常见面试题 ==================== -->
+    <h2>八、常见面试题</h2>
+
+    <div class="card">
+        <h3>Q1: 从输入URL到页面展示发生了什么？</h3>
+        <ol>
+            <li>URL解析 → 判断是搜索还是URL</li>
+            <li>DNS解析 → 获取IP地址（浏览器缓存 → OS缓存 → DNS服务器递归查询）</li>
+            <li>TCP三次握手 → 建立连接（1.5个RTT）</li>
+            <li>TLS握手 → 建立加密通道（1-2个RTT，TLS 1.3可0-1RTT）</li>
+            <li>发送HTTP请求 → 服务器处理并返回响应</li>
+            <li>浏览器解析HTML → 构建DOM树</li>
+            <li>解析CSS → 构建CSSOM树</li>
+            <li>执行JavaScript → 可能修改DOM/CSSOM</li>
+            <li>构建渲染树 → 布局 → 绘制 → 合成</li>
+            <li>TCP四次挥手 → 关闭连接</li>
+        </ol>
+    </div>
+
+    <div class="card">
+        <h3>Q2: HTTP/1.1的队头阻塞问题是什么？</h3>
+        <p>HTTP/1.1 虽然支持Keep-Alive复用TCP连接，但在一个连接上请求必须串行处理——上一个请求的响应完整返回后，才能处理下一个请求。浏览器通过开启多个TCP连接（每个域名6个）来缓解此问题，但连接数仍然有限。</p>
+        <p>HTTP/2通过多路复用解决了HTTP层的队头阻塞，但TCP层的队头阻塞仍然存在。HTTP/3使用QUIC协议彻底解决了此问题。</p>
+    </div>
+
+    <div class="highlight">
+        <strong>总结：</strong>浏览器网络栈的优化目标是最小化请求延迟。关键技术包括：DNS预解析减少DNS查询时间、预连接减少TCP+TLS握手时间、HTTP/2多路复用减少连接数和队头阻塞、Fetch Priority API优化资源加载顺序、Preload/Prefetch提前下载关键资源。
+    </div>
+</div>
+<!-- 本文档总结了浏览器网络栈的完整流程和优化策略 -->
+</body>
+</html>

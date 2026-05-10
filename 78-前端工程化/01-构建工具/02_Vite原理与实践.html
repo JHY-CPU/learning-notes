@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vite原理与实践</title>
+    <style>
+        :root { --primary: #646cff; --primary-light: #eef0ff; --secondary: #34a853; --warning: #ea4335; --purple: #9c27b0; --bg: #f8f9fa; --card-bg: #ffffff; --text: #202124; --border: #dadce0; --code-bg: #f1f3f4; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { font-size: 2em; color: var(--primary); border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 1.5em; color: var(--primary); margin: 32px 0 16px; padding-left: 12px; border-left: 4px solid var(--primary); }
+        h3 { font-size: 1.2em; margin: 20px 0 10px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .highlight { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .warning { background: #fce8e6; border-left: 4px solid var(--warning); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .success { background: #e6f4ea; border-left: 4px solid var(--secondary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; font-family: 'Fira Code','Consolas',monospace; font-size: 0.9em; line-height: 1.6; margin: 12px 0; }
+        code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre code { background: none; padding: 0; }
+        ul, ol { padding-left: 24px; margin: 8px 0; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid var(--border); padding: 12px; text-align: left; }
+        th { background: var(--primary-light); font-weight: 600; }
+        .flow-diagram { background: var(--card-bg); border: 2px solid var(--primary); border-radius: 12px; padding: 20px; text-align: center; font-family: monospace; margin: 16px 0; white-space: pre; line-height: 1.6; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Vite原理与实践</h1>
+
+    <div class="highlight">
+        <strong>核心概念：</strong>Vite是一个基于ESM（ES Module）的下一代前端构建工具。开发环境利用浏览器原生ESM能力实现按需编译，配合esbuild预构建依赖，实现极速启动；生产环境使用Rollup进行打包，输出优化的静态资源。Vite的核心优势是开发体验：冷启动极快、HMR即时更新。
+    </div>
+
+    <!-- ==================== 一、架构设计 ==================== -->
+    <h2>一、Vite架构设计</h2>
+
+    <div class="card">
+        <h3>1.1 开发环境 vs 生产环境</h3>
+        <div class="flow-diagram">
+开发环境（Dev）：                           生产环境（Build）：
+┌─────────────────────┐                    ┌─────────────────────┐
+│ 浏览器               │                    │ Rollup              │
+│ 原生ESM按需请求模块  │                    │ 静态分析依赖        │
+│ ↓                   │                    │ Tree Shaking        │
+│ Vite Dev Server     │                    │ 代码压缩            │
+│ (Koa + esbuild)     │                    │ Code Splitting      │
+│ ↓                   │                    │ CSS提取             │
+│ 即时编译单个文件     │                    │ 资源优化            │
+│ HMR通过WebSocket    │                    │ ↓                   │
+│ esbuild预构建依赖   │                    │ dist/ 静态资源       │
+└─────────────────────┘                    └─────────────────────┘</div>
+    </div>
+
+    <div class="card">
+        <h3>1.2 为什么Vite这么快</h3>
+        <table>
+            <tr><th>环节</th><th>Webpack</th><th>Vite</th></tr>
+            <tr><td>冷启动</td><td>打包所有模块后启动（慢）</td><td>不打包，按需编译（快）</td></tr>
+            <tr><td>依赖预构建</td><td>打包时处理</td><td>esbuild预构建（Go语言，极快）</td></tr>
+            <tr><td>文件编译</td><td>Webpack编译</td><td>esbuild编译（比babel快10-100倍）</td></tr>
+            <tr><td>HMR</td><td>重新构建受影响的模块链</td><td>精确失效，只编译修改的文件</td></tr>
+            <tr><td>TS编译</td><td>ts-loader（慢）</td><td>esbuild转译（不检查类型）</td></tr>
+        </table>
+    </div>
+
+    <!-- ==================== 二、ESM开发服务器 ==================== -->
+    <h2>二、ESM开发服务器原理</h2>
+
+    <div class="card">
+        <h3>2.1 浏览器原生ESM</h3>
+        <p>现代浏览器原生支持 <code>&lt;script type="module"&gt;</code>，Vite利用这一特性，在开发时让浏览器按需请求模块：</p>
+        <pre><code>&lt;!-- index.html --&gt;
+&lt;script type="module" src="/src/main.js"&gt;&lt;/script&gt;
+
+// 浏览器请求 main.js 后，发现其中的 import 语句：
+import { createApp } from '/node_modules/.vite/deps/vue.js?v=abc123'
+import App from '/src/App.vue?t=1234567890'
+
+// 浏览器继续请求这些依赖...
+// Vite在服务器端即时编译每个请求的文件</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>2.2 Vite Dev Server工作流程</h3>
+        <div class="flow-diagram">
+1. 启动时：
+   - esbuild预构建 node_modules 中的依赖（转为ESM，缓存到 node_modules/.vite）
+   - 启动HTTP服务器（基于Koa/Connect）
+
+2. 浏览器请求 /src/main.js：
+   - Vite拦截请求
+   - 读取源文件
+   - 如果是Vue SFC → @vitejs/plugin-vue 编译
+   - 如果是TS → esbuild转译
+   - 如果是CSS → 处理后注入JS
+   - 返回编译后的ESM模块
+
+3. 文件修改时：
+   - Vite检测文件变化
+   - 仅编译修改的文件
+   - 通过WebSocket通知浏览器
+   - 浏览器精确替换模块</div>
+    </div>
+
+    <div class="card">
+        <h3>2.3 依赖预构建</h3>
+        <p>由于许多npm包仍然使用CommonJS格式，且一个包可能有多个小模块（如lodash有600+个模块），Vite在启动时使用esbuild进行预构建：</p>
+        <pre><code>// 预构建的作用：
+// 1. CommonJS → ESM 转换
+//    require('xxx') → import xxx from 'xxx'
+
+// 2. 依赖合并
+//    lodash有600+个小文件 → 合并为一个ESM文件
+//    减少浏览器请求数
+
+// 3. 缓存
+//    预构建结果缓存在 node_modules/.vite/
+//    只有 package.json 或 lockfile 变化时才重新构建
+
+// vite.config.js 配置预构建
+export default {
+    optimizeDeps: {
+        include: ['lodash', 'axios'],      // 强制预构建
+        exclude: ['some-local-package'],    // 排除预构建
+        needsInterop: ['problematic-lib'],  // 强制interop转换
+        esbuildOptions: {
+            // esbuild选项
+        }
+    }
+};</code></pre>
+    </div>
+
+    <!-- ==================== 三、HMR ==================== -->
+    <h2>三、Vite的HMR实现</h2>
+
+    <div class="card">
+        <h3>3.1 HMR流程</h3>
+        <div class="flow-diagram">
+文件修改（chokidar监听）
+    ↓
+Vite分析模块图，找到修改文件的所有依赖者（importers）
+    ↓
+精确失效：只标记修改的模块和直接依赖它的模块为invalid
+    ↓
+通过WebSocket发送更新通知
+    ↓
+浏览器只请求更新的模块（精确的URL + timestamp查询参数）
+    ↓
+执行 HMR API 回调，更新DOM/CSS</div>
+    </div>
+
+    <div class="card">
+        <h3>3.2 Vite HMR API</h3>
+        <pre><code>// Vite提供 import.meta.hot API
+
+// 1. 监听自身模块更新
+if (import.meta.hot) {
+    import.meta.hot.accept((newModule) => {
+        // 模块更新后的处理
+        console.log('模块已更新', newModule);
+    });
+}
+
+// 2. 监听依赖模块更新
+if (import.meta.hot) {
+    import.meta.hot.accept('./utils', (newUtils) => {
+        // utils模块更新后的处理
+        updateUI(newUtils);
+    });
+}
+
+// 3. 监听CSS更新（自动处理，无需手动代码）
+// Vite自动将CSS提取为CSS模块，更新时通过&lt;link&gt;标签替换
+
+// 4. 监听Vue SFC更新（@vitejs/plugin-vue自动处理）
+// 保留组件状态，只更新变化的部分
+
+// 5. 自定义HMR处理
+if (import.meta.hot) {
+    import.meta.hot.on('custom-event', (data) => {
+        console.log('自定义事件:', data);
+    });
+
+    // 发送事件到服务器
+    import.meta.hot.send('client-event', { msg: 'hello' });
+}</code></pre>
+    </div>
+
+    <!-- ==================== 四、Vite插件系统 ==================== -->
+    <h2>四、Vite插件系统</h2>
+
+    <div class="card">
+        <h3>4.1 插件钩子</h3>
+        <p>Vite插件基于Rollup的插件接口，并扩展了一些Vite特有的钩子：</p>
+        <table>
+            <tr><th>钩子</th><th>阶段</th><th>说明</th></tr>
+            <tr><td><code>config</code></td><td>Vite特有</td><td>修改Vite配置</td></tr>
+            <tr><td><code>configResolved</code></td><td>Vite特有</td><td>配置解析完成后</td></tr>
+            <tr><td><code>configureServer</code></td><td>Vite特有</td><td>配置Dev Server中间件</td></tr>
+            <tr><td><code>transformIndexHtml</code></td><td>Vite特有</td><td>转换HTML</td></tr>
+            <tr><td><code>resolveId</code></td><td>Rollup</td><td>解析模块路径</td></tr>
+            <tr><td><code>load</code></td><td>Rollup</td><td>加载模块内容</td></tr>
+            <tr><td><code>transform</code></td><td>Rollup</td><td>转换模块内容</td></tr>
+            <tr><td><code>buildStart</code></td><td>Rollup</td><td>构建开始</td></tr>
+            <tr><td><code>buildEnd</code></td><td>Rollup</td><td>构建结束</td></tr>
+            <tr><td><code>generateBundle</code></td><td>Rollup</td><td>生成bundle</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>4.2 自定义Vite插件</h3>
+        <pre><code>// vite-plugin-example.js
+export default function myPlugin(options = {}) {
+    return {
+        name: 'vite-plugin-example',  // 插件名称（必须）
+
+        // 修改Vite配置
+        config(config, { command }) {
+            return {
+                define: {
+                    __APP_VERSION__: JSON.stringify('1.0.0')
+                }
+            };
+        },
+
+        // 配置Dev Server
+        configureServer(server) {
+            // 添加中间件
+            server.middlewares.use('/api/custom', (req, res) => {
+                res.end(JSON.stringify({ msg: 'Hello from plugin' }));
+            });
+
+            // 监听文件变化
+            server.watcher.on('change', (file) => {
+                console.log('文件变化:', file);
+            });
+        },
+
+        // 转换模块内容
+        transform(code, id) {
+            // 只处理 .js 文件
+            if (!id.endsWith('.js')) return;
+
+            // 替换代码中的占位符
+            return code.replace('__BUILD_TIME__', Date.now().toString());
+        },
+
+        // 转换HTML
+        transformIndexHtml(html) {
+            return html.replace(
+                '&lt;title&gt;',
+                '&lt;title&gt;[DEV] '
+            );
+        }
+    };
+}
+
+// 使用插件
+// vite.config.js
+import myPlugin from './vite-plugin-example';
+
+export default {
+    plugins: [
+        myPlugin({ option: 'value' })
+    ]
+};</code></pre>
+    </div>
+
+    <!-- ==================== 五、Vite配置 ==================== -->
+    <h2>五、Vite配置详解</h2>
+
+    <div class="card">
+        <h3>5.1 常用配置</h3>
+        <pre><code>// vite.config.js
+import { defineConfig } from 'vite';
+import vue from '@vitejs/plugin-vue';
+import path from 'path';
+
+export default defineConfig({
+    // 基础路径
+    base: '/',
+
+    // 插件
+    plugins: [vue()],
+
+    // 路径别名
+    resolve: {
+        alias: {
+            '@': path.resolve(__dirname, 'src'),
+            '@components': path.resolve(__dirname, 'src/components')
+        },
+        extensions: ['.js', '.ts', '.jsx', '.tsx', '.vue', '.json']
+    },
+
+    // CSS配置
+    css: {
+        preprocessorOptions: {
+            scss: {
+                additionalData: `@import "@/styles/variables.scss";`
+            }
+        },
+        modules: {
+            localsConvention: 'camelCase'
+        }
+    },
+
+    // 开发服务器
+    server: {
+        port: 3000,
+        open: true,
+        cors: true,
+        proxy: {
+            '/api': {
+                target: 'http://localhost:8080',
+                changeOrigin: true,
+                rewrite: (path) => path.replace(/^\/api/, '')
+            }
+        }
+    },
+
+    // 构建配置
+    build: {
+        target: 'es2015',
+        outDir: 'dist',
+        assetsDir: 'assets',
+        sourcemap: false,
+        minify: 'esbuild',
+        rollupOptions: {
+            output: {
+                manualChunks: {
+                    vendor: ['vue', 'vue-router', 'pinia'],
+                    utils: ['lodash-es', 'dayjs']
+                }
+            }
+        },
+        chunkSizeWarningLimit: 1000  // KB
+    }
+});</code></pre>
+    </div>
+
+    <!-- ==================== 六、SSR支持 ==================== -->
+    <h2>六、Vite SSR支持</h2>
+
+    <div class="card">
+        <h3>6.1 SSR原理</h3>
+        <pre><code>// server.js - Vite SSR开发服务器
+import { createServer } from 'vite';
+
+async function startServer() {
+    const vite = await createServer({
+        server: { middlewareMode: true },
+        appType: 'custom'
+    });
+
+    app.use(vite.middlewares);
+
+    app.use('*', async (req, res) => {
+        // 1. 读取index.html
+        let template = fs.readFileSync('index.html', 'utf-8');
+        template = await vite.transformIndexHtml(req.originalUrl, template);
+
+        // 2. 加载SSR入口
+        const { render } = await vite.ssrLoadModule('/src/entry-server.js');
+
+        // 3. 服务端渲染
+        const [appHtml, preloadLinks] = await render(req.originalUrl);
+
+        // 4. 注入HTML
+        const html = template
+            .replace('<!--preload-links-->', preloadLinks)
+            .replace('<!--ssr-outlet-->', appHtml);
+
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(html);
+    });
+}
+
+startServer();</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>6.2 SSR关键API</h3>
+        <ul>
+            <li><code>vite.ssrLoadModule(url)</code>：在Node.js中加载ESM模块（无需打包）</li>
+            <li><code>vite.ssrFixStacktrace(err)</code>：修复SSR错误的堆栈信息</li>
+            <li><code>import.meta.env.SSR</code>：判断当前是否为SSR环境</li>
+            <li><code>import.meta.glob()</code>：批量导入模块（支持SSR）</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 七、最佳实践 ==================== -->
+    <h2>七、Vite最佳实践</h2>
+
+    <div class="card">
+        <h3>7.1 性能优化</h3>
+        <ul>
+            <li><strong>依赖预构建优化：</strong>对已知的大依赖手动配置 <code>optimizeDeps.include</code></li>
+            <li><strong>图片压缩：</strong>使用 <code>vite-plugin-imagemin</code></li>
+            <li><strong>Gzip/Brotli压缩：</strong>使用 <code>vite-plugin-compression</code></li>
+            <li><strong>CDN引入：</strong>使用 <code>rollup-plugin-external-globals</code> + <code>vite-plugin-html</code></li>
+            <li><strong>按需导入：</strong>使用 <code>unplugin-vue-components</code> 自动按需导入组件</li>
+            <li><strong>可视化分析：</strong>使用 <code>rollup-plugin-visualizer</code></li>
+        </ul>
+        <pre><code>// 性能优化配置示例
+import { visualizer } from 'rollup-plugin-visualizer';
+import compression from 'vite-plugin-compression';
+
+export default defineConfig({
+    plugins: [
+        // Gzip压缩
+        compression({ algorithm: 'gzip' }),
+        // 打包分析
+        visualizer({ open: true, gzipSize: true })
+    ],
+    build: {
+        rollupOptions: {
+            // CDN外部化
+            external: ['vue', 'vue-router'],
+            output: {
+                globals: {
+                    vue: 'Vue',
+                    'vue-router': 'VueRouter'
+                }
+            }
+        }
+    }
+});</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>7.2 环境变量</h3>
+        <pre><code>// .env（所有环境）
+VITE_APP_TITLE=My App
+
+// .env.development（开发环境）
+VITE_API_BASE=http://localhost:8080/api
+
+// .env.production（生产环境）
+VITE_API_BASE=https://api.example.com
+
+// 代码中使用
+console.log(import.meta.env.VITE_API_BASE);
+console.log(import.meta.env.MODE);        // development | production
+console.log(import.meta.env.DEV);         // true | false
+console.log(import.meta.env.PROD);        // true | false
+console.log(import.meta.env.SSR);         // true | false
+
+// 类型声明（env.d.ts）
+/// &lt;reference types="vite/client" /&gt;
+interface ImportMetaEnv {
+    readonly VITE_API_BASE: string;
+    readonly VITE_APP_TITLE: string;
+}</code></pre>
+    </div>
+
+    <div class="highlight">
+        <strong>总结：</strong>Vite通过ESM原生按需编译、esbuild预构建依赖、精确HMR实现极速开发体验。生产环境使用Rollup输出优化的静态资源。核心优势是：冷启动快（不打包直接服务）、HMR即时更新（精确失效）、开箱即用（TS/CSS/PostCSS/SFC等）。Vite已成为Vue和React项目的首选构建工具。
+    </div>
+</div>
+<!-- 本文档总结了Vite的架构设计、ESM开发服务器原理、HMR实现和插件系统 -->
+</body>
+</html>

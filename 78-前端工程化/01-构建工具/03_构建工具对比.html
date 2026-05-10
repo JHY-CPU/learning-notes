@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>构建工具对比</title>
+    <style>
+        :root { --primary: #1a73e8; --primary-light: #e8f0fe; --secondary: #34a853; --warning: #ea4335; --purple: #9c27b0; --bg: #f8f9fa; --card-bg: #ffffff; --text: #202124; --border: #dadce0; --code-bg: #f1f3f4; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { font-size: 2em; color: var(--primary); border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 1.5em; color: var(--primary); margin: 32px 0 16px; padding-left: 12px; border-left: 4px solid var(--primary); }
+        h3 { font-size: 1.2em; margin: 20px 0 10px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .highlight { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .warning { background: #fce8e6; border-left: 4px solid var(--warning); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .success { background: #e6f4ea; border-left: 4px solid var(--secondary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; font-family: 'Fira Code','Consolas',monospace; font-size: 0.9em; line-height: 1.6; margin: 12px 0; }
+        code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre code { background: none; padding: 0; }
+        ul, ol { padding-left: 24px; margin: 8px 0; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid var(--border); padding: 12px; text-align: left; }
+        th { background: var(--primary-light); font-weight: 600; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>构建工具对比</h1>
+
+    <div class="highlight">
+        <strong>核心概念：</strong>前端构建工具从Grunt/Gulp的任务运行，到Webpack的模块打包，再到Vite的ESM原生按需编译，经历了三代演进。当前主流工具各有所长：Webpack生态完善适合大型项目，Vite开发体验极致适合新项目，Rollup适合库开发，Turbopack/Rspack是新一代高性能方案。
+    </div>
+
+    <!-- ==================== 一、全方位对比 ==================== -->
+    <h2>一、全方位对比</h2>
+
+    <div class="card">
+        <h3>1.1 核心特性对比</h3>
+        <table>
+            <tr><th>特性</th><th>Webpack 5</th><th>Vite 5</th><th>Rollup</th><th>Turbopack</th><th>Rspack</th></tr>
+            <tr><td><strong>语言</strong></td><td>JavaScript</td><td>JavaScript</td><td>JavaScript</td><td>Rust</td><td>Rust</td></tr>
+            <tr><td><strong>开发模式</strong></td><td>Bundle</td><td>Native ESM</td><td>Bundle</td><td>Bundle</td><td>Bundle</td></tr>
+            <tr><td><strong>生产构建</strong></td><td>Webpack</td><td>Rollup</td><td>Rollup</td><td>Turbopack</td><td>Rspack</td></tr>
+            <tr><td><strong>冷启动速度</strong></td><td>慢</td><td>极快</td><td>中等</td><td>快</td><td>快</td></tr>
+            <tr><td><strong>HMR速度</strong></td><td>中等</td><td>极快</td><td>N/A</td><td>快</td><td>快</td></tr>
+            <tr><td><strong>Tree Shaking</strong></td><td>支持</td><td>支持（Rollup）</td><td>优秀</td><td>支持</td><td>支持</td></tr>
+            <tr><td><strong>Code Splitting</strong></td><td>强大</td><td>支持（Rollup）</td><td>支持</td><td>支持</td><td>支持</td></tr>
+            <tr><td><strong>Module Federation</strong></td><td>原生支持</td><td>插件</td><td>不支持</td><td>支持</td><td>支持</td></tr>
+            <tr><td><strong>生态成熟度</strong></td><td>成熟</td><td>丰富</td><td>丰富</td><td>早期</td><td>增长中</td></tr>
+            <tr><td><strong>配置复杂度</strong></td><td>复杂</td><td>简单</td><td>简单</td><td>简单</td><td>兼容Webpack</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>1.2 性能基准对比</h3>
+        <table>
+            <tr><th>场景</th><th>Webpack</th><th>Vite</th><th>Rspack</th><th>Turbopack</th></tr>
+            <tr><td>冷启动（中型项目）</td><td>30-60s</td><td>0.3-1s</td><td>2-5s</td><td>1-3s</td></tr>
+            <tr><td>HMR更新</td><td>1-3s</td><td>&lt;50ms</td><td>&lt;100ms</td><td>&lt;100ms</td></tr>
+            <tr><td>生产构建</td><td>30-120s</td><td>15-45s</td><td>5-15s</td><td>5-15s</td></tr>
+        </table>
+        <div class="warning">
+            <strong>注意：</strong>以上数据为大致范围，实际性能取决于项目规模、依赖数量、硬件配置等因素。Vite的开发环境构建速度远超其他工具是因为其不打包的设计，而非单纯的编译速度优势。
+        </div>
+    </div>
+
+    <!-- ==================== 二、Webpack ==================== -->
+    <h2>二、Webpack - 生态之王</h2>
+
+    <div class="card">
+        <h3>2.1 优势</h3>
+        <ul>
+            <li><strong>生态最完善：</strong>几乎所有前端场景都有成熟的Loader/Plugin</li>
+            <li><strong>Module Federation：</strong>原生支持微前端架构</li>
+            <li><strong>灵活配置：</strong>几乎可以定制任何构建流程</li>
+            <li><strong>社区庞大：</strong>遇到问题容易找到解决方案</li>
+            <li><strong>兼容性好：</strong>支持各种模块格式（ESM/CJS/AMD/UMD）</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3>2.2 劣势</h3>
+        <ul>
+            <li><strong>构建速度慢：</strong>大型项目冷启动和构建耗时较长</li>
+            <li><strong>配置复杂：</strong>需要大量配置才能达到最佳状态</li>
+            <li><strong>学习曲线陡：</strong>需要理解Loader/Plugin/Tapable等概念</li>
+            <li><strong>历史包袱：</strong>需要兼容旧设计，创新受限</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3>2.3 适用场景</h3>
+        <ul>
+            <li>已有大型Webpack项目（迁移成本高）</li>
+            <li>需要Module Federation的微前端项目</li>
+            <li>需要高度定制化的构建流程</li>
+            <li>企业级项目需要稳定的工具链</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 三、Vite ==================== -->
+    <h2>三、Vite - 体验之王</h2>
+
+    <div class="card">
+        <h3>3.1 优势</h3>
+        <ul>
+            <li><strong>极速启动：</strong>开发环境不打包，冷启动极快</li>
+            <li><strong>极速HMR：</strong>精确失效，毫秒级更新</li>
+            <li><strong>开箱即用：</strong>TS/JSX/CSS/PostCSS等零配置</li>
+            <li><strong>Rollup生产构建：</strong>生产环境可靠，Tree Shaking优秀</li>
+            <li><strong>插件生态丰富：</strong>兼容Rollup插件 + Vite专属插件</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3>3.2 劣势</h3>
+        <ul>
+            <li><strong>开发/生产不一致：</strong>开发用ESM，生产用Rollup打包，可能存在差异</li>
+            <li><strong>传统浏览器支持差：</strong>原生ESM不支持IE11等旧浏览器</li>
+            <li><strong>CommonJS处理：</strong>需要预构建，偶有兼容问题</li>
+            <li><strong>大型项目首次加载慢：</strong>大量模块需要逐个请求</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3>3.3 适用场景</h3>
+        <ul>
+            <li>新建的Vue/React项目</li>
+            <li>对开发体验有高要求的项目</li>
+            <li>不需要支持IE11的项目</li>
+            <li>中小规模项目快速开发</li>
+            <li>SSR项目（如Nuxt 3、Remix等底层使用Vite）</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 四、Rollup ==================== -->
+    <h2>四、Rollup - 库开发首选</h2>
+
+    <div class="card">
+        <h3>4.1 优势</h3>
+        <ul>
+            <li><strong>Tree Shaking最优：</strong>静态分析ES Module最彻底</li>
+            <li><strong>输出干净：</strong>生成的代码几乎没有运行时开销</li>
+            <li><strong>ES Module原生：</strong>天然支持ESM输出格式</li>
+            <li><strong>配置简单：</strong>API简洁，学习成本低</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3>4.2 劣势</h3>
+        <ul>
+            <li><strong>不擅长应用构建：</strong>Code Splitting、HMR支持有限</li>
+            <li><strong>CommonJS支持弱：</strong>需要插件转换</li>
+            <li><strong>没有Dev Server：</strong>需要配合其他工具</li>
+        </ul>
+    </div>
+    <div class="card">
+        <h3>4.3 适用场景</h3>
+        <ul>
+            <li>开发JavaScript库（Vue、React、D3等都用Rollup）</li>
+            <li>需要输出多种格式（ESM/CJS/UMD）的包</li>
+            <li>对输出代码大小和质量有高要求</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 五、Turbopack ==================== -->
+    <h2>五、Turbopack - Vercel出品</h2>
+
+    <div class="card">
+        <h3>5.1 概述</h3>
+        <p>Turbopack是Vercel（Next.js团队）用Rust编写的下一代构建工具，旨在替代Webpack：</p>
+        <ul>
+            <li><strong>Rust编写：</strong>底层用Rust实现，编译速度快</li>
+            <li><strong>增量计算：</strong>使用Turbo引擎实现增量构建（类似Gradle）</li>
+            <li><strong>与Next.js深度集成：</strong>Next.js 13+ 默认使用Turbopack</li>
+            <li><strong>Webpack兼容：</strong>设计上兼容Webpack的Loader和Plugin</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 六、Rspack ==================== -->
+    <h2>六、Rspack - 字节跳动出品</h2>
+
+    <div class="card">
+        <h3>6.1 概述</h3>
+        <p>Rspack是字节跳动Web Infra团队用Rust编写的高性能构建工具，目标是<strong>完全兼容Webpack API</strong>：</p>
+        <ul>
+            <li><strong>Webpack兼容：</strong>大多数Webpack配置和插件可以直接使用</li>
+            <li><strong>Rust编写：</strong>冷启动比Webpack快5-10倍</li>
+            <li><strong>内置优化：</strong>内置了Swc（Rust版Babel）、CSS处理等</li>
+            <li><strong>生产可用：</strong>字节内部大规模使用，稳定性验证充分</li>
+        </ul>
+        <pre><code>// rspack.config.js - 与webpack.config.js几乎一样
+module.exports = {
+    entry: './src/index.js',
+    output: {
+        path: 'dist',
+        filename: '[name].[contenthash:8].js'
+    },
+    module: {
+        rules: [
+            {
+                test: /\.tsx?$/,
+                use: 'builtin:swc-loader',  // 内置SWC
+                options: {
+                    jsc: {
+                        parser: { syntax: 'typescript' },
+                        transform: { react: { runtime: 'automatic' } }
+                    }
+                }
+            },
+            {
+                test: /\.css$/,
+                type: 'css'  // 内置CSS支持
+            }
+        ]
+    },
+    builtins: {
+        html: [{ template: './src/index.html' }],
+        define: { 'process.env.NODE_ENV': JSON.stringify('production') }
+    }
+};</code></pre>
+    </div>
+
+    <!-- ==================== 七、选型指南 ==================== -->
+    <h2>七、选型指南</h2>
+
+    <div class="card">
+        <h3>7.1 决策树</h3>
+        <pre><code>你需要做什么？
+
+├── 开发JavaScript库/npm包
+│   └── 选择 Rollup（或tsup/unbuild）
+│
+├── 开发应用
+│   ├── 新项目
+│   │   ├── 需要支持IE11？
+│   │   │   └── Webpack
+│   │   └── 不需要支持IE11？
+│   │       ├── Vue项目 → Vite
+│   │       ├── React项目 → Vite（或Next.js内置Turbopack）
+│   │       └── 其他 → Vite
+│   │
+│   ├── 已有Webpack项目
+│   │   ├── 构建速度是主要痛点？
+│   │   │   ├── 尝试迁移到Vite
+│   │   │   └── 或使用Rspack（兼容Webpack配置）
+│   │   └── 构建速度可以接受？
+│   │       └── 继续使用Webpack
+│   │
+│   └── 微前端项目（需要Module Federation）
+│       └── Webpack（或Rspack）
+│
+└── 使用元框架
+    ├── Next.js → 内置Turbopack/Webpack
+    ├── Nuxt → 内置Vite
+    └── SvelteKit → 内置Vite</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>7.2 迁移建议</h3>
+        <table>
+            <tr><th>迁移路径</th><th>难度</th><th>收益</th><th>建议</th></tr>
+            <tr><td>Webpack → Vite</td><td>中等</td><td>高</td><td>新项目推荐；旧项目评估成本</td></tr>
+            <tr><td>Webpack → Rspack</td><td>低</td><td>中高</td><td>几乎兼容Webpack配置，适合快速提速</td></tr>
+            <tr><td>Rollup → Vite</td><td>低</td><td>高</td><td>Vite底层就是Rollup，迁移简单</td></tr>
+            <tr><td>CRA → Vite</td><td>低</td><td>高</td><td>有官方迁移指南</td></tr>
+        </table>
+    </div>
+
+    <div class="success">
+        <strong>总结：2024年的构建工具格局</strong>
+        <ul>
+            <li><strong>新项目首选Vite：</strong>除非有特殊需求（如IE11、Module Federation），新项目都推荐Vite</li>
+            <li><strong>Webpack仍然是存量项目的主力：</strong>庞大的生态和企业级项目仍在使用</li>
+            <li><strong>Rspack是Webpack的最佳替代：</strong>兼容Webpack配置，性能大幅提升</li>
+            <li><strong>Rollup适合库开发：</strong>输出代码最干净，Vue/React等核心库都用Rollup</li>
+            <li><strong>Turbopack值得观望：</strong>与Next.js深度绑定，看Next.js生态发展</li>
+        </ul>
+    </div>
+
+    <div class="highlight">
+        <strong>总结：</strong>构建工具选型需要综合考虑项目类型（应用/库）、团队技术栈（Vue/React）、浏览器兼容性要求、构建性能需求等因素。当前趋势是从Webpack向Vite/Rspack等高性能工具迁移，同时Rollup在库开发领域保持主导地位。
+    </div>
+</div>
+<!-- 本文档总结了主流前端构建工具的对比与选型指南 -->
+</body>
+</html>

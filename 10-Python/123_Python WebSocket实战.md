@@ -1,0 +1,369 @@
+# Python WebSocket实战
+
+
+## 🔌 Python WebSocket 实战
+
+
+websockets 库服务器/客户端、FastAPI WebSocket、连接管理、广播、心跳保活、聊天室实战。
+
+
+## websockets 库基础
+
+
+```
+// ========== 安装 ==========
+# pip install websockets
+
+# ========== WebSocket 服务器 ==========
+import asyncio
+import websockets
+
+async def handler(websocket):
+    """处理客户端连接"""
+    # 接收客户端名字
+    name = await websocket.recv()
+    print(f"客户端: {name}")
+
+    try:
+        async for message in websocket:
+            print(f"收到: {message}")
+            # 回复客户端
+            await websocket.send(f"服务器收到: {message}")
+    except websockets.ConnectionClosed:
+        print("客户端断开连接")
+
+async def main():
+    async with websockets.serve(handler, "localhost", 8765):
+        print("WebSocket 服务器启动 ws://localhost:8765")
+        await asyncio.Future()  # 永久运行
+
+asyncio.run(main())
+
+# ========== WebSocket 客户端 ==========
+import asyncio
+import websockets
+
+async def client():
+    async with websockets.connect("ws://localhost:8765") as ws:
+        await ws.send("Hello!")
+        response = await ws.recv()
+        print(f"收到: {response}")
+
+asyncio.run(client())
+```
+
+
+## 消息格式与 JSON
+
+
+```
+// ========== JSON 消息 ==========
+import asyncio
+import websockets
+import json
+
+# 使用 JSON 格式传输结构化数据
+
+async def json_handler(websocket):
+    async for raw in websocket:
+        data = json.loads(raw)
+        msg_type = data.get("type")
+
+        if msg_type == "ping":
+            response = {"type": "pong", "timestamp": asyncio.get_event_loop().time()}
+        elif msg_type == "message":
+            response = {
+                "type": "ack",
+                "original": data["content"],
+                "length": len(data["content"]),
+            }
+        else:
+            response = {"type": "error", "message": f"未知类型: {msg_type}"}
+
+        await websocket.send(json.dumps(response))
+
+async def main():
+    async with websockets.serve(json_handler, "localhost", 8765):
+        await asyncio.Future()
+
+asyncio.run(main())
+
+# 客户端示例:
+async def json_client():
+    async with websockets.connect("ws://localhost:8765") as ws:
+        # 发送 JSON 消息
+        await ws.send(json.dumps({
+            "type": "message",
+            "content": "你好!",
+            "user": "Alice",
+        }))
+        # 接收 JSON 响应
+        response = json.loads(await ws.recv())
+        print(f"响应: {response}")
+
+asyncio.run(json_client())
+```
+
+
+## 连接管理
+
+
+```
+// ========== 连接池 ==========
+import asyncio
+import websockets
+import json
+
+class ConnectionManager:
+    """管理所有 WebSocket 连接"""
+
+    def __init__(self):
+        self.connections: set[websockets.WebSocketServerProtocol] = set()
+
+    async def connect(self, websocket):
+        self.connections.add(websocket)
+
+    def disconnect(self, websocket):
+        self.connections.remove(websocket)
+
+    async def broadcast(self, message):
+        """向所有连接广播消息"""
+        if not self.connections:
+            return
+        disconnected = set()
+        for ws in self.connections:
+            try:
+                await ws.send(message)
+            except websockets.ConnectionClosed:
+                disconnected.add(ws)
+        # 清理断开的连接
+        self.connections -= disconnected
+
+manager = ConnectionManager()
+
+async def chat_handler(websocket):
+    await manager.connect(websocket)
+    try:
+        async for raw in websocket:
+            data = json.loads(raw)
+            # 广播给所有人
+            await manager.broadcast(json.dumps({
+                "user": data["user"],
+                "message": data["message"],
+                "time": asyncio.get_event_loop().time(),
+            }))
+    finally:
+        manager.disconnect(websocket)
+
+async def main():
+    async with websockets.serve(chat_handler, "localhost", 8765):
+        print("聊天服务器启动")
+        await asyncio.Future()
+
+asyncio.run(main())
+```
+
+
+## 心跳与保活
+
+
+```
+// ========== 心跳机制 ==========
+import asyncio
+import websockets
+import json
+
+# 保持连接活跃,检测断线
+
+async def heartbeat(websocket, interval=30):
+    """定期发送心跳包"""
+    try:
+        while True:
+            await asyncio.sleep(interval)
+            try:
+                pong = await asyncio.wait_for(
+                    websocket.ping(), timeout=10
+                )
+                print(f"心跳正常: {websocket.remote_address}")
+            except asyncio.TimeoutError:
+                print(f"心跳超时: {websocket.remote_address}")
+                await websocket.close()
+                break
+    except websockets.ConnectionClosed:
+        pass
+
+async def handler_with_heartbeat(websocket):
+    # 启动心跳任务
+    heartbeat_task = asyncio.create_task(heartbeat(websocket))
+
+    try:
+        async for message in websocket:
+            print(f"收到: {message}")
+            await websocket.send(f"echo: {message}")
+    finally:
+        heartbeat_task.cancel()
+
+async def main():
+    async with websockets.serve(
+        handler_with_heartbeat,
+        "localhost", 8765,
+        ping_interval=20,       # 内置心跳间隔
+        ping_timeout=10,         # 心跳超时
+        max_size=2 ** 20,        # 最大消息 1MB
+        max_queue=32,            # 最大排队消息数
+    ):
+        await asyncio.Future()
+
+asyncio.run(main())
+```
+
+
+## FastAPI WebSocket
+
+
+```
+// ========== FastAPI WebSocket ==========
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse
+
+app = FastAPI()
+
+html = """
+
+
+Chat
+
+WebSocket Chat
+
+发送
+
+
+"""
+
+@app.get("/")
+async def get():
+    return HTMLResponse(html)
+
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            await websocket.send_text(f"收到: {data}")
+    except WebSocketDisconnect:
+        print("客户端断开")
+
+# ========== 房间管理 ==========
+class Room:
+    def __init__(self):
+        self.clients: dict[str, WebSocket] = {}
+
+    async def join(self, name: str, websocket: WebSocket):
+        await websocket.accept()
+        self.clients[name] = websocket
+        await self.broadcast(f"{name} 加入房间")
+
+    async def leave(self, name: str):
+        self.clients.pop(name, None)
+        await self.broadcast(f"{name} 离开房间")
+
+    async def broadcast(self, message: str, exclude: str = None):
+        for name, ws in self.clients.items():
+            if name != exclude:
+                try:
+                    await ws.send_text(message)
+                except WebSocketDisconnect:
+                    pass
+
+room = Room()
+
+@app.websocket("/chat/{name}")
+async def chat(websocket: WebSocket, name: str):
+    await room.join(name, websocket)
+    try:
+        while True:
+            data = await websocket.receive_text()
+            await room.broadcast(f"{name}: {data}", exclude=name)
+    except WebSocketDisconnect:
+        await room.leave(name)
+```
+
+
+## 完整示例: WebSocket 聊天室
+
+
+```
+// ========== 完整聊天室 ==========
+import asyncio
+import websockets
+import json
+from datetime import datetime
+
+class ChatRoom:
+    """WebSocket 聊天室"""
+
+    def __init__(self):
+        self.users: dict[str, websockets.WebSocketServerProtocol] = {}
+
+    async def register(self, websocket, username):
+        self.users[username] = websocket
+        await self.broadcast({
+            "type": "system",
+            "message": f"{username} 加入了聊天室",
+            "online": list(self.users.keys()),
+        })
+
+    async def unregister(self, username):
+        self.users.pop(username, None)
+        await self.broadcast({
+            "type": "system",
+            "message": f"{username} 离开了聊天室",
+            "online": list(self.users.keys()),
+        })
+
+    async def broadcast(self, message):
+        dead = []
+        for username, ws in self.users.items():
+            try:
+                await ws.send(json.dumps(message))
+            except websockets.ConnectionClosed:
+                dead.append(username)
+        for username in dead:
+            self.users.pop(username, None)
+
+    async def handle(self, websocket):
+        # 先接收用户名
+        username = await websocket.recv()
+        await self.register(websocket, username)
+
+        try:
+            async for raw in websocket:
+                data = json.loads(raw)
+                await self.broadcast({
+                    "type": "message",
+                    "user": username,
+                    "content": data.get("content", ""),
+                    "time": datetime.now().isoformat(),
+                })
+        finally:
+            await self.unregister(username)
+
+async def main():
+    room = ChatRoom()
+    async with websockets.serve(room.handle, "0.0.0.0", 8765):
+        print("聊天室启动: ws://0.0.0.0:8765")
+        await asyncio.Future()
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+
+> **Note:** 💡 WebSocket 要点: websockets 库轻量级; FastAPI 原生 WebSocket 支持; ConnectionManager 管理连接池; JSON 格式传输结构化数据; ping/pong 心跳保活; broadcast 广播模式。
+
+
+## 练习
+
+
+<!-- Converted from: 123_Python WebSocket实战.html -->

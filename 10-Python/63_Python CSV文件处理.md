@@ -1,0 +1,242 @@
+# Python CSV文件处理
+
+
+## 📊 Python CSV 文件处理
+
+
+csv 模块基础、reader/writer、DictReader/DictWriter、自定义分隔符和引号、CSV 常见陷阱与处理、大文件流式处理。
+
+
+## CSV 读写基础
+
+
+```
+// ========== CSV 格式 ==========
+// CSV: 逗号分隔值 (Comma-Separated Values)
+// 每行一条记录,字段用逗号分隔
+
+// 示例 CSV:
+// name,age,email
+// Alice,30,alice@example.com
+// Bob,25,bob@test.com
+// Charlie,35,"charlie@test,com"  (含逗号的值用引号括起)
+
+// ========== csv.reader ==========
+import csv
+
+# 读取 CSV:
+with open("people.csv", "r", encoding="utf-8") as f:
+    reader = csv.reader(f)
+    for row in reader:
+        print(row)               # 每行是一个列表
+        # ['name', 'age', 'email']
+        # ['Alice', '30', 'alice@example.com']
+        # ...
+
+// reader 返回迭代器,逐行产出列表
+// 自动处理引号、转义等
+
+// ========== csv.writer ==========
+# 写入 CSV:
+with open("output.csv", "w", newline="", encoding="utf-8") as f:
+    writer = csv.writer(f)
+
+    # 写表头
+    writer.writerow(["name", "age", "email"])
+
+    # 写数据行
+    writer.writerow(["Alice", 30, "alice@example.com"])
+    writer.writerow(["Bob", 25, "bob@test.com"])
+    writer.writerow(["Charlie", 35, "charlie@test,com"])  # 自动加引号!
+
+// newline="" 很重要!
+// 避免 csv 模块和 Python 双重换行处理
+// 不加可能每行多一个空行
+```
+
+
+## DictReader 和 DictWriter
+
+
+```
+// ========== DictReader ==========
+// 以字典形式读取,表头作为键
+
+import csv
+
+with open("people.csv", "r", encoding="utf-8") as f:
+    reader = csv.DictReader(f)    # 自动用第一行作为字段名
+    for row in reader:
+        print(row["name"])        # 通过列名访问
+        print(row["age"])
+        print(row["email"])
+        # row: {'name': 'Alice', 'age': '30', 'email': 'alice@example.com'}
+
+// 指定字段名 (没有表头时):
+with open("data.csv", "r", encoding="utf-8") as f:
+    reader = csv.DictReader(f, fieldnames=["name", "age", "email"])
+    for row in reader:
+        print(row["name"])
+
+// ========== DictWriter ==========
+// 以字典形式写入
+
+with open("output.csv", "w", newline="", encoding="utf-8") as f:
+    fieldnames = ["name", "age", "email"]
+    writer = csv.DictWriter(f, fieldnames=fieldnames)
+
+    # 写入表头
+    writer.writeheader()
+
+    # 写数据
+    writer.writerow({"name": "Alice", "age": 30, "email": "alice@test.com"})
+    writer.writerow({"name": "Bob", "age": 25, "email": "bob@test.com"})
+
+// DictWriter 比 writer 更好用:
+// - 明确字段名
+// - 不用记列顺序
+// - 可跳过/重排字段
+
+// ========== 缺失值处理 ==========
+# extra action: 如果多出未定义字段
+# restval: 如果缺少字段
+# extrasaction: "raise" 或 "ignore"
+
+writer = csv.DictWriter(f, fieldnames=["name", "age"],
+                        restval="N/A", extrasaction="ignore")
+writer.writeheader()
+writer.writerow({"name": "Alice", "age": 30, "email": "忽略"})  # email 被忽略
+```
+
+
+## 自定义分隔符和格式
+
+
+```
+// ========== 自定义分隔符 ==========
+// 不是所有 CSV 都用逗号分隔!
+
+// TSV (制表符分隔):
+with open("data.tsv", "r", encoding="utf-8") as f:
+    reader = csv.reader(f, delimiter="\t")
+    for row in reader:
+        print(row)
+
+// 分号分隔 (欧洲常用):
+with open("data.csv", "r", encoding="utf-8") as f:
+    reader = csv.reader(f, delimiter=";")
+
+// ========== csv.Dialect ==========
+// 预定义方言:
+// excel — 标准 CSV (逗号,双引号引号)
+// excel-tab — TSV (制表符)
+// unix — 类 Unix 风格
+
+reader = csv.reader(f, dialect="excel")
+
+// 自定义方言:
+csv.register_dialect("mycsv",
+    delimiter="|",
+    quotechar='"',
+    quoting=csv.QUOTE_MINIMAL,
+    lineterminator="\n",
+    skipinitialspace=True,
+)
+
+with open("data.csv", "r", encoding="utf-8") as f:
+    reader = csv.reader(f, dialect="mycsv")
+
+// ========== quoting 选项 ==========
+# csv.QUOTE_ALL       — 所有字段加引号
+# csv.QUOTE_MINIMAL   — 只在必要时加引号 (默认)
+# csv.QUOTE_NONNUMERIC — 非数字字段加引号
+# csv.QUOTE_NONE      — 从不加引号
+
+with open("output.csv", "w", newline="", encoding="utf-8") as f:
+    writer = csv.writer(f, quoting=csv.QUOTE_ALL)
+    writer.writerow(["name", "age"])   # "name","age"
+    writer.writerow(["Alice", 30])     # "Alice","30"
+```
+
+
+## CSV 实战与陷阱
+
+
+```
+// ========== 实战: 数据处理 ==========
+import csv
+from collections import Counter
+
+def analyze_csv(filename):
+    """分析 CSV 数据"""
+    with open(filename, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+
+        total = 0
+        age_sum = 0
+        city_counter = Counter()
+
+        for row in reader:
+            total += 1
+            age_sum += int(row["age"])
+            city_counter[row["city"]] += 1
+
+    return {
+        "total": total,
+        "avg_age": age_sum / total if total else 0,
+        "cities": dict(city_counter.most_common()),
+    }
+
+// ========== 大文件流式处理 ==========
+def process_large_csv(filename, chunk_size=1000):
+    """流式处理大 CSV"""
+    with open(filename, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+
+        batch = []
+        for row in reader:
+            batch.append(row)
+            if len(batch) >= chunk_size:
+                process_batch(batch)
+                batch = []
+
+        # 处理最后一批
+        if batch:
+            process_batch(batch)
+
+// ========== 常见陷阱 ==========
+// 陷阱 1: 数字是字符串!
+reader = csv.reader(f)
+for row in reader:
+    age = row[1]                # "30" (字符串,不是整数)
+    age = int(row[1])           # 需要手动转换
+
+// 陷阱 2: BOM 头 (UTF-8 with BOM)
+# 某些 Windows 软件导出会带 BOM
+with open("file.csv", "r", encoding="utf-8-sig") as f:  # utf-8-sig 自动处理 BOM
+    reader = csv.reader(f)
+
+// 陷阱 3: 空行
+# 某些 CSV 文件中间有空行
+# csv.reader 会产出空列表 []
+# 需要跳过:
+for row in reader:
+    if not row:                 # 跳过空行
+        continue
+    process(row)
+
+// 陷阱 4: 编码问题
+# 遇到未知编码,用 chardet 检测
+# import chardet
+# with open("file.csv", "rb") as f:
+#     encoding = chardet.detect(f.read())["encoding"]
+```
+
+
+> **Note:** 💡 CSV 要点: (1) csv.reader/csv.writer 读写列表,DictReader/DictWriter 读写字典; (2) 打开文件时 newline="" 避免多余空行; (3) delimiter="\t" 支持 TSV,自定义 dialect; (4) 默认所有值都是字符串,数字需手动转换; (5) utf-8-sig 处理 Windows BOM 头。
+
+
+## 练习
+
+
+<!-- Converted from: 63_Python CSV文件处理.html -->

@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>前端测试策略</title>
+    <style>
+        :root { --primary: #1a73e8; --primary-light: #e8f0fe; --secondary: #34a853; --warning: #ea4335; --purple: #9c27b0; --bg: #f8f9fa; --card-bg: #ffffff; --text: #202124; --border: #dadce0; --code-bg: #f1f3f4; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { font-size: 2em; color: var(--primary); border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 1.5em; color: var(--primary); margin: 32px 0 16px; padding-left: 12px; border-left: 4px solid var(--primary); }
+        h3 { font-size: 1.2em; margin: 20px 0 10px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .highlight { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .warning { background: #fce8e6; border-left: 4px solid var(--warning); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .success { background: #e6f4ea; border-left: 4px solid var(--secondary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; font-family: 'Fira Code','Consolas',monospace; font-size: 0.9em; line-height: 1.6; margin: 12px 0; }
+        code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre code { background: none; padding: 0; }
+        ul, ol { padding-left: 24px; margin: 8px 0; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid var(--border); padding: 12px; text-align: left; }
+        th { background: var(--primary-light); font-weight: 600; }
+        .flow-diagram { background: var(--card-bg); border: 2px solid var(--primary); border-radius: 12px; padding: 20px; text-align: center; font-family: monospace; margin: 16px 0; white-space: pre; line-height: 1.6; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>前端测试策略</h1>
+
+    <div class="highlight">
+        <strong>核心概念：</strong>前端测试金字塔分为三层：单元测试（Unit Test，测试独立的函数和组件）、集成测试（Integration Test，测试模块之间的交互）、端到端测试（E2E Test，测试完整的用户流程）。此外还有视觉回归测试和Storybook组件测试。Vitest是当前推荐的单元测试框架，Playwright是E2E测试首选。
+    </div>
+
+    <!-- ==================== 一、测试金字塔 ==================== -->
+    <h2>一、测试金字塔</h2>
+
+    <div class="card">
+        <h3>1.1 测试层级</h3>
+        <div class="flow-diagram">
+            /\          E2E测试（少量）
+           /  \         浏览器中完整用户流程
+          /    \        Playwright / Cypress
+         /______\
+        /        \      集成测试（适量）
+       /          \     组件 + API 交互
+      /            \    Testing Library + MSW
+     /______________\
+    /                \   单元测试（大量）
+   /                  \  纯函数、工具类、组件
+  /                    \ Vitest / Jest
+ /______________________\
+
+原则：单元测试多（快、稳定），E2E测试少（慢、易碎）</div>
+    </div>
+
+    <div class="card">
+        <h3>1.2 各层测试对比</h3>
+        <table>
+            <tr><th>类型</th><th>测试对象</th><th>速度</th><th>稳定性</th><th>工具</th></tr>
+            <tr><td><strong>单元测试</strong></td><td>函数、类、Hook</td><td>快（ms级）</td><td>高</td><td>Vitest, Jest</td></tr>
+            <tr><td><strong>组件测试</strong></td><td>React/Vue组件</td><td>中等</td><td>中高</td><td>Testing Library</td></tr>
+            <tr><td><strong>集成测试</strong></td><td>多组件协作</td><td>中等</td><td>中等</td><td>Testing Library + MSW</td></tr>
+            <tr><td><strong>E2E测试</strong></td><td>完整用户流程</td><td>慢（秒级）</td><td>低（易碎）</td><td>Playwright, Cypress</td></tr>
+            <tr><td><strong>视觉回归</strong></td><td>UI外观</td><td>中等</td><td>中等</td><td>Chromatic, Percy</td></tr>
+        </table>
+    </div>
+
+    <!-- ==================== 二、Vitest ==================== -->
+    <h2>二、Vitest（单元测试框架）</h2>
+
+    <div class="card">
+        <h3>2.1 Vitest配置</h3>
+        <pre><code>// vitest.config.ts
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+    test: {
+        globals: true,             // 全局API（describe/it/expect）
+        environment: 'jsdom',      // 浏览器环境模拟
+        include: ['src/**/*.{test,spec}.{ts,tsx}'],
+        exclude: ['node_modules', 'dist'],
+        coverage: {
+            provider: 'v8',        // 或 'istanbul'
+            reporter: ['text', 'html', 'lcov'],
+            include: ['src/**/*.{ts,tsx}'],
+            exclude: ['src/**/*.d.ts', 'src/**/*.test.*'],
+            thresholds: {
+                branches: 80,
+                functions: 80,
+                lines: 80,
+                statements: 80
+            }
+        },
+        setupFiles: ['./src/test/setup.ts'],  // 测试前置文件
+        css: true,                 // 支持CSS模块
+        alias: {
+            '@': '/src'
+        }
+    }
+});</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>2.2 基本测试语法</h3>
+        <pre><code>// src/utils/math.test.ts
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { add, divide, fetchData } from './math';
+
+describe('math utils', () => {
+    describe('add', () => {
+        it('should add two positive numbers', () => {
+            expect(add(1, 2)).toBe(3);
+        });
+
+        it('should handle negative numbers', () => {
+            expect(add(-1, -2)).toBe(-3);
+        });
+
+        it('should handle zero', () => {
+            expect(add(0, 5)).toBe(5);
+        });
+    });
+
+    describe('divide', () => {
+        it('should divide two numbers', () => {
+            expect(divide(6, 2)).toBe(3);
+        });
+
+        it('should throw on division by zero', () => {
+            expect(() => divide(1, 0)).toThrow('Division by zero');
+        });
+    });
+
+    describe('fetchData', () => {
+        it('should fetch data successfully', async () => {
+            // Mock fetch
+            const mockData = { id: 1, name: 'test' };
+            global.fetch = vi.fn().mockResolvedValue({
+                ok: true,
+                json: () => Promise.resolve(mockData)
+            });
+
+            const result = await fetchData('/api/data');
+            expect(result).toEqual(mockData);
+            expect(global.fetch).toHaveBeenCalledWith('/api/data');
+        });
+    });
+});</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>2.3 Mock（模拟）</h3>
+        <pre><code>import { vi, describe, it, expect, beforeEach } from 'vitest';
+
+// 1. Mock函数
+const mockFn = vi.fn();
+mockFn.mockReturnValue(42);
+mockFn.mockResolvedValue(42);  // async
+mockFn.mockRejectedValue(new Error('fail'));  // async error
+
+expect(mockFn).toHaveBeenCalled();
+expect(mockFn).toHaveBeenCalledWith('arg1', 'arg2');
+expect(mockFn).toHaveBeenCalledTimes(2);
+
+// 2. Mock模块
+vi.mock('./api', () => ({
+    getUser: vi.fn().mockResolvedValue({ id: 1, name: 'test' }),
+    updateUser: vi.fn().mockResolvedValue(true)
+}));
+
+// 3. Mock部分模块
+vi.mock('./api', async () => {
+    const actual = await vi.importActual('./api');
+    return {
+        ...actual,
+        getUser: vi.fn().mockResolvedValue({ id: 1, name: 'test' })
+    };
+});
+
+// 4. Mock定时器
+vi.useFakeTimers();
+vi.advanceTimersByTime(1000);
+vi.runAllTimers();
+vi.useRealTimers();
+
+// 5. Mock DOM API
+Object.defineProperty(window, 'location', {
+    value: { href: 'http://localhost:3000' },
+    writable: true
+});
+
+// 6. beforeEach / afterEach
+beforeEach(() => {
+    vi.clearAllMocks();  // 清除所有mock的调用记录
+});
+
+// 7. Spy（监视）
+const spy = vi.spyOn(console, 'log');
+expect(spy).toHaveBeenCalledWith('hello');
+spy.mockRestore();  // 恢复原实现</code></pre>
+    </div>
+
+    <!-- ==================== 三、Testing Library ==================== -->
+    <h2>三、Testing Library（组件测试）</h2>
+
+    <div class="card">
+        <h3>3.1 React Testing Library</h3>
+        <pre><code>// src/components/Counter.test.tsx
+import { describe, it, expect } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import Counter from './Counter';
+
+describe('Counter', () => {
+    it('should render with initial count', () => {
+        render(&lt;Counter initialCount={0} /&gt;);
+        expect(screen.getByText('Count: 0')).toBeInTheDocument();
+    });
+
+    it('should increment count on click', async () => {
+        const user = userEvent.setup();
+        render(&lt;Counter initialCount={0} /&gt;);
+
+        const button = screen.getByRole('button', { name: /increment/i });
+        await user.click(button);
+
+        expect(screen.getByText('Count: 1')).toBeInTheDocument();
+    });
+
+    it('should call onChange when count changes', async () => {
+        const user = userEvent.setup();
+        const onChange = vi.fn();
+        render(&lt;Counter initialCount={0} onChange={onChange} /&gt;);
+
+        await user.click(screen.getByRole('button', { name: /increment/i }));
+
+        expect(onChange).toHaveBeenCalledWith(1);
+    });
+
+    it('should be accessible', () => {
+        render(&lt;Counter initialCount={0} /&gt;);
+
+        // 检查ARIA标签
+        expect(screen.getByRole('button')).toHaveAccessibleName('Increment');
+        // 检查状态
+        expect(screen.getByRole('status')).toHaveTextContent('Count: 0');
+    });
+});</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>3.2 Testing Library查询优先级</h3>
+        <table>
+            <tr><th>优先级</th><th>查询方法</th><th>用途</th></tr>
+            <tr><td>1（推荐）</td><td><code>getByRole</code></td><td>通过ARIA角色查询（最接近用户感知）</td></tr>
+            <tr><td>2</td><td><code>getByLabelText</code></td><td>通过label文本查询表单元素</td></tr>
+            <tr><td>3</td><td><code>getByPlaceholderText</code></td><td>通过placeholder查询</td></tr>
+            <tr><td>4</td><td><code>getByText</code></td><td>通过文本内容查询</td></tr>
+            <tr><td>5</td><td><code>getByDisplayValue</code></td><td>通过当前值查询</td></tr>
+            <tr><td>6（不推荐）</td><td><code>getByTestId</code></td><td>通过data-testid查询（最后手段）</td></tr>
+        </table>
+        <div class="success">
+            <strong>Testing Library哲学：</strong>测试应该模拟用户如何与应用交互，而不是测试实现细节。避免：查询内部DOM结构、测试组件状态、模拟内部方法。
+        </div>
+    </div>
+
+    <!-- ==================== 四、Playwright E2E ==================== -->
+    <h2>四、Playwright（E2E测试）</h2>
+
+    <div class="card">
+        <h3>4.1 Playwright配置</h3>
+        <pre><code>// playwright.config.ts
+import { defineConfig, devices } from '@playwright/test';
+
+export default defineConfig({
+    testDir: './e2e',
+    fullyParallel: true,
+    forbidOnly: !!process.env.CI,
+    retries: process.env.CI ? 2 : 0,
+    workers: process.env.CI ? 1 : undefined,
+    reporter: [['html', { open: 'never' }], ['list']],
+
+    use: {
+        baseURL: 'http://localhost:3000',
+        trace: 'on-first-retry',   // 录制trace
+        screenshot: 'only-on-failure',
+        video: 'retain-on-failure'
+    },
+
+    projects: [
+        { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+        { name: 'firefox', use: { ...devices['Desktop Firefox'] } },
+        { name: 'webkit', use: { ...devices['Desktop Safari'] } },
+        { name: 'mobile-chrome', use: { ...devices['Pixel 5'] } }
+    ],
+
+    webServer: {
+        command: 'pnpm dev',
+        port: 3000,
+        reuseExistingServer: !process.env.CI
+    }
+});</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>4.2 Playwright测试示例</h3>
+        <pre><code>// e2e/login.spec.ts
+import { test, expect } from '@playwright/test';
+
+test.describe('Login Flow', () => {
+    test.beforeEach(async ({ page }) => {
+        await page.goto('/login');
+    });
+
+    test('should login with valid credentials', async ({ page }) => {
+        await page.getByLabel('Email').fill('user@example.com');
+        await page.getByLabel('Password').fill('password123');
+        await page.getByRole('button', { name: 'Sign In' }).click();
+
+        // 断言跳转到dashboard
+        await expect(page).toHaveURL('/dashboard');
+        await expect(page.getByText('Welcome')).toBeVisible();
+    });
+
+    test('should show error for invalid credentials', async ({ page }) => {
+        await page.getByLabel('Email').fill('wrong@example.com');
+        await page.getByLabel('Password').fill('wrong');
+        await page.getByRole('button', { name: 'Sign In' }).click();
+
+        await expect(page.getByRole('alert')).toHaveText('Invalid credentials');
+    });
+
+    test('should navigate between pages', async ({ page }) => {
+        // 登录
+        await page.getByLabel('Email').fill('user@example.com');
+        await page.getByLabel('Password').fill('password123');
+        await page.getByRole('button', { name: 'Sign In' }).click();
+
+        // 导航到设置页面
+        await page.getByRole('link', { name: 'Settings' }).click();
+        await expect(page).toHaveURL('/settings');
+
+        // 返回dashboard
+        await page.getByRole('link', { name: 'Dashboard' }).click();
+        await expect(page).toHaveURL('/dashboard');
+    });
+
+    test('should be responsive on mobile', async ({ page, isMobile }) => {
+        if (!isMobile) test.skip();
+
+        await expect(page.getByRole('navigation')).toBeHidden();
+        await page.getByRole('button', { name: 'Menu' }).click();
+        await expect(page.getByRole('navigation')).toBeVisible();
+    });
+});</code></pre>
+    </div>
+
+    <!-- ==================== 五、视觉回归测试 ==================== -->
+    <h2>五、视觉回归测试</h2>
+
+    <div class="card">
+        <h3>5.1 Playwright截图对比</h3>
+        <pre><code>// e2e/visual.spec.ts
+import { test, expect } from '@playwright/test';
+
+test('homepage visual regression', async ({ page }) => {
+    await page.goto('/');
+    await expect(page).toHaveScreenshot('homepage.png', {
+        maxDiffPixels: 100  // 允许的像素差异
+    });
+});
+
+test('button states visual regression', async ({ page }) => {
+    await page.goto('/');
+    const button = page.getByRole('button', { name: 'Submit' });
+
+    // 默认状态
+    await expect(button).toHaveScreenshot('button-default.png');
+
+    // Hover状态
+    await button.hover();
+    await expect(button).toHaveScreenshot('button-hover.png');
+});</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>5.2 Storybook + Chromatic</h3>
+        <pre><code>// Button.stories.tsx
+import type { Meta, StoryObj } from '@storybook/react';
+import { Button } from './Button';
+
+const meta: Meta&lt;typeof Button&gt; = {
+    title: 'Components/Button',
+    component: Button,
+    argTypes: {
+        variant: {
+            control: 'select',
+            options: ['primary', 'secondary', 'outline']
+        }
+    }
+};
+
+export default meta;
+type Story = StoryObj&lt;typeof Button&gt;;
+
+export const Primary: Story = {
+    args: { variant: 'primary', children: 'Button' }
+};
+
+export const Secondary: Story = {
+    args: { variant: 'secondary', children: 'Button' }
+};
+
+// Chromatic会自动为每个Story生成截图并进行视觉对比</code></pre>
+    </div>
+
+    <!-- ==================== 六、测试最佳实践 ==================== -->
+    <h2>六、测试最佳实践</h2>
+
+    <div class="card">
+        <h3>6.1 测试原则（FIRST）</h3>
+        <ul>
+            <li><strong>Fast（快速）：</strong>测试应该快速执行，否则开发人员不会频繁运行</li>
+            <li><strong>Isolated（隔离）：</strong>每个测试独立运行，不依赖其他测试的状态</li>
+            <li><strong>Repeatable（可重复）：</strong>每次运行结果一致，不依赖外部环境</li>
+            <li><strong>Self-Validating（自验证）：</strong>测试自动判断通过/失败，不需要人工检查</li>
+            <li><strong>Timely（及时）：</strong>测试应该与代码同时编写（TDD）或紧随其后</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>6.2 测试覆盖率</h3>
+        <pre><code>// vitest.config.ts 覆盖率配置
+export default defineConfig({
+    test: {
+        coverage: {
+            provider: 'v8',
+            reporter: ['text', 'html', 'json-summary'],
+            thresholds: {
+                branches: 80,
+                functions: 80,
+                lines: 80,
+                statements: 80
+            }
+        }
+    }
+});
+
+// package.json
+{
+    "scripts": {
+        "test": "vitest",
+        "test:run": "vitest run",
+        "test:coverage": "vitest run --coverage",
+        "test:ui": "vitest --ui"  // 可视化UI
+    }
+}</code></pre>
+        <div class="warning">
+            <strong>覆盖率不是万能的：</strong>100%覆盖率不等于代码没有bug。应该关注关键业务逻辑的覆盖率，而不是追求100%。测试质量比覆盖率数字更重要。
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>6.3 测试文件组织</h3>
+        <pre><code>src/
+├── components/
+│   ├── Button/
+│   │   ├── Button.tsx
+│   │   ├── Button.test.tsx        // 测试文件放在同目录
+│   │   ├── Button.module.css
+│   │   └── index.ts
+│   └── Modal/
+│       ├── Modal.tsx
+│       └── Modal.test.tsx
+├── utils/
+│   ├── format.ts
+│   └── format.test.ts
+├── hooks/
+│   ├── useAuth.ts
+│   └── useAuth.test.ts
+├── test/
+│   ├── setup.ts                   // 测试环境设置
+│   ├── utils.tsx                  // 测试工具函数
+│   └── mocks/                     // Mock数据
+│       ├── handlers.ts
+│       └── server.ts
+└── __tests__/                     // 或集中放测试文件
+    └── integration/</code></pre>
+    </div>
+
+    <div class="highlight">
+        <strong>总结：</strong>前端测试策略遵循测试金字塔：大量单元测试（Vitest）提供快速反馈，适量集成测试（Testing Library）验证模块协作，少量E2E测试（Playwright）确保用户流程正确。视觉回归测试（截图对比/Chromatic）补充UI层面的质量保障。测试应该关注用户行为而非实现细节。
+    </div>
+</div>
+<!-- 本文档总结了前端测试策略、Vitest、Testing Library、Playwright的使用 -->
+</body>
+</html>

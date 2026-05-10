@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Webpack核心原理</title>
+    <style>
+        :root { --primary: #1a73e8; --primary-light: #e8f0fe; --secondary: #34a853; --warning: #ea4335; --purple: #9c27b0; --bg: #f8f9fa; --card-bg: #ffffff; --text: #202124; --border: #dadce0; --code-bg: #f1f3f4; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { font-size: 2em; color: var(--primary); border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 1.5em; color: var(--primary); margin: 32px 0 16px; padding-left: 12px; border-left: 4px solid var(--primary); }
+        h3 { font-size: 1.2em; margin: 20px 0 10px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .highlight { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .warning { background: #fce8e6; border-left: 4px solid var(--warning); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .success { background: #e6f4ea; border-left: 4px solid var(--secondary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .purple { background: #f3e5f5; border-left: 4px solid var(--purple); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; font-family: 'Fira Code','Consolas',monospace; font-size: 0.9em; line-height: 1.6; margin: 12px 0; }
+        code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre code { background: none; padding: 0; }
+        ul, ol { padding-left: 24px; margin: 8px 0; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid var(--border); padding: 12px; text-align: left; }
+        th { background: var(--primary-light); font-weight: 600; }
+        .flow-diagram { background: var(--card-bg); border: 2px solid var(--primary); border-radius: 12px; padding: 20px; text-align: center; font-family: monospace; margin: 16px 0; white-space: pre; line-height: 1.6; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Webpack核心原理</h1>
+
+    <div class="highlight">
+        <strong>核心概念：</strong>Webpack是一个现代JavaScript应用程序的静态模块打包器。它从entry开始，递归构建依赖图（Dependency Graph），将所有模块打包为少量的bundle文件。核心概念包括Entry、Output、Loaders（转换非JS文件）、Plugins（扩展功能）、Module（一切皆模块）。
+    </div>
+
+    <!-- ==================== 一、核心概念 ==================== -->
+    <h2>一、核心概念（5大核心）</h2>
+
+    <div class="card">
+        <h3>1.1 Entry（入口）</h3>
+        <p>Entry指示Webpack从哪个模块开始构建依赖图：</p>
+        <pre><code>// 单入口
+module.exports = {
+    entry: './src/index.js'
+};
+
+// 多入口（多页面应用）
+module.exports = {
+    entry: {
+        main: './src/index.js',
+        admin: './src/admin.js',
+        vendor: ['react', 'react-dom']
+    }
+};
+
+// 动态入口
+module.exports = {
+    entry: () => new Promise((resolve) => {
+        resolve({
+            main: './src/index.js',
+            admin: './src/admin.js'
+        });
+    })
+};</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>1.2 Output（输出）</h3>
+        <pre><code>const path = require('path');
+
+module.exports = {
+    output: {
+        path: path.resolve(__dirname, 'dist'),  // 输出目录
+        filename: '[name].[contenthash:8].js',   // 文件名（带hash）
+        chunkFilename: '[name].[contenthash:8].chunk.js',  // 非入口chunk
+        publicPath: '/',  // 资源公共路径
+        clean: true,  // 构建前清理dist目录（Webpack 5）
+        // 库输出
+        // library: 'MyLib',
+        // libraryTarget: 'umd',
+        // globalObject: 'this'
+    }
+};</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>1.3 Module（模块）</h3>
+        <p>Webpack将一切视为模块：JS、CSS、图片、字体等。每个模块都有唯一的ID和依赖关系。</p>
+        <ul>
+            <li>ES Module（<code>import/export</code>）</li>
+            <li>CommonJS（<code>require/module.exports</code>）</li>
+            <li>AMD（<code>define/require</code>）</li>
+            <li>CSS/SASS/LESS 的 <code>@import</code></li>
+            <li>图片的 <code>url()</code></li>
+            <li>HTML 的 <code>&lt;img src&gt;</code></li>
+        </ul>
+    </div>
+
+    <!-- ==================== 二、Loaders ==================== -->
+    <h2>二、Loaders（加载器）</h2>
+
+    <div class="card">
+        <h3>2.1 Loader的作用</h3>
+        <p>Webpack本身只理解JavaScript和JSON文件。Loaders让Webpack能够处理其他类型的文件，将它们转换为模块。Loader在 <code>module.rules</code> 中配置：</p>
+        <pre><code>module.exports = {
+    module: {
+        rules: [
+            // JavaScript/TypeScript
+            {
+                test: /\.tsx?$/,
+                use: 'ts-loader',
+                exclude: /node_modules/
+            },
+            // CSS
+            {
+                test: /\.css$/,
+                use: [
+                    'style-loader',      // 将CSS注入DOM
+                    'css-loader',        // 解析CSS中的@import和url()
+                    'postcss-loader'     // PostCSS处理（自动前缀等）
+                ]
+            },
+            // Sass
+            {
+                test: /\.scss$/,
+                use: [
+                    'style-loader',
+                    'css-loader',
+                    'sass-loader'
+                ]
+            },
+            // 图片（Webpack 5 Asset Modules）
+            {
+                test: /\.(png|jpg|gif|webp)$/,
+                type: 'asset',  // 自动选择inline或文件
+                parser: {
+                    dataUrlCondition: {
+                        maxSize: 8 * 1024  // 8KB以下转为base64
+                    }
+                },
+                generator: {
+                    filename: 'images/[name].[hash:8][ext]'
+                }
+            },
+            // 字体
+            {
+                test: /\.(woff2?|eot|ttf|otf)$/,
+                type: 'asset/resource',  // 始终输出为文件
+                generator: {
+                    filename: 'fonts/[name].[hash:8][ext]'
+                }
+            }
+        ]
+    }
+};</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>2.2 Loader执行顺序</h3>
+        <p>Loader从右到左（从下到上）执行，从最终文件到入口文件：</p>
+        <pre><code>// scss文件的处理链：
+// scss → sass-loader → css-loader → style-loader → JS模块
+// 执行顺序：sass-loader → css-loader → style-loader
+
+// 等价于：
+// style-loader(css-loader(sass-loader(scss文件)))
+
+// enforce调整执行顺序
+{
+    test: /\.css$/,
+    use: ['style-loader', 'css-loader'],
+    enforce: 'pre'   // 最先执行
+    enforce: 'post'  // 最后执行
+}</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>2.3 自定义Loader</h3>
+        <pre><code>// loaders/reverse-loader.js
+module.exports = function(source) {
+    // source是文件内容
+    // this是Loader上下文
+    const options = this.getOptions();
+    const result = source.split('').reverse().join('');
+
+    // 返回处理后的结果
+    return `module.exports = ${JSON.stringify(result)}`;
+
+    // 或者异步返回
+    // const callback = this.async();
+    // callback(null, result);
+
+    // 如果需要返回多个结果（如source map）
+    // this.callback(null, result, sourceMap, meta);
+};
+
+// 使用自定义Loader
+module: {
+    rules: [{
+        test: /\.txt$/,
+        use: {
+            loader: path.resolve(__dirname, 'loaders/reverse-loader.js'),
+            options: { separator: ',' }
+        }
+    }]
+}</code></pre>
+    </div>
+
+    <!-- ==================== 三、Plugins ==================== -->
+    <h2>三、Plugins（插件）</h2>
+
+    <div class="card">
+        <h3>3.1 Plugin原理</h3>
+        <p>Plugin是Webpack的支柱，扩展Webpack的功能。Plugin通过监听Webpack的生命周期钩子（Tapable）来执行自定义操作：</p>
+        <div class="flow-diagram">
+Webpack构建流程（生命周期钩子）：
+initialize → beforeRun → run → compile → make → buildModule
+→ seal → optimize → afterCompile → emit → afterEmit → done
+
+Plugin通过 compiler.hooks.xxx.tap() 监听这些钩子</div>
+    </div>
+
+    <div class="card">
+        <h3>3.2 常用Plugin</h3>
+        <pre><code>const HtmlWebpackPlugin = require('html-webpack-plugin');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const { CleanWebpackPlugin } = require('clean-webpack-plugin');
+const TerserPlugin = require('terser-webpack-plugin');
+const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
+const BundleAnalyzerPlugin = require('webpack-bundle-analyzer').BundleAnalyzerPlugin;
+
+module.exports = {
+    plugins: [
+        // 生成HTML文件，自动引入打包后的JS/CSS
+        new HtmlWebpackPlugin({
+            template: './src/index.html',
+            filename: 'index.html',
+            chunks: ['main'],  // 只引入main chunk
+            minify: {
+                collapseWhitespace: true,
+                removeComments: true
+            }
+        }),
+
+        // CSS提取为独立文件（代替style-loader）
+        new MiniCssExtractPlugin({
+            filename: 'css/[name].[contenthash:8].css'
+        }),
+
+        // 清理dist目录（Webpack 5可用output.clean代替）
+        new CleanWebpackPlugin(),
+
+        // 打包分析
+        new BundleAnalyzerPlugin({
+            analyzerMode: 'static',  // 生成静态HTML报告
+            openAnalyzer: false
+        })
+    ],
+
+    optimization: {
+        minimizer: [
+            // JS压缩
+            new TerserPlugin({
+                parallel: true,  // 多线程压缩
+                terserOptions: {
+                    compress: {
+                        drop_console: true,  // 移除console
+                        drop_debugger: true
+                    }
+                }
+            }),
+            // CSS压缩
+            new CssMinimizerPlugin()
+        ]
+    }
+};</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>3.3 自定义Plugin</h3>
+        <pre><code>// plugins/my-plugin.js
+class MyPlugin {
+    constructor(options = {}) {
+        this.options = options;
+    }
+
+    apply(compiler) {
+        // 监听emit钩子（输出资源到目录前）
+        compiler.hooks.emit.tapAsync('MyPlugin', (compilation, callback) => {
+            // 遍历所有输出的资源
+            for (const [filename, asset] of Object.entries(compilation.assets)) {
+                console.log(`资源: ${filename}, 大小: ${asset.size()} bytes`);
+            }
+
+            // 可以修改资源内容
+            const source = compilation.assets['main.js'].source();
+            compilation.assets['main.js'] = {
+                source: () => '/* Banner */\n' + source,
+                size: () => source.length + 12
+            };
+
+            callback();
+        });
+
+        // 监听done钩子（构建完成）
+        compiler.hooks.done.tap('MyPlugin', (stats) => {
+            console.log('构建完成！耗时:', stats.endTime - stats.startTime, 'ms');
+        });
+    }
+}
+
+module.exports = MyPlugin;</code></pre>
+    </div>
+
+    <!-- ==================== 四、Tree Shaking ==================== -->
+    <h2>四、Tree Shaking（摇树优化）</h2>
+
+    <div class="card">
+        <h3>4.1 原理</h3>
+        <p>Tree Shaking通过静态分析ES Module的 <code>import/export</code> 语句，识别并移除未使用的代码（Dead Code Elimination）。</p>
+        <div class="flow-diagram">
+源码（ES Module）：
+import { add } from './math';  // 只引入了add
+console.log(add(1, 2));
+
+math.js:
+export function add(a, b) { return a + b; }
+export function subtract(a, b) { return a - b; }  // 未使用
+
+Tree Shaking后：
+只保留 add 函数，移除 subtract 函数</div>
+    </div>
+
+    <div class="card">
+        <h3>4.2 配置Tree Shaking</h3>
+        <pre><code>// webpack.config.js
+module.exports = {
+    mode: 'production',  // 自动启用tree shaking
+    optimization: {
+        usedExports: true,  // 标记未使用的导出
+        minimize: true,     // 启用压缩（移除dead code）
+        sideEffects: true,  // 识别package.json的sideEffects字段
+    }
+};
+
+// package.json
+{
+    "sideEffects": [
+        "*.css",     // CSS文件有副作用（不能被shaking）
+        "*.scss",
+        "./src/polyfills.js"  // polyfill有副作用
+    ]
+    // 或 "sideEffects": false（所有模块无副作用）
+}
+
+// 源码中确保使用ES Module语法
+// ✅ Tree Shaking 友好
+import { Button } from 'antd';
+export { add } from './math';
+
+// ❌ Tree Shaking 不友好
+const math = require('./math');  // CommonJS不支持tree shaking
+import _ from 'lodash';  // 整个lodash引入（没有具名导入）</code></pre>
+    </div>
+
+    <div class="success">
+        <strong>Tree Shaking条件：</strong>
+        <ul>
+            <li>使用ES Module语法（<code>import/export</code>）</li>
+            <li>production模式或手动配置 <code>usedExports: true</code></li>
+            <li>启用代码压缩（<code>minimize: true</code>）</li>
+            <li>第三方库需要使用ES Module版本（如 <code>lodash-es</code> 而非 <code>lodash</code>）</li>
+            <li>正确设置 <code>sideEffects</code> 字段</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 五、Code Splitting ==================== -->
+    <h2>五、Code Splitting（代码分割）</h2>
+
+    <div class="card">
+        <h3>5.1 分割方式</h3>
+        <pre><code>// 方式1：入口分割（entry）
+module.exports = {
+    entry: {
+        main: './src/index.js',
+        vendor: './src/vendor.js'
+    }
+};
+
+// 方式2：防止重复（splitChunks）
+optimization: {
+    splitChunks: {
+        chunks: 'all',  // 分割同步和异步模块
+        cacheGroups: {
+            // 提取node_modules中的第三方库
+            vendors: {
+                test: /[\\/]node_modules[\\/]/,
+                name: 'vendors',
+                chunks: 'all',
+                priority: 10
+            },
+            // 提取公共模块
+            common: {
+                minChunks: 2,  // 被至少2个chunk引用
+                name: 'common',
+                chunks: 'all',
+                priority: 5
+            }
+        }
+    }
+};
+
+// 方式3：动态导入（Dynamic Import）- 推荐
+// 按需加载，Webpack自动分割
+button.addEventListener('click', async () => {
+    const { formatDate } = await import('./utils/date');
+    console.log(formatDate(new Date()));
+});
+
+// 路由级别代码分割（React）
+const Home = lazy(() => import('./pages/Home'));
+const About = lazy(() => import('./pages/About'));
+
+// 路由级别代码分割（Vue）
+const Home = () => import('./pages/Home.vue');
+const About = () => import('./pages/About.vue');</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>5.2 splitChunks详解</h3>
+        <pre><code>optimization: {
+    splitChunks: {
+        chunks: 'all',          // all | async(默认) | initial
+        minSize: 20000,         // 最小分割大小（20KB）
+        maxSize: 0,             // 最大分割大小（0不限制）
+        minChunks: 1,           // 最少被引用次数
+        maxAsyncRequests: 30,   // 最大并行请求数
+        maxInitialRequests: 30, // 入口最大请求数
+        automaticNameDelimiter: '~',
+        cacheGroups: {
+            vendors: {
+                test: /[\\/]node_modules[\\/]/,
+                priority: -10,
+                reuseExistingChunk: true  // 复用已有的chunk
+            },
+            default: {
+                minChunks: 2,
+                priority: -20,
+                reuseExistingChunk: true
+            }
+        }
+    }
+};</code></pre>
+    </div>
+
+    <!-- ==================== 六、HMR ==================== -->
+    <h2>六、HMR（模块热替换）</h2>
+
+    <div class="card">
+        <h3>6.1 HMR原理</h3>
+        <div class="flow-diagram">
+文件修改 → Webpack重新编译 → 通过WebSocket通知浏览器
+→ 浏览器只请求变化的模块（而非整个页面刷新）
+→ 替换运行时的模块代码
+→ 触发 module.hot.accept 回调
+→ 页面更新，状态保持
+
+优势：
+- 保持应用状态（不丢失表单数据等）
+- 保留当前DOM位置（CSS更新无需刷新）
+- 开发体验好（快速反馈）</div>
+        <pre><code>// webpack.config.js
+const webpack = require('webpack');
+
+module.exports = {
+    devServer: {
+        hot: true,  // 启用HMR
+        open: true,
+        port: 3000,
+        proxy: {
+            '/api': 'http://localhost:8080'
+        }
+    },
+    plugins: [
+        new webpack.HotModuleReplacementPlugin()
+    ]
+};
+
+// 手动处理HMR（大多数框架loader自动处理）
+if (module.hot) {
+    module.hot.accept('./utils/date', () => {
+        // date模块更新后的处理逻辑
+        console.log('date模块已更新');
+    });
+}</code></pre>
+    </div>
+
+    <!-- ==================== 七、Module Federation ==================== -->
+    <h2>七、Module Federation（模块联邦）</h2>
+
+    <div class="card">
+        <h3>7.1 概念</h3>
+        <p>Module Federation是Webpack 5引入的革命性特性，允许在运行时动态加载远程应用的模块，实现<strong>微前端</strong>架构：</p>
+        <pre><code>// host应用（宿主）webpack.config.js
+const { ModuleFederationPlugin } = require('webpack').container;
+
+module.exports = {
+    plugins: [
+        new ModuleFederationPlugin({
+            name: 'host',
+            remotes: {
+                // 引用远程应用
+                remoteApp: 'remoteApp@http://localhost:3001/remoteEntry.js'
+            },
+            shared: {
+                react: { singleton: true },
+                'react-dom': { singleton: true }
+            }
+        })
+    ]
+};
+
+// 在代码中使用远程模块
+const RemoteButton = React.lazy(() => import('remoteApp/Button'));
+
+// remote应用（远程） webpack.config.js
+module.exports = {
+    plugins: [
+        new ModuleFederationPlugin({
+            name: 'remoteApp',
+            filename: 'remoteEntry.js',
+            exposes: {
+                // 暴露模块
+                './Button': './src/components/Button',
+                './utils': './src/utils'
+            },
+            shared: {
+                react: { singleton: true },
+                'react-dom': { singleton: true }
+            }
+        })
+    ]
+};</code></pre>
+    </div>
+
+    <!-- ==================== 八、完整配置 ==================== -->
+    <h2>八、生产级配置示例</h2>
+
+    <div class="card">
+        <h3>8.1 完整webpack.config.js</h3>
+        <pre><code>const path = require('path');
+const HtmlWebpackPlugin = require('html-webpack-plugin');
+const MiniCssExtractPlugin = require('mini-css-extract-plugin');
+const TerserPlugin = require('terser-webpack-plugin');
+const CssMinimizerPlugin = require('css-minimizer-webpack-plugin');
+
+const isDev = process.env.NODE_ENV !== 'production';
+
+module.exports = {
+    mode: isDev ? 'development' : 'production',
+    devtool: isDev ? 'eval-cheap-module-source-map' : 'source-map',
+
+    entry: './src/index.js',
+
+    output: {
+        path: path.resolve(__dirname, 'dist'),
+        filename: isDev ? '[name].js' : '[name].[contenthash:8].js',
+        chunkFilename: isDev ? '[name].chunk.js' : '[name].[contenthash:8].chunk.js',
+        publicPath: '/',
+        clean: true
+    },
+
+    resolve: {
+        extensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
+        alias: {
+            '@': path.resolve(__dirname, 'src'),
+            '@components': path.resolve(__dirname, 'src/components'),
+            '@utils': path.resolve(__dirname, 'src/utils')
+        }
+    },
+
+    module: {
+        rules: [
+            {
+                test: /\.[jt]sx?$/,
+                exclude: /node_modules/,
+                use: {
+                    loader: 'babel-loader',
+                    options: {
+                        presets: [
+                            ['@babel/preset-env', {
+                                useBuiltIns: 'usage',
+                                corejs: 3
+                            }],
+                            '@babel/preset-react',
+                            '@babel/preset-typescript'
+                        ],
+                        plugins: [
+                            '@babel/plugin-transform-runtime',
+                            isDev && 'react-refresh/babel'
+                        ].filter(Boolean)
+                    }
+                }
+            },
+            {
+                test: /\.css$/,
+                use: [
+                    isDev ? 'style-loader' : MiniCssExtractPlugin.loader,
+                    'css-loader',
+                    'postcss-loader'
+                ]
+            },
+            {
+                test: /\.scss$/,
+                use: [
+                    isDev ? 'style-loader' : MiniCssExtractPlugin.loader,
+                    'css-loader',
+                    'postcss-loader',
+                    'sass-loader'
+                ]
+            },
+            {
+                test: /\.(png|jpe?g|gif|webp|svg)$/,
+                type: 'asset',
+                parser: { dataUrlCondition: { maxSize: 8192 } },
+                generator: { filename: 'images/[name].[hash:8][ext]' }
+            }
+        ]
+    },
+
+    plugins: [
+        new HtmlWebpackPlugin({
+            template: './public/index.html',
+            minify: !isDev && {
+                collapseWhitespace: true,
+                removeComments: true
+            }
+        }),
+        !isDev && new MiniCssExtractPlugin({
+            filename: 'css/[name].[contenthash:8].css'
+        })
+    ].filter(Boolean),
+
+    optimization: {
+        minimize: !isDev,
+        minimizer: [new TerserPlugin(), new CssMinimizerPlugin()],
+        splitChunks: {
+            chunks: 'all',
+            cacheGroups: {
+                vendors: {
+                    test: /[\\/]node_modules[\\/]/,
+                    name: 'vendors',
+                    priority: 10
+                }
+            }
+        },
+        runtimeChunk: 'single'  // 提取runtime
+    },
+
+    devServer: isDev ? {
+        hot: true,
+        open: true,
+        port: 3000,
+        historyApiFallback: true
+    } : undefined
+};</code></pre>
+    </div>
+
+    <div class="highlight">
+        <strong>总结：</strong>Webpack的核心是Entry→Loader→Plugin→Output的流水线。Loaders负责文件转换，Plugins通过生命周期钩子扩展功能。Tree Shaking移除未使用代码，Code Splitting按需加载，HMR提供热更新开发体验，Module Federation实现微前端。理解这些概念是掌握Webpack的关键。
+    </div>
+</div>
+<!-- 本文档总结了Webpack的核心原理、Loader、Plugin、Tree Shaking、Code Splitting等 -->
+</body>
+</html>

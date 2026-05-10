@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HTML解析与DOM树</title>
+    <style>
+        :root {
+            --primary: #1a73e8;
+            --primary-light: #e8f0fe;
+            --secondary: #34a853;
+            --warning: #ea4335;
+            --bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --text: #202124;
+            --text-secondary: #5f6368;
+            --border: #dadce0;
+            --code-bg: #f1f3f4;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.8;
+            padding: 20px;
+        }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 {
+            font-size: 2em;
+            color: var(--primary);
+            border-bottom: 3px solid var(--primary);
+            padding-bottom: 12px;
+            margin-bottom: 24px;
+        }
+        h2 {
+            font-size: 1.5em;
+            color: var(--primary);
+            margin: 32px 0 16px;
+            padding-left: 12px;
+            border-left: 4px solid var(--primary);
+        }
+        h3 {
+            font-size: 1.2em;
+            color: var(--text);
+            margin: 20px 0 10px;
+        }
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            margin: 16px 0;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+        }
+        .highlight { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .warning { background: #fce8e6; border-left: 4px solid var(--warning); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .success { background: #e6f4ea; border-left: 4px solid var(--secondary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        pre {
+            background: var(--code-bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            overflow-x: auto;
+            font-family: 'Fira Code', 'Consolas', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+            margin: 12px 0;
+        }
+        code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre code { background: none; padding: 0; }
+        ul, ol { padding-left: 24px; margin: 8px 0; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid var(--border); padding: 12px; text-align: left; }
+        th { background: var(--primary-light); font-weight: 600; }
+        .flow-diagram {
+            background: var(--card-bg);
+            border: 2px solid var(--primary);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            font-family: monospace;
+            margin: 16px 0;
+            white-space: pre;
+            line-height: 1.6;
+        }
+        .tag { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 0.8em; font-weight: 600; margin: 2px; }
+        .tag-blue { background: #e8f0fe; color: #1a73e8; }
+        .tag-green { background: #e6f4ea; color: #137333; }
+        .tag-red { background: #fce8e6; color: #c5221f; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>HTML解析与DOM树</h1>
+
+    <div class="highlight">
+        <strong>核心概念：</strong>浏览器将HTML文档解析为一棵DOM树（Document Object Model Tree），这是页面渲染的基础数据结构。解析过程包括词法分析（Tokenization）、语法分析（Tree Construction）和推测解析（Speculative Parsing）三个关键阶段。
+    </div>
+
+    <!-- ==================== 一、整体解析流程 ==================== -->
+    <h2>一、整体解析流程</h2>
+
+    <div class="flow-diagram">
+HTML字节流 → 字符流 → Tokenizer(词法分析) → Token序列 → Tree Construction(语法分析) → DOM树
+                          ↑                                      ↓
+                   网络层接收数据                          与CSSOM合并 → 渲染树</div>
+
+    <div class="card">
+        <h3>1.1 字节流到字符流</h3>
+        <p>浏览器从网络层接收HTML字节流后，根据 <code>&lt;meta charset&gt;</code> 或 HTTP响应头中的 <code>Content-Type</code> 确定编码方式，将字节流转换为字符流。</p>
+        <ul>
+            <li><strong>编码检测优先级：</strong>BOM > HTTP Content-Type > meta charset > 自动检测（chardet）</li>
+            <li><strong>UTF-8 BOM：</strong>如果字节流以 <code>EF BB BF</code> 开头，强制使用UTF-8</li>
+            <li>编码转换错误会导致乱码，这在中文网页中尤为常见</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>1.2 解析模型</h3>
+        <p>HTML解析采用的不是传统的上下文无关文法（Context-Free Grammar），而是由HTML规范定义的<strong>状态机解析模型</strong>。这是因为HTML具有容错性要求——浏览器必须能够解析格式不规范的HTML。</p>
+        <table>
+            <tr><th>特性</th><th>XML解析</th><th>HTML解析</th></tr>
+            <tr><td>文法类型</td><td>上下文无关文法</td><td>状态机 + 规范定义的规则</td></tr>
+            <tr><td>容错性</td><td>严格，遇错即停</td><td>高度容错，自动修复</td></tr>
+            <tr><td>解析算法</td><td>SAX / DOM</td><td>增量式解析（Incremental）</td></tr>
+            <tr><td>脚本处理</td><td>不涉及</td><td>可能阻塞解析</td></tr>
+        </table>
+    </div>
+
+    <!-- ==================== 二、词法分析（Tokenization） ==================== -->
+    <h2>二、词法分析（Tokenization）</h2>
+
+    <div class="card">
+        <h3>2.1 Token类型</h3>
+        <p>Tokenizer是一个有限状态机（Finite State Machine），逐字符扫描输入流，将字符序列转换为Token序列。HTML5规范定义了以下Token类型：</p>
+        <table>
+            <tr><th>Token类型</th><th>示例</th><th>说明</th></tr>
+            <tr><td>DOCTYPE</td><td><code>&lt;!DOCTYPE html&gt;</code></td><td>文档类型声明</td></tr>
+            <tr><td>Start Tag</td><td><code>&lt;div class="box"&gt;</code></td><td>开始标签，含属性</td></tr>
+            <tr><td>End Tag</td><td><code>&lt;/div&gt;</code></td><td>结束标签</td></tr>
+            <tr><td>Character</td><td>文本内容</td><td>连续字符数据</td></tr>
+            <tr><td>Comment</td><td><code>&lt;!-- 注释 --&gt;</code></td><td>HTML注释</td></tr>
+            <tr><td>End-of-File</td><td>-</td><td>输入结束标记</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>2.2 状态机核心状态</h3>
+        <p>Tokenizer包含约80个状态，以下是核心状态转换：</p>
+        <pre><code>// 简化的Tokenizer状态机伪代码
+enum State {
+    Data,               // 默认状态
+    TagOpen,            // 遇到 '&lt;'
+    TagName,            // 读取标签名
+    BeforeAttributeName,// 标签名后的空白
+    AttributeName,      // 读取属性名
+    BeforeAttributeValue,// 遇到 '='
+    AttributeValueDoubleQuoted, // 双引号属性值
+    AttributeValueSingleQuoted, // 单引号属性值
+    AttributeValueUnquoted,     // 无引号属性值
+    SelfClosingStartTag, // 遇到 '/'
+    EndTagOpen,         // '&lt;/' 后
+    ScriptData,         // &lt;script&gt; 内容
+    RAWTEXT,            // &lt;style&gt; / &lt;textarea&gt; 内容
+};
+
+// 核心循环
+function tokenize(input) {
+    let state = State.Data;
+    let currentToken = null;
+    let tokens = [];
+
+    for (let char of input) {
+        switch (state) {
+            case State.Data:
+                if (char === '&lt;') {
+                    state = State.TagOpen;
+                } else {
+                    emitCharacterToken(char);
+                }
+                break;
+            case State.TagOpen:
+                if (char === '/') {
+                    state = State.EndTagOpen;
+                } else if (isAsciiAlpha(char)) {
+                    currentToken = { type: 'StartTag', name: char, attributes: [] };
+                    state = State.TagName;
+                }
+                break;
+            case State.TagName:
+                if (isWhitespace(char)) {
+                    state = State.BeforeAttributeName;
+                } else if (char === '&gt;') {
+                    emitToken(currentToken);
+                    state = State.Data;
+                } else {
+                    currentToken.name += char;
+                }
+                break;
+            // ... 更多状态处理
+        }
+    }
+}</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>2.3 属性解析</h3>
+        <p>属性解析的关键规则：</p>
+        <ul>
+            <li><strong>属性值引号：</strong>双引号、单引号、无引号三种形式均合法</li>
+            <li><strong>属性去重：</strong>同名属性只保留第一个（除了 <code>class</code> 等特殊属性会合并）</li>
+            <li><strong>布尔属性：</strong>如 <code>disabled</code>、<code>checked</code>，存在即为true</li>
+            <li><strong>属性名大小写不敏感</strong>（HTML模式），属性值大小写敏感</li>
+        </ul>
+        <pre><code>&lt;!-- 以下三种写法都合法 --&gt;
+&lt;input type="text" value="hello"&gt;
+&lt;input type='text' value='hello'&gt;
+&lt;input type=text value=hello&gt;
+
+&lt;!-- 同名属性去重，只保留第一个 --&gt;
+&lt;div id="a" id="b"&gt;  →  id="a"
+
+&lt;!-- class属性会合并（特殊规则）--&gt;
+&lt;div class="a" class="b"&gt;  →  class="a b"</code></pre>
+    </div>
+
+    <!-- ==================== 三、语法分析（Tree Construction） ==================== -->
+    <h2>三、语法分析（Tree Construction）</h2>
+
+    <div class="card">
+        <h3>3.1 DOM树构建过程</h3>
+        <p>Tree Construction阶段接收Token序列，构建DOM树。这是一个<strong>增量式</strong>过程——每个Token到达时立即处理，不需要等待整个HTML解析完毕。</p>
+        <pre><code>// 简化的Tree Construction伪代码
+function treeConstruction(tokens) {
+    let openElements = [];  // 开放元素栈
+    let current = document;
+
+    for (let token of tokens) {
+        switch (token.type) {
+            case 'StartTag':
+                let element = createElement(token);
+                current.appendChild(element);
+                if (!token.selfClosing) {
+                    openElements.push(current);
+                    current = element;
+                }
+                break;
+            case 'EndTag':
+                // 从开放元素栈中找到匹配的开始标签
+                let matchIndex = findMatchingTag(openElements, token.name);
+                if (matchIndex !== -1) {
+                    // 关闭中间的未闭合标签（容错处理）
+                    while (openElements.length > matchIndex) {
+                        current = openElements.pop();
+                    }
+                    current = openElements.pop() || document;
+                }
+                break;
+            case 'Character':
+                current.appendChild(createTextNode(token.value));
+                break;
+        }
+    }
+}</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>3.2 插入模式（Insertion Modes）</h3>
+        <p>HTML解析器使用"插入模式"来决定如何处理Token。不同的上下文（如表格内部、模板元素内）有不同的插入模式：</p>
+        <table>
+            <tr><th>插入模式</th><th>触发条件</th><th>行为</th></tr>
+            <tr><td>initial</td><td>解析开始</td><td>处理DOCTYPE，跳过空白</td></tr>
+            <tr><td>before html</td><td>DOCTYPE之后</td><td>创建 <code>&lt;html&gt;</code> 元素</td></tr>
+            <tr><td>before head</td><td>html元素内</td><td>创建隐式 <code>&lt;head&gt;</code></td></tr>
+            <tr><td>in head</td><td>head元素内</td><td>处理meta/link/script/style等</td></tr>
+            <tr><td>after head</td><td>head关闭后</td><td>创建隐式 <code>&lt;body&gt;</code></td></tr>
+            <tr><td>in body</td><td>body元素内</td><td>处理大部分HTML内容</td></tr>
+            <tr><td>in table</td><td>table元素内</td><td>特殊处理tr/td等</td></tr>
+            <tr><td>in select</td><td>select元素内</td><td>限制允许的子元素</td></tr>
+            <tr><td>text</td><td>script/style内</td><td>原始字符数据</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>3.3 容错机制</h3>
+        <p>HTML规范定义了详细的容错规则，浏览器遇到格式错误时会自动修复。常见的容错场景：</p>
+        <pre><code>&lt;!-- 1. 缺少结束标签 --&gt;
+&lt;p&gt;段落1
+&lt;p&gt;段落2
+&lt;!-- 浏览器自动补全：&lt;p&gt;段落1&lt;/p&gt;&lt;p&gt;段落2&lt;/p&gt; --&gt;
+
+&lt;!-- 2. 错误的嵌套 --&gt;
+&lt;p&gt;&lt;div&gt;块级元素嵌套在行内元素内&lt;/div&gt;&lt;/p&gt;
+&lt;!-- 浏览器修正为：&lt;p&gt;&lt;/p&gt;&lt;div&gt;...&lt;/div&gt;&lt;p&gt;&lt;/p&gt; --&gt;
+
+&lt;!-- 3. 表格中的非表格元素 --&gt;
+&lt;table&gt;
+  &lt;div&gt;这不是表格内容&lt;/div&gt;
+&lt;/table&gt;
+&lt;!-- 浏览器将div移到table之前 --&gt;
+
+&lt;!-- 4. 重复的html/body标签 --&gt;
+&lt;html&gt;&lt;body&gt;内容&lt;/body&gt;&lt;html&gt;
+&lt;!-- 忽略第二个html标签 --&gt;
+
+&lt;!-- 5. 未关闭的格式化元素 --&gt;
+&lt;b&gt;粗体&lt;i&gt;斜体
+&lt;!-- 浏览器自动补全结束标签 --&gt;</code></pre>
+        <div class="warning">
+            <strong>注意：</strong>虽然浏览器会容错，但不规范的HTML可能导致意外的DOM结构，影响CSS选择器匹配和JavaScript DOM操作。始终使用合法的HTML。
+        </div>
+    </div>
+
+    <!-- ==================== 四、DOM树结构 ==================== -->
+    <h2>四、DOM树结构</h2>
+
+    <div class="card">
+        <h3>4.1 节点类型</h3>
+        <table>
+            <tr><th>节点类型</th><th>常量</th><th>示例</th></tr>
+            <tr><td>Element</td><td>Node.ELEMENT_NODE (1)</td><td><code>&lt;div&gt;</code>、<code>&lt;p&gt;</code></td></tr>
+            <tr><td>Text</td><td>Node.TEXT_NODE (3)</td><td>文本内容</td></tr>
+            <tr><td>Comment</td><td>Node.COMMENT_NODE (8)</td><td><code>&lt;!-- 注释 --&gt;</code></td></tr>
+            <tr><td>Document</td><td>Node.DOCUMENT_NODE (9)</td><td>document对象</td></tr>
+            <tr><td>DocumentFragment</td><td>Node.DOCUMENT_FRAGMENT_NODE (11)</td><td>文档片段</td></tr>
+            <tr><td>DOCTYPE</td><td>Node.DOCUMENT_TYPE_NODE (10)</td><td><code>&lt;!DOCTYPE html&gt;</code></td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>4.2 DOM树示例</h3>
+        <pre><code>&lt;!DOCTYPE html&gt;
+&lt;html lang="zh-CN"&gt;
+&lt;head&gt;
+    &lt;meta charset="UTF-8"&gt;
+    &lt;title&gt;示例页面&lt;/title&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;div id="app"&gt;
+        &lt;h1&gt;标题&lt;/h1&gt;
+        &lt;p&gt;段落&lt;/p&gt;
+    &lt;/div&gt;
+&lt;/body&gt;
+&lt;/html&gt;</code></pre>
+        <p>对应的DOM树结构：</p>
+        <div class="flow-diagram">
+Document
+ ├── DOCTYPE: html
+ └── html (lang="zh-CN")
+      ├── head
+      │    ├── meta (charset="UTF-8")
+      │    └── title
+      │         └── Text: "示例页面"
+      └── body
+           └── div#app
+                ├── h1
+                │    └── Text: "标题"
+                └── p
+                     └── Text: "段落"</div>
+    </div>
+
+    <div class="card">
+        <h3>4.3 DOM API常用操作</h3>
+        <pre><code>// 获取节点
+document.getElementById('app');
+document.querySelector('.class');
+document.querySelectorAll('div.item');
+
+// 创建和操作节点
+const div = document.createElement('div');
+div.textContent = '新内容';
+div.setAttribute('class', 'box');
+parent.appendChild(div);
+parent.insertBefore(newNode, referenceNode);
+parent.removeChild(child);
+node.cloneNode(true); // 深拷贝
+
+// 性能优化：使用DocumentFragment批量操作
+const fragment = document.createDocumentFragment();
+for (let i = 0; i &lt; 1000; i++) {
+    fragment.appendChild(document.createElement('li'));
+}
+ul.appendChild(fragment); // 只触发一次回流</code></pre>
+    </div>
+
+    <!-- ==================== 五、CSSOM ==================== -->
+    <h2>五、CSSOM（CSS Object Model）</h2>
+
+    <div class="card">
+        <h3>5.1 CSSOM的构建</h3>
+        <p>与DOM类似，浏览器也会将CSS解析为一棵CSSOM树。CSS解析同样使用状态机，但相比HTML解析更简单——CSS语法是上下文无关文法。</p>
+        <div class="flow-diagram">
+CSS字节流 → 字符流 → Tokenizer → CSSOM树
+                                  ↓
+                       Style Rules（选择器 + 声明块）
+                                  ↓
+                       computed Style → 渲染树</div>
+        <ul>
+            <li><strong>选择器解析：</strong>从右向左匹配（高效匹配策略）</li>
+            <li><strong>层叠计算：</strong>根据 specificity、importance、source order 确定最终样式</li>
+            <li><strong>继承：</strong>某些属性（如 <code>color</code>、<code>font-size</code>）从父元素继承</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>5.2 CSSOM Tree结构</h3>
+        <pre><code>/* CSS 样式表 */
+body { font-size: 16px; color: #333; }
+h1 { font-size: 32px; color: #1a73e8; }
+.class { background: #f0f0f0; }</code></pre>
+        <div class="flow-diagram">
+CSSStyleSheet
+ ├── CSSRule: body
+ │    ├── style.fontSize = "16px"
+ │    └── style.color = "#333"
+ ├── CSSRule: h1
+ │    ├── style.fontSize = "32px"
+ │    └── style.color = "#1a73e8"
+ └── CSSRule: .class
+      └── style.background = "#f0f0f0"</div>
+    </div>
+
+    <div class="card">
+        <h3>5.3 DOM + CSSOM → 渲染树</h3>
+        <p>DOM树和CSSOM树合并形成<strong>渲染树（Render Tree）</strong>：</p>
+        <ul>
+            <li>渲染树只包含<strong>可见节点</strong>（<code>display: none</code> 的元素不包含在内）</li>
+            <li><code>visibility: hidden</code> 的元素仍占据空间，包含在渲染树中</li>
+            <li>每个节点都计算了最终的computed style</li>
+            <li>伪元素（<code>::before</code>、<code>::after</code>）会作为子节点添加到渲染树</li>
+        </ul>
+        <div class="success">
+            <strong>关键点：</strong>CSS解析是<strong>阻塞渲染</strong>的。在CSSOM构建完成之前，浏览器不会开始渲染页面。因此应尽量减少关键CSS的大小，非关键CSS使用异步加载。
+        </div>
+    </div>
+
+    <!-- ==================== 六、推测解析 ==================== -->
+    <h2>六、推测解析（Speculative Parsing / Preload Scanner）</h2>
+
+    <div class="card">
+        <h3>6.1 什么是推测解析</h3>
+        <p>当主线程的HTML解析器遇到阻塞资源（如 <code>&lt;script&gt;</code> 标签）而暂停时，浏览器会启动一个<strong>预加载扫描器（Preload Scanner）</strong>，在后台提前发现并下载后续的关键资源。</p>
+        <div class="flow-diagram">
+主线程：HTML解析 → 遇到 &lt;script&gt; → 暂停解析，等待JS执行
+后台：  预加载扫描器 → 扫描后续HTML → 发现资源 → 提前下载
+                                           ├── &lt;link rel="stylesheet"&gt;
+                                           ├── &lt;script src&gt;
+                                           ├── &lt;img src&gt;
+                                           └── &lt;link rel="preload"&gt;</div>
+    </div>
+
+    <div class="card">
+        <h3>6.2 推测解析的作用</h3>
+        <ul>
+            <li><strong>并行下载：</strong>在主线程阻塞时仍能发现并下载资源</li>
+            <li><strong>资源排序：</strong>根据资源类型和优先级安排下载顺序</li>
+            <li><strong>不执行：</strong>预加载扫描器只负责下载，不修改DOM或执行脚本</li>
+        </ul>
+        <div class="highlight">
+            <strong>实践建议：</strong>
+            <ul>
+                <li>将CSS放在 <code>&lt;head&gt;</code> 中，让预加载扫描器尽早发现</li>
+                <li>使用 <code>&lt;link rel="preload"&gt;</code> 提示浏览器提前下载关键资源</li>
+                <li>避免在 <code>&lt;body&gt;</code> 开头放置阻塞脚本，否则预加载扫描器无法提前工作</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ==================== 七、script标签对解析的影响 ==================== -->
+    <h2>七、script标签对解析的影响</h2>
+
+    <div class="card">
+        <h3>7.1 默认行为：阻塞解析</h3>
+        <p>默认情况下，<code>&lt;script&gt;</code> 标签会<strong>阻塞HTML解析</strong>。浏览器暂停解析，下载（如果是外部脚本）并执行JavaScript代码，然后继续解析。</p>
+        <pre><code>&lt;!-- 解析到此处会暂停，等待下载和执行完毕 --&gt;
+&lt;script src="app.js"&gt;&lt;/script&gt;
+&lt;!-- 脚本执行完毕后继续解析 --&gt;
+&lt;p&gt;这段内容在脚本执行后才被解析&lt;/p&gt;</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>7.2 async与defer属性</h3>
+        <table>
+            <tr><th>属性</th><th>下载阻塞</th><th>执行阻塞</th><th>执行顺序</th><th>DOMContentLoaded</th></tr>
+            <tr><td>无属性</td><td>阻塞</td><td>阻塞</td><td>按顺序</td><td>脚本执行完后触发</td></tr>
+            <tr><td><code>async</code></td><td>不阻塞</td><td>阻塞</td><td>下载完立即执行（不确定顺序）</td><td>可能在之前或之后</td></tr>
+            <tr><td><code>defer</code></td><td>不阻塞</td><td>不阻塞</td><td>按文档顺序</td><td>之前执行</td></tr>
+            <tr><td><code>type="module"</code></td><td>不阻塞</td><td>不阻塞</td><td>默认defer行为</td><td>之前执行</td></tr>
+        </table>
+        <pre><code>&lt;!-- async：下载不阻塞，下载完立即执行，顺序不确定 --&gt;
+&lt;script async src="analytics.js"&gt;&lt;/script&gt;
+&lt;script async src="app.js"&gt;&lt;/script&gt;
+
+&lt;!-- defer：下载不阻塞，HTML解析完按顺序执行 --&gt;
+&lt;script defer src="vendor.js"&gt;&lt;/script&gt;
+&lt;script defer src="app.js"&gt;&lt;/script&gt;
+
+&lt;!-- ES Module 默认具有defer行为 --&gt;
+&lt;script type="module" src="app.mjs"&gt;&lt;/script&gt;</code></pre>
+        <div class="success">
+            <strong>最佳实践：</strong>
+            <ul>
+                <li>无依赖的独立脚本（如统计分析）使用 <code>async</code></li>
+                <li>有依赖关系的脚本使用 <code>defer</code></li>
+                <li>现代项目优先使用 <code>type="module"</code></li>
+                <li>将脚本放在 <code>&lt;/body&gt;</code> 前的做法已过时，<code>defer</code> 更优</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>7.3 动态脚本</h3>
+        <pre><code>// 动态创建的脚本默认是async行为
+const script = document.createElement('script');
+script.src = 'app.js';
+document.head.appendChild(script);
+// 默认async=true，可通过设置script.async = false改为按顺序执行</code></pre>
+    </div>
+
+    <!-- ==================== 八、常见面试题 ==================== -->
+    <h2>八、常见面试题</h2>
+
+    <div class="card">
+        <h3>Q1: DOMContentLoaded和load事件的区别？</h3>
+        <ul>
+            <li><strong>DOMContentLoaded：</strong>HTML解析完毕，DOM树构建完成时触发。不等待样式表、图片、子框架加载</li>
+            <li><strong>load：</strong>整个页面（包括所有依赖资源：样式表、图片等）加载完毕后触发</li>
+        </ul>
+        <pre><code>document.addEventListener('DOMContentLoaded', () =&gt; {
+    console.log('DOM ready, 可以操作DOM了');
+});
+
+window.addEventListener('load', () =&gt; {
+    console.log('所有资源加载完毕');
+});</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>Q2: document.write为什么不好？</h3>
+        <ul>
+            <li>在页面加载过程中调用会覆盖整个文档</li>
+            <li>在页面加载后调用会重新打开文档流，覆盖所有内容</li>
+            <li>阻塞HTML解析</li>
+            <li>无法与CSP（Content Security Policy）兼容</li>
+            <li>唯一合理场景：异步加载polyfill时配合 <code>document.write</code></li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>Q3: innerHTML vs textContent vs innerText？</h3>
+        <table>
+            <tr><th>属性</th><th>读取</th><th>写入</th><th>性能</th></tr>
+            <tr><td><code>innerHTML</code></td><td>返回HTML字符串</td><td>解析HTML并重建DOM</td><td>较慢（触发解析）</td></tr>
+            <tr><td><code>textContent</code></td><td>返回所有文本（含隐藏元素）</td><td>设置纯文本</td><td>快</td></tr>
+            <tr><td><code>innerText</code></td><td>返回可见文本</td><td>设置纯文本</td><td>最慢（触发回流）</td></tr>
+        </table>
+    </div>
+
+    <div class="highlight">
+        <strong>总结：</strong>HTML解析是一个高度优化的增量过程，涉及Tokenization（词法分析）、Tree Construction（语法分析）和推测解析三个核心阶段。理解这些原理对于优化页面加载性能（如脚本加载策略、CSS优化）至关重要。
+    </div>
+</div>
+<!-- 本文档总结了浏览器HTML解析与DOM树构建的核心原理 -->
+</body>
+</html>

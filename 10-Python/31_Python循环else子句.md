@@ -1,0 +1,231 @@
+# Python循环else子句
+
+
+## 🔁 Python 循环 else 子句
+
+
+for-else 和 while-else 语法、质数检测经典案例、与 break 配合、实用场景。
+
+
+## 循环 else 基础
+
+
+```
+// ========== for-else 语法 ==========
+// for 变量 in 可迭代对象:
+//     循环体
+// else:
+//     循环正常结束时执行
+
+for i in range(5):
+    print(i)
+else:
+    print("循环正常结束")
+// 0, 1, 2, 3, 4, "循环正常结束"
+
+// ========== 关键点 ==========
+// else 在以下情况执行:
+// - for 循环遍历完所有元素 (正常结束)
+// - while 条件变为 False (正常结束)
+
+// else 不在以下情况执行:
+// - 循环被 break 中断
+// - 循环中抛出异常
+// - 函数中 return 了
+
+// ========== break 时 else 不执行 ==========
+for i in range(5):
+    if i == 3:
+        break
+    print(i)
+else:
+    print("不会执行")    # 因为 break 了
+// 0, 1, 2
+
+// ========== 理解 else 含义 ==========
+// else = "如果循环没有被 break 中断"
+// 相当于一个标志变量:
+
+// for-else:
+for x in items:
+    if condition(x):
+        break
+else:
+    # 没有 break
+    pass
+
+// 等价于:
+found = False
+for x in items:
+    if condition(x):
+        found = True
+        break
+if not found:
+    pass
+```
+
+
+## 质数检测经典案例
+
+
+```
+// ========== 检测质数 ==========
+// for-else 经典案例: 质数检测
+
+def is_prime(n):
+    """判断 n 是否为质数"""
+    if n < 2:
+        return False
+    for i in range(2, int(n ** 0.5) + 1):
+        if n % i == 0:
+            print(f"{n} 可被 {i} 整除")
+            break
+    else:
+        # 没有 break,说明没有找到约数
+        return True
+    return False
+
+print(is_prime(17))      # True
+print(is_prime(15))      # False (15 = 3 × 5)
+
+// ========== 打印质数 ==========
+for n in range(2, 20):
+    for i in range(2, n):
+        if n % i == 0:
+            print(f"{n} = {i} × {n//i}")
+            break
+    else:
+        print(f"{n} 是质数")
+// 2 是质数
+// 3 是质数
+// 4 = 2 × 2
+// 5 是质数
+// 6 = 2 × 3
+// ...
+
+// ========== 不用 else 的等价写法 ==========
+def is_prime_no_else(n):
+    if n < 2:
+        return False
+    is_prime = True
+    for i in range(2, int(n ** 0.5) + 1):
+        if n % i == 0:
+            is_prime = False
+            break
+    return is_prime
+
+// for-else 版本更简洁,但可读性略有争议
+```
+
+
+## 实用场景
+
+
+```
+// ========== 场景 1: 查找元素 ==========
+// 在列表中查找第一个满足条件的元素
+
+items = [3, 7, 2, 8, 1, 9]
+
+for item in items:
+    if item > 5 and item % 2 == 0:
+        print(f"找到: {item}")
+        break
+else:
+    print("没有找到符合条件的元素")
+// "找到: 8"
+
+// ========== 场景 2: 数据库查询重试 ==========
+def query_with_retry(query_fn, max_retries=3):
+    """带重试的查询,成功则返回结果,失败则执行 else"""
+    for attempt in range(max_retries):
+        try:
+            result = query_fn()
+            if result:
+                return result
+        except Exception as e:
+            print(f"第 {attempt + 1} 次尝试失败: {e}")
+    else:
+        # 所有重试都失败
+        print(f"重试 {max_retries} 次均失败")
+        return None
+
+// ========== 场景 3: 验证密码 ==========
+def check_password_strength(password):
+    """检查密码是否包含数字"""
+    for char in password:
+        if char.isdigit():
+            print("密码包含数字 ✅")
+            break
+    else:
+        print("密码必须包含数字! ❌")
+        return False
+    return True
+
+check_password_strength("hello123")  # ✅
+check_password_strength("hello")     # ❌
+
+// ========== while-else ==========
+n = 0
+while n < 5:
+    n += 1
+    if n == 3:
+        break
+else:
+    print("不会执行")
+print(f"n = {n}")  # n = 3
+```
+
+
+## 讨论与建议
+
+
+```
+// ========== for-else 争议 ==========
+// for-else 是 Python 特有语法
+// 有人认为它不直观 (else 和 for 搭配很奇怪)
+// 但理解后非常有用
+
+// ========== 使用建议 ==========
+// ✅ 适合使用 for-else 的场景:
+//   - 搜索/查找: 找到→break, 没找到→else
+//   - 质数检测: 找到约数→break, 没找到→else
+//   - 密码/数据验证: 违规→break, 合规→else
+
+// ❌ 不适合的场景:
+//   - 简单循环 (没必要)
+//   - 需要额外逻辑的复杂场景 (拆函数更清晰)
+//   - 团队其他成员不熟悉此语法
+
+// ========== 替代方案 ==========
+// 如果觉得 for-else 可读性差:
+// 1. 用标志变量
+found = False
+for item in items:
+    if condition(item):
+        found = True
+        break
+
+if not found:
+    handle_not_found()
+
+// 2. 封装成函数 (return 替代 break)
+def find_item(items):
+    for item in items:
+        if condition(item):
+            return item
+    return None  # 相当于 else 分支
+
+result = find_item(items)
+if result is None:
+    handle_not_found()
+```
+
+
+> **Note:** 💡 for-else 要点: (1) else 在循环正常结束时执行 (未被 break); (2) 最经典案例: 质数检测; (3) 适合"找得到就 break,找不到就执行 else"; (4) 如果觉得可读性差,用标志变量或封装函数替代; (5) while 也有 else,用法相同。
+
+
+## 练习
+
+
+<!-- Converted from: 31_Python循环else子句.html -->

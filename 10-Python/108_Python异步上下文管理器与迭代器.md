@@ -1,0 +1,279 @@
+# Python异步上下文管理器与迭代器
+
+
+## 🔄 异步上下文管理器与迭代器
+
+
+async with 与 __aenter__/__aexit__、async for 与 __aiter__/__anext__、异步生成器、异步推导式、async contextlib。
+
+
+## 异步上下文管理器
+
+
+```
+// ========== async with ==========
+import asyncio
+
+# 异步上下文管理器: 实现 __aenter__ 和 __aexit__
+# 用于管理异步资源 (数据库连接/网络连接/文件)
+
+class AsyncResource:
+    async def __aenter__(self):
+        print("异步打开资源...")
+        await asyncio.sleep(0.5)
+        self.conn = "连接对象"
+        return self  # as … 接收的值
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        print("异步关闭资源...")
+        await asyncio.sleep(0.3)
+        self.conn = None
+        # 返回 True 表示异常已处理
+
+async def main():
+    async with AsyncResource() as res:
+        print(f"使用: {res.conn}")
+    print("资源已关闭")
+
+asyncio.run(main())
+# 输出:
+# 异步打开资源...
+# 使用: 连接对象
+# 异步关闭资源...
+# 资源已关闭
+```
+
+
+## 异步迭代器
+
+
+```
+// ========== async for ==========
+import asyncio
+
+# 异步迭代器: 实现 __aiter__ 和 __anext__
+# 每次迭代都可能等待 (网络请求/数据库游标)
+
+class AsyncCounter:
+    def __init__(self, limit):
+        self.limit = limit
+        self.current = 0
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self.current >= self.limit:
+            raise StopAsyncIteration  # 停止信号
+
+        await asyncio.sleep(0.3)  # 模拟异步等待
+        self.current += 1
+        return self.current
+
+async def main():
+    async for num in AsyncCounter(5):
+        print(f"数字: {num}")
+    # 每 0.3 秒输出一个数
+    print("迭代完成")
+
+asyncio.run(main())
+
+# ========== 异步分页数据 ==========
+class PaginatedAPI:
+    def __init__(self, pages):
+        self.pages = pages
+        self.page = 0
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        if self.page >= self.pages:
+            raise StopAsyncIteration
+
+        self.page += 1
+        # 模拟网络请求
+        await asyncio.sleep(0.5)
+        return {"page": self.page, "data": [f"item-{self.page}-{i}" for i in range(3)]}
+
+async def main():
+    async for page in PaginatedAPI(3):
+        print(f"获取到: {page}")
+```
+
+
+## 异步生成器
+
+
+```
+// =========== async yield ==========
+import asyncio
+
+# 异步生成器: 同时使用 async 和 yield
+# 每次 yield 之间可以 await
+
+async def async_range(start, end, delay=0.5):
+    """异步版本的 range"""
+    for i in range(start, end):
+        await asyncio.sleep(delay)
+        yield i  # yield 在 async 函数中 = 异步生成器
+
+async def main():
+    async for num in async_range(1, 6, 0.3):
+        print(f"异步生成: {num}")
+
+asyncio.run(main())
+
+# ========== 实际应用: 逐行读取大文件 ==========
+async def read_large_file(filename):
+    """异步逐行读取文件"""
+    # 实际使用 aiofiles
+    # async with aiofiles.open(filename) as f:
+    #     async for line in f:
+    #         yield line.strip()
+    pass
+
+# ========== 异步生成器表达式 ==========
+async def main():
+    # 异步推导式 (Python 3.6+)
+    result = [i async for i in async_range(1, 5, 0.1)]
+    print(result)  # [1, 2, 3, 4]
+
+    # 异步列表推导式 + 条件
+    evens = [i async for i in async_range(1, 10, 0.1) if i % 2 == 0]
+    print(evens)  # [2, 4, 6, 8]
+
+    # 异步集合/字典推导式
+    squares = {i: i*i async for i in async_range(1, 5, 0.1)}
+    print(squares)  # {1: 1, 2: 4, 3: 9, 4: 16}
+
+asyncio.run(main())
+```
+
+
+## contextlib 异步工具
+
+
+```
+// ========== @asynccontextmanager ==========
+from contextlib import asynccontextmanager
+import asyncio
+
+# 用装饰器方式创建异步上下文管理器
+
+@asynccontextmanager
+async def db_connection(url):
+    print(f"连接数据库: {url}")
+    conn = {"url": url, "connected": True}
+    try:
+        yield conn  # 进入 async with 时返回
+    finally:
+        print("关闭数据库连接")
+        conn["connected"] = False
+
+async def main():
+    async with db_connection("postgresql://localhost/mydb") as conn:
+        print(f"查询中... 连接状态: {conn['connected']}")
+    print(f"连接已关闭: {not conn['connected']}")
+
+asyncio.run(main())
+
+# ========== asynccontextmanager + 异常处理 ==========
+@asynccontextmanager
+async def transaction(db):
+    print("开始事务")
+    try:
+        yield db
+        print("提交事务")
+    except Exception as e:
+        print(f"回滚事务: {e}")
+        raise
+
+async def main():
+    async with transaction("db") as db:
+        print("执行数据库操作...")
+        # 如果这里抛出异常,会自动回滚
+
+# ========== aclosing 安全关闭 ==========
+from contextlib import aclosing
+
+async def main():
+    # aclosing 确保异步生成器被正确关闭
+    async with aclosing(async_range(1, 5)) as values:
+        async for v in values:
+            print(v)
+            if v == 3:
+                break  # 提前退出,资源正确释放
+```
+
+
+> **Note:** 💡 异步上下文管理器: 实现 __aenter__/__aexit__ 用于 async with; 异步迭代器: 实现 __aiter__/__anext__; 异步生成器: async def 中包含 yield; 用 @asynccontextmanager 快速创建异步上下文管理器。
+
+
+## 完整示例: 异步数据库连接池
+
+
+```
+// ========== 综合示例 ==========
+import asyncio
+from contextlib import asynccontextmanager
+
+class ConnectionPool:
+    """模拟异步连接池"""
+    def __init__(self, size=3):
+        self.size = size
+        self.available = [f"conn-{i}" for i in range(size)]
+        self.busy = set()
+
+    @asynccontextmanager
+    async def get_connection(self):
+        conn = await self._acquire()
+        try:
+            yield conn
+        finally:
+            await self._release(conn)
+
+    async def _acquire(self):
+        while not self.available:
+            await asyncio.sleep(0.1)  # 等待连接释放
+        conn = self.available.pop()
+        self.busy.add(conn)
+        print(f"获取 {conn}, 空闲:{len(self.available)}, 忙碌:{len(self.busy)}")
+        return conn
+
+    async def _release(self, conn):
+        self.busy.remove(conn)
+        self.available.append(conn)
+        print(f"释放 {conn}")
+
+    async def __aiter__(self):
+        """遍历池中所有连接"""
+        all_conns = self.available + list(self.busy)
+        for conn in all_conns:
+            await asyncio.sleep(0.1)
+            yield conn
+
+async def worker(pool, wid):
+    async with pool.get_connection() as conn:
+        print(f"Worker {wid} 使用 {conn}")
+        await asyncio.sleep(1)  # 模拟工作
+
+async def main():
+    pool = ConnectionPool(size=3)
+
+    # 5 个 worker 竞争 3 个连接
+    workers = [worker(pool, i) for i in range(5)]
+    await asyncio.gather(*workers)
+
+    print("\n所有连接:")
+    async for conn in pool:
+        print(f"  {conn}")
+
+asyncio.run(main())
+```
+
+
+## 练习
+
+
+<!-- Converted from: 108_Python异步上下文管理器与迭代器.html -->

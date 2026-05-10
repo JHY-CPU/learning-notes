@@ -1,0 +1,256 @@
+# Python继承与多态
+
+
+## 🧬 Python 继承与多态
+
+
+继承 extends、方法重写 override、super() 调用父类、多态与鸭子类型、组合 vs 继承、Mixin 模式。
+
+
+## 继承基础
+
+
+```
+// ========== 什么是继承 ==========
+// 子类继承父类的属性和方法
+// 实现代码复用和层次化设计
+
+class Animal:
+    """动物基类"""
+    def __init__(self, name):
+        self.name = name
+
+    def speak(self):
+        return "... (动物不会说话)"
+
+    def move(self):
+        return f"{self.name} 在移动"
+
+class Dog(Animal):              # 继承 Animal
+    """狗: 继承自动物"""
+    def speak(self):            # 重写父类方法
+        return "汪汪!"
+
+class Cat(Animal):              # 另一个子类
+    def speak(self):
+        return "喵喵~"
+
+// 使用:
+dog = Dog("旺财")
+cat = Cat("咪咪")
+
+print(dog.move())               # 旺财 在移动 (继承的方法)
+print(dog.speak())              # 汪汪! (重写的方法)
+print(cat.speak())              # 喵喵~ (各自的实现)
+
+print(isinstance(dog, Dog))     # True
+print(isinstance(dog, Animal))  # True (是子类也是父类类型)
+print(issubclass(Dog, Animal))  # True
+```
+
+
+## super() 调用父类
+
+
+```
+// ========== super() 的作用 ==========
+// super() 调用父类的方法
+// 在子类中扩展父类的行为,而不是完全覆盖
+
+class Animal:
+    def __init__(self, name):
+        self.name = name
+
+    def describe(self):
+        return f"我是 {self.name}"
+
+class Dog(Animal):
+    def __init__(self, name, breed):
+        super().__init__(name)   # 调用父类的 __init__
+        self.breed = breed
+
+    def describe(self):
+        # 调用父类方法并添加额外信息
+        base = super().describe()
+        return f"{base}, 品种是 {self.breed}"
+
+dog = Dog("旺财", "金毛")
+print(dog.describe())            # 我是 旺财, 品种是 金毛
+
+// ========== super() 在多重继承中 ==========
+// super() 不是简单地调用"父类"
+// 而是按 MRO (方法解析顺序) 调用下一个类
+
+class A:
+    def __init__(self):
+        print("A.__init__")
+        super().__init__()       # 继续 MRO 链
+
+class B(A):
+    def __init__(self):
+        print("B.__init__")
+        super().__init__()       # 调用 A.__init__
+
+class C(A):
+    def __init__(self):
+        print("C.__init__")
+        super().__init__()       # 调用 A.__init__
+
+class D(B, C):
+    def __init__(self):
+        print("D.__init__")
+        super().__init__()       # 按 MRO 调用
+
+d = D()
+// D.__init__
+// B.__init__
+// C.__init__
+// A.__init__
+
+// MRO: D → B → C → A
+// super() 沿着 MRO 链向上调用
+// 如果没 super(), 多重继承会出问题!
+```
+
+
+## 多态与鸭子类型
+
+
+```
+// ========== 多态 ==========
+// 多态: 同一个接口,不同的实现
+// Python 天然支持多态
+
+# 不同子类有不同的 speak 实现
+animals = [Dog("旺财"), Cat("咪咪"), Animal("无名")]
+
+for animal in animals:
+    print(animal.speak())
+# 汪汪!
+# 喵喵~
+# ... (动物不会说话)
+
+// 多态的好处:
+// 调用者不需要知道具体的子类类型
+// 只需要知道父类有什么方法即可
+
+// ========== 鸭子类型 ==========
+// "如果它走起来像鸭子,叫起来像鸭子,那它就是鸭子"
+// Python 不检查类型,只检查是否有对应方法
+
+class Duck:
+    def speak(self):
+        return "嘎嘎!"
+
+class Robot:
+    def speak(self):
+        return "哔哔, 我是机器人"
+
+def make_sound(thing):
+    # 不检查类型,直接调用 speak()
+    return thing.speak()
+
+print(make_sound(Duck()))      # 嘎嘎!
+print(make_sound(Robot()))     # 哔哔, 我是机器人
+// Robot 不是 Duck 的子类,但也能用!
+// 这就是鸭子类型 — "有 speak() 方法就行"
+
+// ========== 抽象基类 vs 鸭子类型 ==========
+// Python 哲学: "请求原谅比请求许可容易" (EAFP)
+
+// 鸭子类型方式:
+def make_sound(thing):
+    try:
+        return thing.speak()
+    except AttributeError:
+        return "这个对象不会说话"
+
+// 检查类型方式 (不推荐):
+# if isinstance(thing, Animal):  # 限制太死!
+#     thing.speak()
+```
+
+
+## 组合 vs 继承与 Mixin
+
+
+```
+// ========== 组合优于继承 ==========
+// "优先使用对象组合,而不是类继承"
+
+// ❌ 继承: "is-a" 关系
+class Car:
+    def drive(self):
+        return "开车"
+
+class FlyingCar(Car):           # 飞行汽车是汽车?
+    def fly(self):
+        return "飞行"
+# 问题: FlyingCar 继承了很多 Car 的东西
+# 但 Car 的某些行为可能不适合
+
+// ✅ 组合: "has-a" 关系
+class Engine:
+    def start(self):
+        return "引擎启动"
+
+class Car:
+    def __init__(self):
+        self.engine = Engine()   # 汽车有引擎
+
+    def drive(self):
+        self.engine.start()
+        return "开车"
+
+// 组合更灵活,耦合更低
+
+// ========== Mixin 模式 ==========
+// Mixin: 提供特定功能的小型可复用类
+// 通过多重继承组合功能
+
+class JSONMixin:
+    """提供 JSON 序列化功能"""
+    def to_json(self):
+        import json
+        return json.dumps(self.__dict__)
+
+class LogMixin:
+    """提供日志功能"""
+    def log(self, message):
+        print(f"[{self.__class__.__name__}] {message}")
+
+class User(JSONMixin, LogMixin):
+    """用户类: 继承 JSON + 日志能力"""
+    def __init__(self, name):
+        self.name = name
+        self.log(f"创建用户: {name}")
+
+user = User("Alice")
+print(user.to_json())           # {"name": "Alice"}
+
+// Mixin 的特点:
+// 1. 只提供功能,不单独使用
+// 2. 没有 __init__ 或很轻量
+// 3. 类名通常以 Mixin 结尾
+// 4. 组合多个 Mixin 获得多种能力
+
+// ========== 继承设计原则 ==========
+// 使用继承当:
+//   子类是父类的一种 (is-a)
+//   子类需要复用父类大部分行为
+//   有层次化的类型体系
+//
+// 使用组合当:
+//   只是需要某个功能 (has-a)
+//   避免继承带来的复杂耦合
+//   行为需要在运行时改变
+```
+
+
+> **Note:** 💡 继承与多态要点: (1) 继承用 class Child(Parent),子类获得父类所有方法; (2) super() 调用父类方法,在多重继承中按 MRO 链调用; (3) 多态让不同子类有相同接口不同行为; (4) 鸭子类型关注方法而非类型; (5) 组合优于继承,Mixin 提供可复用功能。
+
+
+## 练习
+
+
+<!-- Converted from: 49_Python继承与多态.html -->

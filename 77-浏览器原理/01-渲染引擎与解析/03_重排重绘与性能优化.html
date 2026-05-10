@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>重排重绘与性能优化</title>
+    <style>
+        :root {
+            --primary: #1a73e8;
+            --primary-light: #e8f0fe;
+            --secondary: #34a853;
+            --warning: #ea4335;
+            --purple: #9c27b0;
+            --bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --text: #202124;
+            --border: #dadce0;
+            --code-bg: #f1f3f4;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { font-size: 2em; color: var(--primary); border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 1.5em; color: var(--primary); margin: 32px 0 16px; padding-left: 12px; border-left: 4px solid var(--primary); }
+        h3 { font-size: 1.2em; margin: 20px 0 10px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .highlight { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .warning { background: #fce8e6; border-left: 4px solid var(--warning); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .success { background: #e6f4ea; border-left: 4px solid var(--secondary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .purple { background: #f3e5f5; border-left: 4px solid var(--purple); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; font-family: 'Fira Code','Consolas',monospace; font-size: 0.9em; line-height: 1.6; margin: 12px 0; }
+        code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre code { background: none; padding: 0; }
+        ul, ol { padding-left: 24px; margin: 8px 0; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid var(--border); padding: 12px; text-align: left; }
+        th { background: var(--primary-light); font-weight: 600; }
+        .flow-diagram { background: var(--card-bg); border: 2px solid var(--primary); border-radius: 12px; padding: 20px; text-align: center; font-family: monospace; margin: 16px 0; white-space: pre; line-height: 1.6; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>重排重绘与性能优化</h1>
+
+    <div class="highlight">
+        <strong>核心概念：</strong>重排（Reflow）和重绘（Repaint）是浏览器渲染过程中的两个关键操作。理解什么会触发它们，以及如何最小化它们的影响，是前端性能优化的核心技能。本文档详细讨论触发条件、布局抖动问题、will-change、content-visibility等优化手段。
+    </div>
+
+    <!-- ==================== 一、重排（Reflow） ==================== -->
+    <h2>一、重排（Reflow / Layout）</h2>
+
+    <div class="card">
+        <h3>1.1 什么是重排</h3>
+        <p>重排（也叫回流）是指浏览器重新计算元素的几何属性（位置和大小），并重新构建部分或全部布局树。重排是渲染管线中最昂贵的操作之一。</p>
+        <div class="flow-diagram">
+触发重排 → 重新计算受影响元素的几何属性
+         → 可能影响子元素、兄弟元素、祖先元素
+         → 重建布局树的受影响部分
+         → 触发重绘
+         → 触发合成</div>
+    </div>
+
+    <div class="card">
+        <h3>1.2 触发重排的操作</h3>
+        <table>
+            <tr><th>类别</th><th>具体操作</th><th>影响范围</th></tr>
+            <tr><td>几何属性变更</td><td><code>width</code>, <code>height</code>, <code>margin</code>, <code>padding</code>, <code>border</code>, <code>font-size</code>, <code>line-height</code></td><td>元素自身及其后代</td></tr>
+            <tr><td>位置变更</td><td><code>top</code>, <code>left</code>, <code>bottom</code>, <code>right</code>（对 positioned 元素）</td><td>元素自身及可能影响其他元素</td></tr>
+            <tr><td>显示/隐藏</td><td><code>display: none</code> ↔ <code>display: block</code></td><td>元素自身及后续元素</td></tr>
+            <tr><td>DOM操作</td><td>添加/删除/移动DOM节点</td><td>受影响的子树</td></tr>
+            <tr><td>内容变化</td><td>文本内容变化导致尺寸变化、图片加载完成</td><td>元素自身及祖先</td></tr>
+            <tr><td>布局属性变更</td><td><code>position</code>, <code>float</code>, <code>clear</code>, <code>overflow</code></td><td>元素自身及周边元素</td></tr>
+            <tr><td>读取布局属性</td><td><code>offsetTop</code>, <code>offsetLeft</code>, <code>offsetWidth</code>, <code>offsetHeight</code>, <code>scrollTop</code>, <code>scrollLeft</code>, <code>scrollWidth</code>, <code>scrollHeight</code>, <code>getComputedStyle()</code>, <code>getBoundingClientRect()</code></td><td>强制同步布局</td></tr>
+            <tr><td>窗口大小变更</td><td>窗口resize</td><td>整个页面</td></tr>
+            <tr><td>字体加载</td><td>Web字体加载完成</td><td>使用该字体的所有元素</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>1.3 重排的影响范围</h3>
+        <ul>
+            <li><strong>自身：</strong>元素几何属性变化会影响自身</li>
+            <li><strong>后代：</strong>父元素尺寸变化影响所有后代元素</li>
+            <li><strong>祖先：</strong>子元素变化可能导致祖先元素尺寸变化（如 <code>height: auto</code> 的容器）</li>
+            <li><strong>兄弟：</strong>浮动元素、flex/grid布局中一个元素变化影响兄弟元素</li>
+            <li><strong>后续元素：</strong>文档流中前面元素尺寸变化影响后面所有元素的位置</li>
+        </ul>
+        <div class="warning">
+            <strong>display:none vs visibility:hidden：</strong>
+            <code>display: none</code> 触发重排（元素从渲染树中移除），<code>visibility: hidden</code> 只触发重绘（元素仍在渲染树中，只是不可见）。
+        </div>
+    </div>
+
+    <!-- ==================== 二、重绘（Repaint） ==================== -->
+    <h2>二、重绘（Repaint）</h2>
+
+    <div class="card">
+        <h3>2.1 什么是重绘</h3>
+        <p>重绘是指当元素的外观属性（不影响布局的属性）发生变化时，浏览器重新绘制受影响的区域。重绘的成本低于重排，但仍需消耗CPU资源。</p>
+    </div>
+
+    <div class="card">
+        <h3>2.2 只触发重绘（不触发重排）的属性</h3>
+        <table>
+            <tr><th>属性</th><th>说明</th></tr>
+            <tr><td><code>color</code></td><td>文字颜色</td></tr>
+            <tr><td><code>background-color</code>, <code>background-image</code></td><td>背景色/背景图</td></tr>
+            <tr><td><code>visibility</code></td><td>可见性（不同于display:none）</td></tr>
+            <tr><td><code>box-shadow</code></td><td>盒子阴影</td></tr>
+            <tr><td><code>text-shadow</code></td><td>文字阴影</td></tr>
+            <tr><td><code>border-radius</code></td><td>圆角</td></tr>
+            <tr><td><code>outline</code>, <code>outline-color</code></td><td>轮廓</td></tr>
+            <tr><td><code>border-color</code></td><td>边框颜色（注意border-width会触发重排）</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>2.3 既不触发重排也不触发重绘的属性（只触发Composite）</h3>
+        <table>
+            <tr><th>属性</th><th>说明</th></tr>
+            <tr><td><code>transform</code></td><td>2D/3D变换（translate, rotate, scale）</td></tr>
+            <tr><td><code>opacity</code></td><td>透明度</td></tr>
+            <tr><td><code>filter</code></td><td>滤镜效果（需独立合成层）</td></tr>
+            <tr><td><code>will-change</code></td><td>提示浏览器提前优化</td></tr>
+        </table>
+        <div class="success">
+            <strong>性能黄金法则：</strong>做动画时，优先使用 <code>transform</code> 和 <code>opacity</code>，它们只触发GPU合成，性能最好。
+        </div>
+    </div>
+
+    <!-- ==================== 三、布局抖动（Layout Thrashing） ==================== -->
+    <h2>三、布局抖动（Layout Thrashing）</h2>
+
+    <div class="card">
+        <h3>3.1 什么是布局抖动</h3>
+        <p>布局抖动是指在同一个JavaScript任务中，交替进行<strong>写操作</strong>（修改DOM/样式）和<strong>读操作</strong>（读取布局属性），导致浏览器被迫进行多次同步布局计算。</p>
+        <div class="flow-diagram">
+❌ 布局抖动（每读一次就强制同步布局一次）：
+for循环 {
+    写操作（修改style）→ 标记布局为dirty
+    读操作（offsetHeight）→ 强制同步布局（flush）→ 获取值
+    写操作（修改style）→ 标记布局为dirty
+    读操作（offsetHeight）→ 强制同步布局（flush）→ 获取值
+}
+→ 触发N次重排，性能极差</div>
+    </div>
+
+    <div class="card">
+        <h3>3.2 强制同步布局（Forced Synchronous Layout）</h3>
+        <p>当JavaScript在修改样式后立即读取布局属性时，浏览器必须先完成所有挂起的布局计算，才能返回正确的值。这称为<strong>强制同步布局</strong>。</p>
+        <pre><code>// ❌ 强制同步布局 - 性能灾难
+function badExample() {
+    const boxes = document.querySelectorAll('.box');
+    boxes.forEach(box => {
+        // 写操作：标记布局为dirty
+        box.style.width = (box.offsetWidth * 2) + 'px';
+        // 读操作：强制浏览器立即执行布局，才能获取正确的offsetWidth
+        // 布局执行完毕后，下一个循环的写操作又标记为dirty
+        // 循环往复...
+    });
+}
+
+// ✅ 正确做法 - 先读后写
+function goodExample() {
+    const boxes = document.querySelectorAll('.box');
+
+    // 第一轮：只读
+    const widths = [];
+    boxes.forEach(box => {
+        widths.push(box.offsetWidth);  // 浏览器可以延迟布局
+    });
+
+    // 第二轮：只写
+    boxes.forEach((box, i) => {
+        box.style.width = (widths[i] * 2) + 'px';  // 只标记dirty，不执行布局
+    });
+    // 循环结束后，浏览器统一执行一次布局
+}</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>3.3 触发强制同步布局的API</h3>
+        <table>
+            <tr><th>属性/方法</th><th>所属对象</th><th>说明</th></tr>
+            <tr><td><code>offsetTop/Left/Width/Height</code></td><td>Element</td><td>元素偏移和尺寸</td></tr>
+            <tr><td><code>scrollTop/Left/Width/Height</code></td><td>Element</td><td>滚动位置和尺寸</td></tr>
+            <tr><td><code>clientTop/Left/Width/Height</code></td><td>Element</td><td>客户端区域</td></tr>
+            <tr><td><code>getBoundingClientRect()</code></td><td>Element</td><td>元素边界矩形</td></tr>
+            <tr><td><code>getComputedStyle()</code></td><td>window</td><td>计算后的样式</td></tr>
+            <tr><td><code>window.scrollX/Y</code></td><td>window</td><td>滚动位置</td></tr>
+            <tr><td><code>focus()</code></td><td>Element</td><td>可能需要布局信息</td></tr>
+            <tr><td><code>element.innerText</code></td><td>Element</td><td>需要计算可见文本</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>3.4 使用FastDOM等库</h3>
+        <pre><code>// FastDOM思路：自动分离读写操作
+import fastdom from 'fastdom';
+
+fastdom.measure(() => {
+    const height = element.offsetHeight;  // 读操作
+    fastdom.mutate(() => {
+        element.style.height = (height * 2) + 'px';  // 写操作
+    });
+});
+
+// 现代替代方案：requestAnimationFrame
+function updateLayout() {
+    // 所有读操作
+    const heights = Array.from(boxes).map(el => el.offsetHeight);
+
+    requestAnimationFrame(() => {
+        // 所有写操作
+        boxes.forEach((el, i) => {
+            el.style.height = (heights[i] * 2) + 'px';
+        });
+    });
+}</code></pre>
+    </div>
+
+    <!-- ==================== 四、批量DOM操作优化 ==================== -->
+    <h2>四、批量DOM操作优化</h2>
+
+    <div class="card">
+        <h3>4.1 DocumentFragment</h3>
+        <pre><code>// ❌ 逐个添加，每个都触发一次回流
+for (let i = 0; i &lt; 1000; i++) {
+    const li = document.createElement('li');
+    li.textContent = `Item ${i}`;
+    ul.appendChild(li);  // 每次都可能触发回流
+}
+
+// ✅ 使用DocumentFragment，只触发一次回流
+const fragment = document.createDocumentFragment();
+for (let i = 0; i &lt; 1000; i++) {
+    const li = document.createElement('li');
+    li.textContent = `Item ${i}`;
+    fragment.appendChild(li);
+}
+ul.appendChild(fragment);  // 只触发一次回流</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>4.2 离线DOM操作</h3>
+        <pre><code>// 方法1：display:none → 操作 → display:block
+const el = document.getElementById('list');
+el.style.display = 'none';  // 触发1次重排
+// ... 大量DOM修改操作 ...
+el.style.display = 'block'; // 触发1次重排
+
+// 方法2：将元素移出DOM → 操作 → 放回DOM
+const el = document.getElementById('list');
+const parent = el.parentNode;
+parent.removeChild(el);      // 触发1次重排
+// ... 大量DOM修改操作 ...
+parent.appendChild(el);      // 触发1次重排
+
+// 方法3：克隆 → 操作 → 替换
+const el = document.getElementById('list');
+const clone = el.cloneNode(true);
+// ... 在克隆节点上做大量修改 ...
+el.parentNode.replaceChild(clone, el);  // 触发1次重排</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>4.3 CSS类切换代替逐属性修改</h3>
+        <pre><code>// ❌ 每个style修改都可能触发重排
+element.style.width = '100px';
+element.style.height = '100px';
+element.style.margin = '10px';
+element.style.padding = '5px';
+
+// ✅ 一次类切换，只触发1次重排
+element.classList.add('resized');
+
+// .resized {
+//     width: 100px;
+//     height: 100px;
+//     margin: 10px;
+//     padding: 5px;
+// }</code></pre>
+    </div>
+
+    <!-- ==================== 五、will-change ==================== -->
+    <h2>五、will-change属性</h2>
+
+    <div class="card">
+        <h3>5.1 什么是will-change</h3>
+        <p><code>will-change</code> 是一个CSS属性，用于<strong>提前告知浏览器</strong>某个元素将要发生什么变化，让浏览器可以提前进行优化（如创建独立的合成层）。</p>
+        <pre><code>/* 语法 */
+will-change: auto;          /* 默认 */
+will-change: scroll-position;  /* 将改变滚动位置 */
+will-change: contents;         /* 将改变内容 */
+will-change: transform;        /* 将改变transform */
+will-change: opacity;          /* 将改变opacity */
+will-change: transform, opacity;  /* 多个属性 */</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>5.2 will-change的工作原理</h3>
+        <ol>
+            <li><strong>提升到独立合成层：</strong>对于 <code>will-change: transform</code>，浏览器提前将元素提升到独立的GPU层</li>
+            <li><strong>创建新的层叠上下文：</strong>元素变为新的层叠上下文根</li>
+            <li><strong>提前分配GPU资源：</strong>为该元素预留显存等资源</li>
+        </ol>
+        <div class="flow-diagram">
+没有will-change：
+用户交互 → 浏览器检测到变化 → 创建合成层 → 开始GPU加速（有延迟）
+
+有will-change：
+页面加载 → 浏览器看到will-change → 预创建合成层 → 变化发生时直接GPU加速（无延迟）</div>
+    </div>
+
+    <div class="card">
+        <h3>5.3 will-change的最佳实践</h3>
+        <div class="warning">
+            <strong>不要滥用will-change！</strong>每个 <code>will-change</code> 都会创建一个独立的合成层，消耗额外的内存（在低端设备上可能达数MB）。以下是一些规则：
+        </div>
+        <pre><code>/* ❌ 错误：对所有元素使用 */
+* { will-change: transform; }
+
+/* ❌ 错误：在元素上永久保留 */
+.element { will-change: transform; }
+
+/* ✅ 正确：只在动画开始前添加，动画结束后移除 */
+.element {
+    transition: transform 0.3s;
+}
+
+.element.animate {
+    will-change: transform;  /* 动画前添加 */
+    transform: translateX(100px);
+}
+
+/* ✅ 正确：用JavaScript动态管理 */
+function startAnimation(el) {
+    el.style.willChange = 'transform';
+    el.classList.add('animating');
+}
+
+function endAnimation(el) {
+    el.classList.remove('animating');
+    el.style.willChange = 'auto';
+}
+
+el.addEventListener('animationend', () => endAnimation(el));
+
+/* ✅ 正确：对hover动画，用:hover触发 */
+.button:hover {
+    will-change: transform;
+    transform: scale(1.05);
+}</code></pre>
+    </div>
+
+    <!-- ==================== 六、content-visibility ==================== -->
+    <h2>六、content-visibility深入</h2>
+
+    <div class="card">
+        <h3>6.1 content-visibility: auto</h3>
+        <p>这是 <code>content-visibility</code> 最有用的值，它会自动跳过屏幕外元素的渲染工作：</p>
+        <pre><code>/* 长列表优化 */
+.virtual-list-item {
+    content-visibility: auto;
+    contain-intrinsic-size: 0 50px; /* 每项预估高度50px */
+}
+
+/* 长文章优化 */
+.article-body {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 1000px;
+}</code></pre>
+        <div class="flow-diagram">
+没有content-visibility：
+浏览器渲染全部元素（包括屏幕外的） → 初始渲染慢，内存占用高
+
+有content-visibility: auto：
+浏览器只渲染视口内的元素 → 初始渲染快，内存占用低
+用户滚动 → 滚入视口的元素被渲染
+用户滚出 → 滚出视口的元素释放渲染状态</div>
+    </div>
+
+    <div class="card">
+        <h3>6.2 contain-intrinsic-size</h3>
+        <p>当 <code>content-visibility</code> 跳过渲染时，元素没有大小信息。<code>contain-intrinsic-size</code> 用于指定占位大小，防止布局跳动：</p>
+        <pre><code>/* 固定占位大小 */
+.item {
+    content-visibility: auto;
+    contain-intrinsic-size: 200px;  /* 高度200px */
+}
+
+/* 宽度和高度 */
+.item {
+    content-visibility: auto;
+    contain-intrinsic-size: 300px 200px;  /* 宽300px，高200px */
+}
+
+/* auto关键字：记住上次渲染时的实际大小 */
+.item {
+    content-visibility: auto;
+    contain-intrinsic-size: auto;  /* 记住上次渲染的大小 */
+    contain-intrinsic-size: auto 200px;  /* 宽度自动，高度200px */
+}</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>6.3 content-visibility的注意事项</h3>
+        <ul>
+            <li><strong>锚点跳转：</strong><code>&lt;a href="#section"&gt;</code> 跳转到被跳过渲染的元素时，浏览器会自动渲染该元素</li>
+            <li><strong>Find-in-Page：</strong>浏览器搜索功能会渲染被跳过的元素以搜索文本</li>
+            <li><strong>焦点管理：</strong>被跳过渲染的元素内的可聚焦元素仍可获得焦点</li>
+            <li><strong>Intersection Observer：</strong>可能在元素实际可见之前就触发回调</li>
+            <li><strong>不适用于：</strong>需要精确控制首屏内容的场景（如LCP优化）</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 七、动画性能优化 ==================== -->
+    <h2>七、动画性能优化</h2>
+
+    <div class="card">
+        <h3>7.1 CSS动画 vs JavaScript动画</h3>
+        <table>
+            <tr><th>特性</th><th>CSS动画（transition/animation）</th><th>JavaScript动画（requestAnimationFrame）</th></tr>
+            <tr><td>性能</td><td>可被提升到合成线程</td><td>在主线程执行</td></tr>
+            <tr><td>灵活性</td><td>有限（预定义的关键帧）</td><td>完全灵活</td></tr>
+            <tr><td>控制</td><td>通过animation-play-state</td><td>完全控制暂停/继续/反向</td></tr>
+            <tr><td>适用场景</td><td>简单的状态过渡</td><td>复杂的交互式动画</td></tr>
+            <tr><td>主线程阻塞</td><td>可能不阻塞（合成器动画）</td><td>会阻塞</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>7.2 合成器线程动画（Compositor Thread Animation）</h3>
+        <p>如果CSS动画只涉及 <code>transform</code> 和 <code>opacity</code>，并且元素在独立的合成层上，动画可以完全在<strong>合成器线程</strong>上运行，不依赖主线程：</p>
+        <pre><code>/* 合成器线程动画 - 不受主线程JS阻塞影响 */
+@keyframes slide {
+    from { transform: translateX(0); }
+    to   { transform: translateX(100vw); }
+}
+
+.animated {
+    animation: slide 2s linear infinite;
+    will-change: transform; /* 确保在独立合成层 */
+}
+
+/* 即使主线程被大量JS阻塞，这个动画仍然流畅 */</code></pre>
+        <div class="success">
+            <strong>性能对比：</strong>
+            <ul>
+                <li>在主线程上的动画（如 <code>left</code>、<code>top</code>）：每帧需要 Layout + Paint + Composite</li>
+                <li>合成器线程动画（<code>transform</code>、<code>opacity</code>）：每帧只需 Composite</li>
+                <li>在主线程繁忙时，合成器线程动画仍保持流畅</li>
+            </ul>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>7.3 使用requestAnimationFrame</h3>
+        <pre><code>// requestAnimationFrame: 在下一次浏览器重绘前执行回调
+// 约 60fps（每秒60帧），即每 16.67ms 执行一次
+
+let position = 0;
+function animate() {
+    position += 2;
+    element.style.transform = `translateX(${position}px)`;
+
+    if (position &lt; 300) {
+        requestAnimationFrame(animate);  // 递归调用
+    }
+}
+requestAnimationFrame(animate);
+
+// ❌ 不要用setTimeout/setInterval做动画
+// - 不与浏览器刷新率同步，可能丢帧或重复帧
+// - 即使页面不可见也会执行，浪费资源
+// - 无法自动暂停
+
+// ✅ rAF的优势：
+// - 与浏览器刷新率同步（通常60Hz）
+// - 页面不可见时自动暂停，节省资源
+// - 批量执行：多个rAF回调在同一帧内执行</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>7.4 使用requestIdleCallback</h3>
+        <pre><code>// requestIdleCallback: 在浏览器空闲时执行低优先级任务
+// 不阻塞关键渲染和用户交互
+
+requestIdleCallback((deadline) => {
+    // deadline.timeRemaining(): 返回当前帧剩余的空闲时间（ms）
+    // deadline.didTimeout: 是否已超时
+
+    while (deadline.timeRemaining() > 0 && tasks.length > 0) {
+        const task = tasks.shift();
+        task();  // 执行低优先级任务
+    }
+
+    if (tasks.length > 0) {
+        requestIdleCallback(processTasks);  // 还有任务，继续调度
+    }
+}, { timeout: 2000 });  // 最多等待2秒，超时后强制执行
+
+// 适用场景：
+// - 非关键的数据分析/上报
+// - 延迟加载非可见内容
+// - 预计算和缓存
+// - 非用户触发的动画/过渡</code></pre>
+    </div>
+
+    <!-- ==================== 八、性能优化检查清单 ==================== -->
+    <h2>八、性能优化检查清单</h2>
+
+    <div class="card">
+        <h3>8.1 减少重排</h3>
+        <ul>
+            <li>使用 <code>transform</code> 代替 <code>top/left</code> 做位移动画</li>
+            <li>使用 <code>opacity</code> 代替 <code>visibility</code> 做显隐动画</li>
+            <li>批量修改DOM（DocumentFragment、离线DOM、一次性innerHTML）</li>
+            <li>使用CSS类切换代替逐属性修改style</li>
+            <li>将动画元素设置为 <code>position: absolute/fixed</code>，脱离文档流</li>
+            <li>避免在循环中读取布局属性（先读后写）</li>
+            <li>使用 <code>contain</code> 限制布局影响范围</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>8.2 减少重绘</h3>
+        <ul>
+            <li>减少透明度变化的面积</li>
+            <li>使用 <code>will-change</code> 提示浏览器提前创建合成层</li>
+            <li>使用 <code>content-visibility: auto</code> 跳过屏幕外元素</li>
+            <li>避免不必要的 <code>box-shadow</code> 和渐变背景（它们的绘制成本较高）</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>8.3 利用DevTools诊断</h3>
+        <ul>
+            <li><strong>Performance面板：</strong>查看Layout、Paint、Composite各阶段的耗时</li>
+            <li><strong>Layers面板：</strong>检查图层分解是否合理</li>
+            <li><strong>Rendering面板：</strong>开启 "Paint flashing" 查看重绘区域</li>
+            <li><strong>Rendering面板：</strong>开启 "Layout Shift Regions" 检测CLS问题</li>
+            <li><strong>Performance Monitor：</strong>实时监控CPU、JS堆大小、DOM节点数</li>
+        </ul>
+    </div>
+
+    <div class="highlight">
+        <strong>总结：</strong>重排重绘优化的核心思路是：(1) 优先使用 transform/opacity 做动画，利用GPU合成；(2) 避免布局抖动，分离读写操作；(3) 使用 will-change 预创建合成层；(4) 使用 content-visibility 减少不必要的渲染；(5) 批量操作DOM，减少重排次数。
+    </div>
+</div>
+<!-- 本文档总结了浏览器重排重绘机制与前端性能优化策略 -->
+</body>
+</html>

@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小程序架构与生命周期 - 小程序开发笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", "SimSun", sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; border-bottom: 3px solid #2b6cb0; padding-bottom: 12px; margin-bottom: 30px; }
+        h2 { color: #2c5282; margin: 25px 0 12px; padding-left: 10px; border-left: 4px solid #2b6cb0; }
+        h3 { color: #2d3748; margin: 18px 0 8px; }
+        p, li { margin-bottom: 8px; }
+        ul, ol { padding-left: 25px; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 10px 14px; text-align: center; }
+        th { background: #2b6cb0; color: #fff; }
+        tr:nth-child(even) { background: #edf2f7; }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: "Consolas", monospace; color: #c53030; }
+        .code-block { background: #1a202c; color: #e2e8f0; border-radius: 8px; padding: 16px; margin: 12px 0; font-family: "Consolas", monospace; font-size: 0.9em; overflow-x: auto; white-space: pre; line-height: 1.6; }
+        .code-block .comment { color: #718096; }
+        .code-block .keyword { color: #63b3ed; }
+        .code-block .string { color: #68d391; }
+        .diagram { background: #ebf8ff; border: 2px solid #3182ce; border-radius: 8px; padding: 20px; margin: 15px 0; text-align: center; font-family: monospace; white-space: pre; line-height: 1.6; }
+        .highlight { background: #fefcbf; border-left: 4px solid #d69e2e; padding: 12px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+        .example { background: #f0fff4; border: 1px solid #48bb78; border-radius: 6px; padding: 14px; margin: 12px 0; }
+        .tag { display: inline-block; background: #2b6cb0; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 0.85em; margin: 2px; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<!-- 小程序架构与生命周期 -->
+<!-- 本页面介绍微信小程序的运行架构、App/Page生命周期、WXML/WXSS、数据绑定、组件系统和rpx单位 -->
+<h1>01 - 小程序架构与生命周期</h1>
+
+<!-- ====== 第一部分：小程序架构原理 ====== -->
+<h2>一、小程序架构原理</h2>
+<div class="card">
+    <h3>1.1 双线程架构</h3>
+    <p>微信小程序采用<strong>双线程架构</strong>，将渲染层和逻辑层分离到不同的线程中运行，避免了JS线程阻塞渲染，保障了安全性。</p>
+
+    <div class="diagram">  ┌─────────────────────────────────────────────────┐
+  │                  微信客户端                      │
+  │                                                  │
+  │  ┌── 渲染层（View Thread）─────┐                │
+  │  │  WXML模板 → 生成Virtual DOM  │                │
+  │  │  WXSS样式 → 页面样式渲染     │                │
+  │  │  WebView  → 渲染页面        │                │
+  │  └────────────┬────────────────┘                │
+  │               │ 通信（Native）                   │
+  │  ┌── 逻辑层（App Service Thread）──┐            │
+  │  │  JS脚本    → 业务逻辑处理        │            │
+  │  │  App/Page  → 生命周期管理        │            │
+  │  │  数据绑定  → setData驱动视图     │            │
+  │  └─────────────────────────────────┘            │
+  └─────────────────────────────────────────────────┘</div>
+
+    <h3>1.2 双线程的优势与限制</h3>
+    <table>
+        <tr><th>维度</th><th>说明</th></tr>
+        <tr><td>安全性</td><td>JS无法直接操作DOM，避免XSS攻击</td></tr>
+        <tr><td>稳定性</td><td>逻辑层崩溃不会导致页面白屏</td></tr>
+        <tr><td>性能</td><td>渲染和逻辑互不阻塞</td></tr>
+        <tr><td>通信开销</td><td>数据需通过setData序列化传递，频繁调用影响性能</td></tr>
+        <tr><td>无DOM/BOM</td><td>无法使用document、window等浏览器API</td></tr>
+    </table>
+
+    <h3>1.3 小程序文件结构</h3>
+    <div class="code-block"><span class="comment"># 小程序项目结构</span>
+├── app.js        <span class="comment"># 小程序逻辑（App实例）</span>
+├── app.json      <span class="comment"># 全局配置（页面路由、窗口样式、tabBar等）</span>
+├── app.wxss      <span class="comment"># 全局样式</span>
+├── project.config.json  <span class="comment"># 项目配置</span>
+├── sitemap.json  <span class="comment"># 索引配置</span>
+│
+├── pages/
+│   ├── index/
+│   │   ├── index.js      <span class="comment"># 页面逻辑</span>
+│   │   ├── index.json    <span class="comment"># 页面配置</span>
+│   │   ├── index.wxml    <span class="comment"># 页面结构（类似HTML）</span>
+│   │   └── index.wxss    <span class="comment"># 页面样式（类似CSS）</span>
+│   └── logs/
+│       ├── logs.js
+│       ├── logs.json
+│       ├── logs.wxml
+│       └── logs.wxss
+│
+├── components/    <span class="comment"># 自定义组件</span>
+├── utils/         <span class="comment"># 工具函数</span>
+└── static/        <span class="comment"># 静态资源</span></div>
+</div>
+
+<!-- ====== 第二部分：App生命周期 ====== -->
+<h2>二、App生命周期</h2>
+<div class="card">
+    <p>App是小程序的入口，管理整个应用的生命周期和全局数据。</p>
+
+    <h3>2.1 App生命周期钩子</h3>
+    <div class="code-block"><span class="comment">// app.js</span>
+App({
+  <span class="comment">// 小程序初始化完成时触发（全局只触发一次）</span>
+  onLaunch(options) {
+    console.log(<span class="string">'小程序启动'</span>, options);
+    <span class="comment">// options包含scene（场景值）、query（启动参数）等</span>
+
+    <span class="comment">// 检查登录状态</span>
+    wx.checkSession({
+      success() { console.log(<span class="string">'session未过期'</span>); },
+      fail() { console.log(<span class="string">'session已过期，需重新登录'</span>); }
+    });
+  },
+
+  <span class="comment">// 小程序启动或从后台进入前台时触发</span>
+  onShow(options) {
+    console.log(<span class="string">'小程序显示'</span>, options);
+  },
+
+  <span class="comment">// 小程序从前台进入后台时触发</span>
+  onHide() {
+    console.log(<span class="string">'小程序隐藏'</span>);
+  },
+
+  <span class="comment">// 小程序发生脚本错误或API调用失败时触发</span>
+  onError(error) {
+    console.error(<span class="string">'小程序错误'</span>, error);
+  },
+
+  <span class="comment">// 页面不存在时触发（做页面兜底）</span>
+  onPageNotFound(res) {
+    wx.redirectTo({ url: <span class="string">'/pages/index/index'</span> });
+  },
+
+  <span class="comment">// 全局数据</span>
+  globalData: {
+    userInfo: null,
+    baseUrl: <span class="string">'https://api.example.com'</span>
+  }
+})</div>
+
+    <h3>2.2 App生命周期流程</h3>
+    <div class="diagram">  用户打开小程序 → onLaunch（首次） → onShow
+  用户切换到其他App → onHide
+  用户切换回小程序 → onShow
+  用户关闭小程序 → （下次打开重新 onLaunch）
+
+  触发顺序：onLaunch → onShow（首次）
+            onShow（后续切回）</div>
+</div>
+
+<!-- ====== 第三部分：Page生命周期 ====== -->
+<h2>三、Page生命周期</h2>
+<div class="card">
+    <h3>3.1 Page生命周期钩子</h3>
+    <div class="code-block"><span class="comment">// pages/index/index.js</span>
+Page({
+  <span class="comment">// 页面数据（驱动视图渲染）</span>
+  data: {
+    message: <span class="string">'Hello World'</span>,
+    list: [],
+    count: 0
+  },
+
+  <span class="comment">// 页面加载时触发（接收页面参数）</span>
+  onLoad(options) {
+    console.log(<span class="string">'页面加载'</span>, options);
+    <span class="comment">// options.id 获取跳转时传递的参数</span>
+    this.setData({ count: options.id || 0 });
+  },
+
+  <span class="comment">// 页面显示时触发（每次进入页面都触发）</span>
+  onShow() {
+    console.log(<span class="string">'页面显示'</span>);
+  },
+
+  <span class="comment">// 页面初次渲染完成时触发（可操作DOM-like操作）</span>
+  onReady() {
+    console.log(<span class="string">'页面就绪'</span>);
+  },
+
+  <span class="comment">// 页面隐藏时触发（navigateTo到其他页面、切换tab等）</span>
+  onHide() {
+    console.log(<span class="string">'页面隐藏'</span>);
+  },
+
+  <span class="comment">// 页面卸载时触发（redirectTo、navigateBack等）</span>
+  onUnload() {
+    console.log(<span class="string">'页面卸载'</span>);
+  },
+
+  <span class="comment">// 用户下拉刷新</span>
+  onPullDownRefresh() {
+    console.log(<span class="string">'下拉刷新'</span>);
+    this.loadData().then(() => wx.stopPullDownRefresh());
+  },
+
+  <span class="comment">// 页面触底（上拉加载更多）</span>
+  onReachBottom() {
+    console.log(<span class="string">'触底加载'</span>);
+    this.loadMore();
+  },
+
+  <span class="comment">// 用户点击右上角分享</span>
+  onShareAppMessage() {
+    <span class="keyword">return</span> {
+      title: <span class="string">'推荐给你这个小程序'</span>,
+      path: <span class="string">'/pages/index/index?id=123'</span>
+    };
+  },
+
+  <span class="comment">// 页面滚动</span>
+  onPageScroll(e) {
+    console.log(<span class="string">'滚动位置'</span>, e.scrollTop);
+  },
+
+  <span class="comment">// 页面事件处理函数</span>
+  handleTap() {
+    this.setData({ count: this.data.count + 1 });
+  },
+
+  <span class="comment">// 自定义方法</span>
+  async loadData() {
+    const res = await wx.request({ url: <span class="string">'/api/data'</span> });
+    this.setData({ list: res.data });
+  }
+})</div>
+
+    <h3>3.2 Page生命周期流程</h3>
+    <div class="diagram">  打开页面 → onLoad → onShow → onReady（页面可见且可交互）
+  跳转到其他页面 → onHide（当前页面隐藏）
+  返回当前页面 → onShow（页面重新显示）
+  返回上一页/关闭 → onUnload（页面销毁）
+
+  触发频率：onLoad/onReady/onUnload 只触发一次
+            onShow/onHide 每次页面切换都触发</div>
+</div>
+
+<!-- ====== 第四部分：WXML与数据绑定 ====== -->
+<h2>四、WXML与数据绑定</h2>
+<div class="card">
+    <h3>4.1 WXML基础</h3>
+    <p>WXML（WeiXin Markup Language）是小程序的标记语言，类似HTML，但提供了数据绑定、条件渲染、列表渲染等增强能力。</p>
+
+    <div class="code-block"><span class="comment"><!-- 数据绑定 --></span>
+<span class="keyword">&lt;view&gt;</span>{{ message }}<span class="keyword">&lt;/view&gt;</span>
+<span class="keyword">&lt;view&gt;</span>{{ count > 10 ? '超过10' : '小于等于10' }}<span class="keyword">&lt;/view&gt;</span>
+<span class="keyword">&lt;view&gt;</span>{{ item.name + ' - ' + item.age }}<span class="keyword">&lt;/view&gt;</span>
+
+<span class="comment"><!-- 条件渲染 --></span>
+<span class="keyword">&lt;view</span> wx:if="{{ isLoggedIn }}"<span class="keyword">&gt;</span>已登录<span class="keyword">&lt;/view&gt;</span>
+<span class="keyword">&lt;view</span> wx:elif="{{ isLogging }}"<span class="keyword">&gt;</span>登录中...<span class="keyword">&lt;/view&gt;</span>
+<span class="keyword">&lt;view</span> wx:else<span class="keyword">&gt;</span>未登录<span class="keyword">&lt;/view&gt;</span>
+
+<span class="comment"><!-- hidden控制显示隐藏（元素始终渲染） --></span>
+<span class="keyword">&lt;view</span> hidden="{{ !showDetail }}"<span class="keyword">&gt;</span>详情内容<span class="keyword">&lt;/view&gt;</span>
+
+<span class="comment"><!-- 列表渲染 --></span>
+<span class="keyword">&lt;view</span> wx:for="{{ list }}" wx:key="id" wx:for-item="item" wx:for-index="idx"<span class="keyword">&gt;</span>
+  <span class="keyword">&lt;text&gt;</span>{{ idx + 1 }}. {{ item.name }}<span class="keyword">&lt;/text&gt;</span>
+<span class="keyword">&lt;/view&gt;</span>
+
+<span class="comment"><!-- 嵌套列表渲染 --></span>
+<span class="keyword">&lt;view</span> wx:for="{{ categories }}" wx:key="id"<span class="keyword">&gt;</span>
+  <span class="keyword">&lt;view&gt;</span>{{ item.title }}<span class="keyword">&lt;/view&gt;</span>
+  <span class="keyword">&lt;view</span> wx:for="{{ item.children }}" wx:for-item="child" wx:key="id"<span class="keyword">&gt;</span>
+    {{ child.name }}
+  <span class="keyword">&lt;/view&gt;</span>
+<span class="keyword">&lt;/view&gt;</span>
+
+<span class="comment"><!-- 事件绑定 --></span>
+<span class="keyword">&lt;button</span> bindtap="handleTap"<span class="keyword">&gt;</span>点击我<span class="keyword">&lt;/button&gt;</span>
+<span class="keyword">&lt;input</span> bindinput="onInput" placeholder="请输入内容" <span class="keyword">/&gt;</span>
+<span class="keyword">&lt;scroll-view</span> bindscroll="onScroll"<span class="keyword">&gt;</span>...<span class="keyword">&lt;/scroll-view&gt;</span>
+
+<span class="comment"><!-- 数据双向绑定（简易） --></span>
+<span class="keyword">&lt;input</span> model:value="{{ inputValue }}" <span class="keyword">/&gt;</span></div>
+
+    <h3>4.2 setData性能优化</h3>
+    <div class="highlight">
+        <strong>setData最佳实践：</strong>
+        <ul>
+            <li>避免频繁调用setData，合并多次更新为一次调用</li>
+            <li>只设置变化的数据字段，不要传递整个大对象</li>
+            <li>避免在onPageScroll中调用setData</li>
+            <li>长列表使用virtual-list或分页加载</li>
+            <li>不要设置过大的数据（建议每次setData的数据不超过1MB）</li>
+        </ul>
+    </div>
+
+    <div class="code-block"><span class="comment">// 错误做法：频繁调用setData</span>
+this.setData({ a: 1 });
+this.setData({ b: 2 });
+this.setData({ c: 3 });
+
+<span class="comment">// 正确做法：合并更新</span>
+this.setData({ a: 1, b: 2, c: 3 });
+
+<span class="comment">// 错误做法：传递不变的大数据</span>
+this.setData({ list: this.data.list }); <span class="comment">// list没变就不需要set</span>
+
+<span class="comment">// 正确做法：只更新变化的部分</span>
+this.setData({ <span class="string">'list[2].name'</span>: <span class="string">'新名字'</span> });</div>
+</div>
+
+<!-- ====== 第五部分：WXSS与rpx ====== -->
+<h2>五、WXSS与rpx单位</h2>
+<div class="card">
+    <h3>5.1 WXSS基础</h3>
+    <p>WXSS（WeiXin Style Sheets）是小程序的样式语言，类似CSS，但进行了裁剪和扩展。</p>
+
+    <table>
+        <tr><th>特性</th><th>说明</th></tr>
+        <tr><td>尺寸单位</td><td>新增rpx（响应式像素），不支持rem/vw等</td></tr>
+        <tr><td>样式导入</td><td>支持<code>@import</code>导入其他WXSS文件</td></tr>
+        <tr><td>选择器</td><td>支持.class、#id、element、::after、::before等，不支持*通配符</td></tr>
+        <tr><td>全局样式</td><td>app.wxss中定义，所有页面生效</td></tr>
+        <tr><td>局部样式</td><td>页面.wxss中定义，仅当前页面生效</td></tr>
+    </table>
+
+    <h3>5.2 rpx响应式单位</h3>
+    <p>rpx（responsive pixel）是微信小程序特有的响应式尺寸单位，可根据屏幕宽度自适应。</p>
+
+    <div class="highlight">
+        <strong>rpx换算规则：</strong>
+        <ul>
+            <li>规定屏幕宽度为 <strong>750rpx</strong></li>
+            <li>在iPhone 6（屏幕宽度375px）上：<code>1rpx = 0.5px</code></li>
+            <li>换算公式：<code>px = rpx * (屏幕实际宽度px / 750)</code></li>
+            <li>设计稿按750px宽度设计时，标注值直接使用rpx</li>
+        </ul>
+    </div>
+
+    <div class="code-block"><span class="comment">/* WXSS示例 */</span>
+
+<span class="comment">/* 使用rpx单位（推荐） */</span>
+.container {
+  width: 750rpx;        <span class="comment">/* 满屏宽度 */</span>
+  padding: 20rpx;
+  font-size: 28rpx;
+}
+
+.title {
+  font-size: 36rpx;
+  margin-bottom: 16rpx;
+  color: #333;
+}
+
+<span class="comment">/* 引入外部样式 */</span>
+@import <span class="string">"../common/style.wxss"</span>;
+
+<span class="comment">/* 全局样式在 app.wxss 中定义 */</span>
+page {
+  background-color: #f5f5f5;
+  font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+<span class="comment">/* 常用布局 */</span>
+.flex-row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.flex-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.card {
+  background: #fff;
+  border-radius: 16rpx;
+  padding: 24rpx;
+  margin: 20rpx;
+}</div>
+
+    <h3>5.3 rpx适配参考表</h3>
+    <table>
+        <tr><th>机型</th><th>屏幕宽度(px)</th><th>1rpx等于</th><th>750rpx等于</th></tr>
+        <tr><td>iPhone 5/SE</td><td>320</td><td>0.43px</td><td>320px</td></tr>
+        <tr><td>iPhone 6/7/8</td><td>375</td><td>0.5px</td><td>375px</td></tr>
+        <tr><td>iPhone 6/7/8 Plus</td><td>414</td><td>0.55px</td><td>414px</td></tr>
+        <tr><td>iPhone X/11/12</td><td>375</td><td>0.5px</td><td>375px</td></tr>
+        <tr><td>安卓常见</td><td>360</td><td>0.48px</td><td>360px</td></tr>
+    </table>
+</div>
+
+<!-- ====== 第六部分：组件系统 ====== -->
+<h2>六、组件系统</h2>
+<div class="card">
+    <h3>6.1 内置组件</h3>
+    <table>
+        <tr><th>组件</th><th>功能</th><th>类似HTML</th></tr>
+        <tr><td>view</td><td>视图容器</td><td>div</td></tr>
+        <tr><td>text</td><td>文本</td><td>span</td></tr>
+        <tr><td>image</td><td>图片</td><td>img</td></tr>
+        <tr><td>scroll-view</td><td>可滚动视图</td><td>overflow: scroll</td></tr>
+        <tr><td>swiper</td><td>滑块视图（轮播）</td><td>轮播插件</td></tr>
+        <tr><td>button</td><td>按钮</td><td>button</td></tr>
+        <tr><td>input</td><td>输入框</td><td>input</td></tr>
+        <tr><td>picker</td><td>选择器</td><td>select</td></tr>
+        <tr><td>navigator</td><td>页面链接</td><td>a</td></tr>
+        <tr><td>map</td><td>地图</td><td>地图API</td></tr>
+        <tr><td>canvas</td><td>画布</td><td>canvas</td></tr>
+        <tr><td>video</td><td>视频</td><td>video</td></tr>
+    </table>
+
+    <h3>6.2 自定义组件</h3>
+    <div class="code-block"><span class="comment">// components/my-card/my-card.js</span>
+Component({
+  <span class="comment">// 组件属性（外部传入）</span>
+  properties: {
+    title: { type: String, value: <span class="string">'默认标题'</span> },
+    count: { type: Number, value: 0 }
+  },
+
+  <span class="comment">// 组件内部数据</span>
+  data: {
+    expanded: false
+  },
+
+  <span class="comment">// 组件方法</span>
+  methods: {
+    toggleExpand() {
+      this.setData({ expanded: !this.data.expanded });
+      <span class="comment">// 触发事件通知父组件</span>
+      this.triggerEvent(<span class="string">'change'</span>, { expanded: this.data.expanded });
+    }
+  },
+
+  <span class="comment">// 组件生命周期</span>
+  lifetimes: {
+    attached() { console.log(<span class="string">'组件挂载'</span>); },
+    detached() { console.log(<span class="string">'组件销毁'</span>); }
+  }
+})
+
+<span class="comment">&lt;!-- components/my-card/my-card.wxml --&gt;</span>
+<span class="keyword">&lt;view</span> class="card"<span class="keyword">&gt;</span>
+  <span class="keyword">&lt;view</span> class="card-header" bindtap="toggleExpand"<span class="keyword">&gt;</span>
+    <span class="keyword">&lt;text&gt;</span>{{ title }}<span class="keyword">&lt;/text&gt;</span>
+    <span class="keyword">&lt;text&gt;</span>{{ expanded ? '收起' : '展开' }}<span class="keyword">&lt;/text&gt;</span>
+  <span class="keyword">&lt;/view&gt;</span>
+  <span class="keyword">&lt;view</span> class="card-body" wx:if="{{ expanded }}"<span class="keyword">&gt;</span>
+    <span class="keyword">&lt;slot&gt;&lt;/slot&gt;</span>  <span class="comment">&lt;!-- 插槽 --&gt;</span>
+  <span class="keyword">&lt;/view&gt;</span>
+<span class="keyword">&lt;/view&gt;</span></div>
+
+    <div class="highlight">
+        <strong>组件使用要点：</strong>
+        <ul>
+            <li>在页面json中声明引用的组件：<code>"usingComponents": {"my-card": "/components/my-card/my-card"}</code></li>
+            <li>组件的wxss默认隔离（<code>styleIsolation: 'isolated'</code>），可通过配置修改</li>
+            <li>组件间通信：properties向下传值，triggerEvent向上传事件</li>
+            <li>behavior可实现组件间代码复用</li>
+        </ul>
+    </div>
+</div>
+
+</div><!-- end container -->
+
+<!-- 小程序架构与生命周期总结 -->
+<!-- 核心要点：双线程架构（渲染层+逻辑层）、App/Page生命周期、WXML数据绑定与条件/列表渲染、rpx响应式单位、组件系统 -->
+</body>
+</html>

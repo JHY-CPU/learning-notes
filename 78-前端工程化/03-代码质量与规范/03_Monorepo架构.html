@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monorepo架构</title>
+    <style>
+        :root { --primary: #1a73e8; --primary-light: #e8f0fe; --secondary: #34a853; --warning: #ea4335; --purple: #9c27b0; --bg: #f8f9fa; --card-bg: #ffffff; --text: #202124; --border: #dadce0; --code-bg: #f1f3f4; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { font-size: 2em; color: var(--primary); border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 1.5em; color: var(--primary); margin: 32px 0 16px; padding-left: 12px; border-left: 4px solid var(--primary); }
+        h3 { font-size: 1.2em; margin: 20px 0 10px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .highlight { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .warning { background: #fce8e6; border-left: 4px solid var(--warning); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .success { background: #e6f4ea; border-left: 4px solid var(--secondary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .purple { background: #f3e5f5; border-left: 4px solid var(--purple); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; font-family: 'Fira Code','Consolas',monospace; font-size: 0.9em; line-height: 1.6; margin: 12px 0; }
+        code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre code { background: none; padding: 0; }
+        ul, ol { padding-left: 24px; margin: 8px 0; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid var(--border); padding: 12px; text-align: left; }
+        th { background: var(--primary-light); font-weight: 600; }
+        .flow-diagram { background: var(--card-bg); border: 2px solid var(--primary); border-radius: 12px; padding: 20px; text-align: center; font-family: monospace; margin: 16px 0; white-space: pre; line-height: 1.6; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>Monorepo架构</h1>
+
+    <div class="highlight">
+        <strong>核心概念：</strong>Monorepo是一种将多个项目/包放在同一个代码仓库中的管理方式。主流工具包括Turborepo（Vercel出品，增量构建+远程缓存）、Nx（功能全面，依赖图分析）、Lerna（历史最久，已逐渐被替代）。配合pnpm workspace的workspace:协议和依赖提升，形成高效的Monorepo开发体验。
+    </div>
+
+    <!-- ==================== 一、Monorepo vs Polyrepo ==================== -->
+    <h2>一、Monorepo vs Polyrepo</h2>
+
+    <div class="card">
+        <h3>1.1 两种模式对比</h3>
+        <div class="flow-diagram">
+Monorepo（单仓库多项目）：              Polyrepo（多仓库多项目）：
+repo/                                 repo-app/
+├── packages/                         ├── src/
+│   ├── ui/                           └── package.json
+│   ├── utils/                        repo-lib/
+│   └── api-client/                   ├── src/
+├── apps/                             └── package.json
+│   ├── web/                          repo-shared/
+│   └── admin/                        ├── src/
+└── package.json                      └── package.json</div>
+        <table>
+            <tr><th>特性</th><th>Monorepo</th><th>Polyrepo</th></tr>
+            <tr><td>代码共享</td><td>容易（直接引用本地包）</td><td>困难（需发布npm包）</td></tr>
+            <tr><td>依赖管理</td><td>统一管理，版本一致</td><td>各仓库独立管理</td></tr>
+            <tr><td>原子性变更</td><td>支持（一次提交跨多个包）</td><td>不支持</td></tr>
+            <tr><td>CI/CD</td><td>可按需构建（受影响的包）</td><td>各仓库独立CI</td></tr>
+            <tr><td>权限控制</td><td>粒度粗</td><td>粒度细（按仓库）</td></tr>
+            <tr><td>仓库大小</td><td>大</td><td>小</td></tr>
+            <tr><td>学习曲线</td><td>需要工具支持</td><td>简单直接</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>1.2 适用场景</h3>
+        <ul>
+            <li><strong>Monorepo适合：</strong>共享组件库、全栈项目（前端+后端+移动端）、设计系统、多产品线共享基础设施</li>
+            <li><strong>Polyrepo适合：</strong>独立项目、团队规模大需要细粒度权限、微服务架构</li>
+            <li>知名Monorepo项目：React、Vue、Next.js、Babel、Vite、Angular</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 二、Turborepo ==================== -->
+    <h2>二、Turborepo</h2>
+
+    <div class="card">
+        <h3>2.1 Turborepo核心特性</h3>
+        <ul>
+            <li><strong>增量构建：</strong>只构建发生变化的包及其依赖</li>
+            <li><strong>远程缓存：</strong>构建结果可以缓存到远程（Vercel/自建），CI/CD和开发者共享</li>
+            <li><strong>并行构建：</strong>自动分析依赖关系，并行执行无依赖的任务</li>
+            <li><strong>任务管道（Pipeline）：</strong>定义任务之间的依赖关系</li>
+            <li><strong>零配置：</strong>与pnpm/yarn/npm workspace无缝集成</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>2.2 项目结构</h3>
+        <pre><code>my-monorepo/
+├── apps/
+│   ├── web/                  # 主应用
+│   │   ├── src/
+│   │   ├── package.json
+│   │   └── vite.config.ts
+│   └── admin/                # 管理后台
+│       ├── src/
+│       ├── package.json
+│       └── vite.config.ts
+├── packages/
+│   ├── ui/                   # UI组件库
+│   │   ├── src/
+│   │   └── package.json      # "@myorg/ui"
+│   ├── utils/                # 工具函数
+│   │   ├── src/
+│   │   └── package.json      # "@myorg/utils"
+│   ├── tsconfig/             # 共享TS配置
+│   │   ├── base.json
+│   │   ├── react-library.json
+│   │   └── package.json
+│   └── eslint-config/        # 共享ESLint配置
+│       ├── index.js
+│       └── package.json
+├── turbo.json                # Turborepo配置
+├── pnpm-workspace.yaml       # pnpm workspace配置
+├── package.json              # 根package.json
+└── tsconfig.json</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>2.3 turbo.json配置</h3>
+        <pre><code>// turbo.json
+{
+    "$schema": "https://turbo.build/schema.json",
+    "globalDependencies": [
+        ".env.*",           // 环境变量变化时重新构建
+        "tsconfig.json"
+    ],
+    "globalEnv": [
+        "NODE_ENV",
+        "API_URL"
+    ],
+    "pipeline": {
+        // build任务
+        "build": {
+            "dependsOn": ["^build"],  // 依赖先构建（上游包先build）
+            "outputs": ["dist/**", ".next/**", ".vite/**"],
+            "env": ["NODE_ENV", "API_URL"]
+        },
+        // dev任务（不缓存）
+        "dev": {
+            "cache": false,
+            "persistent": true      // 持续运行的任务
+        },
+        // test任务
+        "test": {
+            "dependsOn": ["build"],
+            "outputs": ["coverage/**"],
+            "inputs": [
+                "src/**/*.tsx",
+                "src/**/*.ts",
+                "test/**/*.ts"
+            ]
+        },
+        // lint任务
+        "lint": {
+            "dependsOn": ["^build"],  // TypeScript类型检查需要上游构建结果
+            "outputs": []
+        },
+        // typecheck任务
+        "typecheck": {
+            "dependsOn": ["^build"],
+            "outputs": []
+        }
+    }
+}</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>2.4 Turborepo常用命令</h3>
+        <pre><code># 构建所有包（增量，只构建变化的）
+turbo run build
+
+# 并行运行所有包的dev
+turbo run dev
+
+# 只构建web应用及其依赖
+turbo run build --filter=web
+
+# 排除某些包
+turbo run build --filter='!admin'
+
+# 运行自上次提交以来变化的包的build
+turbo run build --filter='[HEAD~1]'
+
+# 强制重新构建（忽略缓存）
+turbo run build --force
+
+# 清理缓存
+turbo prune --scope=web  # 只保留web所需的依赖
+
+# 远程缓存
+turbo login              # 登录Vercel
+turbo link               # 关联远程缓存</code></pre>
+    </div>
+
+    <!-- ==================== 三、Nx ==================== -->
+    <h2>三、Nx</h2>
+
+    <div class="card">
+        <h3>3.1 Nx核心特性</h3>
+        <ul>
+            <li><strong>依赖图可视化：</strong>自动生成项目依赖关系图</li>
+            <li><strong>代码生成器（Generators）：</strong>快速生成组件、库、应用模板</li>
+            <li><strong>受影响分析：</strong>精确知道哪些项目受到代码变更影响</li>
+            <li><strong>分布式任务执行（DTE）：</strong>在CI中将任务分布到多台机器</li>
+            <li><strong>插件生态：</strong>React、Vue、Angular、Node.js等官方插件</li>
+        </ul>
+        <pre><code># Nx常用命令
+npx create-nx-workspace@latest my-org  # 创建workspace
+nx graph                                # 查看依赖图
+nx affected --target=test               # 运行受影响项目的测试
+nx run-many --target=build --all        # 构建所有项目
+nx generate @nx/react:lib my-lib        # 生成React库
+nx g @nx/react:component MyComp --project=my-lib  # 生成组件</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>3.2 nx.json配置</h3>
+        <pre><code>// nx.json
+{
+    "targetDefaults": {
+        "build": {
+            "dependsOn": ["^build"],
+            "cache": true
+        },
+        "test": {
+            "dependsOn": ["build"],
+            "inputs": ["default", "^default"],
+            "cache": true
+        }
+    },
+    "namedInputs": {
+        "default": ["{projectRoot}/**/*", "!{projectRoot}/**/*.test.*"],
+        "sharedGlobals": []
+    }
+}</code></pre>
+    </div>
+
+    <!-- ==================== 四、Lerna ==================== -->
+    <h2>四、Lerna（传统方案）</h2>
+
+    <div class="card">
+        <h3>4.1 Lerna概述</h3>
+        <p>Lerna是最早的前端Monorepo工具之一，现由Nx团队维护。新版Lerna底层使用Nx进行任务运行和缓存：</p>
+        <pre><code># 安装
+npm install -g lerna
+
+# 初始化
+lerna init
+
+# 发布所有变更的包
+lerna publish          # 自动检测变更、更新版本、发布npm
+
+# 运行所有包的脚本
+lerna run build        # 构建所有包
+lerna run test         # 测试所有包
+
+# 在所有包中执行命令
+lerna exec -- ls -la   # 在每个包目录执行ls
+
+# 版本管理
+lerna version          # 交互式选择版本号
+lerna version --conventional-commits  # 基于conventional commits自动确定版本</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>4.2 lerna.json配置</h3>
+        <pre><code>// lerna.json
+{
+    "$schema": "node_modules/lerna/schemas/lerna-schema.json",
+    "version": "independent",  // 独立版本（每个包独立版本号）
+    // "version": "1.0.0",    // 固定版本（所有包统一版本号）
+    "npmClient": "pnpm",
+    "useWorkspaces": true,     // 使用package.json的workspaces
+    "command": {
+        "publish": {
+            "conventionalCommits": true,
+            "message": "chore(release): publish"
+        },
+        "version": {
+            "conventionalCommits": true
+        }
+    }
+}</code></pre>
+        <div class="warning">
+            <strong>Lerna现状：</strong>Lerna适合需要发布npm包的场景。对于纯应用型Monorepo，推荐使用Turborepo或Nx，它们的增量构建和缓存能力更强。
+        </div>
+    </div>
+
+    <!-- ==================== 五、Workspace协议 ==================== -->
+    <h2>五、pnpm workspace:协议</h2>
+
+    <div class="card">
+        <h3>5.1 workspace协议</h3>
+        <pre><code>// packages/ui/package.json
+{
+    "name": "@myorg/ui",
+    "version": "1.0.0",
+    "dependencies": {
+        // workspace:* → 始终使用本地版本
+        "@myorg/utils": "workspace:*",
+
+        // workspace:~ → 发布时转换为 ~1.0.0
+        "@myorg/core": "workspace:~",
+
+        // workspace:^ → 发布时转换为 ^1.0.0（推荐）
+        "@myorg/shared": "workspace:^"
+    }
+}
+
+// workspace协议在不同阶段的行为：
+// 开发时：始终指向本地包
+// 发布npm时：workspace:* 会被替换为实际版本号
+// workspace:^ → "^1.0.0"
+// workspace:~ → "~1.0.0"
+// workspace:* → "1.0.0"（精确版本）</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>5.2 依赖提升配置</h3>
+        <pre><code>// .npmrc
+// pnpm配置
+shamefully-hoist=false        // 不提升依赖（严格模式）
+// shamefully-hoist=true      // 模仿npm/yarn的扁平结构
+
+// 选择性提升
+public-hoist-pattern[]=*eslint*
+public-hoist-pattern[]=*prettier*
+auto-install-peers=true       // 自动安装peerDependencies
+
+// package.json 配置不提升的依赖
+{
+    "pnpm": {
+        "neverBuiltDependencies": ["fsevents"],
+        "peerDependencyRules": {
+            "ignoreMissing": ["@types/*"]
+        }
+    }
+}</code></pre>
+    </div>
+
+    <!-- ==================== 六、任务管道与缓存 ==================== -->
+    <h2>六、任务管道与缓存</h2>
+
+    <div class="card">
+        <h3>6.1 依赖图与执行顺序</h3>
+        <div class="flow-diagram">
+依赖关系：
+@myorg/utils ← @myorg/ui ← web
+@myorg/utils ← @myorg/api-client ← web
+@myorg/ui ← admin
+
+构建顺序（拓扑排序）：
+1. @myorg/utils      （无依赖）
+2. @myorg/ui         （依赖utils）
+3. @myorg/api-client  （依赖utils）
+4. web               （依赖ui, api-client）
+5. admin             （依赖ui）
+
+Turborepo自动按此顺序构建，无依赖的包并行执行</div>
+    </div>
+
+    <div class="card">
+        <h3>6.2 缓存策略</h3>
+        <pre><code>// Turborepo缓存原理：
+// 输入：源代码 + 依赖 + 环境变量 + 配置文件
+// → 计算hash
+// → 检查本地/远程缓存
+// → 命中：跳过构建，恢复输出文件
+// → 未命中：执行构建，缓存结果
+
+// 增量构建示例：
+// 只修改了 packages/utils/src/format.ts
+// 1. @myorg/utils: 未命中缓存 → 重新build
+// 2. @myorg/ui: 依赖utils → 重新build
+// 3. @myorg/api-client: 依赖utils → 重新build
+// 4. web: 依赖ui和api-client → 重新build
+// 5. admin: 只依赖ui → 重新build
+// 6. packages/tsconfig: 无变化 → 命中缓存，跳过
+// 7. packages/eslint-config: 无变化 → 命中缓存，跳过</code></pre>
+    </div>
+
+    <!-- ==================== 七、工具选型 ==================== -->
+    <h2>七、Monorepo工具选型</h2>
+
+    <div class="card">
+        <h3>7.1 工具对比</h3>
+        <table>
+            <tr><th>特性</th><th>Turborepo</th><th>Nx</th><th>Lerna</th></tr>
+            <tr><td><strong>学习曲线</strong></td><td>低</td><td>中等</td><td>低</td></tr>
+            <tr><td><strong>增量构建</strong></td><td>优秀</td><td>优秀</td><td>依赖Nx</td></tr>
+            <tr><td><strong>远程缓存</strong></td><td>原生支持</td><td>原生支持</td><td>依赖Nx</td></tr>
+            <tr><td><strong>分布式执行</strong></td><td>Vercel支持</td><td>原生支持</td><td>不支持</td></tr>
+            <tr><td><strong>依赖图</strong></td><td>基础</td><td>可视化优秀</td><td>基础</td></tr>
+            <tr><td><strong>代码生成</strong></td><td>无</td><td>强大</td><td>无</td></tr>
+            <tr><td><strong>版本发布</strong></td><td>无</td><td>有</td><td>核心功能</td></tr>
+            <tr><td><strong>配置复杂度</strong></td><td>简单</td><td>复杂</td><td>简单</td></tr>
+            <tr><td><strong>生态</strong></td><td>Vercel生态</td><td>丰富插件</td><td>维护模式</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>7.2 选型建议</h3>
+        <ul>
+            <li><strong>Turborepo：</strong>首选。简单易用，与pnpm workspace配合完美，Vercel部署无缝集成</li>
+            <li><strong>Nx：</strong>大型团队、需要代码生成器、分布式任务执行、依赖图可视化</li>
+            <li><strong>Lerna：</strong>只需要发布npm包的场景（结合Changesets更现代）</li>
+            <li><strong>pnpm workspace alone：</strong>简单Monorepo，不需要高级构建优化</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>7.3 现代推荐方案</h3>
+        <pre><code>// 最佳实践组合：
+// pnpm workspace + Turborepo + Changesets
+
+// 1. pnpm workspace 管理依赖和本地包引用
+// 2. Turborepo 管理任务编排和缓存
+// 3. Changesets 管理版本号和CHANGELOG
+
+// 使用Changesets管理版本
+// 安装
+pnpm add -D @changesets/cli
+
+// 初始化
+pnpm changeset init
+
+// 添加变更集（交互式）
+pnpm changeset
+// 选择哪些包有变更
+// 选择版本号（patch/minor/major）
+// 填写变更描述
+
+// 应用变更集，更新版本号
+pnpm changeset version
+
+// 发布到npm
+pnpm changeset publish</code></pre>
+    </div>
+
+    <div class="success">
+        <strong>完整工程化体系：</strong>
+        <ul>
+            <li><strong>包管理：</strong>pnpm workspace 管理依赖和包引用</li>
+            <li><strong>构建编排：</strong>Turborepo 增量构建、并行执行、远程缓存</li>
+            <li><strong>代码规范：</strong>ESLint + Prettier + husky + commitlint</li>
+            <li><strong>版本发布：</strong>Changesets 管理版本和CHANGELOG</li>
+            <li><strong>CI/CD：</strong>GitHub Actions + Turborepo远程缓存</li>
+            <li><strong>类型安全：</strong>共享tsconfig，workspace协议引用类型</li>
+        </ul>
+    </div>
+
+    <div class="highlight">
+        <strong>总结：</strong>Monorepo是管理多包/多项目代码的有效方式。Turborepo以简单易用为核心优势，配合pnpm workspace形成最佳组合。Nx适合需要高级功能的大型团队。Lerna专注于npm包发布。核心理念是通过依赖图分析实现增量构建和智能缓存，大幅提升CI/CD和开发体验。
+    </div>
+</div>
+<!-- 本文档总结了Monorepo架构、Turborepo、Nx、Lerna的配置和选型 -->
+</body>
+</html>

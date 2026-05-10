@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小程序API与云开发 - 小程序开发笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", "SimSun", sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; border-bottom: 3px solid #2b6cb0; padding-bottom: 12px; margin-bottom: 30px; }
+        h2 { color: #2c5282; margin: 25px 0 12px; padding-left: 10px; border-left: 4px solid #2b6cb0; }
+        h3 { color: #2d3748; margin: 18px 0 8px; }
+        p, li { margin-bottom: 8px; }
+        ul, ol { padding-left: 25px; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 10px 14px; text-align: center; }
+        th { background: #2b6cb0; color: #fff; }
+        tr:nth-child(even) { background: #edf2f7; }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: "Consolas", monospace; color: #c53030; }
+        .code-block { background: #1a202c; color: #e2e8f0; border-radius: 8px; padding: 16px; margin: 12px 0; font-family: "Consolas", monospace; font-size: 0.9em; overflow-x: auto; white-space: pre; line-height: 1.6; }
+        .code-block .comment { color: #718096; }
+        .code-block .keyword { color: #63b3ed; }
+        .code-block .string { color: #68d391; }
+        .diagram { background: #ebf8ff; border: 2px solid #3182ce; border-radius: 8px; padding: 20px; margin: 15px 0; text-align: center; font-family: monospace; white-space: pre; line-height: 1.6; }
+        .highlight { background: #fefcbf; border-left: 4px solid #d69e2e; padding: 12px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+        .example { background: #f0fff4; border: 1px solid #48bb78; border-radius: 6px; padding: 14px; margin: 12px 0; }
+        .tag { display: inline-block; background: #2b6cb0; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 0.85em; margin: 2px; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<!-- 小程序API与云开发 -->
+<!-- 本页面介绍微信小程序常用API（网络请求、存储、位置、多媒体）和微信云开发（云函数、云数据库） -->
+<h1>02 - 小程序API与云开发</h1>
+
+<!-- ====== 第一部分：网络请求 ====== -->
+<h2>一、网络请求 API</h2>
+<div class="card">
+    <h3>1.1 wx.request</h3>
+    <div class="code-block"><span class="comment">// 基本用法</span>
+wx.request({
+  url: <span class="string">'https://api.example.com/data'</span>,
+  method: <span class="string">'GET'</span>,
+  data: { page: 1, size: 20 },
+  header: { <span class="string">'content-type'</span>: <span class="string">'application/json'</span> },
+  success(res) {
+    console.log(<span class="string">'请求成功'</span>, res.data);
+  },
+  fail(err) {
+    console.error(<span class="string">'请求失败'</span>, err);
+  },
+  complete() {
+    console.log(<span class="string">'请求完成'</span>);
+  }
+})
+
+<span class="comment">// 封装为Promise（推荐）</span>
+const request = (options) => {
+  return new Promise((resolve, reject) => {
+    wx.request({
+      url: getApp().globalData.baseUrl + options.url,
+      method: options.method || <span class="string">'GET'</span>,
+      data: options.data,
+      header: {
+        <span class="string">'content-type'</span>: <span class="string">'application/json'</span>,
+        <span class="string">'Authorization'</span>: wx.getStorageSync(<span class="string">'token'</span>)
+      },
+      success: (res) => {
+        if (res.statusCode === 200) resolve(res.data);
+        else reject(res);
+      },
+      fail: reject
+    });
+  });
+}
+
+<span class="comment">// 使用封装后的request</span>
+async function loadData() {
+  try {
+    const res = await request({ url: <span class="string">'/api/users'</span> });
+    this.setData({ users: res.data });
+  } catch (err) {
+    wx.showToast({ title: <span class="string">'加载失败'</span>, icon: <span class="string">'error'</span> });
+  }
+}</div>
+
+    <h3>1.2 网络相关配置</h3>
+    <ul>
+        <li><strong>域名白名单</strong>：小程序只能请求在后台配置的合法域名（开发阶段可关闭域名校验）</li>
+        <li><strong>HTTPS要求</strong>：正式环境必须使用HTTPS</li>
+        <li><strong>超时设置</strong>：默认60秒，可在<code>app.json</code>中配置<code>networkTimeout</code></li>
+        <li><strong>并发限制</strong>：同时最多10个网络请求</li>
+    </ul>
+</div>
+
+<!-- ====== 第二部分：存储API ====== -->
+<h2>二、本地存储 API</h2>
+<div class="card">
+    <h3>2.1 同步与异步API</h3>
+    <div class="code-block"><span class="comment">// ===== 同步API（简单直接） =====</span>
+wx.setStorageSync(<span class="string">'token'</span>, <span class="string">'abc123'</span>);
+wx.setStorageSync(<span class="string">'userInfo'</span>, { name: <span class="string">'张三'</span>, age: 25 });
+
+const token = wx.getStorageSync(<span class="string">'token'</span>);
+const userInfo = wx.getStorageSync(<span class="string">'userInfo'</span>);
+
+wx.removeStorageSync(<span class="string">'token'</span>);
+wx.clearStorageSync();  <span class="comment">// 清空所有本地存储</span>
+
+<span class="comment">// ===== 异步API（推荐，不阻塞主线程） =====</span>
+wx.setStorage({
+  key: <span class="string">'config'</span>,
+  data: { theme: <span class="string">'dark'</span>, lang: <span class="string">'zh-CN'</span> },
+  success() { console.log(<span class="string">'存储成功'</span>); }
+});
+
+wx.getStorage({
+  key: <span class="string">'config'</span>,
+  success(res) { console.log(res.data); }
+});
+
+<span class="comment">// 异步Promise封装</span>
+const getStorage = (key) => new Promise((resolve) => {
+  wx.getStorage({ key, success: (res) => resolve(res.data) });
+});
+
+<span class="comment">// 获取存储信息</span>
+wx.getStorageInfo({
+  success(res) {
+    console.log(<span class="string">'keys:'</span>, res.keys);
+    console.log(<span class="string">'当前大小:'</span>, res.currentSize, <span class="string">'KB'</span>);
+    console.log(<span class="string">'限制大小:'</span>, res.limitSize, <span class="string">'KB'</span>);
+  }
+});</div>
+
+    <h3>2.2 存储限制</h3>
+    <table>
+        <tr><th>维度</th><th>限制</th></tr>
+        <tr><td>单个key数据大小</td><td>不超过1MB</td></tr>
+        <tr><td>总存储空间</td><td>不超过10MB</td></tr>
+        <tr><td>清理策略</td><td>存储满后新数据存储失败，不会自动清理</td></tr>
+    </table>
+</div>
+
+<!-- ====== 第三部分：位置与设备API ====== -->
+<h2>三、位置与设备 API</h2>
+<div class="card">
+    <h3>3.1 位置API</h3>
+    <div class="code-block"><span class="comment">// 获取当前位置</span>
+wx.getLocation({
+  type: <span class="string">'gcj02'</span>,  <span class="comment">// gcj02（国测局坐标）或 wgs84</span>
+  success(res) {
+    const { latitude, longitude, speed, accuracy } = res;
+    console.log(<span class="string">`纬度: ${latitude}, 经度: ${longitude}`</span>);
+  },
+  fail() {
+    wx.showToast({ title: <span class="string">'获取位置失败'</span> });
+  }
+});
+
+<span class="comment">// 打开地图选择位置</span>
+wx.chooseLocation({
+  success(res) {
+    console.log(<span class="string">'选中位置:'</span>, res.name, res.address);
+    console.log(<span class="string">`坐标: ${res.latitude}, ${res.longitude}`</span>);
+  }
+});
+
+<span class="comment">// 使用地图组件</span>
+<span class="comment">// &lt;map latitude="{{lat}}" longitude="{{lng}}" scale="16" markers="{{markers}}" /&gt;</span></div>
+
+    <h3>3.2 常用设备API</h3>
+    <div class="code-block"><span class="comment">// 拍照或从相册选择图片</span>
+wx.chooseImage({
+  count: 9,           <span class="comment">// 最多选择9张</span>
+  sizeType: [<span class="string">'compressed'</span>],  <span class="comment">// 原图/压缩图</span>
+  sourceType: [<span class="string">'album'</span>, <span class="string">'camera'</span>],  <span class="comment">// 相册/相机</span>
+  success(res) {
+    const tempFilePaths = res.tempFilePaths;
+    <span class="comment">// 上传图片</span>
+    tempFilePaths.forEach(path => {
+      wx.uploadFile({
+        url: <span class="string">'https://api.example.com/upload'</span>,
+        filePath: path,
+        name: <span class="string">'file'</span>,
+        success(res) { console.log(<span class="string">'上传成功'</span>); }
+      });
+    });
+  }
+});
+
+<span class="comment">// 扫码</span>
+wx.scanCode({
+  success(res) {
+    console.log(<span class="string">'扫码结果:'</span>, res.result);
+    console.log(<span class="string">'扫码类型:'</span>, res.scanType);  <span class="comment">// QR_CODE / BAR_CODE 等</span>
+  }
+});
+
+<span class="comment">// 获取系统信息</span>
+const systemInfo = wx.getSystemInfoSync();
+console.log(<span class="string">'手机品牌:'</span>, systemInfo.brand);
+console.log(<span class="string">'手机型号:'</span>, systemInfo.model);
+console.log(<span class="string">'屏幕宽度:'</span>, systemInfo.screenWidth);
+console.log(<span class="string">'状态栏高度:'</span>, systemInfo.statusBarHeight);
+console.log(<span class="string">'安全区域:'</span>, systemInfo.safeArea);
+
+<span class="comment">// 振动</span>
+wx.vibrateShort({ type: <span class="string">'medium'</span> });
+wx.vibrateLong();
+
+<span class="comment">// 剪贴板</span>
+wx.setClipboardData({ data: <span class="string">'要复制的文字'</span> });
+wx.getClipboardData({
+  success(res) { console.log(<span class="string">'剪贴板内容:'</span>, res.data); }
+});</div>
+</div>
+
+<!-- ====== 第四部分：用户授权与登录 ====== -->
+<h2>四、用户授权与微信登录</h2>
+<div class="card">
+    <h3>4.1 微信登录流程</h3>
+    <div class="diagram">  小程序端                        业务服务器                  微信服务器
+  ──────────                    ──────────                ──────────
+  wx.login() → 获取code
+                    code ──────────→
+                                    code + appId + secret ──→
+                                                          ←── openid / session_key
+                                    生成自定义token
+                    token ←─────────
+  存储token到本地</div>
+
+    <h3>4.2 登录实现</h3>
+    <div class="code-block"><span class="comment">// 微信登录</span>
+async function wxLogin() {
+  <span class="comment">// 1. 获取code</span>
+  const loginRes = await new Promise((resolve) => {
+    wx.login({ success: resolve });
+  });
+  const code = loginRes.code;
+
+  <span class="comment">// 2. 发送code到后端换取openid和自定义token</span>
+  const tokenRes = await new Promise((resolve, reject) => {
+    wx.request({
+      url: <span class="string">'https://api.example.com/login'</span>,
+      method: <span class="string">'POST'</span>,
+      data: { code },
+      success: resolve,
+      fail: reject
+    });
+  });
+
+  <span class="comment">// 3. 存储token</span>
+  wx.setStorageSync(<span class="string">'token'</span>, tokenRes.data.token);
+  getApp().globalData.isLogin = true;
+}
+
+<span class="comment">// 获取用户信息（新方式：使用头像昵称填写组件）</span>
+<span class="comment">// &lt;button open-type="chooseAvatar" bindchooseavatar="onChooseAvatar"&gt;</span>
+function onChooseAvatar(e) {
+  this.setData({ avatarUrl: e.detail.avatarUrl });
+}
+
+<span class="comment">// 获取手机号（需用户主动触发）</span>
+<span class="comment">// &lt;button open-type="getPhoneNumber" bindgetphonenumber="onGetPhone"&gt;</span>
+function onGetPhone(e) {
+  if (e.detail.code) {
+    <span class="comment">// 将code发送到后端换取手机号</span>
+    wx.request({
+      url: <span class="string">'/api/bindPhone'</span>,
+      data: { code: e.detail.code }
+    });
+  }
+}</div>
+
+    <h3>4.3 微信支付</h3>
+    <div class="code-block"><span class="comment">// 微信支付（需要商户号配置）</span>
+async function wxPay(orderId) {
+  <span class="comment">// 1. 后端生成支付参数</span>
+  const payRes = await request({
+    url: <span class="string">'/api/pay/create'</span>,
+    method: <span class="string">'POST'</span>,
+    data: { orderId }
+  });
+
+  <span class="comment">// 2. 调起微信支付</span>
+  const result = await new Promise((resolve, reject) => {
+    wx.requestPayment({
+      timeStamp: payRes.timeStamp,
+      nonceStr: payRes.nonceStr,
+      package: payRes.package,      <span class="comment">// prepay_id=xxx</span>
+      signType: payRes.signType,     <span class="comment">// RSA</span>
+      paySign: payRes.paySign,
+      success: resolve,
+      fail: reject
+    });
+  });
+
+  <span class="comment">// 3. 支付成功，查询订单状态</span>
+  wx.showToast({ title: <span class="string">'支付成功'</span>, icon: <span class="string">'success'</span> });
+}</div>
+</div>
+
+<!-- ====== 第五部分：云开发基础 ====== -->
+<h2>五、微信云开发</h2>
+<div class="card">
+    <h3>5.1 云开发概述</h3>
+    <p>微信云开发是微信官方提供的 Serverless 后端服务，包含云函数、云数据库、云存储三大核心能力，无需搭建服务器即可开发完整的小程序后端。</p>
+
+    <div class="diagram">  ┌──── 小程序前端 ────┐
+  │                      │
+  │  wx.cloud.callFunction() ──→ 云函数（Node.js）
+  │  wx.cloud.database()  ──→ 云数据库（MongoDB）
+  │  wx.cloud.uploadFile() ──→ 云存储（对象存储）
+  │                      │
+  └──────────────────────┘
+  无需后端服务器，无需运维，按调用次数计费</div>
+
+    <h3>5.2 云开发初始化</h3>
+    <div class="code-block"><span class="comment">// app.js 中初始化云开发</span>
+App({
+  onLaunch() {
+    wx.cloud.init({
+      env: <span class="string">'prod-xxx'</span>,  <span class="comment">// 云开发环境ID</span>
+      traceUser: true   <span class="comment">// 用户访问记录</span>
+    });
+  }
+})</div>
+
+    <h3>5.3 云函数</h3>
+    <div class="code-block"><span class="comment">// cloudfunctions/hello/index.js</span>
+const cloud = require(<span class="string">'wx-server-sdk'</span>);
+cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
+
+const db = cloud.database();
+
+<span class="comment">// 云函数入口</span>
+exports.main = async (event, context) => {
+  const { OPENID, APPID } = cloud.getWXContext();
+
+  <span class="comment">// 查询数据库</span>
+  const users = await db.collection(<span class="string">'users'</span>)
+    .where({ status: <span class="string">'active'</span> })
+    .orderBy(<span class="string">'createdAt'</span>, <span class="string">'desc'</span>)
+    .limit(20)
+    .get();
+
+  <span class="comment">// 返回结果</span>
+  return {
+    openid: OPENID,
+    users: users.data,
+    message: <span class="string">'Hello from cloud function!'</span>
+  };
+};
+
+<span class="comment">// 小程序端调用云函数</span>
+const res = await wx.cloud.callFunction({
+  name: <span class="string">'hello'</span>,
+  data: { page: 1 }
+});
+console.log(res.result);  <span class="comment">// { openid, users, message }</span></div>
+
+    <h3>5.4 云数据库</h3>
+    <div class="code-block"><span class="comment">// 获取数据库引用</span>
+const db = wx.cloud.database();
+const _ = db.command;  <span class="comment">// 数据库操作符</span>
+
+<span class="comment">// ===== 增删改查 =====</span>
+
+<span class="comment">// 创建集合中的记录</span>
+const addRes = await db.collection(<span class="string">'todos'</span>).add({
+  data: {
+    title: <span class="string">'学习小程序云开发'</span>,
+    done: false,
+    createdAt: db.serverDate()
+  }
+});
+
+<span class="comment">// 查询单条</span>
+const todo = await db.collection(<span class="string">'todos'</span>).doc(<span class="string">'todo-id'</span>).get();
+
+<span class="comment">// 条件查询</span>
+const list = await db.collection(<span class="string">'todos'</span>)
+  .where({
+    done: false,
+    createdAt: _.gte(new Date(<span class="string">'2024-01-01'</span>))
+  })
+  .orderBy(<span class="string">'createdAt'</span>, <span class="string">'desc'</span>)
+  .skip(0)
+  .limit(20)
+  .get();
+
+<span class="comment">// 更新记录</span>
+await db.collection(<span class="string">'todos'</span>).doc(<span class="string">'todo-id'</span>).update({
+  data: {
+    done: true,
+    completedAt: db.serverDate()
+  }
+});
+
+<span class="comment">// 删除记录</span>
+await db.collection(<span class="string">'todos'</span>).doc(<span class="string">'todo-id'</span>).remove();
+
+<span class="comment">// 聚合查询</span>
+const stats = await db.collection(<span class="string">'orders'</span>)
+  .aggregate()
+  .match({ status: <span class="string">'completed'</span> })
+  .group({
+    _id: <span class="string">'$userId'</span>,
+    totalAmount: _.sum(<span class="string">'$amount'</span>),
+    orderCount: _.sum(1)
+  })
+  .end();</div>
+
+    <h3>5.5 云存储</h3>
+    <div class="code-block"><span class="comment">// 上传文件</span>
+const uploadRes = await wx.cloud.uploadFile({
+  cloudPath: <span class="string">`images/${Date.now()}.jpg`</span>,  <span class="comment">// 云存储路径</span>
+  filePath: tempFilePath  <span class="comment">// 本地临时文件路径</span>
+});
+const fileID = uploadRes.fileID;
+
+<span class="comment">// 下载文件</span>
+const downloadRes = await wx.cloud.downloadFile({
+  fileID: <span class="string">'cloud://xxx.jpg'</span>
+});
+const tempPath = downloadRes.tempFilePath;
+
+<span class="comment">// 获取文件临时链接（用于展示图片）</span>
+const urlRes = await wx.cloud.getTempFileURL({
+  fileList: [<span class="string">'cloud://xxx.jpg'</span>, <span class="string">'cloud://yyy.png'</span>]
+});
+console.log(urlRes.fileList[0].tempFileURL);
+
+<span class="comment">// 删除文件</span>
+await wx.cloud.deleteFile({
+  fileList: [<span class="string">'cloud://xxx.jpg'</span>]
+});</div>
+
+    <h3>5.6 云开发与传统后端对比</h3>
+    <table>
+        <tr><th>维度</th><th>云开发</th><th>传统后端</th></tr>
+        <tr><td>服务器</td><td>无需管理</td><td>需自行部署运维</td></tr>
+        <tr><td>数据库</td><td>云数据库（MongoDB）</td><td>自行搭建MySQL/Redis等</td></tr>
+        <tr><td>存储</td><td>云存储</td><td>自行搭建OSS/文件系统</td></tr>
+        <tr><td>运维</td><td>免运维、自动扩缩容</td><td>需自行维护</td></tr>
+        <tr><td>成本</td><td>免费额度+按量付费</td><td>固定服务器成本</td></tr>
+        <tr><td>灵活性</td><td>受限于云开发能力</td><td>完全自由</td></tr>
+        <tr><td>适用阶段</td><td>MVP/小型项目/快速验证</td><td>中大型项目/复杂业务</td></tr>
+    </table>
+</div>
+
+</div><!-- end container -->
+
+<!-- 小程序API与云开发总结 -->
+<!-- 核心要点：wx.request网络请求封装、本地存储、位置/设备API、微信登录流程、微信支付、云开发三件套（云函数/云数据库/云存储） -->
+</body>
+</html>

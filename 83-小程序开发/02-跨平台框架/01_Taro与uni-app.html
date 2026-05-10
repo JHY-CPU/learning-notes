@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Taro与uni-app - 小程序开发笔记</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: "Microsoft YaHei", "SimSun", sans-serif; background: #f0f4f8; color: #2d3748; line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { text-align: center; color: #2b6cb0; border-bottom: 3px solid #2b6cb0; padding-bottom: 12px; margin-bottom: 30px; }
+        h2 { color: #2c5282; margin: 25px 0 12px; padding-left: 10px; border-left: 4px solid #2b6cb0; }
+        h3 { color: #2d3748; margin: 18px 0 8px; }
+        p, li { margin-bottom: 8px; }
+        ul, ol { padding-left: 25px; }
+        .card { background: #fff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); padding: 20px; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 12px 0; }
+        th, td { border: 1px solid #cbd5e0; padding: 10px 14px; text-align: center; }
+        th { background: #2b6cb0; color: #fff; }
+        tr:nth-child(even) { background: #edf2f7; }
+        code { background: #edf2f7; padding: 2px 6px; border-radius: 4px; font-family: "Consolas", monospace; color: #c53030; }
+        .code-block { background: #1a202c; color: #e2e8f0; border-radius: 8px; padding: 16px; margin: 12px 0; font-family: "Consolas", monospace; font-size: 0.9em; overflow-x: auto; white-space: pre; line-height: 1.6; }
+        .code-block .comment { color: #718096; }
+        .code-block .keyword { color: #63b3ed; }
+        .code-block .string { color: #68d391; }
+        .diagram { background: #ebf8ff; border: 2px solid #3182ce; border-radius: 8px; padding: 20px; margin: 15px 0; text-align: center; font-family: monospace; white-space: pre; line-height: 1.6; }
+        .highlight { background: #fefcbf; border-left: 4px solid #d69e2e; padding: 12px; margin: 12px 0; border-radius: 0 4px 4px 0; }
+        .example { background: #f0fff4; border: 1px solid #48bb78; border-radius: 6px; padding: 14px; margin: 12px 0; }
+        .tag { display: inline-block; background: #2b6cb0; color: #fff; padding: 2px 10px; border-radius: 12px; font-size: 0.85em; margin: 2px; }
+        .pro { background: #c6f6d5; border-left: 4px solid #38a169; padding: 10px; margin: 8px 0; border-radius: 0 4px 4px 0; }
+        .con { background: #fed7d7; border-left: 4px solid #e53e3e; padding: 10px; margin: 8px 0; border-radius: 0 4px 4px 0; }
+    </style>
+</head>
+<body>
+<div class="container">
+
+<!-- Taro与uni-app -->
+<!-- 本页面介绍跨平台小程序框架Taro和uni-app，包括React/Vue写法、条件编译、性能对比 -->
+<h1>01 - Taro与uni-app</h1>
+
+<!-- ====== 第一部分：跨平台框架概述 ====== -->
+<h2>一、跨平台框架概述</h2>
+<div class="card">
+    <h3>1.1 为什么需要跨平台框架</h3>
+    <p>微信小程序、支付宝小程序、百度小程序、字节小程序等各平台的语法和API存在差异。跨平台框架允许开发者使用统一的技术栈编写代码，编译生成各平台的原生小程序代码。</p>
+
+    <div class="diagram">  ┌──────────── 源代码 ────────────┐
+  │  React/Vue + TypeScript       │
+  │  统一的API和组件               │
+  └──────────┬────────────────────┘
+             │ 编译
+    ┌────────┼────────┬────────────┐
+    ↓        ↓        ↓            ↓
+  微信小程序  支付宝   H5网页     App(React Native/WebView)
+  支付宝小程序 百度    字节跳动</div>
+
+    <h3>1.2 主流跨平台框架对比</h3>
+    <table>
+        <tr><th>维度</th><th>Taro</th><th>uni-app</th></tr>
+        <tr><td>开发团队</td><td>京东</td><td>DCloud（数字天堂）</td></tr>
+        <tr><td>技术栈</td><td>React / Vue3</td><td>Vue2 / Vue3（主推）</td></tr>
+        <tr><td>语言支持</td><td>JS/TS/JSX/TSX</td><td>JS/TS/Vue SFC</td></tr>
+        <tr><td>编译目标</td><td>微信/支付宝/百度/字节/QQ/H5/RN</td><td>微信/支付宝/百度/字节/H5/App/iOS/Android</td></tr>
+        <tr><td>App端</td><td>Taro RN / Harmony</td><td>uni-app（基于WebView）/ uni-app x（原生渲染）</td></tr>
+        <tr><td>生态</td><td>NPM生态、React生态</td><td>插件市场、组件市场</td></tr>
+        <tr><td>社区</td><td>中等</td><td>较大（国内）</td></tr>
+        <tr><td>IDE</td><td>任意编辑器</td><td>HBuilderX（官方IDE）</td></tr>
+        <tr><td>学习曲线</td><td>中等（需了解React/Vue）</td><td>较低（Vue开发者友好）</td></tr>
+    </table>
+</div>
+
+<!-- ====== 第二部分：Taro ====== -->
+<h2>二、Taro框架</h2>
+<div class="card">
+    <h3>2.1 项目创建与结构</h3>
+    <div class="code-block"><span class="comment"># 创建Taro项目</span>
+npm install -g @tarojs/cli
+taro init my-taro-app
+
+<span class="comment"># 选择模板：React + TypeScript + Sass</span>
+<span class="comment"># 项目结构</span>
+my-taro-app/
+├── config/              <span class="comment"># 编译配置</span>
+│   ├── index.js
+│   ├── dev.js
+│   └── prod.js
+├── src/
+│   ├── app.config.ts    <span class="comment"># 全局配置</span>
+│   ├── app.scss         <span class="comment"># 全局样式</span>
+│   ├── app.tsx          <span class="comment"># 入口组件</span>
+│   ├── pages/
+│   │   └── index/
+│   │       ├── index.tsx
+│   │       ├── index.config.ts
+│   │       └── index.module.scss
+│   └── components/
+├── project.config.json  <span class="comment"># 小程序项目配置</span>
+├── tsconfig.json
+└── package.json</div>
+
+    <h3>2.2 Taro + React 示例</h3>
+    <div class="code-block"><span class="comment">// src/app.tsx - 应用入口</span>
+import { Component } from <span class="string">'react'</span>
+import <span class="string">'./app.scss'</span>
+
+class App extends Component {
+  componentDidMount() {
+    console.log(<span class="string">'App onLaunch'</span>)
+  }
+
+  render() {
+    return this.props.children
+  }
+}
+
+export default App
+
+<span class="comment">// src/pages/index/index.tsx - 页面组件</span>
+import { useState, useEffect } from <span class="string">'react'</span>
+import { View, Text, Button, Image } from <span class="string">'@tarojs/components'</span>
+import { useDidShow, usePullDownRefresh } from <span class="string">'@tarojs/taro'</span>
+import Taro from <span class="string">'@tarojs/taro'</span>
+import <span class="string">'./index.module.scss'</span>
+
+interface TodoItem {
+  id: number
+  title: string
+  done: boolean
+}
+
+export default function Index() {
+  const [todos, setTodos] = useState&lt;TodoItem[]&gt;([])
+  const [loading, setLoading] = useState(false)
+
+  <span class="comment">// 页面显示时加载数据</span>
+  useDidShow(() => {
+    loadTodos()
+  })
+
+  <span class="comment">// 下拉刷新</span>
+  usePullDownRefresh(async () => {
+    await loadTodos()
+    Taro.stopPullDownRefresh()
+  })
+
+  const loadTodos = async () => {
+    setLoading(true)
+    try {
+      const res = await Taro.request({
+        url: <span class="string">'https://api.example.com/todos'</span>
+      })
+      setTodos(res.data)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAdd = () => {
+    Taro.navigateTo({ url: <span class="string">'/pages/todo/add'</span> })
+  }
+
+  const handleToggle = async (id: number) => {
+    setTodos(prev =>
+      prev.map(item =>
+        item.id === id ? { ...item, done: !item.done } : item
+      )
+    )
+  }
+
+  return (
+    &lt;View className=<span class="string">"container"</span>&gt;
+      &lt;Text className=<span class="string">"title"</span>&gt;待办事项&lt;/Text&gt;
+      {loading ? (
+        &lt;Text&gt;加载中...&lt;/Text&gt;
+      ) : (
+        &lt;View&gt;
+          {todos.map(todo => (
+            &lt;View
+              key={todo.id}
+              className=<span class="string">"todo-item"</span>
+              onClick={() => handleToggle(todo.id)}
+            &gt;
+              &lt;Text className={todo.done ? <span class="string">'done'</span> : <span class="string">''</span>}&gt;
+                {todo.title}
+              &lt;/Text&gt;
+            &lt;/View&gt;
+          ))}
+        &lt;/View&gt;
+      )}
+      &lt;Button onClick={handleAdd}&gt;添加待办&lt;/Button&gt;
+    &lt;/View&gt;
+  )
+}
+
+<span class="comment">// 页面配置</span>
+Index.config = {
+  navigationBarTitleText: <span class="string">'首页'</span>,
+  enablePullDownRefresh: true
+}</div>
+
+    <h3>2.3 Taro API调用</h3>
+    <div class="code-block"><span class="comment">// Taro统一了各平台的API</span>
+import Taro from <span class="string">'@tarojs/taro'</span>
+
+<span class="comment">// 路由</span>
+Taro.navigateTo({ url: <span class="string">'/pages/detail/index?id=1'</span> })
+Taro.redirectTo({ url: <span class="string">'/pages/login/index'</span> })
+Taro.switchTab({ url: <span class="string">'/pages/index/index'</span> })
+Taro.navigateBack()
+
+<span class="comment">// 存储</span>
+await Taro.setStorage({ key: <span class="string">'token'</span>, data: <span class="string">'abc'</span> })
+const token = await Taro.getStorageSync(<span class="string">'token'</span>)
+
+<span class="comment">// 交互</span>
+Taro.showToast({ title: <span class="string">'操作成功'</span>, icon: <span class="string">'success'</span> })
+Taro.showModal({
+  title: <span class="string">'确认'</span>,
+  content: <span class="string">'确定删除吗？'</span>
+})
+
+<span class="comment">// 网络请求</span>
+const res = await Taro.request({
+  url: <span class="string">'/api/data'</span>,
+  method: <span class="string">'GET'</span>,
+  data: { page: 1 }
+})</div>
+</div>
+
+<!-- ====== 第三部分：uni-app ====== -->
+<h2>三、uni-app框架</h2>
+<div class="card">
+    <h3>3.1 项目创建与结构</h3>
+    <div class="code-block"><span class="comment"># 方式1：使用HBuilderX创建（可视化）</span>
+<span class="comment"># 方式2：使用CLI创建</span>
+npx degit dcloudio/uni-preset-vue#vite-ts my-uniapp
+
+<span class="comment"># 项目结构</span>
+my-uniapp/
+├── pages.json        <span class="comment"># 页面路由和导航配置</span>
+├── manifest.json     <span class="comment"># 应用配置（AppID、权限等）</span>
+├── uni.scss          <span class="comment"># 全局SCSS变量</span>
+├── App.vue           <span class="comment"># 应用入口</span>
+├── main.ts           <span class="comment"># 入口JS</span>
+├── pages/
+│   └── index/
+│       └── index.vue <span class="comment"># 页面组件</span>
+├── components/       <span class="comment"># 公共组件</span>
+├── static/           <span class="comment"># 静态资源</span>
+├── store/            <span class="comment"># Pinia/Vuex状态管理</span>
+└── uni_modules/      <span class="comment"># uni-app插件</span></div>
+
+    <h3>3.2 uni-app + Vue3 示例</h3>
+    <div class="code-block"><span class="comment">&lt;!-- App.vue --&gt;</span>
+<span class="keyword">&lt;script setup lang="ts"&gt;</span>
+import { onLaunch, onShow, onHide } from <span class="string">'@dcloudio/uni-app'</span>
+
+onLaunch(() => {
+  console.log(<span class="string">'App Launch'</span>)
+})
+
+onShow(() => {
+  console.log(<span class="string">'App Show'</span>)
+})
+
+onHide(() => {
+  console.log(<span class="string">'App Hide'</span>)
+})
+<span class="keyword">&lt;/script&gt;</span>
+
+<span class="comment">&lt;!-- pages/index/index.vue --&gt;</span>
+<span class="keyword">&lt;template&gt;</span>
+  <span class="keyword">&lt;view</span> class="container"<span class="keyword">&gt;</span>
+    <span class="keyword">&lt;text</span> class="title"<span class="keyword">&gt;</span>{{ title }}<span class="keyword">&lt;/text&gt;</span>
+
+    <span class="keyword">&lt;view</span> class="todo-list"<span class="keyword">&gt;</span>
+      <span class="keyword">&lt;view</span>
+        v-for="item in todos"
+        :key="item.id"
+        class="todo-item"
+        @click="toggleTodo(item.id)"
+      <span class="keyword">&gt;</span>
+        <span class="keyword">&lt;text</span> :class="{ done: item.done }"<span class="keyword">&gt;</span>{{ item.title }}<span class="keyword">&lt;/text&gt;</span>
+      <span class="keyword">&lt;/view&gt;</span>
+    <span class="keyword">&lt;/view&gt;</span>
+
+    <span class="keyword">&lt;button</span> @click="addTodo"<span class="keyword">&gt;</span>添加待办<span class="keyword">&lt;/button&gt;</span>
+    <span class="keyword">&lt;button</span> @click="goDetail"<span class="keyword">&gt;</span>跳转详情<span class="keyword">&lt;/button&gt;</span>
+  <span class="keyword">&lt;/view&gt;</span>
+<span class="keyword">&lt;/template&gt;</span>
+
+<span class="keyword">&lt;script setup lang="ts"&gt;</span>
+import { ref } from <span class="string">'vue'</span>
+import { onLoad, onPullDownRefresh, onReachBottom } from <span class="string">'@dcloudio/uni-app'</span>
+
+interface TodoItem {
+  id: number
+  title: string
+  done: boolean
+}
+
+const title = ref(<span class="string">'待办事项'</span>)
+const todos = ref&lt;TodoItem[]&gt;([
+  { id: 1, title: <span class="string">'学习uni-app'</span>, done: false },
+  { id: 2, title: <span class="string">'完成项目'</span>, done: true },
+])
+
+onLoad((query) => {
+  console.log(<span class="string">'页面加载'</span>, query)
+})
+
+onPullDownRefresh(async () => {
+  <span class="comment">// 刷新数据</span>
+  await loadTodos()
+  uni.stopPullDownRefresh()
+})
+
+const toggleTodo = (id: number) => {
+  todos.value = todos.value.map(item =>
+    item.id === id ? { ...item, done: !item.done } : item
+  )
+}
+
+const addTodo = () => {
+  uni.navigateTo({ url: <span class="string">'/pages/todo/add'</span> })
+}
+
+const goDetail = () => {
+  uni.navigateTo({ url: <span class="string">'/pages/detail/detail?id=1'</span> })
+}
+
+const loadTodos = async () => {
+  const res = await uni.request({
+    url: <span class="string">'https://api.example.com/todos'</span>
+  })
+  todos.value = res.data as TodoItem[]
+}
+<span class="keyword">&lt;/script&gt;</span>
+
+<span class="keyword">&lt;style lang="scss" scoped&gt;</span>
+.container {
+  padding: 20rpx;
+}
+.title {
+  font-size: 36rpx;
+  font-weight: bold;
+  margin-bottom: 20rpx;
+}
+.todo-item {
+  padding: 16rpx;
+  border-bottom: 1rpx solid #eee;
+  .done {
+    text-decoration: line-through;
+    color: #999;
+  }
+}
+<span class="keyword">&lt;/style&gt;</span></div>
+
+    <h3>3.3 uni-app页面配置</h3>
+    <div class="code-block"><span class="comment">// pages.json - 页面路由和全局配置</span>
+{
+  <span class="string">"pages"</span>: [
+    { <span class="string">"path"</span>: <span class="string">"pages/index/index"</span>, <span class="string">"style"</span>: { <span class="string">"navigationBarTitleText"</span>: <span class="string">"首页"</span> } },
+    { <span class="string">"path"</span>: <span class="string">"pages/detail/detail"</span>, <span class="string">"style"</span>: { <span class="string">"navigationBarTitleText"</span>: <span class="string">"详情"</span> } }
+  ],
+  <span class="string">"globalStyle"</span>: {
+    <span class="string">"navigationBarBackgroundColor"</span>: <span class="string">"#2b6cb0"</span>,
+    <span class="string">"navigationBarTitleText"</span>: <span class="string">"我的应用"</span>,
+    <span class="string">"navigationBarTextStyle"</span>: <span class="string">"white"</span>,
+    <span class="string">"backgroundColor"</span>: <span class="string">"#f5f5f5"</span>
+  },
+  <span class="string">"tabBar"</span>: {
+    <span class="string">"color"</span>: <span class="string">"#999"</span>,
+    <span class="string">"selectedColor"</span>: <span class="string">"#2b6cb0"</span>,
+    <span class="string">"list"</span>: [
+      { <span class="string">"pagePath"</span>: <span class="string">"pages/index/index"</span>, <span class="string">"text"</span>: <span class="string">"首页"</span>, <span class="string">"iconPath"</span>: <span class="string">"static/home.png"</span> },
+      { <span class="string">"pagePath"</span>: <span class="string">"pages/mine/mine"</span>, <span class="string">"text"</span>: <span class="string">"我的"</span>, <span class="string">"iconPath"</span>: <span class="string">"static/mine.png"</span> }
+    ]
+  }
+}</div>
+</div>
+
+<!-- ====== 第四部分：条件编译 ====== -->
+<h2>四、条件编译</h2>
+<div class="card">
+    <h3>4.1 什么是条件编译</h3>
+    <p>条件编译是跨平台框架解决平台差异的核心机制。通过特定的注释语法，为不同平台编写差异化代码，编译时只保留目标平台的代码。</p>
+
+    <h3>4.2 Taro条件编译</h3>
+    <div class="code-block"><span class="comment">// Taro使用环境变量进行条件编译</span>
+<span class="comment">// 编译时会被摇树优化掉其他平台的代码</span>
+
+<span class="comment">// JS/TS中的条件编译</span>
+if (process.env.TARO_ENV === <span class="string">'weapp'</span>) {
+  <span class="comment">// 仅微信小程序执行</span>
+  wx.login()
+} else if (process.env.TARO_ENV === <span class="string">'alipay'</span>) {
+  <span class="comment">// 仅支付宝小程序执行</span>
+  my.getAuthCode()
+} else if (process.env.TARO_ENV === <span class="string">'h5'</span>) {
+  <span class="comment">// 仅H5执行</span>
+  console.log(<span class="string">'Running in browser'</span>)
+}
+
+<span class="comment">// 文件级别的条件编译（自动识别）</span>
+<span class="comment">// index.weapp.tsx   → 仅微信小程序使用</span>
+<span class="comment">// index.alipay.tsx  → 仅支付宝小程序使用</span>
+<span class="comment">// index.h5.tsx      → 仅H5使用</span></div>
+
+    <h3>4.3 uni-app条件编译</h3>
+    <div class="code-block"><span class="comment">&lt;!-- uni-app使用 #ifdef 和 #endif 进行条件编译 --&gt;</span>
+
+<span class="comment">&lt;!-- 模板中的条件编译 --&gt;</span>
+<span class="keyword">&lt;view&gt;</span>
+  <span class="keyword">&lt;text&gt;</span>所有平台显示的内容<span class="keyword">&lt;/text&gt;</span>
+
+  <span class="comment">&lt;!-- #ifdef MP-WEIXIN --&gt;</span>
+  <span class="keyword">&lt;button</span> open-type="getPhoneNumber"<span class="keyword">&gt;</span>获取手机号（仅微信）<span class="keyword">&lt;/button&gt;</span>
+  <span class="comment">&lt;!-- #endif --&gt;</span>
+
+  <span class="comment">&lt;!-- #ifdef MP-ALIPAY --&gt;</span>
+  <span class="keyword">&lt;button</span> open-type="getPhoneNumber"<span class="keyword">&gt;</span>获取手机号（仅支付宝）<span class="keyword">&lt;/button&gt;</span>
+  <span class="comment">&lt;!-- #endif --&gt;</span>
+
+  <span class="comment">&lt;!-- #ifdef H5 --&gt;</span>
+  <span class="keyword">&lt;div&gt;</span>仅H5显示的内容<span class="keyword">&lt;/div&gt;</span>
+  <span class="comment">&lt;!-- #endif --&gt;</span>
+<span class="keyword">&lt;/view&gt;</span>
+
+<span class="comment">&lt;!-- JS中的条件编译 --&gt;</span>
+<span class="keyword">&lt;script setup&gt;</span>
+function login() {
+  <span class="comment">// #ifdef MP-WEIXIN</span>
+  uni.login({ provider: <span class="string">'weixin'</span> })
+  <span class="comment">// #endif</span>
+
+  <span class="comment">// #ifdef MP-ALIPAY</span>
+  uni.login({ provider: <span class="string">'alipay'</span> })
+  <span class="comment">// #endif</span>
+
+  <span class="comment">// #ifdef H5</span>
+  console.log(<span class="string">'H5端登录'</span>)
+  <span class="comment">// #endif</span>
+}
+<span class="keyword">&lt;/script&gt;</span>
+
+<span class="comment">/* CSS中的条件编译 */</span>
+<span class="comment">/* #ifdef MP-WEIXIN */</span>
+.container { padding-bottom: env(safe-area-inset-bottom); }
+<span class="comment">/* #endif */</span>
+
+<span class="comment">// 常用平台标识：
+// MP-WEIXIN     微信小程序
+// MP-ALIPAY     支付宝小程序
+// MP-BAIDU      百度小程序
+// MP-TOUTIAO    字节跳动小程序
+// MP-QQ         QQ小程序
+// H5            H5网页
+// APP-PLUS      App（5+App）
+// APP-PLUS-NVUE App（NVue原生渲染）
+// APP-ANDROID   Android App
+// APP-IOS       iOS App</span></div>
+</div>
+
+<!-- ====== 第五部分：性能与选型 ====== -->
+<h2>五、性能对比与选型建议</h2>
+<div class="card">
+    <h3>5.1 性能对比</h3>
+    <table>
+        <tr><th>维度</th><th>Taro</th><th>uni-app</th><th>原生开发</th></tr>
+        <tr><td>包体积</td><td>中等（运行时较大）</td><td>较小（优化较好）</td><td>最小</td></tr>
+        <tr><td>运行性能</td><td>接近原生</td><td>接近原生</td><td>最优</td></tr>
+        <tr><td>首屏加载</td><td>一般</td><td>一般</td><td>最快</td></tr>
+        <tr><td>编译速度</td><td>中等（Webpack）</td><td>较快（Vite支持）</td><td>N/A</td></tr>
+        <tr><td>多端一致性</td><td>好（部分差异）</td><td>好（条件编译完善）</td><td>差（需单独开发）</td></tr>
+    </table>
+
+    <h3>5.2 选型建议</h3>
+    <div class="pro">
+        <strong>选择Taro的情况：</strong>
+        <ul>
+            <li>团队熟悉React技术栈</li>
+            <li>需要TypeScript严格类型支持</li>
+            <li>已有React项目需要适配小程序</li>
+            <li>需要更灵活的生态和NPM包管理</li>
+        </ul>
+    </div>
+
+    <div class="pro">
+        <strong>选择uni-app的情况：</strong>
+        <ul>
+            <li>团队熟悉Vue技术栈</li>
+            <li>需要同时发布到App端（iOS/Android）</li>
+            <li>希望快速开发，使用丰富的插件市场</li>
+            <li>需要一站式IDE（HBuilderX）支持</li>
+            <li>项目预算有限，需要免费版即可覆盖更多端</li>
+        </ul>
+    </div>
+
+    <div class="highlight">
+        <strong>注意事项：</strong>
+        <ul>
+            <li>跨平台框架无法100%消除平台差异，仍需条件编译处理特殊情况</li>
+            <li>复杂动画和高频交互场景，原生开发仍是最优选择</li>
+            <li>跨平台框架增加了抽象层，调试定位问题可能更复杂</li>
+            <li>选择框架时要考虑长期维护成本和社区活跃度</li>
+        </ul>
+    </div>
+</div>
+
+</div><!-- end container -->
+
+<!-- Taro与uni-app总结 -->
+<!-- 核心要点：跨平台框架解决多端适配问题、Taro(React栈)、uni-app(Vue栈)、条件编译机制、性能对比与选型建议 -->
+</body>
+</html>

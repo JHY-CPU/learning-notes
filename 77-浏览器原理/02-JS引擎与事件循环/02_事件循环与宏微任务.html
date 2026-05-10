@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>事件循环与宏微任务</title>
+    <style>
+        :root { --primary: #1a73e8; --primary-light: #e8f0fe; --secondary: #34a853; --warning: #ea4335; --purple: #9c27b0; --bg: #f8f9fa; --card-bg: #ffffff; --text: #202124; --border: #dadce0; --code-bg: #f1f3f4; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { font-size: 2em; color: var(--primary); border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 1.5em; color: var(--primary); margin: 32px 0 16px; padding-left: 12px; border-left: 4px solid var(--primary); }
+        h3 { font-size: 1.2em; margin: 20px 0 10px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .highlight { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .warning { background: #fce8e6; border-left: 4px solid var(--warning); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .success { background: #e6f4ea; border-left: 4px solid var(--secondary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .purple { background: #f3e5f5; border-left: 4px solid var(--purple); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; font-family: 'Fira Code','Consolas',monospace; font-size: 0.9em; line-height: 1.6; margin: 12px 0; }
+        code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre code { background: none; padding: 0; }
+        ul, ol { padding-left: 24px; margin: 8px 0; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid var(--border); padding: 12px; text-align: left; }
+        th { background: var(--primary-light); font-weight: 600; }
+        .flow-diagram { background: var(--card-bg); border: 2px solid var(--primary); border-radius: 12px; padding: 20px; text-align: center; font-family: monospace; margin: 16px 0; white-space: pre; line-height: 1.6; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>事件循环与宏微任务</h1>
+
+    <div class="highlight">
+        <strong>核心概念：</strong>JavaScript是单线程语言，通过事件循环（Event Loop）机制实现异步操作。事件循环不断地从任务队列（Task Queue / Macro Task Queue）中取出宏任务执行，每个宏任务执行完毕后清空微任务队列（Microtask Queue），然后进行渲染更新，如此循环。理解宏任务和微任务的执行顺序是掌握JS异步编程的关键。
+    </div>
+
+    <!-- ==================== 一、执行模型 ==================== -->
+    <h2>一、JavaScript执行模型</h2>
+
+    <div class="card">
+        <h3>1.1 单线程与异步</h3>
+        <p>JavaScript是单线程语言，同一时间只能执行一个任务。为了不阻塞用户操作和网络请求，JS使用<strong>事件循环</strong>来处理异步操作：</p>
+        <div class="flow-diagram">
+┌──────────────────────────────────────────────────┐
+│                  JavaScript引擎                    │
+│  ┌─────────────────────────────────────────────┐  │
+│  │            调用栈 (Call Stack)                │  │
+│  │  执行同步代码，函数调用压栈，返回弹栈        │  │
+│  └─────────────────────────────────────────────┘  │
+│                         ↑↓                         │
+│  ┌─────────────────────────────────────────────┐  │
+│  │            堆 (Heap)                         │  │
+│  │  对象分配在堆上                              │  │
+│  └─────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────┘
+         ↕ (事件循环)
+┌──────────────────────────────────────────────────┐
+│                  任务队列                          │
+│  ┌──────────────────┐ ┌───────────────────────┐  │
+│  │ 微任务队列        │ │ 宏任务队列              │  │
+│  │ (Microtask Queue) │ │ (Macrotask Queue)      │  │
+│  │ - Promise回调     │ │ - setTimeout回调       │  │
+│  │ - MutationObserver│ │ - setInterval回调      │  │
+│  │ - queueMicrotask  │ │ - I/O回调             │  │
+│  │                   │ │ - UI渲染事件           │  │
+│  │  优先级: 高        │ │ - requestAnimationFrame│  │
+│  └──────────────────┘ └───────────────────────┘  │
+└──────────────────────────────────────────────────┘</div>
+    </div>
+
+    <div class="card">
+        <h3>1.2 调用栈（Call Stack）</h3>
+        <p>调用栈是JS引擎跟踪正在执行的函数的数据结构，使用后进先出（LIFO）原则：</p>
+        <pre><code>// 调用栈示例
+function first() {
+    console.log('first');
+    second();
+}
+
+function second() {
+    console.log('second');
+    third();
+}
+
+function third() {
+    console.log('third');
+}
+
+first();
+
+// 调用栈变化：
+// 1. [first]        → first()被调用
+// 2. [first, second] → second()被调用
+// 3. [first, second, third] → third()被调用
+// 4. [first, second] → third()返回
+// 5. [first]        → second()返回
+// 6. []             → first()返回
+
+// 堆栈溢出（Stack Overflow）
+function infinite() {
+    infinite();  // 无限递归，调用栈溢出
+}
+// RangeError: Maximum call stack size exceeded</code></pre>
+    </div>
+
+    <!-- ==================== 二、事件循环详解 ==================== -->
+    <h2>二、事件循环（Event Loop）详解</h2>
+
+    <div class="card">
+        <h3>2.1 浏览器事件循环</h3>
+        <div class="flow-diagram">
+┌─────────────────────────────────────────┐
+│           Event Loop (一次循环)           │
+│                                         │
+│  1. 从宏任务队列中取出一个宏任务          │
+│     ↓                                    │
+│  2. 执行该宏任务（同步代码）              │
+│     ↓                                    │
+│  3. 清空微任务队列（执行所有微任务）      │
+│     ↓                                    │
+│  4. 是否需要渲染？                        │
+│     ├── 是 → 执行渲染（Layout, Paint）    │
+│     └── 否 → 跳过                        │
+│     ↓                                    │
+│  5. 执行 requestAnimationFrame 回调      │
+│     ↓                                    │
+│  6. 回到步骤1                             │
+│                                         │
+└─────────────────────────────────────────┘</div>
+    </div>
+
+    <div class="card">
+        <h3>2.2 执行顺序规则</h3>
+        <ol>
+            <li>执行<strong>同步代码</strong>（整个script作为第一个宏任务）</li>
+            <li>执行过程中产生的微任务放入微任务队列，宏任务放入宏任务队列</li>
+            <li>同步代码执行完毕后，<strong>清空微任务队列</strong>（包括微任务中新产生的微任务）</li>
+            <li>执行<strong>渲染</strong>（如果需要）</li>
+            <li>从宏任务队列取出<strong>一个</strong>宏任务执行</li>
+            <li>重复步骤3-5</li>
+        </ol>
+        <div class="warning">
+            <strong>关键点：</strong>每次事件循环只取一个宏任务执行，但会清空所有微任务。所以微任务的优先级高于宏任务。
+        </div>
+    </div>
+
+    <!-- ==================== 三、宏任务与微任务 ==================== -->
+    <h2>三、宏任务与微任务</h2>
+
+    <div class="card">
+        <h3>3.1 宏任务（Macrotask）</h3>
+        <table>
+            <tr><th>API</th><th>说明</th></tr>
+            <tr><td><code>setTimeout</code></td><td>延迟执行，最小延迟4ms（嵌套5层以上）</td></tr>
+            <tr><td><code>setInterval</code></td><td>定时重复执行</td></tr>
+            <tr><td><code>setImmediate</code></td><td>Node.js特有，当前事件循环结束后立即执行</td></tr>
+            <tr><td><code>I/O操作</code></td><td>文件读写、网络请求的回调</td></tr>
+            <tr><td><code>UI渲染</code></td><td>浏览器的渲染事件</td></tr>
+            <tr><td><code>MessageChannel</code></td><td>postMessage的回调</td></tr>
+            <tr><td><code>script（整体代码）</code></td><td>整个script标签作为一个宏任务</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>3.2 微任务（Microtask）</h3>
+        <table>
+            <tr><th>API</th><th>说明</th></tr>
+            <tr><td><code>Promise.then/catch/finally</code></td><td>Promise的回调</td></tr>
+            <tr><td><code>MutationObserver</code></td><td>DOM变化观察器的回调</td></tr>
+            <tr><td><code>queueMicrotask()</code></td><td>显式地将函数加入微任务队列</td></tr>
+            <tr><td><code>process.nextTick</code></td><td>Node.js特有，优先级最高的微任务</td></tr>
+        </table>
+        <div class="success">
+            <strong>微任务的特点：</strong>
+            <ul>
+                <li>在当前宏任务执行完毕后立即执行，不需要等待下一个宏任务</li>
+                <li>微任务中产生的微任务也会在同一轮事件循环中执行</li>
+                <li>渲染发生在微任务清空之后、下一个宏任务之前</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ==================== 四、经典执行顺序题 ==================== -->
+    <h2>四、经典执行顺序题</h2>
+
+    <div class="card">
+        <h3>4.1 经典题目1</h3>
+        <pre><code>console.log('1');  // 同步
+
+setTimeout(() => {
+    console.log('2');  // 宏任务
+    Promise.resolve().then(() => console.log('3'));  // 微任务（在宏任务内）
+}, 0);
+
+Promise.resolve().then(() => {
+    console.log('4');  // 微任务
+    setTimeout(() => console.log('5'), 0);  // 宏任务
+});
+
+console.log('6');  // 同步
+
+// 输出顺序：1 → 6 → 4 → 2 → 3 → 5
+//
+// 分析：
+// 第一轮（同步代码）：打印1，注册setTimeout1，注册Promise1，打印6
+// 第一轮（微任务）：执行Promise1回调 → 打印4，注册setTimeout2
+// 第二轮（宏任务setTimeout1）：打印2，注册Promise2
+// 第二轮（微任务）：执行Promise2回调 → 打印3
+// 第三轮（宏任务setTimeout2）：打印5</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>4.2 经典题目2（async/await）</h3>
+        <pre><code>async function async1() {
+    console.log('async1 start');  // 同步执行
+    await async2();  // async2执行完后，await后面的代码作为微任务
+    console.log('async1 end');  // 微任务
+}
+
+async function async2() {
+    console.log('async2');  // 同步执行
+}
+
+console.log('script start');  // 同步
+
+setTimeout(() => {
+    console.log('setTimeout');  // 宏任务
+}, 0);
+
+async1();
+
+new Promise((resolve) => {
+    console.log('promise1');  // 同步执行（executor是同步的）
+    resolve();
+}).then(() => {
+    console.log('promise2');  // 微任务
+});
+
+console.log('script end');  // 同步
+
+// 输出顺序：
+// script start → async1 start → async2 → promise1 → script end
+// → async1 end → promise2 → setTimeout
+
+// 分析：
+// 同步：script start, async1 start, async2, promise1, script end
+// 微任务：async1 end（await后面），promise2
+// 宏任务：setTimeout</code></pre>
+        <div class="purple">
+            <strong>await的执行原理：</strong><code>await async2()</code> 实际上等价于 <code>async2().then(() => { /* await后面的代码 */ })</code>。<code>async2()</code>本身是同步执行的，<code>await</code> 后面的代码被包装成微任务。
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>4.3 经典题目3（嵌套Promise）</h3>
+        <pre><code>Promise.resolve()
+    .then(() => {
+        console.log('then1');  // 微任务1
+        return Promise.resolve('inner');  // 返回Promise
+    })
+    .then((val) => {
+        console.log('then2:', val);  // 微任务2（被额外延迟一轮）
+    });
+
+Promise.resolve()
+    .then(() => {
+        console.log('then3');  // 微任务3
+    });
+
+// 输出：then1 → then3 → then2: inner
+//
+// 注意：then1返回Promise.resolve('inner')
+// 根据规范，这会额外插入一个微任务来"解开"这个Promise
+// 所以then2比then3晚执行</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>4.4 经典题目4（setTimeout精度）</h3>
+        <pre><code>// setTimeout的最小延迟
+setTimeout(() => console.log('timeout 0'), 0);
+setTimeout(() => console.log('timeout 1'), 1);
+setTimeout(() => console.log('timeout 4'), 4);
+
+// 实际上 0ms 和 1ms 可能同时触发
+// HTML规范规定：嵌套超过5层的setTimeout，最小延迟为4ms
+
+// setTimeout嵌套
+setTimeout(() => {
+    setTimeout(() => {
+        setTimeout(() => {
+            // 第3层嵌套
+            // 如果前面还有2层以上的setTimeout
+            // 最小延迟变为4ms而不是0ms
+        }, 0);
+    }, 0);
+}, 0);</code></pre>
+    </div>
+
+    <!-- ==================== 五、requestAnimationFrame ==================== -->
+    <h2>五、requestAnimationFrame</h2>
+
+    <div class="card">
+        <h3>5.1 rAF的执行时机</h3>
+        <p><code>requestAnimationFrame</code> 的回调在浏览器<strong>下一次重绘之前</strong>执行：</p>
+        <div class="flow-diagram">
+事件循环的一次完整执行：
+1. 取出一个宏任务执行
+2. 清空微任务队列
+3. 执行 requestAnimationFrame 回调  ← 在这里
+4. 执行渲染（Layout + Paint）
+5. 进入下一轮循环</div>
+        <pre><code>console.log('start');
+
+setTimeout(() => console.log('timeout'), 0);
+Promise.resolve().then(() => console.log('promise'));
+requestAnimationFrame(() => console.log('rAF'));
+
+console.log('end');
+
+// 输出（大概率）：start → end → promise → rAF → timeout
+// rAF在微任务之后、渲染之前执行
+// timeout在下一轮宏任务执行</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>5.2 rAF的特性</h3>
+        <ul>
+            <li><strong>帧率同步：</strong>通常以60fps执行（每~16.67ms一次），与显示器刷新率同步</li>
+            <li><strong>自动节流：</strong>页面不可见时自动暂停执行，节省资源</li>
+            <li><strong>批量执行：</strong>同一帧内的多个rAF回调在同一渲染周期前执行</li>
+            <li><strong>不保证执行次数：</strong>如果帧率下降，回调可能被跳过</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 六、requestIdleCallback ==================== -->
+    <h2>六、requestIdleCallback</h2>
+
+    <div class="card">
+        <h3>6.1 执行时机</h3>
+        <p><code>requestIdleCallback</code> 在浏览器<strong>空闲时</strong>执行回调，优先级最低：</p>
+        <div class="flow-diagram">
+一帧的时间分配（16.67ms @ 60fps）：
+┌────────┬────────┬─────────┬──────────────┐
+│ 宏任务  │ 微任务  │  渲染   │ requestIdleCallback │
+│ 执行    │ 清空    │ rAF+Paint│   空闲回调     │
+└────────┴────────┴─────────┴──────────────┘
+如果帧内工作太多，rIC可能被跳过或缩短时间</div>
+    </div>
+
+    <div class="card">
+        <h3>6.2 使用方法</h3>
+        <pre><code>requestIdleCallback((deadline) => {
+    // deadline.timeRemaining() 返回当前帧剩余空闲时间（毫秒）
+    // deadline.didTimeout 是否已超时
+
+    console.log('剩余时间:', deadline.timeRemaining());
+
+    while (deadline.timeRemaining() > 0 && tasks.length > 0) {
+        doWork(tasks.pop());
+    }
+
+    if (tasks.length > 0) {
+        requestIdleCallback(processTasks);  // 继续处理
+    }
+}, { timeout: 2000 });  // 超时后强制执行
+
+// React Fiber架构就是利用类似机制实现的
+// 将大任务拆分为小任务，在空闲时间执行</code></pre>
+    </div>
+
+    <!-- ==================== 七、浏览器vs Node事件循环 ==================== -->
+    <h2>七、浏览器 vs Node.js 事件循环</h2>
+
+    <div class="card">
+        <h3>7.1 浏览器事件循环</h3>
+        <ul>
+            <li>宏任务队列和微任务队列</li>
+            <li>微任务：Promise.then、MutationObserver、queueMicrotask</li>
+            <li>宏任务：setTimeout、setInterval、I/O、UI渲染、MessageChannel</li>
+            <li>每次取一个宏任务，清空所有微任务</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>7.2 Node.js事件循环</h3>
+        <p>Node.js的事件循环基于 <strong>libuv</strong>，分为6个阶段：</p>
+        <div class="flow-diagram">
+┌──────────────────────────────────────────────┐
+│              Node.js 事件循环                  │
+│                                              │
+│  ┌──────────┐  timers阶段                     │
+│  │  timers   │  执行 setTimeout/setInterval回调 │
+│  └────┬─────┘                                 │
+│       ↓                                      │
+│  ┌──────────┐  pending callbacks阶段           │
+│  │ pending   │  执行I/O回调（上一轮循环延迟的）   │
+│  └────┬─────┘                                 │
+│       ↓                                      │
+│  ┌──────────┐  poll阶段                       │
+│  │   poll    │  获取新的I/O事件，执行I/O回调     │
+│  └────┬─────┘  （可能会阻塞在这里等待事件）     │
+│       ↓                                      │
+│  ┌──────────┐  check阶段                      │
+│  │   check   │  执行 setImmediate 回调         │
+│  └────┬─────┘                                 │
+│       ↓                                      │
+│  ┌──────────┐  close callbacks阶段             │
+│  │  close    │  执行 socket.on('close') 等回调  │
+│  └──────────┘                                 │
+│                                              │
+│  每个阶段之间都会清空微任务队列                  │
+│  process.nextTick 在每个阶段之间执行            │
+└──────────────────────────────────────────────┘</div>
+    </div>
+
+    <div class="card">
+        <h3>7.3 Node.js特有的优先级</h3>
+        <pre><code>// Node.js中的优先级（从高到低）：
+// 1. process.nextTick（最高优先级的微任务）
+// 2. Promise.then（微任务）
+// 3. setTimeout/setInterval（timers阶段）
+// 4. setImmediate（check阶段）
+// 5. I/O回调（poll阶段）
+
+const fs = require('fs');
+
+setImmediate(() => console.log('setImmediate'));
+setTimeout(() => console.log('setTimeout'), 0);
+Promise.resolve().then(() => console.log('Promise'));
+process.nextTick(() => console.log('nextTick'));
+
+fs.readFile(__filename, () => {
+    console.log('I/O callback');
+    setImmediate(() => console.log('setImmediate in I/O'));
+    setTimeout(() => console.log('setTimeout in I/O'), 0);
+});
+
+// 可能的输出：nextTick → Promise → setTimeout → setImmediate → I/O callback
+//            → nextTick在I/O → setImmediate in I/O → setTimeout in I/O
+//
+// 注意：setTimeout和setImmediate的顺序在非I/O回调中不确定
+// 但在I/O回调内部，setImmediate总是先于setTimeout</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>7.4 process.nextTick vs setImmediate</h3>
+        <table>
+            <tr><th>特性</th><th>process.nextTick</th><th>setImmediate</th></tr>
+            <tr><td>执行时机</td><td>当前操作之后，事件循环继续之前</td><td>check阶段（poll阶段之后）</td></tr>
+            <tr><td>优先级</td><td>高于Promise.then</td><td>低于setTimeout</td></tr>
+            <tr><td>递归调用</td><td>会阻塞事件循环</td><td>不会阻塞</td></tr>
+            <tr><td>适用场景</td><td>需要在当前操作后立即执行的任务</td><td>I/O回调后需要立即执行的任务</td></tr>
+        </table>
+        <div class="warning">
+            <strong>注意：</strong>Node.js 11+ 的行为变化：在 Node.js 11 之前，每个阶段执行完所有回调才清空微任务。从 Node.js 11 开始，每个宏任务执行完后立即清空微任务，与浏览器行为一致。
+        </div>
+    </div>
+
+    <!-- ==================== 八、最佳实践 ==================== -->
+    <h2>八、最佳实践</h2>
+
+    <div class="card">
+        <h3>8.1 避免微任务无限循环</h3>
+        <pre><code>// ❌ 微任务无限循环会阻塞页面
+function recursiveMicrotask() {
+    Promise.resolve().then(recursiveMicrotask);
+}
+// 页面会卡死！
+
+// ✅ 使用 setTimeout 让出执行权
+function safeRecursive() {
+    setTimeout(() => {
+        doWork();
+        safeRecursive();
+    }, 0);
+}</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>8.2 拆分长任务</h3>
+        <pre><code>// ❌ 长任务阻塞渲染
+function processLargeArray(arr) {
+    for (let i = 0; i &lt; arr.length; i++) {
+        heavyComputation(arr[i]);  // 可能执行数秒
+    }
+}
+
+// ✅ 使用 setTimeout 拆分
+function processLargeArrayAsync(arr, index = 0) {
+    const startTime = performance.now();
+    while (index &lt; arr.length && performance.now() - startTime &lt; 5) {
+        heavyComputation(arr[index]);
+        index++;
+    }
+    if (index &lt; arr.length) {
+        setTimeout(() => processLargeArrayAsync(arr, index), 0);
+    }
+}
+
+// ✅ 使用 Scheduler API（现代方案）
+async function processWithScheduler(arr) {
+    for (const item of arr) {
+        heavyComputation(item);
+        // 每处理一项后让出主线程
+        await scheduler.yield();
+    }
+}</code></pre>
+    </div>
+
+    <div class="highlight">
+        <strong>总结：</strong>事件循环是JS异步编程的核心机制。浏览器中每次循环执行一个宏任务，然后清空所有微任务，再进行渲染。微任务优先级高于宏任务（Promise.then > setTimeout）。Node.js的事件循环分6个阶段，process.nextTick优先级最高。理解执行顺序对于调试异步问题和优化页面响应性至关重要。
+    </div>
+</div>
+<!-- 本文档总结了浏览器与Node.js事件循环、宏微任务的执行机制 -->
+</body>
+</html>

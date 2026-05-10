@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>模块化演进</title>
+    <style>
+        :root { --primary: #1a73e8; --primary-light: #e8f0fe; --secondary: #34a853; --warning: #ea4335; --purple: #9c27b0; --bg: #f8f9fa; --card-bg: #ffffff; --text: #202124; --border: #dadce0; --code-bg: #f1f3f4; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { font-size: 2em; color: var(--primary); border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 1.5em; color: var(--primary); margin: 32px 0 16px; padding-left: 12px; border-left: 4px solid var(--primary); }
+        h3 { font-size: 1.2em; margin: 20px 0 10px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .highlight { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .warning { background: #fce8e6; border-left: 4px solid var(--warning); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .success { background: #e6f4ea; border-left: 4px solid var(--secondary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .purple { background: #f3e5f5; border-left: 4px solid var(--purple); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; font-family: 'Fira Code','Consolas',monospace; font-size: 0.9em; line-height: 1.6; margin: 12px 0; }
+        code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre code { background: none; padding: 0; }
+        ul, ol { padding-left: 24px; margin: 8px 0; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid var(--border); padding: 12px; text-align: left; }
+        th { background: var(--primary-light); font-weight: 600; }
+        .flow-diagram { background: var(--card-bg); border: 2px solid var(--primary); border-radius: 12px; padding: 20px; text-align: center; font-family: monospace; margin: 16px 0; white-space: pre; line-height: 1.6; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>模块化演进</h1>
+
+    <div class="highlight">
+        <strong>核心概念：</strong>JavaScript模块化经历了从全局变量 → IIFE → CommonJS → AMD → UMD → ES Module的演进。ES Module（ESM）是ECMAScript官方标准，也是当前和未来的主流模块化方案。理解各模块规范的差异、循环依赖的处理方式以及Tree Shaking的前提条件，是掌握现代前端工程化的基础。
+    </div>
+
+    <!-- ==================== 一、模块化演进历史 ==================== -->
+    <h2>一、模块化演进历史</h2>
+
+    <div class="card">
+        <h3>1.1 全局变量时代（远古）</h3>
+        <pre><code>// ❌ 所有代码共享全局作用域，命名冲突严重
+var name = 'jQuery';
+var version = '1.0';
+
+// 另一个文件
+var name = 'React';  // 覆盖了上面的name！
+// 全局命名空间污染，无法管理依赖关系</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>1.2 IIFE（立即执行函数表达式）</h3>
+        <pre><code>// IIFE - 创建私有作用域
+var MyModule = (function() {
+    var privateVar = '私有变量';  // 外部无法访问
+
+    function privateFn() {
+        console.log('私有函数');
+    }
+
+    // 暴露公共接口
+    return {
+        publicVar: '公共变量',
+        publicFn: function() {
+            privateFn();
+            return privateVar;
+        }
+    };
+})();
+
+MyModule.publicFn();  // ✅ 可以调用
+MyModule.privateVar;  // undefined - 无法访问私有变量</code></pre>
+        <ul>
+            <li><strong>优点：</strong>避免全局污染，实现私有作用域</li>
+            <li><strong>缺点：</strong>没有统一的模块加载机制，依赖管理困难，需要手动维护script标签顺序</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 二、CommonJS ==================== -->
+    <h2>二、CommonJS（CJS）</h2>
+
+    <div class="card">
+        <h3>2.1 基本语法</h3>
+        <pre><code>// math.js - 导出模块
+const PI = 3.14159;
+
+function add(a, b) {
+    return a + b;
+}
+
+function subtract(a, b) {
+    return a - b;
+}
+
+// 方式1：逐个导出
+module.exports.add = add;
+module.exports.subtract = subtract;
+
+// 方式2：整体导出（覆盖整个module.exports）
+module.exports = {
+    add,
+    subtract,
+    PI
+};
+
+// app.js - 导入模块
+const math = require('./math');
+console.log(math.add(1, 2));
+
+// 或解构导入
+const { add, subtract } = require('./math');</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>2.2 核心特性</h3>
+        <ul>
+            <li><strong>运行时加载：</strong>require在运行时执行，可以动态加载模块</li>
+            <li><strong>值的拷贝：</strong>导出的是值的拷贝（不是引用），内部变化不影响外部</li>
+            <li><strong>同步加载：</strong>适合服务器端（文件在本地磁盘），不适合浏览器（网络加载慢）</li>
+            <li><strong>缓存机制：</strong>模块首次加载后缓存，后续require返回缓存结果</li>
+            <li><strong>循环依赖：</strong>返回已执行部分的结果（可能不完整）</li>
+        </ul>
+        <pre><code>// 循环依赖示例
+// a.js
+console.log('a开始');
+exports.done = false;
+const b = require('./b');
+console.log('b在a中:', b.done);
+exports.done = true;
+console.log('a结束');
+
+// b.js
+console.log('b开始');
+const a = require('./a');
+console.log('a在b中:', a.done);  // false！因为a还没执行完
+exports.done = true;
+console.log('b结束');
+
+// 执行a.js输出：
+// a开始 → b开始 → a在b中: false → b结束 → b在a中: true → a结束</code></pre>
+    </div>
+
+    <!-- ==================== 三、AMD ==================== -->
+    <h2>三、AMD（Asynchronous Module Definition）</h2>
+
+    <div class="card">
+        <h3>3.1 基本语法</h3>
+        <pre><code>// AMD使用define函数定义模块
+// 需要配合RequireJS等加载器使用
+
+// math.js
+define('math', [], function() {
+    return {
+        add: function(a, b) { return a + b; },
+        PI: 3.14159
+    };
+});
+
+// app.js - 依赖声明
+define('app', ['math', 'jquery'], function(math, $) {
+    // math和jquery已经加载并执行
+    console.log(math.add(1, 2));
+    $('body').addClass('loaded');
+
+    return {
+        init: function() { /* ... */ }
+    };
+});
+
+// 动态加载
+require(['math'], function(math) {
+    console.log(math.PI);
+});</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>3.2 特性</h3>
+        <ul>
+            <li><strong>异步加载：</strong>适合浏览器环境，依赖并行下载</li>
+            <li><strong>前置声明依赖：</strong>依赖在回调函数的参数中声明</li>
+            <li><strong>依赖前置：</strong>所有依赖必须在回调前声明（ESM的import也是如此）</li>
+            <li><strong>已过时：</strong>现代项目不再使用AMD，被ESM和打包工具取代</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 四、UMD ==================== -->
+    <h2>四、UMD（Universal Module Definition）</h2>
+
+    <div class="card">
+        <h3>4.1 基本语法</h3>
+        <pre><code>// UMD - 同时兼容CommonJS、AMD和全局变量
+(function(root, factory) {
+    if (typeof define === 'function' && define.amd) {
+        // AMD环境（RequireJS）
+        define(['jquery'], factory);
+    } else if (typeof module === 'object' && module.exports) {
+        // CommonJS环境（Node.js）
+        module.exports = factory(require('jquery'));
+    } else {
+        // 浏览器全局变量
+        root.MyLib = factory(root.jQuery);
+    }
+}(typeof self !== 'undefined' ? self : this, function($) {
+    // 模块的实际代码
+    return {
+        version: '1.0.0',
+        init: function() {
+            $('body').addClass('initialized');
+        }
+    };
+}));</code></pre>
+    </div>
+    <div class="card">
+        <h3>4.2 使用场景</h3>
+        <ul>
+            <li>需要同时支持Node.js和浏览器的库</li>
+            <li>需要兼容旧环境的第三方库</li>
+            <li>大多数NPM包在ESM普及前都使用UMD格式</li>
+            <li>现代项目通过构建工具自动处理，很少手写UMD</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 五、ES Module ==================== -->
+    <h2>五、ES Module（ESM）</h2>
+
+    <div class="card">
+        <h3>5.1 基本语法</h3>
+        <pre><code>// ===== 导出（Export）=====
+
+// math.js - 命名导出
+export const PI = 3.14159;
+
+export function add(a, b) {
+    return a + b;
+}
+
+export class Calculator {
+    multiply(a, b) { return a * b; }
+}
+
+// utils.js - 默认导出
+export default function formatDate(date) {
+    return date.toISOString().split('T')[0];
+}
+
+// 也可以混合使用
+export const helper = () => {};
+export default function main() {}
+
+// ===== 导入（Import）=====
+
+// 命名导入
+import { add, PI } from './math.js';
+
+// 默认导入
+import formatDate from './utils.js';
+
+// 混合导入
+import main, { helper } from './module.js';
+
+// 整体导入（所有导出作为命名空间）
+import * as math from './math.js';
+math.add(1, 2);
+
+// 动态导入（返回Promise）
+const module = await import('./math.js');
+module.add(1, 2);
+
+// 仅执行副作用（如polyfill）
+import './polyfills.js';
+
+// 重命名
+import { add as sum } from './math.js';
+export { add as addition } from './math.js';</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>5.2 ESM核心特性</h3>
+        <table>
+            <tr><th>特性</th><th>ESM</th><th>CommonJS</th></tr>
+            <tr><td>加载方式</td><td>编译时静态分析</td><td>运行时动态加载</td></tr>
+            <tr><td>值的类型</td><td>导出值的引用（live binding）</td><td>导出值的拷贝</td></tr>
+            <tr><td>this</td><td>undefined</td><td>当前模块的exports</td></tr>
+            <tr><td>顶层await</td><td>支持</td><td>不支持</td></tr>
+            <tr><td>Tree Shaking</td><td>支持</td><td>不支持</td></tr>
+            <tr><td>循环依赖</td><td>引用（可能取到未初始化的值）</td><td>部分导出（可能不完整）</td></tr>
+            <tr><td>动态导入</td><td><code>import()</code></td><td><code>require()</code></td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>5.3 ESM的Live Binding（实时绑定）</h3>
+        <pre><code>// counter.js
+export let count = 0;
+
+export function increment() {
+    count++;  // ESM中导出的是引用，内部变化外部可见
+}
+
+// app.js
+import { count, increment } from './counter.js';
+
+console.log(count);  // 0
+increment();
+console.log(count);  // 1  ← Live Binding！
+
+// 对比CommonJS：
+// let count = 0;
+// module.exports = { count, increment };
+// 外部拿到的count是值的拷贝，increment后外部count仍是0</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>5.4 顶层await（ES2022）</h3>
+        <pre><code>// 顶层await - 模块加载时的异步操作
+const response = await fetch('/api/config');
+export const config = await response.json();
+
+// 动态导入
+const lodash = await import('https://cdn.example.com/lodash.js');
+
+// 资源初始化
+const db = await connectDatabase();
+export default db;
+
+// 注意：使用顶层await的模块会变成异步模块
+// 导入它的模块也会等待它完成
+// import './module-with-top-level-await.js';  // 这里会等待</code></pre>
+    </div>
+
+    <!-- ==================== 六、循环依赖详解 ==================== -->
+    <h2>六、循环依赖详解</h2>
+
+    <div class="card">
+        <h3>6.1 CommonJS循环依赖</h3>
+        <pre><code>// a.js
+exports.done = false;
+const b = require('./b');  // 执行b.js
+console.log('a中b.done:', b.done);  // true（b已执行完）
+exports.done = true;
+
+// b.js
+const a = require('./a');  // 返回a的部分导出（只返回已执行的部分）
+console.log('b中a.done:', a.done);  // false！a还没执行到exports.done = true
+exports.done = true;
+
+// CommonJS循环依赖返回部分结果</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>6.2 ESM循环依赖</h3>
+        <pre><code>// a.mjs
+import { b } from './b.mjs';
+export const a = 'a';
+console.log('a中b:', b);  // 如果b.mjs还没完成解析，可能是undefined
+
+// b.mjs
+import { a } from './a.mjs';
+export const b = 'b';
+console.log('b中a:', a);  // 取决于解析顺序
+
+// ESM循环依赖的值是引用（live binding）
+// 解析阶段建立引用关系，执行阶段才赋值
+// 如果模块还没执行到导出语句，导入方获取到的是undefined</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>6.3 如何避免循环依赖</h3>
+        <ul>
+            <li><strong>重构模块结构：</strong>提取公共依赖到第三个模块</li>
+            <li><strong>延迟导入：</strong>在函数内部使用 <code>require()</code> 或 <code>import()</code></li>
+            <li><strong>依赖注入：</strong>通过参数传递依赖而非直接导入</li>
+            <li><strong>使用依赖检查工具：</strong><code>madge</code>、<code>dependency-cruiser</code> 检测循环依赖</li>
+        </ul>
+        <pre><code>// 解决方案1：提取公共模块
+// common.js
+export const SHARED_CONSTANT = 'shared';
+
+// a.js
+import { SHARED_CONSTANT } from './common.js';
+export const a = 'a';
+
+// b.js
+import { SHARED_CONSTANT } from './common.js';
+export const b = 'b';
+
+// 解决方案2：延迟导入
+// a.js
+export function getB() {
+    const { b } = require('./b');  // 运行时加载
+    return b;
+}
+
+// 解决方案3：动态import
+// a.js
+export const a = 'a';
+export async function getB() {
+    const { b } = await import('./b.js');
+    return b;
+}</code></pre>
+    </div>
+
+    <!-- ==================== 七、Tree Shaking前提条件 ==================== -->
+    <h2>七、Tree Shaking前提条件</h2>
+
+    <div class="card">
+        <h3>7.1 为什么只有ESM支持Tree Shaking</h3>
+        <div class="flow-diagram">
+ESM（编译时）：                    CommonJS（运行时）：
+import { add } from './math'      const math = require('./math')
+↑                                  ↑
+编译时确定依赖关系                  运行时才能确定依赖关系
+→ 静态分析可能                    → 无法静态分析
+→ Tree Shaking ✅                 → Tree Shaking ❌
+
+关键区别：
+ESM: import的路径必须是字符串字面量
+     import { x } from './module.js'  // ✅ 静态
+CJS: require的路径可以是动态的
+     const name = getModuleName();
+     const mod = require(name);  // ❌ 动态，无法分析</div>
+    </div>
+
+    <div class="card">
+        <h3>7.2 Tree Shaking的条件</h3>
+        <ul>
+            <li><strong>使用ESM语法：</strong><code>import/export</code> 而非 <code>require/module.exports</code></li>
+            <li><strong>构建工具支持：</strong>Webpack、Rollup、Vite等都支持Tree Shaking</li>
+            <li><strong>没有副作用：</strong>模块不产生副作用（修改全局状态等），或在 <code>package.json</code> 中声明 <code>sideEffects</code></li>
+            <li><strong>不使用动态导入：</strong>避免 <code>import(`./${name}.js`)</code> 这种动态路径</li>
+            <li><strong>使用具名导入：</strong><code>import { Button } from 'antd'</code> 比 <code>import _ from 'lodash'</code> 更容易被shaking</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>7.3 sideEffects字段</h3>
+        <pre><code>// package.json
+{
+    "name": "my-lib",
+    "sideEffects": false  // 声明所有模块都没有副作用
+}
+
+// 或指定有副作用的文件
+{
+    "sideEffects": [
+        "*.css",
+        "*.scss",
+        "./src/polyfills.js",
+        "./src/register-global.js"
+    ]
+}
+
+// 副作用是指：模块加载时执行了不影响导出的操作
+// 例如：
+// - 注册全局变量
+// - 修改原型链
+// - 执行console.log
+// - 导入CSS（CSS是典型副作用）
+
+// 没有副作用的模块可以安全地被Tree Shaking</code></pre>
+    </div>
+
+    <!-- ==================== 八、现代模块化最佳实践 ==================== -->
+    <h2>八、现代模块化最佳实践</h2>
+
+    <div class="card">
+        <h3>8.1 推荐做法</h3>
+        <ul>
+            <li><strong>始终使用ESM：</strong>新项目统一使用 <code>import/export</code></li>
+            <li><strong>具名导出优先：</strong>默认导出在重构时容易出错（导入名随意）</li>
+            <li><strong>一个模块一个职责：</strong>保持模块单一职责，便于Tree Shaking</li>
+            <li><strong>index.js统一导出：</strong>目录结构中用index.js统一导出子模块</li>
+            <li><strong>避免循环依赖：</strong>使用依赖检查工具</li>
+            <li><strong>正确声明sideEffects：</strong>让构建工具可以安全Tree Shaking</li>
+        </ul>
+        <pre><code>// 推荐：目录结构
+components/
+├── index.js          // 统一导出
+├── Button/
+│   ├── index.js
+│   ├── Button.tsx
+│   └── Button.module.css
+└── Modal/
+    ├── index.js
+    ├── Modal.tsx
+    └── Modal.module.css
+
+// components/index.js
+export { Button } from './Button';
+export { Modal } from './Modal';
+
+// 使用方
+import { Button, Modal } from '@/components';</code></pre>
+    </div>
+
+    <div class="highlight">
+        <strong>总结：</strong>JavaScript模块化从全局变量发展到ES Module，经历了IIFE（私有作用域）→ CommonJS（Node.js同步）→ AMD（浏览器异步）→ UMD（通用兼容）→ ESM（官方标准）的演进。ESM是当前和未来的主流方案，支持编译时静态分析、Tree Shaking、顶层await等现代特性。理解循环依赖的本质和Tree Shaking的前提条件是模块化编程的基础。
+    </div>
+</div>
+<!-- 本文档总结了JavaScript模块化规范的演进历史和ES Module核心特性 -->
+</body>
+</html>

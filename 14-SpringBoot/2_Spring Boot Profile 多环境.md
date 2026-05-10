@@ -1,0 +1,409 @@
+# Spring Boot Profile 多环境
+
+
+## 🌍 Spring Boot 多环境配置
+
+
+@Profile 注解、多环境 YML 文件 (dev/test/prod)、激活方式、条件 Bean、配置分组、多环境最佳实践。
+
+
+## Profile 概念
+
+
+```
+// ========== Profile ==========
+// Spring 多环境支持
+// 不同环境: dev (开发)、test (测试)、prod (生产)
+// 控制 Bean 注册和配置加载
+
+// ========== 多环境配置文件 ==========
+// 命名格式: application-{profile}.yml
+// 主配置:   application.yml (共用配置)
+// 环境特定: application-dev.yml
+//           application-test.yml
+//           application-prod.yml
+
+// ========== application.yml (共用) ==========
+spring:
+  application:
+    name: my-service
+
+server:
+  port: 8080
+
+# 激活环境 (默认)
+spring:
+  profiles:
+    active: dev
+
+// ========== application-dev.yml ==========
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+
+logging:
+  level:
+    com.example: DEBUG
+    org.springframework: INFO
+
+server:
+  port: 8080
+
+// ========== application-prod.yml ==========
+spring:
+  datasource:
+    url: jdbc:mysql://prod-db:3306/mydb
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: 50
+      minimum-idle: 10
+  jpa:
+    hibernate:
+      ddl-auto: validate          # 生产环境只验证, 不自动更新
+    show-sql: false
+
+logging:
+  level:
+    com.example: WARN
+    root: WARN
+  file:
+    name: /var/log/myapp/app.log
+
+server:
+  port: 80
+
+// ========== 配置加载机制 ==========
+// 激活 dev Profile:
+// 1. application.yml  (所有环境共用)
+// 2. application-dev.yml (dev 特定)
+// dev 配置覆盖共用配置中的相同属性
+```
+
+
+## 激活 Profile
+
+
+```
+// ========== 激活 Profile 的方式 ==========
+
+// ========== 1. application.yml 中指定 ==========
+spring:
+  profiles:
+    active: dev
+
+// ========== 2. 命令行参数 ==========
+java -jar myapp.jar --spring.profiles.active=prod
+
+// ========== 3. 环境变量 ==========
+SPRING_PROFILES_ACTIVE=prod java -jar myapp.jar
+
+// 多环境:
+SPRING_PROFILES_ACTIVE=dev,elasticsearch,swagger
+
+// ========== 4. JVM 参数 ==========
+java -Dspring.profiles.active=prod -jar myapp.jar
+
+// ========== 5. Maven/Gradle 构建时指定 ==========
+// Maven 资源过滤
+mvn package -P prod
+
+// application.yml 中使用占位符:
+spring:
+  profiles:
+    active: @spring.profiles.active@   // Maven 替换
+
+// ========== 6. 编程式设置 ==========
+@SpringBootApplication
+public class Application {
+    public static void main(String[] args) {
+        SpringApplication app = new SpringApplication(Application.class);
+        app.setAdditionalProfiles("dev");   // 添加 dev profile
+        app.run(args);
+    }
+}
+
+// ========== 7. 测试中激活 ==========
+@SpringBootTest
+@ActiveProfiles("test")                    // 激活 test profile
+class UserServiceTest {
+    @Test
+    void testSomething() { ... }
+}
+
+// ========== 优先级 (高→低) ==========
+// 1. 命令行 --spring.profiles.active
+// 2. 环境变量 SPRING_PROFILES_ACTIVE
+// 3. JVM 参数 -Dspring.profiles.active
+// 4. application.yml 中的 spring.profiles.active
+// 5. SpringApplication.setAdditionalProfiles()
+```
+
+
+## @Profile 注解
+
+
+```
+// ========== @Profile ==========
+// 控制 Bean 在指定 Profile 下才注册
+
+// ========== 在 @Configuration 上使用 ==========
+@Configuration
+@Profile("dev")                              // 仅 dev 环境加载
+public class DevConfig {
+
+    @Bean
+    public DataSource devDataSource() {
+        return new H2DataSource();           // 开发用 H2 内存数据库
+    }
+}
+
+@Configuration
+@Profile("prod")                             // 仅 prod 环境加载
+public class ProdConfig {
+
+    @Bean
+    public DataSource prodDataSource() {
+        HikariDataSource ds = new HikariDataSource();
+        ds.setJdbcUrl("jdbc:mysql://prod:3306/mydb");
+        ds.setMaximumPoolSize(50);
+        return ds;
+    }
+}
+
+// ========== 在 @Component 上使用 ==========
+@Component
+@Profile("dev")
+public class DevDataInitializer implements CommandLineRunner {
+    @Override
+    public void run(String... args) {
+        System.out.println("初始化开发测试数据...");
+    }
+}
+
+// ========== 在 @Bean 方法上使用 ==========
+@Configuration
+public class AppConfig {
+
+    @Bean
+    @Profile("dev")
+    public DataSource devDataSource() { ... }
+
+    @Bean
+    @Profile("prod")
+    public DataSource prodDataSource() { ... }
+
+    @Bean
+    @Profile("test")
+    public DataSource testDataSource() { ... }
+}
+
+// ========== 组合条件 ==========
+// 多 Profile 或关系
+@Component
+@Profile({"dev", "test"})                    // dev 或 test 都加载
+public class DevLogger { ... }
+
+// 取反
+@Component
+@Profile("!prod")                            // 非 prod 环境加载
+public class DebugLogger { ... }
+
+// 与关系 (必须同时激活)
+@Component
+@Profile("dev & elasticsearch")              // dev + elasticsearch 同时激活
+public class DevSearchConfig { ... }
+
+// ========== @Profile 常见场景 ==========
+// 1. 数据源: dev→H2, test→H2, prod→MySQL
+// 2. 日志级别: dev→DEBUG, prod→WARN
+// 3. 外部服务: dev→Mock, prod→真实
+// 4. 初始化数据: dev→填充测试数据
+// 5. 定时任务: dev→关闭, prod→开启
+
+// ========== 默认 profile ==========
+// 未激活任何 profile 时, 默认使用 "default"
+@Profile("default")                          // 没有其他 profile 时激活
+@Component
+public class DefaultConfig { ... }
+```
+
+
+## Profile 分组与多文档
+
+
+```
+// ========== Profile 分组 (Spring Boot 3.1+) ==========
+// application.yml
+spring:
+  profiles:
+    group:
+      dev: [dev, dev-db, dev-queue]         // dev 组包含 3 个子 profile
+      prod: [prod, prod-db, prod-queue]
+
+// 激活 dev: 自动激活 dev + dev-db + dev-queue
+// 简化: --spring.profiles.active=dev 而不是 dev,dev-db,dev-queue
+
+// ========== 多文档 YAML ==========
+// 一个文件中包含多个 Profile 配置
+// --- 分隔不同文档
+
+# application.yml
+# 文档 1: 通用配置
+spring:
+  application:
+    name: my-service
+
+server:
+  port: 8080
+
+---
+# 文档 2: dev 配置
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb
+  jpa:
+    show-sql: true
+
+---
+# 文档 3: prod 配置
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+spring:
+  datasource:
+    url: jdbc:mysql://prod:3306/mydb
+    username: ${DB_USER}
+    password: ${DB_PASS}
+
+logging:
+  level:
+    com.example: WARN
+
+// 注意: 多文档 YAML 中不能用 spring.profiles 属性
+// Spring Boot 3.x 使用 spring.config.activate.on-profile
+
+// ========== Profile 特定文件 vs 多文档 ==========
+// profile 特定文件: application-dev.yml (推荐, 更清晰)
+// 多文档 YAML: 适合小项目, 所有配置在一个文件
+
+// ========== 程序化获取激活的 Profile ==========
+@Component
+public class ProfileReporter {
+
+    @Value("${spring.profiles.active:}")
+    private String activeProfile;
+
+    @Autowired
+    private Environment env;
+
+    public void printProfiles() {
+        // 方式 1
+        System.out.println("Active: " + activeProfile);
+
+        // 方式 2
+        String[] profiles = env.getActiveProfiles();
+        System.out.println("Active: " + Arrays.toString(profiles));
+
+        // 是否包含某个 profile
+        if (env.acceptsProfiles(Profiles.of("prod"))) {
+            System.out.println("生产环境!");
+        }
+    }
+}
+```
+
+
+## 多环境最佳实践
+
+
+```
+// ========== 多环境最佳实践 ==========
+
+// ========== 推荐环境划分 ==========
+// local         — 本地开发环境
+// dev           — 开发服务器环境
+// test/qa       — 测试环境
+// staging       — 预发布环境 (与生产配置一致)
+// prod          — 生产环境
+
+// ========== 典型配置差异 ==========
+// ┌────────────┬───────────┬─────────┬──────────┐
+// │ 配置项     │ dev       │ staging │ prod     │
+// ├────────────┼───────────┼─────────┼──────────┤
+// │ 数据库     │ H2/本地   │ 测试 DB │ 生产 DB  │
+// │ 日志级别   │ DEBUG     │ INFO    │ WARN     │
+// │ SQL 显示   │ true      │ false   │ false    │
+// │ ddl-auto   │ update    │ validate│ validate │
+// │ 缓存       │ 关闭      │ 开启    │ 开启     │
+// │ 限流       │ 关闭      │ 开启    │ 开启     │
+// │ SSL        │ 关闭      │ 开启    │ 开启     │
+// └────────────┴───────────┴─────────┴──────────┘
+
+// ========== 数据库配置 ==========
+// dev: H2 内存数据库, 快速启动
+// test: H2 或独立测试数据库
+// prod: 高性能连接池 + 读写分离
+
+// ========== 日志配置 ==========
+// dev: 控制台彩色输出, DEBUG 级别
+// prod: 文件输出, WARN 级别, 日志轮转
+
+// logback-spring.xml 中按 profile 配置:
+<springProfile name="dev">
+    <logger name="com.example" level="DEBUG"/>
+</springProfile>
+<springProfile name="prod">
+    <logger name="com.example" level="WARN"/>
+</springProfile>
+
+// ========== 安全配置 ==========
+// dev: 关闭安全检查, 方便调试
+// prod: 开启所有安全措施
+
+// ========== 第三方服务 ==========
+// dev: Mock 或沙箱环境
+// prod: 真实服务
+
+// ========== 配置校验 ==========
+// 启动时检查关键配置是否存在
+@SpringBootApplication
+public class Application {
+    public static void main(String[] args) {
+        // prod 环境必须设置 JWT_SECRET
+        if (Arrays.asList(env.getActiveProfiles()).contains("prod")) {
+            Preconditions.checkNotNull(
+                System.getenv("JWT_SECRET"),
+                "生产环境必须设置 JWT_SECRET 环境变量!"
+            );
+        }
+    }
+}
+
+// ========== Gradle/Maven 配合 ==========
+// 构建时自动激活对应 profile
+// Maven: mvn package -P prod
+// Gradle: ./gradlew build -Dspring.profiles.active=prod
+```
+
+
+> **Note:** 💡 Profile 要点: application-{profile}.yml 按环境分离; @Profile 控制 Bean 注册 (dev/test/prod/!prod); 命令行/environment/JVM 三种激活方式; 环境分组 Spring Boot 3.1+ Group; 多文档 YAML 用 --- 分隔; 最佳实践: local/dev/staging/prod 四级; 敏感信息用环境变量; ddl-auto dev=update prod=validate。
+
+
+## 练习
+
+
+<!-- Converted from: 2_Spring Boot Profile 多环境.html -->

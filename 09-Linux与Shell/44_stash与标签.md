@@ -1,0 +1,188 @@
+# stash与临时保存
+
+
+## 📦 stash 与临时保存
+
+
+git stash 保存/恢复进度、stash 管理、stash 冲突解决。
+
+
+## stash 基础
+
+
+```
+// ========== stash 是什么 ==========
+// stash = 临时保存工作区的修改
+// 场景: 正在开发一半,需要切到其他分支
+// 不想提交半成品,又不想丢失修改
+
+// ========== 基本用法 ==========
+git stash                       # 保存所有未提交的修改
+git stash push -m "WIP: login"  # 带消息保存 (推荐)
+git stash -u                    # 包括 untracked 文件
+git stash -a                    # 包括所有文件 (含 ignored)
+
+// ========== 恢复 stash ==========
+git stash pop                   # 恢复最近的 stash 并删除
+git stash apply                 # 恢复但不删除
+git stash apply stash@{1}       # 恢复指定 stash
+git stash pop stash@{2}         # 弹出指定 stash
+
+// ========== 查看 stash ==========
+git stash list                  # 列出所有 stash
+// stash@{0}: On feature: WIP: login form
+// stash@{1}: On main: fix: typo
+
+git stash show                  # 查看最近 stash 的改动的文件
+git stash show -p               # 查看最近 stash 的 diff
+git stash show stash@{1}        # 查看指定 stash
+
+// ========== 删除 stash ==========
+git stash drop                  # 删除最近 stash
+git stash drop stash@{1}        # 删除指定 stash
+git stash clear                 # 删除所有 stash (小心!)
+
+// ========== 典型工作流 ==========
+// 1. 在 feature 上开发
+echo "WIP code" >> file.js
+git status                      # 有修改
+
+// 2. 需要紧急切换到 main 修 bug
+git stash push -m "WIP: feature progress"
+
+// 3. 切换到 main
+git checkout main
+# 修 bug...
+
+// 4. 回到 feature,恢复进度
+git checkout feature
+git stash pop
+# 继续开发
+```
+
+
+## stash 进阶
+
+
+```
+// ========== 部分 stash ==========
+// 只暂存工作区的部分文件
+
+git stash push -m "only src" src/       # 只暂存 src 目录
+git stash push -m "config" -- config.yml  # 只暂存指定文件
+git stash push -m "no node_modules" -- ':!node_modules'  # 排除
+
+// ========== stash 的 untracked ==========
+// 默认 stash 不保存 untracked 文件
+// -u 或 --include-untracked 包含 untracked
+// -a 或 --all 包含所有 (含 .gitignore 中的文件)
+
+git stash -u                    # 包含 untracked 文件
+git stash push -u -m "WIP"      # 同上,带消息
+
+// ========== 从 stash 创建分支 ==========
+// stash pop 冲突时,可以从 stash 创建分支
+
+git stash branch new-feature    # 基于 stash 创建新分支
+// 自动: 切到 stash 保存时的 commit
+// 恢复 stash 的内容
+// 适合: stash 与当前分支状态差异太大
+
+// ========== stash vs 临时 commit ==========
+// stash:    临时保存,不进入 commit 历史
+// commit:   正式保存,进入历史,可推送
+//
+// 选择:
+// 几分钟的切换 → stash
+// 需要推送/共享 → commit
+// 不确定的修改 → stash
+```
+
+
+## stash 冲突解决
+
+
+```
+// ========== stash 冲突 ==========
+// git stash pop 或 git stash apply 时可能冲突
+// 和工作区当前的修改冲突
+
+// 现象:
+// Auto-merging file.txt
+// CONFLICT (content): Merge conflict in file.txt
+
+// ========== 解决步骤 ==========
+// 1. 查看冲突文件
+git status
+
+// 2. 手动解决冲突 (同 merge 冲突)
+// 编辑冲突文件
+
+// 3. 标记已解决
+git add file.txt
+
+// 4. 注意: pop 后 stash 不会自动删除
+// 因为冲突导致 pop 不完全
+// 解决完冲突后手动删除
+git stash drop
+
+// ========== 预防 stash 冲突 ==========
+// 1. 切分支前先 stash
+// 2. 恢复前先 git status 确认工作区干净
+// 3. 如果冲突太多,用 git stash branch
+```
+
+
+## tag — 标签
+
+
+```
+// ========== 标签概念 ==========
+// 标签 = 给 commit 打上可读的"书签"
+// 常用于标记版本号 (v1.0.0, v2.1.0)
+// 两种标签:
+//   轻量标签 (lightweight): 只是一个指针
+//   附注标签 (annotated): 包含作者/日期/消息 (推荐)
+
+// ========== 创建标签 ==========
+git tag v1.0.0                  # 轻量标签
+git tag -a v1.0.0 -m "Release version 1.0.0"  # 附注标签
+git tag -a v1.0.0 abc123 -m "Tag specific commit"  # 指定 commit
+
+// ========== 查看标签 ==========
+git tag                         # 列出所有标签
+git tag -l "v1.*"              # 通配符过滤
+git show v1.0.0                 # 查看标签详情
+git describe                    # 最近的标签描述
+
+// ========== 推送标签 ==========
+git push origin v1.0.0          # 推送单个标签
+git push origin --tags          # 推送所有标签
+git push --follow-tags          # 推送 commit 及其附注标签
+
+// ========== 删除标签 ==========
+git tag -d v1.0.0               # 删除本地标签
+git push origin --delete v1.0.0 # 删除远程标签
+git push origin :refs/tags/v1.0.0 # 同上
+
+// ========== 切换到标签 ==========
+git checkout v1.0.0             # detached HEAD (阅读模式)
+git checkout -b release-1.0 v1.0.0  # 基于标签创建分支
+
+// ========== 语义化版本 (SemVer) ==========
+// 格式: MAJOR.MINOR.PATCH
+// v1.2.3
+// MAJOR: 不兼容的 API 修改 (大版本)
+// MINOR: 向下兼容的功能添加
+// PATCH: 向下兼容的 bug 修复
+// 预发布: v1.0.0-alpha, v1.0.0-beta, v1.0.0-rc.1
+```
+
+
+> **Note:** 💡 stash 是"正在做的事的临时抽屉"——用 git stash push -m "描述" 代替无参数的 git stash,几个月后你还能知道每个 stash 是干什么的。标签是"重要历史节点的书签"——用附注标签 (git tag -a) 标记版本发布,对团队协作非常重要。
+
+
+## 练习
+
+
+<!-- Converted from: 44_stash与标签.html -->

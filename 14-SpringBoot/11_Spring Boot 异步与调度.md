@@ -1,0 +1,445 @@
+# Spring Boot 异步与调度
+
+
+## ⏰ Spring Boot 异步与调度
+
+
+@Async 异步任务、@Scheduled 定时任务、TaskExecutor/ThreadPoolTaskExecutor 线程池配置、异步异常处理、条件调度。
+
+
+## @Async 异步任务
+
+
+```
+// ========== @Async ==========
+// 让方法在单独线程中异步执行
+// 不阻塞调用方线程
+
+// ========== 1. 启用异步 ==========
+@SpringBootApplication
+@EnableAsync                             // 启用异步支持
+public class Application { ... }
+
+// ========== 2. 异步方法 ==========
+@Slf4j
+@Service
+public class EmailService {
+
+    // 无返回值异步
+    @Async
+    public void sendWelcomeEmail(String to) {
+        log.info("发送欢迎邮件到 {} (线程: {})", to,
+            Thread.currentThread().getName());
+        // 模拟耗时操作
+        try {
+            Thread.sleep(2000);
+            log.info("欢迎邮件发送成功: {}", to);
+        } catch (InterruptedException e) {
+            log.error("邮件发送失败", e);
+        }
+    }
+
+    // 有返回值异步 (Future)
+    @Async
+    public CompletableFuture<String> fetchUserData(Long userId) {
+        log.info("获取用户数据: {}", userId);
+        // 模拟耗时查询
+        String result = "UserData-" + userId;
+        return CompletableFuture.completedFuture(result);
+    }
+
+    // 异常会包装在 Future 中
+    @Async
+    public CompletableFuture<Integer> processPayment(Long orderId) {
+        if (orderId == null) {
+            CompletableFuture<Integer> future = new CompletableFuture<>();
+            future.completeExceptionally(new IllegalArgumentException("订单 ID 不能为空"));
+            return future;
+        }
+        return CompletableFuture.completedFuture(100);
+    }
+}
+
+// ========== 3. 调用异步方法 ==========
+@RestController
+@RequestMapping("/api/users")
+@Slf4j
+public class UserController {
+
+    private final EmailService emailService;
+
+    @PostMapping("/register")
+    public ApiResponse<User> register(@RequestBody User user) {
+        User saved = userService.create(user);
+
+        // 异步发送邮件 (不阻塞响应)
+        emailService.sendWelcomeEmail(saved.getEmail());
+        log.info("注册完成, 正在异步发送邮件...");
+
+        return ApiResponse.success(saved);
+    }
+
+    @GetMapping("/async-data")
+    public ApiResponse<List<String>> getAsyncData() {
+        // 并发执行多个异步任务
+        CompletableFuture<String> f1 = emailService.fetchUserData(1L);
+        CompletableFuture<String> f2 = emailService.fetchUserData(2L);
+        CompletableFuture<String> f3 = emailService.fetchUserData(3L);
+
+        // 等待所有完成
+        List<String> results = CompletableFuture
+            .allOf(f1, f2, f3)
+            .thenApply(v -> Stream.of(f1, f2, f3)
+                .map(CompletableFuture::join)
+                .collect(Collectors.toList()))
+            .join();
+
+        return ApiResponse.success(results);
+    }
+}
+
+// ========== @Async 限制 ==========
+// 1. 不能在同一类中调用 (this.method()), 不走代理
+// 2. 方法必须是 public
+// 3. 返回值只能是 void 或 Future/CompletableFuture
+```
+
+
+## 线程池配置
+
+
+```
+// ========== 线程池配置 ==========
+// 自定义 @Async 使用的线程池
+
+// ========== 方式 1: 实现 AsyncConfigurer ==========
+@Configuration
+@EnableAsync
+public class AsyncConfig implements AsyncConfigurer {
+
+    @Override
+    public Executor getAsyncExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+
+        // 核心参数
+        executor.setCorePoolSize(5);               // 核心线程数
+        executor.setMaxPoolSize(20);               // 最大线程数
+        executor.setQueueCapacity(100);            // 队列容量
+        executor.setKeepAliveSeconds(60);          // 空闲线程存活时间
+
+        // 线程名前缀 (方便排查)
+        executor.setThreadNamePrefix("async-");
+
+        // 拒绝策略
+        executor.setRejectedExecutionHandler(
+            new ThreadPoolExecutor.CallerRunsPolicy());  // 调用方自己执行
+
+        // 等待所有任务完成再关闭
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
+
+        executor.initialize();
+        return executor;
+    }
+
+    @Override
+    public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
+        return (ex, method, params) -> {
+            log.error("异步方法 {} 执行异常: {}", method.getName(), ex.getMessage(), ex);
+        };
+    }
+}
+
+// ========== 方式 2: @Bean 定义 ==========
+@Configuration
+@EnableAsync
+public class AsyncConfig {
+
+    @Bean("customExecutor")
+    public Executor customExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(10);
+        executor.setMaxPoolSize(30);
+        executor.setQueueCapacity(200);
+        executor.setThreadNamePrefix("custom-async-");
+        executor.initialize();
+        return executor;
+    }
+
+    @Bean("mailExecutor")
+    public Executor mailExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(3);
+        executor.setMaxPoolSize(10);
+        executor.setQueueCapacity(50);
+        executor.setThreadNamePrefix("mail-async-");
+        executor.initialize();
+        return executor;
+    }
+}
+
+// ========== 指定线程池 ==========
+@Async("mailExecutor")                   // 使用 mailExecutor 线程池
+public void sendMail() { ... }
+
+@Async("customExecutor")                 // 使用 customExecutor
+public void processData() { ... }
+
+// ========== 拒绝策略 ==========
+// AbortPolicy:        抛 RejectedExecutionException (默认)
+// CallerRunsPolicy:   调用方线程执行 (降低提交速度)
+// DiscardPolicy:      丢弃任务 (静默)
+// DiscardOldestPolicy: 丢弃最旧的任务
+```
+
+
+## @Scheduled 定时任务
+
+
+```
+// ========== @Scheduled ==========
+// 定时执行方法 (类似 Linux cron)
+
+// ========== 1. 启用调度 ==========
+@SpringBootApplication
+@EnableScheduling                        // 启用定时任务
+public class Application { ... }
+
+// ========== 2. 基本用法 ==========
+@Component
+@Slf4j
+public class ScheduledTasks {
+
+    // ========== fixedRate: 固定频率 ==========
+    // 上次开始 → 下次开始 (无论上次是否完成)
+    @Scheduled(fixedRate = 5000)          // 每 5 秒执行一次
+    public void reportCurrentTime() {
+        log.info("当前时间: {}", LocalDateTime.now());
+    }
+
+    // ========== fixedDelay: 固定延迟 ==========
+    // 上次结束 → 下次开始 (等待上次完成)
+    @Scheduled(fixedDelay = 5000)         // 上次结束后等 5 秒
+    public void runAfterPrevious() {
+        log.info("执行耗时任务...");
+    }
+
+    // ========== initialDelay: 初始延迟 ==========
+    // 应用启动后延迟指定时间再首次执行
+    @Scheduled(fixedRate = 10000, initialDelay = 30000)
+    public void delayedStart() {
+        log.info("应用启动 30 秒后开始执行, 之后每 10 秒执行");
+    }
+
+    // ========== cron: Cron 表达式 ==========
+    // 秒 分 时 日 月 星期
+    @Scheduled(cron = "0 0 3 * * ?")           // 每天凌晨 3 点
+    public void nightlyBackup() {
+        log.info("执行每日备份...");
+    }
+
+    @Scheduled(cron = "0 0/5 * * * ?")         // 每 5 分钟
+    public void everyFiveMinutes() { ... }
+
+    @Scheduled(cron = "0 0 9-18 * * MON-FRI")  // 工作日 9-18 点每小时
+    public void workHours() { ... }
+
+    @Scheduled(cron = "0 0 0 1 * ?")            // 每月 1 号凌晨
+    public void monthlyReport() { ... }
+}
+
+// ========== Cron 表达式说明 ==========
+// ┌───── 秒 (0-59)
+// │ ┌───── 分 (0-59)
+// │ │ ┌───── 时 (0-23)
+// │ │ │ ┌───── 日 (1-31)
+// │ │ │ │ ┌───── 月 (1-12)
+// │ │ │ │ │ ┌───── 星期 (0-7, 0/7=周日)
+// │ │ │ │ │ │
+// * * * * * *
+
+// 特殊字符:
+// *     — 所有值
+// ?     — 不指定 (日/星期互斥)
+// -     — 范围 (1-5)
+// /     — 步长 (0/5 = 从 0 开始每 5)
+// ,     — 枚举 (1,3,5)
+// L     — 最后 (L = 月的最后一天)
+// W     — 最近工作日 (15W = 15号最近的周工作日)
+```
+
+
+## 调度进阶
+
+
+```
+// ========== 定时任务进阶 ==========
+
+// ========== 条件调度 ==========
+// 只在特定 Profile 执行
+@Component
+@Profile("!test")                        // 非测试环境执行
+public class ScheduledTasks { ... }
+
+// 或通过条件属性控制
+@Scheduled(cron = "${scheduling.backup.cron}")
+public void configurableBackup() { ... }
+
+// application.yml:
+// scheduling.backup.cron=0 0 3 * * ?
+
+// ========== 动态控制调度 ==========
+@Component
+public class DynamicScheduler {
+
+    private final TaskScheduler taskScheduler;
+    private ScheduledFuture<?> scheduledFuture;
+
+    public DynamicScheduler(TaskScheduler taskScheduler) {
+        this.taskScheduler = taskScheduler;
+    }
+
+    // 启动任务
+    public void startBackup() {
+        if (scheduledFuture == null || scheduledFuture.isCancelled()) {
+            scheduledFuture = taskScheduler.scheduleAtFixedRate(
+                () -> log.info("执行备份..."),
+                Duration.ofHours(1)
+            );
+            log.info("备份任务已启动");
+        }
+    }
+
+    // 停止任务
+    public void stopBackup() {
+        if (scheduledFuture != null) {
+            scheduledFuture.cancel(false);  // 不中断正在执行的
+            log.info("备份任务已停止");
+        }
+    }
+}
+
+// ========== 调度线程池配置 ==========
+// 默认单线程, 可配置
+spring:
+  task:
+    scheduling:
+      pool:
+        size: 5                          # 调度线程池大小
+      thread-name-prefix: scheduled-
+
+// 或编程式:
+@Configuration
+public class SchedulingConfig {
+
+    @Bean
+    public TaskScheduler taskScheduler() {
+        ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
+        scheduler.setPoolSize(5);
+        scheduler.setThreadNamePrefix("sched-");
+        scheduler.setWaitForTasksToCompleteOnShutdown(true);
+        scheduler.setAwaitTerminationSeconds(30);
+        return scheduler;
+    }
+}
+
+// ========== 异步 + 调度结合 ==========
+// 定时任务也建议异步执行
+@Component
+public class AsyncScheduledTasks {
+
+    // 定时触发, 内部异步执行
+    @Scheduled(cron = "0 0 * * * ?")
+    public void triggerHourlyTask() {
+        processBatch();                   // 立即返回, 异步执行
+    }
+
+    @Async
+    public void processBatch() {
+        // 实际耗时业务
+        log.info("批量处理开始: {}", Thread.currentThread().getName());
+    }
+}
+
+// ========== 分布式调度 ==========
+// 多实例环境下 @Scheduled 会重复执行
+// 解决方案:
+// 1. Quartz + JDBC 集群
+// 2. xxl-job / Elastic-Job 分布式调度
+// 3. ShedLock (轻量分布式锁)
+// 4. Redis 分布式锁 + @Scheduled
+```
+
+
+## 最佳实践
+
+
+```
+// ========== 异步与调度最佳实践 ==========
+
+// ========== 1. 自定义线程池 ==========
+// 不要使用 @Async 默认线程池 (SimpleAsyncTaskExecutor)
+// 每次创建新线程, 无池化
+
+// ========== 2. 拒绝策略选择 ==========
+// 业务关键: CallerRunsPolicy (调用方执行)
+// 非关键:   DiscardPolicy (丢弃)
+// 默认:     AbortPolicy (抛异常)
+
+// ========== 3. 异步异常处理 ==========
+// 实现 AsyncUncaughtExceptionHandler 统一处理
+// Future 返回的异常用 exceptionally() 处理
+
+// ========== 4. 超时控制 ==========
+CompletableFuture<String> future = emailService.fetchUserData(1L);
+try {
+    String result = future.get(5, TimeUnit.SECONDS);  // 5 秒超时
+} catch (TimeoutException e) {
+    future.cancel(true);
+    log.warn("异步任务超时");
+}
+
+// ========== 5. 上下文传递 ==========
+// 异步线程中 MDC/SecurityContext 不会自动传递
+// 需使用 TaskDecorator 包装
+
+@Bean
+public Executor asyncExecutor() {
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setTaskDecorator(runnable -> {
+        Map<String, String> mdc = MDC.getCopyOfContextMap();
+        SecurityContext ctx = SecurityContextHolder.getContext();
+        return () -> {
+            try {
+                MDC.setContextMap(mdc);
+                SecurityContextHolder.setContext(ctx);
+                runnable.run();
+            } finally {
+                MDC.clear();
+                SecurityContextHolder.clearContext();
+            }
+        };
+    });
+    return executor;
+}
+
+// ========== 6. 监控 ==========
+// 监控线程池: 活跃线程数、队列长度、拒绝任务数
+
+// ========== 7. 避免 @Scheduled 长时间阻塞 ==========
+// 内部使用 @Async 异步执行
+// 或在 @Scheduled 中提交到线程池
+
+// ========== 8. 分布式环境注意 ==========
+// @Scheduled 在每台机器都执行
+// 用分布式锁或外部调度中心
+```
+
+
+> **Note:** 💡 异步与调度要点: @EnableAsync + @Async 异步执行; ThreadPoolTaskExecutor 配 corePoolSize/MaxPoolSize/QueueCapacity; @EnableScheduling + @Scheduled 定时; fixedRate/fixedDelay/cron 三种模式; 异步异常处理 AsyncUncaughtExceptionHandler; CallerRunsPolicy 拒绝策略; 分布式用 Quartz/xxl-job/ShedLock; 上下文传递 TaskDecorator。
+
+
+## 练习
+
+
+<!-- Converted from: 11_Spring Boot 异步与调度.html -->

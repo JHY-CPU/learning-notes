@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>V8引擎原理</title>
+    <style>
+        :root { --primary: #1a73e8; --primary-light: #e8f0fe; --secondary: #34a853; --warning: #ea4335; --purple: #9c27b0; --bg: #f8f9fa; --card-bg: #ffffff; --text: #202124; --border: #dadce0; --code-bg: #f1f3f4; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans SC', sans-serif; background: var(--bg); color: var(--text); line-height: 1.8; padding: 20px; }
+        .container { max-width: 960px; margin: 0 auto; }
+        h1 { font-size: 2em; color: var(--primary); border-bottom: 3px solid var(--primary); padding-bottom: 12px; margin-bottom: 24px; }
+        h2 { font-size: 1.5em; color: var(--primary); margin: 32px 0 16px; padding-left: 12px; border-left: 4px solid var(--primary); }
+        h3 { font-size: 1.2em; margin: 20px 0 10px; }
+        .card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 24px; margin: 16px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+        .highlight { background: var(--primary-light); border-left: 4px solid var(--primary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .warning { background: #fce8e6; border-left: 4px solid var(--warning); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .success { background: #e6f4ea; border-left: 4px solid var(--secondary); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        .purple { background: #f3e5f5; border-left: 4px solid var(--purple); padding: 16px; border-radius: 0 8px 8px 0; margin: 12px 0; }
+        pre { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 16px; overflow-x: auto; font-family: 'Fira Code','Consolas',monospace; font-size: 0.9em; line-height: 1.6; margin: 12px 0; }
+        code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.9em; }
+        pre code { background: none; padding: 0; }
+        ul, ol { padding-left: 24px; margin: 8px 0; }
+        li { margin: 6px 0; }
+        table { width: 100%; border-collapse: collapse; margin: 16px 0; }
+        th, td { border: 1px solid var(--border); padding: 12px; text-align: left; }
+        th { background: var(--primary-light); font-weight: 600; }
+        .flow-diagram { background: var(--card-bg); border: 2px solid var(--primary); border-radius: 12px; padding: 20px; text-align: center; font-family: monospace; margin: 16px 0; white-space: pre; line-height: 1.6; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>V8引擎原理</h1>
+
+    <div class="highlight">
+        <strong>核心概念：</strong>V8是Google开发的高性能JavaScript和WebAssembly引擎，用于Chrome浏览器和Node.js。其核心流水线为：源码 → Parser → AST → Ignition（解释器，生成字节码）→ 执行 → TurboFan（优化编译器，生成机器码）。V8通过隐藏类（Hidden Classes）、内联缓存（Inline Caching）和分代垃圾回收等技术实现极致性能。
+    </div>
+
+    <!-- ==================== 一、V8整体架构 ==================== -->
+    <h2>一、V8整体架构</h2>
+
+    <div class="card">
+        <h3>1.1 执行流水线</h3>
+        <div class="flow-diagram">
+JavaScript源码
+    ↓
+[Parser] 词法分析 + 语法分析
+    ↓
+AST (Abstract Syntax Tree)
+    ↓
+[Ignition] 解释器
+    ↓
+字节码 (Bytecode) ←── 直接执行
+    ↓                    ↓
+[Profiler] 收集运行时信息    快速启动
+    ↓
+热点代码 (Hot Code)
+    ↓
+[TurboFan] 优化编译器
+    ↓
+优化机器码 (Optimized Machine Code)
+    ↓
+快速执行（可能触发Deopt反优化）</div>
+    </div>
+
+    <div class="card">
+        <h3>1.2 为什么需要解释器+编译器</h3>
+        <table>
+            <tr><th>方案</th><th>启动速度</th><th>执行速度</th><th>内存占用</th><th>示例</th></tr>
+            <tr><td>纯解释器</td><td>快</td><td>慢</td><td>低</td><td>Python CPython</td></tr>
+            <tr><td>纯编译器</td><td>慢</td><td>快</td><td>高</td><td>C/C++</td></tr>
+            <tr><td>JIT（解释+编译）</td><td>快</td><td>快（热点代码）</td><td>中等</td><td>V8、JVM</td></tr>
+        </table>
+        <p>V8采用的JIT（Just-In-Time Compilation）方案：</p>
+        <ul>
+            <li><strong>Ignition（解释器）：</strong>快速生成字节码并立即执行，启动速度快</li>
+            <li><strong>TurboFan（编译器）：</strong>对热点代码进行优化编译，执行速度快</li>
+            <li><strong>Profiler（分析器）：</strong>在执行过程中收集类型和调用信息，指导优化</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 二、Parser ==================== -->
+    <h2>二、Parser（解析器）</h2>
+
+    <div class="card">
+        <h3>2.1 解析过程</h3>
+        <ol>
+            <li><strong>预解析（Pre-Parser）：</strong>快速扫描源码，检查语法错误，识别函数和变量声明的范围（用于作用域分析）。不生成完整的AST</li>
+            <li><strong>延迟解析（Lazy Parsing）：</strong>函数体只在首次调用时才进行完整解析，减少启动时间</li>
+            <li><strong>完整解析（Full Parser）：</strong>对需要立即执行的代码和被调用的函数进行完整解析，生成AST</li>
+        </ol>
+        <pre><code>// V8的延迟解析示例
+function outer() {
+    // inner函数的函数体在outer被调用时不会被解析
+    // 只有当inner被调用时才会进行完整解析
+    function inner() {
+        // 这段代码在inner()被调用前不会被解析
+        return complexCalculation();
+    }
+    return inner;
+}
+
+const fn = outer();  // outer被调用，outer函数体被完整解析
+fn();  // inner被调用，inner函数体被完整解析</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>2.2 AST（抽象语法树）</h3>
+        <pre><code>// 源码
+function add(a, b) {
+    return a + b;
+}
+
+// 对应的AST（简化表示）
+FunctionDeclaration {
+    name: "add",
+    params: [Identifier("a"), Identifier("b")],
+    body: BlockStatement {
+        body: [ReturnStatement {
+            argument: BinaryExpression {
+                operator: "+",
+                left: Identifier("a"),
+                right: Identifier("b")
+            }
+        }]
+    }
+}</code></pre>
+    </div>
+
+    <!-- ==================== 三、Ignition（解释器） ==================== -->
+    <h2>三、Ignition（解释器）</h2>
+
+    <div class="card">
+        <h3>3.1 字节码</h3>
+        <p>Ignition将AST转换为字节码（Bytecode），字节码是一种紧凑的中间表示，比源码更接近机器码但仍保持平台无关性：</p>
+        <pre><code>// 源码
+function add(a, b) {
+    return a + b;
+}
+
+// V8字节码（简化表示）
+// Stack-based virtual machine
+Ldar a       // 将参数a加载到累加器
+Add b        // 将参数b与累加器相加
+Return       // 返回累加器的值
+
+// 更复杂的示例
+function square(n) {
+    return n * n;
+}
+// 字节码：
+Star0          // 将n保存到寄存器r0
+Ldar r0        // 加载r0到累加器
+Mul r0         // 累加器 * r0
+Return</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>3.2 寄存器和累加器</h3>
+        <p>V8的字节码使用基于寄存器的虚拟机（不是基于栈的）：</p>
+        <ul>
+            <li><strong>累加器（Accumulator）：</strong>V8的一个特殊寄存器，大多数操作的输入和输出都经过累加器</li>
+            <li><strong>寄存器（Registers）：</strong>用于存储临时变量和参数。函数参数映射到寄存器</li>
+            <li><strong>常量池（Constant Pool）：</strong>字面量和常量存储在常量池中，通过索引引用</li>
+        </ul>
+    </div>
+
+    <!-- ==================== 四、TurboFan（优化编译器） ==================== -->
+    <h2>四、TurboFan（优化编译器）</h2>
+
+    <div class="card">
+        <h3>4.1 优化编译过程</h3>
+        <ol>
+            <li><strong>热点检测：</strong>Profiler收集函数的调用次数和类型信息，标记热点函数</li>
+            <li><strong>类型推断：</strong>根据运行时收集的类型信息进行类型推断</li>
+            <li><strong>内联优化（Inlining）：</strong>将小函数内联到调用处，消除函数调用开销</li>
+            <li><strong>逃逸分析（Escape Analysis）：</strong>分析对象是否逃逸出函数作用域，未逃逸的对象可以栈上分配</li>
+            <li><strong>隐藏类优化：</strong>利用隐藏类信息生成高效的属性访问代码</li>
+            <li><strong>死代码消除（DCE）：</strong>移除永远不会执行的代码</li>
+            <li><strong>生成机器码：</strong>将优化后的IR（中间表示）转换为目标平台的机器码</li>
+        </ol>
+    </div>
+
+    <div class="card">
+        <h3>4.2 反优化（Deoptimization）</h3>
+        <p>如果优化后的代码的假设不再成立（如类型变化），V8会执行<strong>反优化</strong>，回退到解释执行：</p>
+        <pre><code>function add(a, b) {
+    return a + b;
+}
+
+// 前10000次调用都是数字
+for (let i = 0; i &lt; 10000; i++) {
+    add(1, 2);  // TurboFan优化为数字加法
+}
+
+// 突然传入字符串
+add("hello", "world");  // 类型假设不成立！
+// → 触发Deoptimization
+// → 回退到Ignition解释执行
+// → 重新收集类型信息
+// → 可能重新优化（如果发现新的稳定模式）</code></pre>
+        <div class="warning">
+            <strong>编写V8友好的代码：</strong>
+            <ul>
+                <li>保持函数参数类型一致（不要混用数字和字符串）</li>
+                <li>对象结构保持一致（不要动态增删属性）</li>
+                <li>避免使用 <code>eval</code> 和 <code>with</code>（破坏优化假设）</li>
+                <li>避免 <code>try/catch</code> 包裹热点代码（V8对异常处理的优化有限）</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- ==================== 五、隐藏类 ==================== -->
+    <h2>五、隐藏类（Hidden Classes / Shapes）</h2>
+
+    <div class="card">
+        <h3>5.1 什么是隐藏类</h3>
+        <p>V8为每个对象创建一个"隐藏类"（Hidden Class），用于快速查找属性。隐藏类的概念类似于Java等静态语言中的类定义：</p>
+        <pre><code>// V8内部为对象创建隐藏类链
+const obj = {};
+obj.x = 1;    // 创建隐藏类 Map0，添加偏移量 x@0
+obj.y = 2;    // 创建隐藏类 Map1，在Map0基础上添加偏移量 y@1
+obj.z = 3;    // 创建隐藏类 Map2，在Map1基础上添加偏移量 z@2
+
+// 查找 obj.y 的过程：
+// 1. 找到obj的隐藏类（Map2）
+// 2. 在Map2中查找y的偏移量（offset=1）
+// 3. 直接通过偏移量访问，无需字符串哈希查找</div>
+    </div>
+
+    <div class="card">
+        <h3>5.2 隐藏类共享与转换</h3>
+        <div class="flow-diagram">
+Map0 (空对象) ──x──→ Map1 (有x属性) ──y──→ Map2 (有x,y属性)
+    │
+    └──a──→ Map3 (有a属性) ──b──→ Map4 (有a,b属性)
+
+相同属性添加顺序的对象共享同一隐藏类链：
+obj1 = {}; obj1.x = 1; obj1.y = 2;  → 使用 Map0→Map1→Map2
+obj2 = {}; obj2.x = 3; obj2.y = 4;  → 也使用 Map0→Map1→Map2 ✅ 共享</code></pre>
+        <pre><code>// ❌ 不同属性顺序导致不同的隐藏类
+const bad1 = {};
+bad1.x = 1;
+bad1.y = 2;
+
+const bad2 = {};
+bad2.y = 2;  // 顺序不同！
+bad2.x = 1;
+
+// bad1和bad2有不同的隐藏类链，无法共享优化
+
+// ✅ 相同属性顺序，共享隐藏类
+const good1 = { x: 1, y: 2 };
+const good2 = { x: 3, y: 4 };
+// good1和good2共享隐藏类，V8可以统一优化</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>5.3 最佳实践</h3>
+        <ul>
+            <li><strong>构造函数中初始化所有属性：</strong>确保所有实例有相同的隐藏类</li>
+            <li><strong>避免动态增删属性：</strong>使用 <code>delete</code> 会创建新的隐藏类</li>
+            <li><strong>保持属性顺序一致：</strong>对象字面量中的属性顺序应该一致</li>
+            <li><strong>避免稀疏数组（Hole）：</strong>稀疏数组的访问性能差</li>
+        </ul>
+        <pre><code>// ✅ 好的模式
+class Point {
+    constructor(x, y) {
+        this.x = x;  // 所有实例按相同顺序初始化属性
+        this.y = y;
+    }
+}
+
+// ❌ 不好的模式
+class BadPoint {
+    constructor(x) {
+        this.x = x;
+    }
+    setY(y) {
+        this.y = y;  // 动态添加属性
+    }
+}</code></pre>
+    </div>
+
+    <!-- ==================== 六、内联缓存 ==================== -->
+    <h2>六、内联缓存（Inline Caching）</h2>
+
+    <div class="card">
+        <h3>6.1 IC机制</h3>
+        <p>内联缓存是一种加速属性访问的技术。V8在属性访问点（如 <code>obj.prop</code>）缓存上次访问的对象类型和结果：</p>
+        <div class="flow-diagram">
+属性访问点 obj.x：
+┌──────────────────────────────────────┐
+│ IC (Inline Cache)                    │
+│  ┌────────────────────────────────┐  │
+│  │ 如果 obj 的隐藏类 == 缓存的Map │  │
+│  │ → 直接返回缓存的偏移量处的值   │  │  ← MONOMORPHIC (单态) - 最快
+│  │ 否则                           │  │
+│  │ → 查表更新缓存                 │  │
+│  └────────────────────────────────┘  │
+└──────────────────────────────────────┘</div>
+    </div>
+
+    <div class="card">
+        <h3>6.2 IC状态</h3>
+        <table>
+            <tr><th>状态</th><th>说明</th><th>性能</th></tr>
+            <tr><td><strong>Uninitialized</strong></td><td>未缓存任何信息</td><td>最慢</td></tr>
+            <tr><td><strong>Monomorphic</strong></td><td>只缓存了一种隐藏类</td><td>最快（直接命中）</td></tr>
+            <tr><td><strong>Polymorphic</strong></td><td>缓存了2-4种隐藏类</td><td>较快（线性搜索）</td></tr>
+            <tr><td><strong>Megamorphic</strong></td><td>缓存了超过4种隐藏类</td><td>慢（哈希表查找）</td></tr>
+        </table>
+        <pre><code>// 保持IC为Monomorphic状态 - 性能最优
+function getX(obj) {
+    return obj.x;  // 如果只传入一种类型的对象，IC为Monomorphic
+}
+
+const point1 = { x: 1, y: 2 };
+getX(point1);  // Monomorphic ✅
+getX(point1);  // 命中缓存 ✅
+
+// 传入不同类型的对象 → Polymorphic
+const point2 = { x: 3, y: 4, z: 5 };  // 不同隐藏类
+getX(point2);  // Polymorphic（还行）
+
+// 传入太多不同类型的对象 → Megamorphic
+getX({ x: 1 });
+getX({ a: 1, x: 2 });
+getX({ x: 1, b: 2, c: 3 });
+// ... 很多种类型 → Megamorphic（慢）</code></pre>
+    </div>
+
+    <!-- ==================== 七、垃圾回收 ==================== -->
+    <h2>七、垃圾回收（Garbage Collection）</h2>
+
+    <div class="card">
+        <h3>7.1 分代垃圾回收</h3>
+        <p>V8采用<strong>分代垃圾回收</strong>策略，将堆内存分为新生代和老生代两个空间：</p>
+        <div class="flow-diagram">
+堆内存（Heap）
+├── 新生代（New Space / Young Generation）
+│   ├── From-Space（正在分配）
+│   └── To-Space（复制目标）
+│   → Scavenger (Minor GC) - 半空间复制算法
+│
+├── 老生代（Old Space / Old Generation）
+│   ├── Old pointer space（含指针的对象）
+│   └── Old data space（不含指针的对象）
+│   → Mark-Sweep-Compact (Major GC) - 标记清除整理
+│
+├── 大对象空间（Large Object Space）
+├── 代码空间（Code Space）
+├── Map空间（Map Space / Hidden Classes）
+└── 新的大对象空间（New Large Object Space）</div>
+    </div>
+
+    <div class="card">
+        <h3>7.2 Scavenger（Minor GC - 新生代回收）</h3>
+        <p>新生代空间很小（1-8MB），存放新创建的对象。使用<strong>半空间复制算法（Semi-Space Copying）</strong>：</p>
+        <ol>
+            <li>新生代分为 From-Space 和 To-Space（各占一半）</li>
+            <li>新对象分配在 From-Space</li>
+            <li>GC时，将 From-Space 中的存活对象复制到 To-Space</li>
+            <li>清空 From-Space，角色互换</li>
+            <li>经过多次GC仍然存活的对象<strong>晋升（Promote）</strong>到老生代</li>
+        </ol>
+        <pre><code>// Scavenger 流程
+From-Space: [obj1, obj2, obj3, obj4, obj5]
+                    ↑存活     ↑存活     ↑存活
+After GC:
+To-Space:   [obj2, obj4, obj5]  (存活对象复制过来)
+From-Space: [empty]  (清空)
+// 下次GC角色互换</code></pre>
+        <ul>
+            <li><strong>速度快：</strong>只需复制存活对象，大多数对象在新生代就被回收</li>
+            <li><strong>代价：</strong>需要两倍空间，但新生代空间本身很小</li>
+            <li><strong>晋升条件：</strong>对象经历过一次Minor GC仍存活，或To-Space使用超过25%</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>7.3 Mark-Sweep-Compact（Major GC - 老生代回收）</h3>
+        <p>老生代空间较大（几百MB），存放长期存活的对象。使用<strong>标记-清除-整理算法</strong>：</p>
+        <ol>
+            <li><strong>标记（Mark）：</strong>从根对象（全局对象、调用栈、寄存器等）出发，递归标记所有可达对象</li>
+            <li><strong>清除（Sweep）：</strong>遍历整个老生代，回收未标记的对象（死亡对象）</li>
+            <li><strong>整理（Compact）：</strong>将存活对象移动到内存的一端，消除内存碎片</li>
+        </ol>
+        <div class="flow-diagram">
+根对象 → 标记可达对象（Mark）
+    ↓
+遍历堆，回收未标记对象（Sweep）
+    ↓
+压缩存活对象，消除碎片（Compact）</div>
+    </div>
+
+    <div class="card">
+        <h3>7.4 增量标记与并发</h3>
+        <p>为避免Major GC造成长时间停顿（Stop-The-World），V8采用了多种优化：</p>
+        <table>
+            <tr><th>技术</th><th>说明</th><th>效果</th></tr>
+            <tr><td><strong>增量标记（Incremental Marking）</strong></td><td>将标记过程分成小块，穿插在JS执行之间</td><td>减少单次停顿时间</td></tr>
+            <tr><td><strong>并发标记（Concurrent Marking）</strong></td><td>在后台线程上进行标记</td><td>几乎不阻塞主线程</td></tr>
+            <tr><td><strong>惰性清除（Lazy Sweeping）</strong></td><td>按需清除，需要分配空间时才清除</td><td>分散清除开销</td></tr>
+            <tr><td><strong>并发整理（Concurrent Compaction）</strong></td><td>在后台线程上进行内存整理</td><td>减少停顿</td></tr>
+            <tr><td><strong>并行Scavenger</strong></td><td>多线程并行执行新生代GC</td><td>加速Minor GC</td></tr>
+        </table>
+    </div>
+
+    <div class="card">
+        <h3>7.5 内存泄漏常见原因</h3>
+        <pre><code>// 1. 全局变量
+function leak() {
+    leakedData = hugeArray;  // 忘记声明let/const，变成全局变量
+}
+
+// 2. 闭包
+function createClosure() {
+    const largeData = new Array(1000000);
+    return function() {
+        // largeData被闭包引用，不会被GC
+        console.log(largeData.length);
+    };
+}
+
+// 3. 未清理的定时器
+const id = setInterval(() => {
+    // 引用了外部变量
+    doSomething(data);
+}, 1000);
+// 忘记 clearInterval(id)
+
+// 4. 未清理的事件监听器
+element.addEventListener('click', handler);
+// element被移除时，如果handler引用了外部数据
+// 需要 element.removeEventListener('click', handler)
+
+// 5. DOM引用
+const elements = {
+    button: document.getElementById('btn')
+};
+// 即使DOM被移除，JS对象仍持有引用
+// 需要手动清空: elements.button = null;
+
+// 6. Map/Set持有引用
+const cache = new Map();
+cache.set(key, largeObject);  // largeObject不会被GC
+// 使用WeakMap/WeakSet代替</code></pre>
+    </div>
+
+    <!-- ==================== 八、V8内存结构 ==================== -->
+    <h2>八、V8内存结构</h2>
+
+    <div class="card">
+        <h3>8.1 内存限制</h3>
+        <table>
+            <tr><th>平台</th><th>新生代</th><th>老生代</th><th>说明</th></tr>
+            <tr><td>64位系统</td><td>16MB</td><td>~1.4GB</td><td>默认限制</td></tr>
+            <tr><td>32位系统</td><td>8MB</td><td>~700MB</td><td>默认限制</td></tr>
+            <tr><td>可调整</td><td><code>--max-semi-space-size</code></td><td><code>--max-old-space-size</code></td><td>Node.js启动参数</td></tr>
+        </table>
+        <pre><code>// 调整Node.js内存限制
+node --max-old-space-size=4096 app.js  // 将老生代限制设为4GB
+
+// 查看V8内存使用
+const v8 = require('v8');
+const heap = v8.getHeapStatistics();
+console.log('堆大小限制:', heap.heap_size_limit);
+console.log('已使用堆大小:', heap.used_heap_size);
+console.log('总堆大小:', heap.total_heap_size);</code></pre>
+    </div>
+
+    <div class="card">
+        <h3>8.2 对象在内存中的表示</h3>
+        <pre><code>// V8中对象的内存布局（64位系统）
+// 对象 { x: 1, y: 2 } 的内存表示：
+
+// ┌─────────────────────────┐
+// │ Map Pointer (8 bytes)   │ → 指向隐藏类
+// ├─────────────────────────┤
+// │ Properties (8 bytes)    │ → 指向属性数组（溢出时）
+// ├─────────────────────────┤
+// │ Elements (8 bytes)      │ → 指向数组元素（如果是数组）
+// ├─────────────────────────┤
+// │ x: 1 (inline, 8 bytes)  │ → 内联属性1
+// ├─────────────────────────┤
+// │ y: 2 (inline, 8 bytes)  │ → 内联属性2
+// └─────────────────────────┘
+
+// V8对象有10个内联属性槽位（in-object properties）
+// 超过10个属性后，溢出到properties数组
+// 属性存储在对象内部比外部数组快得多</code></pre>
+    </div>
+
+    <!-- ==================== 九、性能优化建议 ==================== -->
+    <h2>九、V8性能优化建议</h2>
+
+    <div class="card">
+        <h3>9.1 编码规范</h3>
+        <ul>
+            <li><strong>保持类型稳定：</strong>函数参数和对象属性保持一致的类型</li>
+            <li><strong>使用数组字面量：</strong><code>[]</code> 比 <code>new Array()</code> 更利于优化</li>
+            <li><strong>避免稀疏数组：</strong>不要创建 <code>[1, , , 4]</code> 这种有"洞"的数组</li>
+            <li><strong>使用 <code>for</code> 循环：</strong>比 <code>forEach</code>、<code>map</code> 等函数式方法更快（但差距在缩小）</li>
+            <li><strong>避免 <code>arguments</code> 对象：</strong>使用剩余参数 <code>...args</code> 代替</li>
+            <li><strong>使用 <code>===</code> 代替 <code>==</code>：</strong>严格比较不需要类型转换</li>
+        </ul>
+    </div>
+
+    <div class="card">
+        <h3>9.2 使用--allow-natives-syntax调试</h3>
+        <pre><code>// 使用V8原生API检查优化状态
+function add(a, b) { return a + b; }
+
+add(1, 2);
+add(1, 2);
+// ... 多次调用触发优化
+
+// 检查函数是否被优化
+console.log(%GetOptimizationStatus(add));
+// 返回值含义：
+// 0: 未优化 (interpreted)
+// 1: 优化中 (optimizing)
+// 2: 已优化 (optimized)
+// 3: 反优化 (deoptimized)
+
+// node --allow-natives-syntax test.js</code></pre>
+    </div>
+
+    <div class="highlight">
+        <strong>总结：</strong>V8引擎通过 Parser → Ignition(解释器) → TurboFan(编译器) 的流水线实现高性能JS执行。隐藏类和内联缓存是属性访问优化的核心，分代垃圾回收（Scavenger + Mark-Sweep-Compact）管理内存。编写V8友好的代码的关键是保持类型一致、避免动态增删属性、减少全局变量和闭包导致的内存泄漏。
+    </div>
+</div>
+<!-- 本文档总结了V8 JavaScript引擎的核心原理 -->
+</body>
+</html>
