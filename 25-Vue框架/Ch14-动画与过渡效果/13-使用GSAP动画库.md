@@ -61,8 +61,116 @@ gsap.to('.box', { x: 200, ease: 'elastic.out(1, 0.3)' })
 gsap.to('.box', { x: 200, ease: 'bounce.out' })
 ```
 
+## 四、ScrollTrigger 滚动动画
+
+```vue
+<script setup>
+import { onMounted, ref } from 'vue'
+import gsap from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
+
+gsap.registerPlugin(ScrollTrigger)
+
+const sections = ref([])
+
+onMounted(() => {
+  sections.value.forEach((section) => {
+    gsap.from(section, {
+      scrollTrigger: {
+        trigger: section,
+        start: 'top 80%',
+        toggleActions: 'play none none reverse'
+      },
+      y: 50,
+      opacity: 0,
+      duration: 0.8
+    })
+  })
+})
+</script>
+
+<template>
+  <div v-for="i in 5" :key="i" :ref="el => sections.push(el)" class="section">
+    <h2>Section {{ i }}</h2>
+  </div>
+</template>
+```
+
+## 五、组合动画：Transition + GSAP
+
+```vue
+<script setup>
+import { ref } from 'vue'
+import gsap from 'gsap'
+
+const show = ref(true)
+
+function onBeforeEnter(el) {
+  gsap.set(el, { opacity: 0, scale: 0.8 })
+}
+
+function onEnter(el, done) {
+  gsap.to(el, {
+    opacity: 1, scale: 1,
+    duration: 0.5,
+    ease: 'back.out(1.7)',
+    onComplete: done
+  })
+}
+
+function onLeave(el, done) {
+  gsap.to(el, {
+    opacity: 0, scale: 0.8, y: -20,
+    duration: 0.3,
+    ease: 'power2.in',
+    onComplete: done
+  })
+}
+</script>
+
+<template>
+  <button @click="show = !show">切换</button>
+  <Transition
+    @before-enter="onBeforeEnter"
+    @enter="onEnter"
+    @leave="onLeave"
+    :css="false"
+  >
+    <div v-if="show" class="box">GSAP 动画</div>
+  </Transition>
+</template>
+```
+
+> `:css="false"` 告诉 Vue 不要应用 CSS 过渡类，完全由 JavaScript 控制动画。
+
+## 六、组件卸载清理
+
+```vue
+<script setup>
+import { onMounted, onUnmounted, ref } from 'vue'
+import gsap from 'gsap'
+
+const boxRef = ref(null)
+let tween = null
+
+onMounted(() => {
+  tween = gsap.to(boxRef.value, {
+    rotation: 360, duration: 2, repeat: -1
+  })
+})
+
+onUnmounted(() => {
+  // 清理动画，避免内存泄漏
+  if (tween) tween.kill()
+  gsap.killTweensOf(boxRef.value)
+})
+</script>
+```
+
 ## 三、注意事项与常见陷阱
 
 - GSAP 是付费库（核心功能免费），商业项目注意授权
 - 在组件卸载时调用 `gsap.killTweensOf()` 清理动画，避免内存泄漏
 - GSAP 操作 DOM 直接修改 style，与 Vue 的响应式系统无冲突但需注意时序
+- 使用 `:css="false"` 时 Vue 跳过 CSS 类检测，纯 JS 动画更高效
+- ScrollTrigger 需要 `registerPlugin` 注册后才能使用

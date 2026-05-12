@@ -90,10 +90,105 @@ JavaScript/TypeScript:
     - URL
 ```
 
-## 四、注意事项
+## 四、代码生成配置
+
+```yaml
+# codegen.yml - TypeScript 项目
+overwrite: true
+schema: "http://localhost:4000/graphql"
+documents: "src/**/*.graphql"
+generates:
+  src/generated/graphql.ts:
+    plugins:
+      - typescript
+      - typescript-operations
+      - typescript-react-apollo
+      - typescript-resolvers
+    config:
+      withHooks: true
+      withComponent: false
+      scalars:
+        DateTime: string
+        JSON: Record<string, unknown>
+```
+
+```bash
+# 执行代码生成
+npx graphql-codegen --config codegen.yml
+
+# 监听模式
+npx graphql-codegen --config codegen.yml --watch
+```
+
+生成的 TypeScript 类型:
+```typescript
+// 自动生成的类型
+export type User = {
+  __typename?: 'User';
+  id: string;
+  name: string;
+  email: string;
+  orders: OrderConnection;
+};
+
+export type GetUserQueryVariables = Exact<{
+  id: Scalars['ID'];
+}>;
+
+export type GetUserQuery = {
+  __typename?: 'Query';
+  user?: { __typename?: 'User'; id: string; name: string } | null;
+};
+
+// 自动生成的 Hook
+export function useGetUserQuery(
+  baseOptions: Apollo.QueryHookOptions<GetUserQuery, GetUserQueryVariables>
+) { /* ... */ }
+```
+
+## 五、监控与追踪
+
+```yaml
+可观测性工具:
+  Apollo Studio:
+    - Schema 变更追踪
+    - 字段使用统计
+    - 查询性能分析
+    - 错误率监控
+
+  OpenTelemetry:
+    - 链路追踪
+    - 字段级耗时
+    - 跨服务追踪
+
+  Prometheus + Grafana:
+    - QPS 监控
+    - 延迟分布
+    - 错误率
+```
+
+```javascript
+// OpenTelemetry 集成
+import { ApolloServerPluginUsageReporting } from '@apollo/server/plugin/usageReporting';
+
+const server = new ApolloServer({
+  typeDefs,
+  resolvers,
+  plugins: [
+    ApolloServerPluginUsageReporting({
+      sendVariableValues: { all: true },
+      sendHeaders: { all: true },
+    }),
+  ],
+});
+```
+
+## 六、注意事项
 
 1. **Apollo 生态最完善**，适合大多数场景
 2. **Spring GraphQL 是 Java Spring 的首选**
 3. **codegen 是必备工具**，保证类型安全
 4. **工具选择要考虑团队技术栈**
 5. **关注 GraphQL Foundation 的标准化进展**
+6. **graphql-scalars 提供常用自定义标量**
+7. **graphql-eslint 可以在 CI 中校验 Schema 质量**

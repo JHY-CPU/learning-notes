@@ -1,6 +1,6 @@
 # 12 - Trie 字典树应用 (Trie Applications)
 
-  ## 应用场景概览
+## 应用场景概览
 
   Trie 结构在以下场景中有广泛应用：
 
@@ -21,7 +21,7 @@
 
 
 
-  ## 应用1：自动补全（AutoComplete）
+## 应用1：自动补全（AutoComplete）
 
   自动补全是 Trie 最经典的应用。用户在输入框中键入前缀，系统实时给出以该前缀开头的所有单词建议。
 
@@ -59,7 +59,7 @@ class Trie {
 }
   ```
 
-  ## 应用2：最长公共前缀（Longest Common Prefix）
+## 应用2：最长公共前缀（Longest Common Prefix）
 
   在 Trie 中，从根节点到第一个分叉点之间的路径就是所有单词的最长公共前缀。
 
@@ -89,7 +89,7 @@ function longestCommonPrefix(words) {
 // 示例: ["flower", "flow", "flight"] → "fl"
   ```
 
-  ## 应用3：词频统计与 Top-K
+## 应用3：词频统计与 Top-K
 
   在 Trie 节点中记录 count 字段，可以统计单词出现频率，进而找出频率最高的 K 个单词：
 
@@ -118,7 +118,7 @@ function topKFrequent(words, k) {
 }
   ```
 
-  ## 应用4：单词搜索（DFS + Trie）
+## 应用4：单词搜索（DFS + Trie）
 
   LeetCode 212. 单词搜索 II — 在二维字符网格中找出所有由相邻单元格组成的单词：
 
@@ -153,7 +153,7 @@ function findWords(board, words) {
 }
   ```
 
-  ## 交互演示：自动补全
+## 交互演示：自动补全
 
   在下方输入前缀，实时查看自动补全建议：
 

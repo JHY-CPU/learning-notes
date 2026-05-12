@@ -26,7 +26,7 @@
 
 # 回溯三要素
 
-## 回溯算法三要素
+# 回溯算法三要素
 
 编写回溯算法需要明确三个核心要素：
 
@@ -45,7 +45,8 @@
 function backtrack(path, ...) {
     // path 是已经选择的数字
     // 例如: [1, 3] 表示已经选择了 1 和 3
-}```
+}
+```
 
 ## 选择列表（Choice List）
 
@@ -59,7 +60,8 @@ for (let i = 0; i < choices.length; i++) {
     backtrack(path, choices);
     // 撤销选择
     path.pop();
-}```
+}
+```
 
 ## 结束条件（End Condition）
 
@@ -69,7 +71,8 @@ for (let i = 0; i < choices.length; i++) {
 if (path.length === nums.length) {
     result.push([...path]);  // 记录解
     return;
-}```
+}
+```
 
 ## 三要素实战：组合问题
 

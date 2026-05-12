@@ -75,4 +75,119 @@ def get_user(user_id):
 1. **缓存一致性**：先更新DB再删缓存
 2. **缓存穿透**：空值缓存
 3. **序列化**：ORM对象的序列化
-4. **过期时间**：合理设置缓存TTL
+## 六、缓存注解详解
+
+```java
+// @Cacheable - 查询时缓存
+@Cacheable(value = "users", key = "#id", unless = "#result == null")
+public User getUser(Long id) {
+    return userRepository.findById(id).orElse(null);
+}
+
+// @CachePut - 更新时刷新缓存
+@CachePut(value = "users", key = "#user.id")
+public User updateUser(User user) {
+    return userRepository.save(user);
+}
+
+// @CacheEvict - 删除时清除缓存
+@CacheEvict(value = "users", key = "#id")
+public void deleteUser(Long id) {
+    userRepository.deleteById(id);
+}
+
+// @Caching - 组合注解
+@Caching(
+    put = { @CachePut(value = "users", key = "#user.id") },
+    evict = { @CacheEvict(value = "userList", allEntries = true) }
+)
+public User saveUser(User user) {
+    return userRepository.save(user);
+}
+```
+
+## 七、Django缓存集成
+
+```python
+# settings.py
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',
+        'TIMEOUT': 300,
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        }
+    }
+}
+
+# views.py
+from django.core.cache import cache
+
+def get_user(request, user_id):
+    cache_key = f'user:{user_id}'
+    
+    # 查缓存
+    user = cache.get(cache_key)
+    if user:
+        return JsonResponse(user)
+    
+    # 查数据库
+    user = User.objects.get(id=user_id)
+    
+    # 写缓存
+    cache.set(cache_key, user, timeout=1800)
+    
+    return JsonResponse(user)
+
+# 使用装饰器
+from django.views.decorators.cache import cache_page
+
+@cache_page(60 * 15)  # 缓存15分钟
+def product_list(request):
+    products = Product.objects.all()
+    return render(request, 'products.html', {'products': products})
+```
+
+## 八、缓存一致性方案
+
+```python
+class CacheConsistencyManager:
+    """缓存一致性管理"""
+    
+    def __init__(self, redis_client):
+        self.r = redis_client
+    
+    def update_with_consistency(self, key, db_update_func, db_query_func, ttl=3600):
+        """保证一致性的更新"""
+        # 1. 删除缓存
+        self.r.delete(key)
+        
+        # 2. 更新数据库
+        result = db_update_func()
+        
+        # 3. 延迟删除（处理并发读）
+        def delayed_delete():
+            time.sleep(0.5)
+            self.r.delete(key)
+        
+        threading.Thread(target=delayed_delete, daemon=True).start()
+        
+        return result
+    
+    def read_with_consistency(self, key, db_query_func, ttl=3600):
+        """保证一致性的读取"""
+        # 1. 查缓存
+        cached = self.r.get(key)
+        if cached:
+            return json.loads(cached)
+        
+        # 2. 查数据库
+        data = db_query_func()
+        
+        # 3. 写缓存
+        if data:
+            self.r.setex(key, ttl, json.dumps(data))
+        
+        return data
+```

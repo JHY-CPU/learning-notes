@@ -85,3 +85,98 @@ ACL WHOAMI
 3. **密码安全**：使用强密码
 4. **最小权限原则**：只授予必要的权限
 5. **Redis 6.0+**：旧版本不支持ACL
+
+## 五、ACL规则详解
+
+```bash
+# 规则语法
+# +<command>       允许命令
+# -<command>       禁止命令
+# +@<category>     允许命令类别
+# -@<category>     禁止命令类别
+# +<command>|<subcommand>  允许子命令
+# ~<pattern>       允许访问的Key模式
+# &<pattern>       允许访问的频道模式
+# >password        设置密码
+# <password        从哈希中移除密码
+# nopass           无密码
+# on               启用用户
+# off              禁用用户
+# reset            重置用户
+
+# 命令类别
+ACL CAT
+# 返回所有命令类别
+# @read, @write, @admin, @dangerous, @connection, 
+# @transaction, @scripting, @pubsub, @geo, @stream 等
+```
+
+## 六、生产环境ACL配置
+
+```bash
+# 应用用户：只能访问自己的Key空间
+ACL SETUSER app_user on >StrongPass123 ~app:* +@read +@write -@dangerous
+
+# 只读用户：用于监控和报表
+ACL SETUSER readonly on >ReadOnlyPass ~* +@read -@dangerous
+
+# 缓存用户：只能操作缓存相关的Key
+ACL SETUSER cache_user on >CachePass123 ~cache:* +GET +SET +DEL +EXPIRE +TTL
+
+# 队列用户：只能操作消息队列
+ACL SETUSER queue_user on >QueuePass123 ~queue:* +LPUSH +RPOP +BRPOP +LLEN
+
+# 管理员：完全权限
+ACL SETUSER admin on >AdminPass123 ~* +@all
+
+# 禁用默认用户
+ACL SETUSER default off
+```
+
+## 七、ACL持久化
+
+```bash
+# 方式1：配置文件
+# redis.conf
+user app_user on >password ~app:* +@read +@write
+user readonly on >password ~* +@read
+
+# 方式2：ACL SAVE命令
+ACL SAVE
+# 将当前ACL配置保存到aclfile
+
+# 方式3：指定ACL文件
+aclfile /etc/redis/users.acl
+
+# 查看ACL日志
+ACL LOG
+# 返回被拒绝的命令日志
+
+# 清空ACL日志
+ACL LOG RESET
+```
+
+## 八、ACL调试技巧
+
+```bash
+# 测试用户权限
+ACL WHOAMI
+# 返回当前用户名
+
+# 检查特定命令权限
+ACL DRYRUN app_user SET test_key test_value
+# 返回是否允许执行
+
+# 查看用户详细信息
+ACL GETUSER app_user
+# 返回flags, passwords, commands, keys, channels
+
+# 模拟用户操作
+AUTH app_user password
+# 切换到app_user
+SET app:data "test"
+# 如果权限允许则成功
+
+# 恢复默认用户
+AUTH default ""
+```

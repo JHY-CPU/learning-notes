@@ -74,3 +74,59 @@ runs:
   using: 'node20'
   main: 'index.js'
 ```
+
+## 五、精选第三方Actions
+
+```yaml
+# 代码质量
+- uses: github/super-linter/slim@v5    # 多语言Linter
+- uses: sonarsource/sonarqube-scan-action@master  # SonarQube
+
+# 安全扫描
+- uses: github/codeql-action/init@v3    # CodeQL安全分析
+- uses: aquasecurity/trivy-action@master  # 镜像扫描
+
+# 部署
+- uses: aws-actions/configure-aws-credentials@v4  # AWS认证
+- uses: azure/login@v1                  # Azure认证
+- uses: google-github-actions/auth@v2   # GCP认证
+
+# 通知
+- uses: slackapi/slack-github-action@v1  # Slack通知
+- uses: dawidd6/action-send-mail@v3     # 邮件通知
+
+# 发布
+- uses: softprops/action-gh-release@v1   # GitHub Release
+- uses: pypa/gh-action-pypi-publish@release/v1  # PyPI发布
+
+# Docker
+- uses: docker/setup-buildx-action@v3   # Buildx设置
+- uses: docker/metadata-action@v5       # 元数据提取
+- uses: docker/build-push-action@v5     # 构建推送
+
+# 文档
+- uses: peaceiris/actions-gh-pages@v3   # GitHub Pages部署
+- uses: JamesIves/github-pages-deploy-action@v4  # Pages部署
+```
+
+## 六、Action版本管理策略
+
+```yaml
+# 使用语义化版本标签（推荐）
+- uses: actions/checkout@v4
+
+# 使用主版本标签（自动获取最新补丁）
+- uses: actions/checkout@v4
+
+# 使用SHA固定（最安全，供应链攻击防护）
+- uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608  # v4.1.1
+
+# 使用Dependabot自动更新Actions版本
+# .github/dependabot.yml
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+```

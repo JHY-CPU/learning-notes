@@ -15,7 +15,7 @@
 const emit = defineEmits(['change'])
 
 function increment() {
-  emit('change', 1)  // 触发 change 事件，传递参数 1
+  emit('change', 1)
 }
 </script>
 ```
@@ -28,11 +28,8 @@ function increment() {
 </template>
 <script setup>
 import { ref } from 'vue'
-import Counter from './Counter.vue'
 const count = ref(0)
-const handleCountChange = (delta) => {
-  count.value += delta
-}
+const handleCountChange = (delta) => { count.value += delta }
 </script>
 ```
 
@@ -45,9 +42,6 @@ function handleSubmit() {
   emit('submit', { username: '张三', age: 25 })
 }
 </script>
-
-<!-- 父组件接收 -->
-<!-- <Form @submit="(data) => console.log(data)" /> -->
 ```
 
 ### 2.3 TypeScript 类型化 emit
@@ -56,12 +50,41 @@ function handleSubmit() {
 const emit = defineEmits<{
   change: [value: number]
   submit: [data: { username: string; age: number }]
+  close: []
 }>()
 </script>
 ```
 
-## 三、注意事项与常见陷阱
+### 2.4 事件验证
+```vue
+<script setup>
+const emit = defineEmits({
+  submit: (data) => {
+    if (!data.username) {
+      console.warn('username 不能为空')
+      return false
+    }
+    return true
+  }
+})
+</script>
+```
+
+## 三、常见用例
+
+| 场景 | 事件名 | 参数 |
+|------|--------|------|
+| 表单提交 | `submit` | 表单数据对象 |
+| 选项变化 | `change` | 新值 |
+| 关闭弹窗 | `close` | 无 |
+| 选中项目 | `select` | 选中的项 |
+| 输入验证 | `validate` | 验证结果 |
+
+## 四、注意事项与常见陷阱
+
 - `defineEmits` 不需要导入，是编译器宏
 - 事件名推荐使用 kebab-case（短横线命名）
 - 不要在 emit 的回调中直接修改子组件自身状态
 - 父组件可以用 `$event` 访问第一个事件参数
+- emit 的验证函数返回 false 只产生警告，不会阻止事件
+- 避免 emit 过多事件，考虑用一个事件携带不同类型的数据

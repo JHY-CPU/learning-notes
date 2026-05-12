@@ -62,3 +62,92 @@ const tabs = [
 - v-show **不支持** `v-else`
 - 初始渲染开销比 v-if 高（因为始终编译和渲染）
 - 频繁切换的场景用 v-show 性能更好
+
+## 四、实际应用场景
+
+### 4.1 Tab 切换
+```vue
+<template>
+  <div class="tabs">
+    <div class="tab-headers">
+      <button
+        v-for="tab in tabs"
+        :key="tab.id"
+        :class="{ active: activeTab === tab.id }"
+        @click="activeTab = tab.id"
+      >
+        {{ tab.label }}
+      </button>
+    </div>
+    <!-- v-show 保持组件状态，切换成本低 -->
+    <div v-show="activeTab === 'profile'">
+      <UserProfile />
+    </div>
+    <div v-show="activeTab === 'settings'">
+      <Settings />
+    </div>
+    <div v-show="activeTab === 'notifications'">
+      <Notifications />
+    </div>
+  </div>
+</template>
+```
+
+### 4.2 表单验证提示
+```vue
+<template>
+  <input v-model="email" type="email" />
+  <!-- 频繁显示/隐藏的验证提示用 v-show -->
+  <p v-show="email && !isValidEmail" class="error">邮箱格式错误</p>
+  <p v-show="email.length > 50" class="error">邮箱过长</p>
+</template>
+```
+
+### 4.3 折叠面板
+```vue
+<template>
+  <div class="accordion">
+    <button @click="isOpen = !isOpen">
+      {{ isOpen ? '收起' : '展开' }}
+    </button>
+    <!-- 频繁切换用 v-show -->
+    <div v-show="isOpen" class="panel">
+      <slot />
+    </div>
+  </div>
+</template>
+```
+
+## 五、v-show 的 CSS 影响
+
+```vue
+<template>
+  <!-- v-show 应用 style="display: none" -->
+  <div v-show="false">隐藏</div>
+  <!-- 渲染结果: <div style="display: none;">隐藏</div> -->
+
+  <!-- 如果元素本身有 display 样式，切换时会恢复原有 display -->
+  <span v-show="true" style="display: inline-block">显示</span>
+  <!-- v-show=false 时: style="display: none"
+       v-show=true 时: style="display: inline-block" -->
+</template>
+```
+
+## 六、v-show 与 CSS 动画
+
+```vue
+<template>
+  <!-- v-show 不支持 <Transition> 组件 -->
+  <!-- 但可以用 CSS 过渡 -->
+  <div class="fade" :class="{ hidden: !show }">内容</div>
+</template>
+<style>
+.fade {
+  transition: opacity 0.3s ease;
+}
+.fade.hidden {
+  opacity: 0;
+  /* 注意：元素仍在 DOM 中 */
+}
+</style>
+```

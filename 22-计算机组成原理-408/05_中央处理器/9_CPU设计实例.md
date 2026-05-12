@@ -50,7 +50,8 @@
 │  └──┬───┘                  │                 │
 │     ↓                      │                 │
 │  Reg[ Rd ]←── 写回数据     │                 │
-└─────────────────────────────────────────────┘```
+└─────────────────────────────────────────────┘
+```
 
 ### 三、各指令的微操作与控制信号
 
@@ -102,6 +103,151 @@
 | MemtoReg | 存储器数据送寄存器 |
 | PCSrc | PC 来源选择（顺序/转移） |
 | ImmSel | 立即数选择 |
+
+## 代码/模拟
+
+### Verilog实现简化CPU核心模块
+
+```verilog
+// ============================================
+// 简化CPU核心模块 - 适用于408考研理解数据通路
+// 支持: ADD, SUB, AND, OR, LD, ST, BEQ
+// ============================================
+
+// --- ALU模块 ---
+module alu(
+    input  [31:0] a, b,
+    input  [2:0]  alu_ctrl,    // ALU控制信号
+    output reg [31:0] result,
+    output zero                // 零标志（用于BEQ判断）
+);
+    always @(*) begin
+        case (alu_ctrl)
+            3'b000: result = a + b;        // ADD
+            3'b001: result = a - b;        // SUB
+            3'b010: result = a & b;        // AND
+            3'b011: result = a | b;        // OR
+            3'b100: result = a + b;        // LD/ST计算地址
+            default: result = 32'b0;
+        endcase
+    end
+    assign zero = (result == 32'b0);
+endmodule
+
+// --- 寄存器堆 ---
+module register_file(
+    input         clk,
+    input  [4:0]  rs1, rs2, rd,   // 源寄存器1/2, 目标寄存器
+    input  [31:0] wd,              // 写入数据
+    input         we,              // 写使能
+    output [31:0] rd1, rd2         // 读出数据
+);
+    reg [31:0] regs [0:31];       // 32个32位寄存器
+
+    assign rd1 = (rs1 != 0) ? regs[rs1] : 32'b0;  // x0恒为0
+    assign rd2 = (rs2 != 0) ? regs[rs2] : 32'b0;
+
+    always @(posedge clk) begin
+        if (we && rd != 0)
+            regs[rd] <= wd;
+    end
+endmodule
+
+// --- 指令存储器 ---
+module instr_mem(
+    input  [31:0] addr,
+    output [31:0] instr
+);
+    reg [31:0] mem [0:255];       // 256条指令
+    assign mem[addr[31:2]];       // 字节寻址转字寻址
+    assign instr = mem[addr[9:2]];
+endmodule
+
+// --- 数据存储器 ---
+module data_mem(
+    input         clk,
+    input  [31:0] addr, wd,
+    input         mem_write, mem_read,
+    output [31:0] rd
+);
+    reg [31:0] mem [0:255];
+    always @(posedge clk)
+        if (mem_write) mem[addr[9:2]] <= wd;
+    assign rd = mem_read ? mem[addr[9:2]] : 32'b0;
+endmodule
+
+// --- 控制单元 ---
+module control_unit(
+    input  [6:0] opcode,
+    output reg reg_write, mem_read, mem_write,
+    output reg branch, alu_src, mem_to_reg,
+    output reg [1:0] alu_op
+);
+    always @(*) begin
+        // 默认值
+        {reg_write, mem_read, mem_write, branch,
+         alu_src, mem_to_reg, alu_op} = 0;
+        case (opcode)
+            7'b0110011: begin  // R-type (ADD/SUB/AND/OR)
+                reg_write = 1; alu_op = 2'b10;
+            end
+            7'b0000011: begin  // LD
+                reg_write = 1; mem_read = 1;
+                alu_src = 1; mem_to_reg = 1; alu_op = 2'b00;
+            end
+            7'b0100011: begin  // ST
+                mem_write = 1; alu_src = 1; alu_op = 2'b00;
+            end
+            7'b1100011: begin  // BEQ
+                branch = 1; alu_op = 2'b01;
+            end
+        endcase
+    end
+endmodule
+```
+
+### Python模拟控制信号生成
+
+```python
+"""控制信号生成模拟 - 对应408考试中的控制信号分析题"""
+
+def generate_control_signals(opcode):
+    """
+    根据操作码生成控制信号（对应Verilog控制单元的行为）
+    返回: (RegWrite, ALUSrc, MemRead, MemWrite, MemToReg, Branch, ALUOp)
+    """
+    signals = {
+        # R-type: ADD, SUB, AND, OR
+        'R': (1, 0, 0, 0, 0, 0, 0b10),
+        # I-type: LD
+        'LD': (1, 1, 1, 0, 1, 0, 0b00),
+        # S-type: ST
+        'ST': (0, 1, 0, 1, 0, 0, 0b00),
+        # B-type: BEQ
+        'BEQ': (0, 0, 0, 0, 0, 1, 0b01),
+    }
+
+    names = ['RegWrite', 'ALUSrc', 'MemRead', 'MemWrite',
+             'MemToReg', 'Branch', 'ALUOp']
+
+    if opcode not in signals:
+        print(f"未知操作码: {opcode}")
+        return None
+
+    vals = signals[opcode]
+    print(f"\n指令类型: {opcode}")
+    print(f"{'信号':<12} {'值':>3}")
+    print("-" * 18)
+    for name, val in zip(names, vals):
+        print(f"{name:<12} {val:>3}")
+    return vals
+
+print("=== 控制信号生成 ===")
+generate_control_signals('R')    # ADD R1, R2, R3
+generate_control_signals('LD')   # LD R1, offset(R2)
+generate_control_signals('ST')   # ST R1, offset(R2)
+generate_control_signals('BEQ')  # BEQ R1, R2, offset
+```
 
 ## 知识关联
 

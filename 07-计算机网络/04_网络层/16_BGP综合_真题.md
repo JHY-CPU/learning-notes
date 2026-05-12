@@ -46,11 +46,51 @@ BGP的eBGP和iBGP有什么区别？
 - iBGP：同一AS内部的BGP连接，用于将BGP路由在AS内传播
 - eBGP下一跳会改变，iBGP下一跳不变
 
+### 真题五：BGP选路规则
+AS100有两条到达网络202.100.0.0/16的路由：
+- 路径1：AS-PATH=[200, 300]，LOCAL_PREF=200
+- 路径2：AS-PATH=[400]，LOCAL_PREF=100
+
+**答**：选择路径1。BGP选路规则中，LOCAL_PREF优先级高于AS-PATH长度。LOCAL_PREF越大越优先，路径1的LOCAL_PREF=200 > 100。
+
+### 真题六：BGP与IGP协同
+企业AS100连接两个ISP（AS200和AS300）：
+- AS100内部运行OSPF
+- AS100与AS200/AS300之间运行eBGP
+- AS100内部运行iBGP在边界路由器之间同步BGP路由
+
+**关键点**：
+- IGP（OSPF）保证AS100内部各路由器之间可达
+- eBGP从ISP学到外部路由
+- iBGP将外部路由传播到AS100内部所有BGP路由器
+- 下一跳可达性依赖IGP
+
+### 真题七：概念判断
+1. BGP是链路状态协议
+2. BGP使用UDP端口179
+3. AS-PATH可以用来计算最短路径
+4. iBGP邻居必须直连
+
+**答案**：
+1. **错**：BGP是路径向量协议
+2. **错**：BGP使用TCP端口179（不是UDP）
+3. **对**：AS-PATH长度是BGP选路的重要依据
+4. **错**：iBGP邻居不需要直连，eBGP邻居通常需要直连
+
+### 408易错点
+- BGP是路径向量，不是距离向量也不是链路状态
+- BGP使用TCP（可靠传输），不使用UDP
+- AS-PATH有双重作用：防环+选路
+- eBGP和iBGP的区别：eBGP改变下一跳，iBGP不改变
+- BGP的收敛速度取决于策略配置，不是自动计算
+
 ## 直观理解
 - BGP像"国际贸易协定"——各国之间协商路由政策
 - AS-PATH像"护照上的入境章"——看到自己的章就知道绕回来了
+- LOCAL_PREF像"个人偏好"——AS内管理员设定的优先级
 
 ## 协议关联
 - BGP与IGP（OSPF/RIP）配合：IGP负责AS内路由，BGP负责AS间路由
 - BGP的MED属性可以引导入站流量选择最优入口
 - BGP是互联网的骨干路由协议
+- BGP的路由反射器解决iBGP全网状连接问题

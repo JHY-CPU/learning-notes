@@ -77,3 +77,53 @@ const message = computed<string>(() => {
 - 如果依赖的数据类型正确，大多数情况下不需要显式指定类型
 - 可写 computed 的 getter 和 setter 类型应一致
 - 使用 `ComputedRef<T>` 类型在函数间传递 computed
+
+## 四、高级类型技巧
+
+### 4.1 函数间传递 computed
+```ts
+import { ref, computed, type ComputedRef } from 'vue'
+
+const count = ref(0)
+const doubled = computed(() => count.value * 2)
+
+// 接受 ComputedRef 作为参数
+function useDisplayValue(value: ComputedRef<number>) {
+  const formatted = computed(() => value.value.toLocaleString())
+  return { formatted }
+}
+
+const { formatted } = useDisplayValue(doubled)
+```
+
+### 4.2 条件类型推断
+```ts
+import { ref, computed } from 'vue'
+
+type LoadingState = { status: 'loading' }
+type SuccessState<T> = { status: 'success'; data: T }
+type ErrorState = { status: 'error'; error: string }
+type AsyncState<T> = LoadingState | SuccessState<T> | ErrorState
+
+const state = ref<AsyncState<User[]>>({ status: 'loading' })
+
+const displayText = computed(() => {
+  switch (state.value.status) {
+    case 'loading': return '加载中...'
+    case 'success': return `共 ${state.value.data.length} 条数据`
+    case 'error': return `错误: ${state.value.error}`
+  }
+})
+```
+
+### 4.3 泛型 computed 函数
+```ts
+import { computed, type ComputedRef, type Ref } from 'vue'
+
+function useFiltered<T>(
+  items: Ref<T[]>,
+  predicate: (item: T) => boolean
+): ComputedRef<T[]> {
+  return computed(() => items.value.filter(predicate))
+}
+```

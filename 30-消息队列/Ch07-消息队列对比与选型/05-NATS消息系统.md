@@ -30,10 +30,42 @@ JetStream js = nc.jetStream();
 js.publish("orders", orderJson.getBytes());
 ```
 
-## 三、注意事项
+## 三、JetStream 持久化详解
 
-1. **NATS 延迟极低**，适合实时性要求高的场景
-2. **JetStream 提供持久化保证**
-3. **NATS 集群部署简单**，内置集群支持
-4. **社区和生态不如 Kafka/RabbitMQ**
-5. **适合微服务间轻量通信**
+```java
+// 创建持久化Stream
+JetStreamManagement jsm = nc.jetStreamManagement();
+StreamConfiguration sc = StreamConfiguration.builder()
+    .name("ORDERS")
+    .subjects("orders.>")
+    .storage(StorageType.File)
+    .retentionPolicy(RetentionPolicy.Limits)
+    .maxMsgs(1000000)
+    .build();
+jsm.addStream(sc);
+
+// 消费者拉取消息
+JetStream js = nc.jetStream();
+PullSubscribeOptions so = PullSubscribeOptions.builder()
+    .durable("order-processor")
+    .build();
+JetStreamSubscription sub = js.subscribe("orders.>", so);
+List<Message> messages = sub.fetch(100, Duration.ofSeconds(1));
+```
+
+## 四、NATS vs Kafka vs RabbitMQ
+
+| 特性 | NATS | Kafka | RabbitMQ |
+|------|------|-------|----------|
+| 延迟 | 微秒级 | 毫秒级 | 毫秒级 |
+| 吞吐量 | 高 | 极高 | 中等 |
+| 持久化 | JetStream | 原生支持 | 原生支持 |
+| 协议 | 自有协议 | 自有协议 | AMQP |
+| 复杂度 | 低 | 高 | 中等 |
+
+## 五、常见陷阱
+
+1. **内存模式默认**：NATS Core默认不持久化，服务重启消息丢失，需明确使用JetStream
+2. **JetStream成熟度**：JetStream相对较新，生产环境需充分测试，注意版本升级兼容性
+3. **消息大小限制**：NATS默认消息大小为1MB，大消息需调整`max_payload`或改用对象存储
+4. **集群脑裂**：网络分区时可能出现脑裂，需要合理配置集群节点数（奇数节点）

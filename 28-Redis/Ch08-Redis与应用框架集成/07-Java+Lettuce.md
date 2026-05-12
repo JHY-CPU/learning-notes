@@ -72,4 +72,107 @@ spring:
 1. **线程安全**：Lettuce连接是线程安全的
 2. **连接池**：Lettuce使用Netty连接池
 3. **响应式**：支持Mono/Flux响应式编程
-4. **集群**：自动处理槽位映射
+## 七、Pub/Sub使用
+
+```java
+import io.lettuce.core.pubsub.RedisPubSubListener;
+import io.lettuce.core.pubsub.api.async.RedisPubSubAsyncCommands;
+
+public class PubSubExample {
+    
+    public static void main(String[] args) {
+        RedisClient client = RedisClient.create("redis://localhost");
+        
+        // 订阅端
+        StatefulRedisPubSubConnection<String, String> subscriber = client.connectPubSub();
+        subscriber.addListener(new RedisPubSubListener<String, String>() {
+            public void message(String channel, String message) {
+                System.out.println("频道 " + channel + ": " + message);
+            }
+            public void message(String pattern, String channel, String message) {
+                System.out.println("模式 " + pattern + ", 频道 " + channel + ": " + message);
+            }
+            public void subscribed(String channel, long count) {}
+            public void unsubscribed(String channel, long count) {}
+            public void psubscribed(String pattern, long count) {}
+            public void punsubscribed(String pattern, long count) {}
+        });
+        
+        RedisPubSubAsyncCommands<String, String> async = subscriber.async();
+        async.subscribe("notifications");
+        async.psubscribe("user:*");
+        
+        // 发布端
+        StatefulRedisConnection<String, String> publisher = client.connect();
+        publisher.sync().publish("notifications", "系统维护通知");
+    }
+}
+```
+
+## 八、Lua脚本使用
+
+```java
+import io.lettuce.core.ScriptOutputType;
+
+public class LuaExample {
+    
+    public static void main(String[] args) {
+        RedisClient client = RedisClient.create("redis://localhost");
+        StatefulRedisConnection<String, String> connection = client.connect();
+        RedisCommands<String, String> commands = connection.sync();
+        
+        // Lua脚本：原子性递增并检查
+        String lua = 
+            "local current = redis.call('INCR', KEYS[1]) " +
+            "if current == 1 then " +
+            "  redis.call('EXPIRE', KEYS[1], ARGV[1]) " +
+            "end " +
+            "return current";
+        
+        Long result = commands.eval(lua, ScriptOutputType.INTEGER, 
+            new String[]{"rate:user:1001"}, "60");
+        
+        System.out.println("当前计数: " + result);
+        
+        // EVALSHA方式（推荐）
+        String sha = commands.scriptLoad(lua);
+        result = commands.evalsha(sha, ScriptOutputType.INTEGER,
+            new String[]{"rate:user:1002"}, "60");
+    }
+}
+```
+
+## 九、Spring Boot配置详解
+
+```yaml
+spring:
+  redis:
+    host: 192.168.1.100
+    port: 6379
+    password: yourpassword
+    database: 0
+    timeout: 3000ms
+    lettuce:
+      pool:
+        max-active: 20
+        max-idle: 10
+        min-idle: 5
+        max-wait: 3000ms
+      shutdown-timeout: 2000ms
+    
+    # 哨兵配置
+    sentinel:
+      master: mymaster
+      nodes:
+        - 192.168.1.100:26379
+        - 192.168.1.101:26379
+        - 192.168.1.102:26379
+    
+    # 集群配置
+    cluster:
+      nodes:
+        - 192.168.1.100:7000
+        - 192.168.1.101:7001
+        - 192.168.1.102:7002
+      max-redirects: 3
+```

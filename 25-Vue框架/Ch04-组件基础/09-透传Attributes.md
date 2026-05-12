@@ -13,22 +13,19 @@ defineProps({
 </script>
 
 <template>
-  <!-- class, style, id 等会透传到此元素 -->
   <button :type="type">
     <slot />
   </button>
 </template>
 
-<!-- 父组件 -->
-<!-- <MyButton class="primary" id="submit-btn" data-test="btn">
-  提交
-</MyButton> -->
-<!-- 实际渲染: <button type="button" class="primary" id="submit-btn" data-test="btn">提交</button> -->
+<!-- 父组件使用 -->
+<!-- <MyButton class="primary" id="submit-btn">提交</MyButton> -->
+<!-- 实际渲染: <button type="button" class="primary" id="submit-btn">提交</button> -->
 ```
 
 ## 二、具体用法
 
-### 2.1 访问透传属性
+### 2.1 访问透传属性 useAttrs
 
 ```vue
 <script setup>
@@ -45,12 +42,12 @@ console.log(attrs.id)
 </template>
 ```
 
-### 2.2 禁用透传
+### 2.2 禁用自动透传
 
 ```vue
 <script setup>
 defineOptions({
-  inheritAttrs: false // 禁用自动透传到根元素
+  inheritAttrs: false
 })
 
 const attrs = useAttrs()
@@ -58,7 +55,8 @@ const attrs = useAttrs()
 
 <template>
   <div>
-    <input v-bind="attrs" /> <!-- 手动绑定到子元素 -->
+    <!-- 手动绑定到子元素而非根元素 -->
+    <input v-bind="attrs" />
   </div>
 </template>
 ```
@@ -73,15 +71,64 @@ const attrs = useAttrs()
 
 <template>
   <header>标题</header>
-  <main v-bind="attrs">内容</main> <!-- 需要手动绑定 -->
+  <main v-bind="attrs">内容</main>
   <footer>页脚</footer>
 </template>
 ```
 
-## 三、注意事项与常见陷阱
+### 2.4 透传事件监听器
+
+```vue
+<script setup>
+const attrs = useAttrs()
+// 事件监听器也在 attrs 中
+// attrs.onClick, attrs.onMouseenter 等
+</script>
+
+<template>
+  <div v-bind="attrs">
+    <!-- 点击事件会透传到父组件 -->
+    <slot />
+  </div>
+</template>
+```
+
+## 三、常见用例
+
+### 3.1 封装输入组件
+
+```vue
+<!-- MyInput.vue -->
+<script setup>
+defineOptions({ inheritAttrs: false })
+
+defineProps({
+  label: String,
+  modelValue: String
+})
+
+const emit = defineEmits(['update:modelValue'])
+const attrs = useAttrs()
+</script>
+
+<template>
+  <div class="input-wrapper">
+    <label v-if="label">{{ label }}</label>
+    <input
+      v-bind="attrs"
+      :value="modelValue"
+      @input="emit('update:modelValue', $event.target.value)"
+    />
+  </div>
+</template>
+```
+
+## 四、注意事项与常见陷阱
 
 - 透传的 class 和 style 会与根元素的 class/style **合并**
 - 事件监听器也会透传（如 `@click`）
 - `v-model` 不是透传 attribute
 - `defineProps` 中声明的属性不会透传
 - `inheritAttrs: false` 禁用自动透传后需要手动 `v-bind="$attrs"`
+- `useAttrs()` 返回的不是响应式的（在模板中使用时是响应式的）
+- 多根节点时必须手动指定透传位置，否则 Vue 会警告

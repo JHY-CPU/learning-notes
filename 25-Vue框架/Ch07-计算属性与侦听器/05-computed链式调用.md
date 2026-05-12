@@ -72,3 +72,80 @@ const finalPrice = computed(() =>
 - 避免过长的依赖链（超过 3-4 层），考虑简化数据结构
 - 循环依赖会导致栈溢出（A 依赖 B，B 依赖 A）
 - 链中的每个 computed 都有独立的缓存
+
+## 四、性能优化技巧
+
+### 4.1 避免不必要的中间计算
+```vue
+<script setup>
+import { ref, computed } from 'vue'
+
+const items = ref([])
+
+// ❌ 链过长，每层都有缓存开销
+const filtered = computed(() => items.value.filter(i => i.active))
+const sorted = computed(() => [...filtered.value].sort((a, b) => a.price - b.price))
+const formatted = computed(() => sorted.value.map(i => ({ ...i, label: `${i.name} ¥${i.price}` })))
+
+// ✅ 适当合并减少层数
+const processedItems = computed(() =>
+  items.value
+    .filter(i => i.active)
+    .sort((a, b) => a.price - b.price)
+    .map(i => ({ ...i, label: `${i.name} ¥${i.price}` }))
+)
+</script>
+```
+
+### 4.2 大数据量时避免频繁重新排序
+```vue
+<script setup>
+import { ref, computed } from 'vue'
+
+const products = ref([])
+const sortField = ref('name')
+const sortOrder = ref('asc')
+
+// 缓存排序结果，只在排序条件变化时重新排序
+const sortedProducts = computed(() => {
+  const sorted = [...products.value]
+  sorted.sort((a, b) => {
+    const modifier = sortOrder.value === 'asc' ? 1 : -1
+    return a[sortField.value] > b[sortField.value] ? modifier : -modifier
+  })
+  return sorted
+})
+
+const paginatedProducts = computed(() => {
+  const page = 1
+  const size = 20
+  return sortedProducts.value.slice((page - 1) * size, page * size)
+})
+</script>
+```
+
+## 五、调试依赖链
+
+```js
+import { ref, computed, effect } from 'vue'
+
+const base = ref(1)
+const step1 = computed(() => {
+  console.log('[step1] 计算')
+  return base.value * 2
+})
+const step2 = computed(() => {
+  console.log('[step2] 计算')
+  return step1.value + 10
+})
+const step3 = computed(() => {
+  console.log('[step3] 计算')
+  return step2.value / 3
+})
+
+// 修改 base 时，输出：
+// [step1] 计算
+// [step2] 计算
+// [step3] 计算
+// 链中的所有 computed 都会按顺序更新
+```

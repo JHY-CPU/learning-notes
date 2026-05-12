@@ -2,7 +2,7 @@
 
 ## 一、概念说明
 
-TypeScript 5.0 引入了 `const` 类型参数，允许泛型参数在推断时保持字面量类型而非拓宽为基础类型。这使得泛型函数能推断出更精确的类型。
+TypeScript 5.0 引入了 `const` 类型参数，允许泛型参数在推断时保持字面量类型而非拓宽为基础类型。这使得泛型函数能推断出更精确的类型，是泛型系统的重要增强。
 
 ## 二、具体用法
 
@@ -58,9 +58,28 @@ console.log(config.options);
 // 输出: ["light", "dark", "auto"]
 ```
 
+### 2.4 对象属性冻结
+
+```typescript
+function defineRoutes<const T extends Record<string, { method: string; path: string }>>(
+  routes: T
+): T {
+  return routes;
+}
+
+const routes = defineRoutes({
+  getUser: { method: "GET", path: "/users/:id" },
+  createUser: { method: "POST", path: "/users" },
+});
+// routes.getUser.method 类型为 "GET"（字面量）
+// routes.createUser.method 类型为 "POST"（字面量）
+```
+
 ## 三、注意事项与常见陷阱
 
 1. **只影响推断**：`const` 类型参数改变推断行为，不改变运行时
-2. **需要 `extends readonly unknown[]`**：约束数组或元组
+2. **需要 `extends readonly unknown[]`**：约束数组或元组（对象也适用）
 3. **对象也会冻结**：对象属性也会推断为字面量类型
 4. **TS 5.0+**：旧版本不支持此语法
+5. **不需要 `as const`**：`const` 类型参数替代了部分 `as const` 的使用场景
+6. **灵活性权衡**：`const` 参数使类型更精确，但可能过于严格

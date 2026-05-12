@@ -88,6 +88,83 @@
 - IMAP保留服务器副本 = "云端邮件"
 - 现代邮箱（Gmail、Outlook）多用IMAP
 
+## 代码示例
+
+### 使用 Python imaplib 收取和管理邮件
+
+```python
+import imaplib
+from email.parser import Parser
+
+def imap_demo(host, username, password):
+    """通过IMAP协议操作邮件（服务器端管理）"""
+    # 连接IMAP服务器的143端口
+    server = imaplib.IMAP4(host, 143)
+
+    # 登录认证
+    server.login(username, password)        # LOGIN username password
+    print("登录成功!")
+
+    # LIST - 列出邮箱文件夹
+    status, folders = server.list()
+    print(f"邮箱文件夹: {folders[0].decode()}")
+
+    # SELECT - 选择收件箱
+    status, data = server.select('INBOX')
+    print(f"收件箱邮件数: {data[0].decode()}")
+
+    # SEARCH - 搜索邮件（IMAP独有功能）
+    status, data = server.search(None, 'ALL')
+    email_ids = data[0].split()
+    print(f"找到 {len(email_ids)} 封邮件")
+
+    # FETCH - 获取最新3封邮件
+    for eid in email_ids[-3:]:
+        status, data = server.fetch(eid, '(RFC822)')
+        msg = Parser().parsestr(data[0][1].decode('utf-8', errors='ignore'))
+        print(f"  主题: {msg.get('Subject', '无')}")
+
+    # 搜索未读邮件（IMAP特色功能）
+    status, data = server.search(None, 'UNSEEN')
+    unread = data[0].split()
+    print(f"未读邮件数: {len(unread)}")
+
+    # LOGOUT - 退出
+    server.logout()
+
+# 使用示例
+imap_demo('imap.example.com', 'user@example.com', 'password')
+```
+
+### 使用 telnet 手动体验 IMAP 交互过程
+
+```bash
+# 连接IMAP服务器
+telnet imap.example.com 143
+# 服务器响应: * OK IMAP4 server ready
+
+# 登录
+a001 LOGIN user@example.com password    # a001是命令标签
+
+# 列出文件夹
+a002 LIST "" "*"
+
+# 选择收件箱
+a003 SELECT INBOX
+
+# 搜索所有邮件
+a004 SEARCH ALL
+
+# 获取第1封邮件的首部
+a005 FETCH 1 (BODY[HEADER])
+
+# 获取第1封邮件的正文
+a006 FETCH 1 (BODY[TEXT])
+
+# 退出
+a007 LOGOUT
+```
+
 ## 协议关联
 
 - **IMAP与TCP**：IMAP使用TCP的可靠传输，端口143

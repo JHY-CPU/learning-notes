@@ -3,7 +3,7 @@
 *PyTorch DistributedDataParallel 深度解析*
 
 
-# 数据并行 DDP
+## 数据并行 DDP
 
 
 PyTorch DistributedDataParallel 深度解析

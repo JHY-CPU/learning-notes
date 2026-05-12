@@ -85,6 +85,81 @@
 - FIFO只关心"什么时候来的"，不关心"用没用过"
 - 就像一个不考虑实际需求的仓库管理——只按入库时间出库，不管货物是否经常被取用
 
+## 代码/模拟
+
+### Python实现FIFO替换算法
+
+```python
+"""FIFO Cache替换算法模拟 - 适用于408考研复习"""
+
+def fifo_cache_simulation(access_sequence, cache_size):
+    """
+    模拟FIFO替换算法
+    :param access_sequence: 访问序列，如 [1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5]
+    :param cache_size: Cache行数（组大小）
+    :return: 命中次数和详细过程
+    """
+    cache = []          # 当前Cache内容
+    queue = []          # FIFO队列，记录进入顺序
+    hits = 0
+    log = []
+
+    for i, block in enumerate(access_sequence):
+        if block in cache:
+            # 命中：FIFO不改变任何状态（这是与LRU的关键区别）
+            hits += 1
+            status = "命中"
+        elif len(cache) < cache_size:
+            # 缺失且有空行：直接放入
+            cache.append(block)
+            queue.append(block)
+            status = "调入"
+        else:
+            # 缺失且满：淘汰最早进入的块
+            victim = queue.pop(0)       # 弹出队头（最早进入）
+            cache[cache.index(victim)] = block
+            queue.append(block)
+            status = f"替换{victim}"
+
+        log.append(f"步骤{i+1}: 访问{block:>2} | Cache={cache!s:<20} | {status}")
+        print(log[-1])
+
+    print(f"\n命中率 = {hits}/{len(access_sequence)} = {hits/len(access_sequence):.2%}")
+    return hits
+
+# 运行示例：验证Belady异常的访问序列
+print("=== FIFO算法模拟 (容量=3) ===")
+fifo_cache_simulation([1,2,3,4,1,2,5,1,2,3,4,5], cache_size=3)
+
+print("\n=== FIFO算法模拟 (容量=4) - Belady异常验证 ===")
+fifo_cache_simulation([1,2,3,4,1,2,5,1,2,3,4,5], cache_size=4)
+```
+
+**运行结果说明**：容量=3时命中2次，容量=4时命中仍然只有2次（甚至可能出现命中率下降），这就是Belady异常。
+
+### 循环队列实现方式
+
+```python
+def fifo_circular_queue(access_sequence, cache_size):
+    """FIFO循环队列实现方式 - 更接近硬件实现"""
+    cache = [None] * cache_size
+    pointer = 0  # 指向下一个替换位置
+    hits = 0
+
+    for block in access_sequence:
+        if block in cache:
+            hits += 1  # 命中，pointer不变
+        else:
+            cache[pointer] = block          # 替换pointer指向的位置
+            pointer = (pointer + 1) % cache_size  # 循环递增
+        print(f"  访问{block:>2}: Cache={cache}, pointer={pointer}")
+
+    print(f"命中率 = {hits}/{len(access_sequence)} = {hits/len(access_sequence):.2%}")
+
+print("\n=== FIFO循环队列实现 ===")
+fifo_circular_queue([1,2,3,4,1,2,5,1,2,3,4,5], cache_size=3)
+```
+
 ## 知识关联
 
 ### 与LRU的区别

@@ -55,6 +55,64 @@
 | `router-link-active` | 路径包含目标时激活 |
 | `router-link-exact-active` | 路径完全匹配时激活 |
 
+## 四、导航菜单组件
+
+```vue
+<template>
+  <nav class="sidebar">
+    <RouterLink
+      v-for="item in menuItems"
+      :key="item.path"
+      :to="item.path"
+      class="menu-item"
+      active-class="active"
+    >
+      <span class="icon">{{ item.icon }}</span>
+      <span class="label">{{ item.label }}</span>
+    </RouterLink>
+  </nav>
+</template>
+
+<script setup>
+const menuItems = [
+  { path: '/', icon: 'H', label: '首页' },
+  { path: '/dashboard', icon: 'D', label: '仪表盘' },
+  { path: '/users', icon: 'U', label: '用户管理' },
+  { path: '/settings', icon: 'S', label: '设置' }
+]
+</script>
+```
+
+## 五、精确匹配与包含匹配
+
+```vue
+<!-- /user/123 也匹配，因为路径包含 /user -->
+<RouterLink to="/user" active-class="active">用户</RouterLink>
+
+<!-- 只有 /user 精确匹配才激活 -->
+<RouterLink to="/user" exact-active-class="exact-active">用户</RouterLink>
+```
+
+| 场景 | `/user` | `/user/123` | `/user/123/post` |
+|------|---------|------------|------------------|
+| `active-class` 匹配 `/user` | 激活 | 激活 | 激活 |
+| `exact-active-class` 匹配 `/user` | 激活 | 不激活 | 不激活 |
+
+## 六、自定义渲染为非a标签
+
+```vue
+<!-- 渲染为 <li> 标签 -->
+<RouterLink custom v-slot="{ href, navigate, isActive, isExactActive }">
+  <li
+    :class="{ active: isActive }"
+    @click="navigate"
+    tabindex="0"
+  >
+    <a :href="href">导航项</a>
+  </li>
+</RouterLink>
+```
+
 ## 三、注意事项与常见陷阱
 
 1. `RouterLink`会自动阻止默认行为，使用客户端导航
@@ -62,3 +120,5 @@
 3. `active-class`是路径部分匹配时的类名
 4. `exact-active-class`是路径完全匹配时的类名
 5. 可以通过全局配置设置默认的`active-class`
+6. `replace`属性使用`router.replace`替代`router.push`
+7. `custom`模式下需要手动调用`navigate`处理点击

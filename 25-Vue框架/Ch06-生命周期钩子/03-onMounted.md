@@ -16,7 +16,6 @@ import { ref, onMounted } from 'vue'
 const containerRef = ref(null)
 
 onMounted(() => {
-  // DOM 已可用
   console.log(containerRef.value)  // <div>Hello</div>
   console.log(containerRef.value.offsetHeight)  // 元素高度
 })
@@ -63,8 +62,34 @@ onUnmounted(() => {
 </script>
 ```
 
-## 三、注意事项与常见陷阱
+### 2.4 全局事件监听
+```vue
+<script setup>
+import { onMounted, onUnmounted } from 'vue'
+
+function handleResize() {
+  console.log('窗口大小:', window.innerWidth)
+}
+
+onMounted(() => window.addEventListener('resize', handleResize))
+onUnmounted(() => window.removeEventListener('resize', handleResize))
+</script>
+```
+
+## 三、常见用例
+
+| 场景 | 说明 |
+|------|------|
+| DOM 操作 | 测量元素尺寸、聚焦输入框 |
+| API 请求 | 组件挂载后获取数据 |
+| 第三方库初始化 | 地图、图表、编辑器等 |
+| 全局事件绑定 | resize、scroll、keyboard |
+
+## 四、注意事项与常见陷阱
+
 - 子组件的 `onMounted` 先于父组件执行（从内到外）
 - `onMounted` 只在**客户端**调用，SSR 中不会执行
 - 不要在 `onMounted` 中修改响应式数据导致无限更新
 - ref 绑定的元素在 `onMounted` 之后才可用
+- 如果需要等待所有子组件挂载完成，使用 `nextTick`
+- `onMounted` 可以注册多个，按注册顺序执行

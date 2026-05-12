@@ -1,7 +1,7 @@
 # 嵌入式Linux入门
 
 
-# 嵌入式Linux入门
+## 嵌入式Linux入门
 
 一、嵌入式Linux概述
 

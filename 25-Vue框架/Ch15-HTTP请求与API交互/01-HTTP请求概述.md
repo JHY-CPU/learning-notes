@@ -59,3 +59,85 @@ onMounted(async () => {
 - 跨域（CORS）问题需后端配置 `Access-Control-Allow-Origin`
 - 敏感信息不要放在 URL 查询参数中
 - 始终处理加载和错误状态，提升用户体验
+
+## 四、完整的请求封装
+
+```js
+// utils/request.js
+const BASE_URL = import.meta.env.VITE_API_BASE || 'https://api.example.com'
+
+export async function request(url, options = {}) {
+  const token = localStorage.getItem('token')
+
+  const config = {
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers
+    },
+    ...options
+  }
+
+  try {
+    const res = await fetch(`${BASE_URL}${url}`, config)
+
+    if (res.status === 401) {
+      localStorage.removeItem('token')
+      window.location.href = '/login'
+      throw new Error('未授权')
+    }
+
+    if (!res.ok) {
+      throw new Error(`请求失败: ${res.status}`)
+    }
+
+    return await res.json()
+  } catch (e) {
+    console.error('请求错误:', e)
+    throw e
+  }
+}
+
+export const api = {
+  get: (url, params) => {
+    const query = new URLSearchParams(params).toString()
+    return request(`${url}${query ? `?${query}` : ''}`)
+  },
+  post: (url, data) => request(url, { method: 'POST', body: JSON.stringify(data) }),
+  put: (url, data) => request(url, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (url) => request(url, { method: 'DELETE' })
+}
+```
+
+## 五、Composable 封装
+
+```js
+// composables/useApi.js
+import { ref } from 'vue'
+
+export function useApi(apiFn) {
+  const data = ref(null)
+  const loading = ref(false)
+  const error = ref(null)
+
+  async function execute(...args) {
+    loading.value = true
+    error.value = null
+    try {
+      data.value = await apiFn(...args)
+      return data.value
+    } catch (e) {
+      error.value = e.message
+      throw e
+    } finally {
+      loading.value = false
+    }
+  }
+
+  return { data, loading, error, execute }
+}
+
+// 使用
+const { data: users, loading, execute: fetchUsers } = useApi(api.getUsers)
+onMounted(() => fetchUsers())
+```

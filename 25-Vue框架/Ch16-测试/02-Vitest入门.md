@@ -73,8 +73,113 @@ export default defineConfig({
 })
 ```
 
+## 四、Mock 函数
+
+```js
+import { describe, it, expect, vi } from 'vitest'
+
+describe('用户服务', () => {
+  it('调用 API 获取用户', async () => {
+    // 创建 mock 函数
+    const fetchUser = vi.fn()
+    fetchUser.mockResolvedValue({ id: 1, name: '张三' })
+
+    const user = await fetchUser(1)
+    expect(user.name).toBe('张三')
+    expect(fetchUser).toHaveBeenCalledWith(1)
+    expect(fetchUser).toHaveBeenCalledTimes(1)
+  })
+
+  it('模拟 API 失败', async () => {
+    const fetchUser = vi.fn()
+    fetchUser.mockRejectedValue(new Error('网络错误'))
+
+    await expect(fetchUser(1)).rejects.toThrow('网络错误')
+  })
+})
+```
+
+## 五、Mock 模块
+
+```js
+import { describe, it, expect, vi } from 'vitest'
+
+// Mock 整个模块
+vi.mock('@/api/user', () => ({
+  getUser: vi.fn().mockResolvedValue({ id: 1, name: '张三' }),
+  updateUser: vi.fn().mockResolvedValue({ success: true })
+}))
+
+// Mock 部分模块
+vi.mock('@/utils/helper', async (importOriginal) => {
+  const mod = await importOriginal()
+  return {
+    ...mod,
+    formatDate: vi.fn().mockReturnValue('2024-01-01')
+  }
+})
+```
+
+## 六、测试 Vue 组件
+
+```js
+import { describe, it, expect } from 'vitest'
+import { mount } from '@vue/test-utils'
+import Counter from '../components/Counter.vue'
+
+describe('Counter', () => {
+  it('初始值为0', () => {
+    const wrapper = mount(Counter)
+    expect(wrapper.text()).toContain('0')
+  })
+
+  it('点击按钮递增', async () => {
+    const wrapper = mount(Counter)
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.text()).toContain('1')
+  })
+
+  it('接受 initial prop', () => {
+    const wrapper = mount(Counter, { props: { initial: 10 } })
+    expect(wrapper.text()).toContain('10')
+  })
+
+  it('发出 change 事件', async () => {
+    const wrapper = mount(Counter)
+    await wrapper.find('button').trigger('click')
+    expect(wrapper.emitted('change')).toHaveLength(1)
+    expect(wrapper.emitted('change')[0]).toEqual([1])
+  })
+})
+```
+
+## 七、生命周期钩子
+
+```js
+import { describe, it, vi } from 'vitest'
+
+describe('定时器测试', () => {
+  it('延迟执行', () => {
+    vi.useFakeTimers()
+
+    const callback = vi.fn()
+    setTimeout(callback, 1000)
+
+    vi.advanceTimersByTime(500)
+    expect(callback).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(500)
+    expect(callback).toHaveBeenCalled()
+
+    vi.useRealTimers()
+  })
+})
+```
+
 ## 三、注意事项与常见陷阱
 
 - 需要 `jsdom` 环境来测试 DOM 相关代码
 - Vitest 支持 ESM，不需要额外配置 transform
 - 使用 `vi.fn()` 创建模拟函数，`vi.spyOn()` 监视函数调用
+- `vi.mock()` 的作用域是整个测试文件，放在文件顶部
+- 每个测试用例应独立，使用 `beforeEach` 重置 mock 状态

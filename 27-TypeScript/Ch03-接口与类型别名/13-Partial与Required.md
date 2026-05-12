@@ -2,7 +2,7 @@
 
 ## 一、概念说明
 
-`Partial<T>` 将类型 T 的所有属性变为**可选**，`Required<T>` 将所有属性变为**必选**。它们是 TypeScript 内置的工具类型，基于映射类型实现。
+`Partial<T>` 将类型 T 的所有属性变为**可选**，`Required<T>` 将所有属性变为**必选**。它们是 TypeScript 内置的工具类型，基于映射类型实现。`Partial` 常用于更新操作，`Required` 用于确保完整配置。
 
 ## 二、具体用法
 
@@ -74,9 +74,66 @@ type MyRequired<T> = {
 // -? 表示移除可选修饰符
 ```
 
+### 2.4 深层 Partial
+
+```typescript
+// Partial 是浅层的，深层需要递归实现
+type DeepPartial<T> = T extends object ? {
+  [P in keyof T]?: DeepPartial<T[P]>;
+} : T;
+
+interface NestedConfig {
+  database: {
+    host: string;
+    port: number;
+    credentials: {
+      username: string;
+      password: string;
+    };
+  };
+  cache: {
+    enabled: boolean;
+    ttl: number;
+  };
+}
+
+// 只更新部分嵌套配置
+const partialConfig: DeepPartial<NestedConfig> = {
+  database: {
+    host: "new-host",
+    // 其他字段可省略
+  },
+};
+```
+
+### 2.5 Partial 与 Pick 结合
+
+```typescript
+// 只让部分属性可选
+type PartialPick<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
+
+interface CreateUser {
+  name: string;
+  email: string;
+  age: number;
+  phone: string;
+}
+
+// 创建用户时 phone 可选
+type CreateUserInput = PartialPick<CreateUser, "phone" | "age">;
+
+const input: CreateUserInput = {
+  name: "Alice",
+  email: "alice@example.com",
+  // phone 和 age 可省略
+};
+```
+
 ## 三、注意事项与常见陷阱
 
-1. **Partial 是浅层的**：不会递归地使嵌套对象属性可选
-2. **深 Partial 需自定义**：需要递归工具类型实现
-3. **Required 移除可选**：`-?` 语法移除 `?` 修饰符
-4. **Partial 配合 Pick**：`Partial<Pick<T, K>>` 只让部分属性可选
+1. **Partial 是浅层的**：不会递归地使嵌套对象属性可选，深层需自定义 `DeepPartial`
+2. **深 Partial 需自定义**：需要递归工具类型实现，但要注意性能和类型深度限制
+3. **Required 移除可选**：`-?` 语法移除 `?` 修饰符，使所有属性变为必选
+4. **Partial 配合 Pick**：`Partial<Pick<T, K>>` 只让部分属性可选，更灵活
+5. **Partial 与默认值**：Partial 常配合默认值使用，确保最终对象完整
+6. **性能考虑**：过度嵌套的深层 Partial 可能影响类型检查性能

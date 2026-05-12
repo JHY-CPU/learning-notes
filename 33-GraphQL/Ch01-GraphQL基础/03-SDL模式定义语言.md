@@ -104,10 +104,160 @@ type Query {
 }
 ```
 
-## 五、注意事项
+## 五、完整的 Schema 示例
+
+```graphql
+# schema.graphql - 电商系统示例
+
+# 自定义标量
+scalar DateTime
+scalar Decimal
+
+# 枚举
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
+
+enum SortDirection {
+  ASC
+  DESC
+}
+
+# 接口
+interface Node {
+  id: ID!
+}
+
+interface Timestamped {
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+# 对象类型
+type User implements Node & Timestamped {
+  id: ID!
+  name: String!
+  email: String!
+  orders(first: Int, after: String): OrderConnection!
+  createdAt: DateTime!
+  updatedAt: DateTime!
+}
+
+type Product implements Node {
+  id: ID!
+  name: String!
+  description: String
+  price: Decimal!
+  category: Category!
+  inStock: Boolean!
+}
+
+type Order implements Node {
+  id: ID!
+  orderNo: String!
+  status: OrderStatus!
+  items: [OrderItem!]!
+  total: Decimal!
+  user: User!
+  createdAt: DateTime!
+}
+
+type OrderItem {
+  product: Product!
+  quantity: Int!
+  unitPrice: Decimal!
+}
+
+type Category implements Node {
+  id: ID!
+  name: String!
+  products(first: Int): ProductConnection!
+}
+
+# 联合类型
+union SearchResult = User | Product | Order
+
+# Connection 分页
+type ProductConnection {
+  edges: [ProductEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ProductEdge {
+  node: Product!
+  cursor: String!
+}
+
+type PageInfo {
+  hasNextPage: Boolean!
+  hasPreviousPage: Boolean!
+  startCursor: String
+  endCursor: String
+}
+
+# 输入类型
+input CreateOrderInput {
+  items: [OrderItemInput!]!
+  addressId: ID!
+  paymentMethod: PaymentMethod!
+}
+
+input OrderItemInput {
+  productId: ID!
+  quantity: Int!
+}
+
+enum PaymentMethod {
+  ALIPAY
+  WECHAT_PAY
+  CREDIT_CARD
+}
+
+# 根类型
+type Query {
+  node(id: ID!): Node
+  user(id: ID!): User
+  products(
+    first: Int
+    after: String
+    categoryId: ID
+    search: String
+  ): ProductConnection!
+  search(keyword: String!): [SearchResult!]!
+}
+
+type Mutation {
+  createOrder(input: CreateOrderInput!): Order!
+  cancelOrder(id: ID!): Order!
+}
+
+type Subscription {
+  orderStatusChanged(orderId: ID!): Order!
+}
+```
+
+## 六、SDL 导入与合并
+
+```typescript
+// 多模块 Schema 合并
+import { loadFilesSync } from '@graphql-tools/load-files';
+import { mergeTypeDefs } from '@graphql-tools/merge';
+
+const typesArray = loadFilesSync('./src/modules/**/*.graphql');
+const mergedSchema = mergeTypeDefs(typesArray);
+```
+
+## 七、注意事项
 
 1. **SDL 是 Schema 的声明式写法**
 2. **输入类型不能包含对象类型字段**
 3. **联合类型的所有成员必须是对象类型**
 4. **接口可以被多个类型实现**
 5. **枚举值默认全大写命名**
+6. **推荐一个领域模块一个 .graphql 文件**
+7. **使用 graphql-codegen 自动生成 TypeScript 类型**

@@ -2,7 +2,17 @@
 
 ## 一、概念说明
 
-vector的进阶用法包括emplace系列、shrink_to_fit、swap技巧、以及异常安全保证等高级特性。这些特性在现代C++中对性能优化至关重要。
+vector的进阶用法包括emplace系列、shrink_to_fit、swap技巧、异常安全保证以及`vector<bool>`特化等高级特性。这些特性在现代C++中对性能优化至关重要。理解vector的内部机制（如扩容策略、迭代器失效）是编写高效代码的基础。
+
+### 1.1 扩容策略
+
+| 实现 | 扩容因子 | 说明 |
+|------|---------|------|
+| GCC libstdc++ | 2x | 每次容量翻倍 |
+| MSVC | 1.5x | 每次增加50% |
+| Clang libc++ | 2x | 每次容量翻倍 |
+
+扩容因子影响均摊复杂度和内存利用率：2x更快但更费内存，1.5x更省内存但扩容更频繁。
 
 ## 二、具体用法
 
@@ -22,84 +32,148 @@ struct Person {
     Person(const Person& p) : name(p.name), age(p.age) {
         std::cout << "拷贝: " << name << std::endl;
     }
+    Person(Person&& p) noexcept : name(std::move(p.name)), age(p.age) {
+        std::cout << "移动: " << name << std::endl;
+    }
 };
 
 int main() {
     std::vector<Person> people;
+    people.reserve(10);  // 避免扩容干扰观察
 
-    // push_back：先构造临时对象，再移动/拷贝
-    people.push_back(Person("Alice", 25));  // 构造 + 移动
+    // push_back：先构造临时对象，再移动
+    people.push_back(Person("Alice", 25));  // 构造临时 + 移动 = 2次操作
 
-    // emplace_back：直接在容器中构造，无额外拷贝/移动
-    people.emplace_back("Bob", 30);         // 只构造
+    // emplace_back：直接在容器中构造
+    people.emplace_back("Bob", 30);         // 只构造 = 1次操作
 
     // emplace在指定位置构造
     people.emplace(people.begin(), "Charlie", 20);
+
+    // emplace返回新元素的引用（C++17）
+    auto& ref = people.emplace_back("Dave", 35);
+    ref.age = 36;  // 直接修改
 }
 ```
 
-### 2.2 shrink_to_fit
+### 2.2 shrink_to_fit与内存管理
 
 ```cpp
-void demonstrate_shrink() {
+void memory_management() {
     std::vector<int> v;
-    v.reserve(1000);
-    for (int i = 0; i < 10; ++i) v.push_back(i);
+    v.reserve(10000);
+    for (int i = 0; i < 100; ++i) v.push_back(i);
 
-    std::cout << "before: size=" << v.size()
-              << " capacity=" << v.capacity() << std::endl;  // 10, 1000
+    std::cout << "size=" << v.size()          // 100
+              << " capacity=" << v.capacity()  // 10000
+              << std::endl;
 
-    v.shrink_to_fit();  // 释放多余容量
-    std::cout << "after: size=" << v.size()
-              << " capacity=" << v.capacity() << std::endl;  // 10, 10
+    // shrink_to_fit：请求释放多余容量（非绑定）
+    v.shrink_to_fit();
+    std::cout << "capacity=" << v.capacity()   // 可能是100
+              << std::endl;
 
-    // 注意：shrink_to_fit是非绑定请求，可能被忽略
+    // C++11之前的swap技巧
+    std::vector<int>(v).swap(v);  // 创建临时vector并交换
+
+    // 彻底释放内存
+    std::vector<int>().swap(v);   // capacity归零
 }
 ```
 
-### 2.3 swap技巧释放内存
+### 2.3 异常安全
 
 ```cpp
-void release_memory() {
-    std::vector<int> huge(1000000, 42);
-    huge.clear();  // size=0，但capacity仍很大
+#include <stdexcept>
 
-    // swap技巧：彻底释放内存
-    std::vector<int>().swap(huge);
-    std::cout << "capacity after swap: " << huge.capacity() << std::endl;  // 0
+class Resource {
+public:
+    Resource(int v) {
+        if (v < 0) throw std::invalid_argument("负值");
+    }
+};
 
-    // C++11后可用shrink_to_fit替代
-    // std::vector<int>(huge).swap(huge);
-}
-```
-
-### 2.4 异常安全
-
-```cpp
-// push_back提供强异常安全保证
 void exception_safety() {
-    std::vector<std::string> v{"existing"};
+    std::vector<Resource> v;
+    v.emplace_back(1);
+    v.emplace_back(2);
 
     try {
-        v.push_back("new");  // 如果扩容时抛异常，v保持原样
-    } catch (const std::bad_alloc&) {
-        std::cout << "分配失败，vector未修改" << std::endl;
-    }
-
-    // emplace_back同理
-    try {
-        v.emplace_back("another");
+        v.emplace_back(-3);  // 构造时抛异常
     } catch (...) {
-        std::cout << "emplace失败" << std::endl;
+        // 强异常安全：v保持{1, 2}不变
+        std::cout << "大小: " << v.size() << std::endl;  // 2
     }
+
+    // 移动构造noexcept的重要性：
+    // 扩容时，若移动构造是noexcept则用移动，否则用拷贝
+    // 因为移动中途抛异常无法回滚
+}
+```
+
+### 2.4 vector<bool>特化
+
+```cpp
+#include <vector>
+#include <iostream>
+
+void vector_bool_demo() {
+    std::vector<bool> flags = {true, false, true, false, true};
+
+    // 特化：位压缩存储，每个bool占1位
+    std::cout << "sizeof(vector<bool>): " << sizeof(flags) << std::endl;
+
+    // 注意：flags[i]返回代理对象，不是bool&
+    // auto& ref = flags[0];  // 编译错误！
+    auto ref = flags[0];     // OK，值拷贝
+
+    // flip翻转
+    flags.flip();  // 所有位取反
+
+    // 问题：不能取地址，不能绑定引用
+    // bool* p = &flags[0];  // 编译错误
+
+    // 替代方案：用vector<char>代替
+    std::vector<char> char_flags = {1, 0, 1};
+    char& cref = char_flags[0];  // OK
+}
+```
+
+### 2.5 高级操作
+
+```cpp
+#include <algorithm>
+
+void advanced_ops() {
+    std::vector<int> v = {5, 3, 1, 4, 2};
+
+    // 排序
+    std::sort(v.begin(), v.end());
+
+    // 二分查找（需已排序）
+    bool found = std::binary_search(v.begin(), v.end(), 3);
+
+    // 批量赋值
+    std::fill(v.begin(), v.end(), 0);
+
+    // resize + 默认值
+    v.resize(10, 42);  // 扩充到10，新元素为42
+
+    // 初始化列表赋值（C++11）
+    v = {1, 2, 3, 4, 5};
+
+    // swap（O(1)，交换内部指针）
+    std::vector<int> other = {10, 20, 30};
+    v.swap(other);
 }
 ```
 
 ## 三、注意事项与常见陷阱
 
-- `emplace_back`比`push_back`少一次移动/拷贝（对非平凡类型）
-- `shrink_to_fit`是非绑定请求，编译器可能忽略
-- swap技巧在C++11后不如以前常用（有`shrink_to_fit`）
-- vector的异常安全：push/emplace提供强保证
-- `reserve`不改变`size`，只改变`capacity`
-- vector<bool>是特化的位压缩实现，行为不同于普通vector
+1. **`emplace_back`比`push_back`少一次移动/拷贝**：对非平凡类型有显著性能差异
+2. **`shrink_to_fit`是非绑定请求**：编译器可能忽略，不保证释放
+3. **`vector<bool>`是特化**：位压缩，不满足标准容器的所有要求，不能取地址或绑定引用
+4. **扩容策略影响性能**：频繁push_back时reserve可避免多次扩容
+5. **移动构造的noexcept**：影响扩容时选择移动还是拷贝，务必标记noexcept
+6. **`data()`返回连续内存**：C++11后保证，可安全传给C接口
+7. **迭代器失效**：任何可能导致扩容的操作都会使所有迭代器失效

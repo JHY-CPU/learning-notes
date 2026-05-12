@@ -1,6 +1,6 @@
 # 14 - AC 自动机实现 (Aho-Corasick Implementation)
 
-  ## 完整 JavaScript 实现
+## 完整 JavaScript 实现
 
 
 ```
@@ -141,7 +141,7 @@ class AhoCorasick {
 }
   ```
 
-  ## 优化技术
+## 优化技术
 
 
 
@@ -185,7 +185,7 @@ toDFA() {
 }
   ```
 
-  ## 交互演示：多模式匹配
+## 交互演示：多模式匹配
 
   AC 自动机可以同时匹配多个模式串：
 

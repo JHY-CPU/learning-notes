@@ -77,10 +77,70 @@ Rust 有活跃的社区和丰富的学习资源。
 # cargo-deny (安全检查)
 ```
 
-## 三、注意事项与常见陷阱
+### 2.5 进阶学习路径
 
-1. **信息过载**：选择适合自己的学习资源
-2. **实践为主**：多写代码多实践
-3. **社区参与**：参与社区讨论和贡献
-4. **版本更新**：关注 Rust 版本更新
-5. **持续学习**：Rust 生态持续演进
+```
+入门阶段：
+├── The Rust Programming Language（TRPL）
+├── Rustlings 练习
+└── Exercism Rust Track
+
+中级阶段：
+├── Rust by Example
+├── Rust Cookbook
+└── 项目实战
+
+高级阶段：
+├── The Rustonomicon（unsafe）
+├── The Little Book of Rust Macros
+├── Rust Atomics and Locks（并发）
+└── 源码阅读
+
+专业领域：
+├── Web: axum/actix-web 文档
+├── 嵌入式: The Embedded Rust Book
+├── WebAssembly: Rust and WebAssembly Book
+├── 游戏: Bevy Book
+└── 系统: Writing an OS in Rust
+```
+
+### 2.6 贡献开源
+
+```bash
+# 克隆项目
+git clone https://github.com/user/project
+cd project
+
+# 运行测试
+cargo test
+
+# 提交 PR
+git checkout -b my-fix
+# 修改代码
+git commit -m "fix: description"
+git push origin my-fix
+# 在 GitHub 上创建 PR
+```
+
+## 四、推荐学习资源
+
+| 类型 | 资源 | 难度 |
+|------|------|------|
+| 书籍 | TRPL | 入门 |
+| 书籍 | Rust in Action | 中级 |
+| 书籍 | Programming Rust | 中级 |
+| 视频 | Jon Gjengset | 高级 |
+| 练习 | Rustlings | 入门 |
+| 练习 | Exercism | 中级 |
+| 练习 | Advent of Code | 全级别 |
+| 文档 | docs.rs | 参考 |
+
+## 五、注意事项与常见陷阱
+
+1. **信息过载**：选择适合自己的学习资源，避免同时学太多
+2. **实践为主**：多写代码多实践，理论结合实际
+3. **社区参与**：参与社区讨论和贡献，向他人学习
+4. **版本更新**：关注 Rust 版本更新（每6周），了解新特性
+5. **持续学习**：Rust 生态持续演进，保持学习习惯
+6. **避免教程地狱**：完成项目比看完教程更重要
+7. **阅读源码**：学习优秀 crate 的实现是提升水平的好方法

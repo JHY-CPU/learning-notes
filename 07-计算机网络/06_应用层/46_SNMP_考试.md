@@ -73,9 +73,44 @@ D. 路由网络数据
 - 误认为SNMP使用TCP
 - 忘记MIB的作用
 
+### SNMP版本对比
+
+| 特性 | SNMPv1 | SNMPv2c | SNMPv3 |
+|------|--------|---------|--------|
+| 安全性 | 社区名（明文） | 社区名（明文） | USM（加密+认证） |
+| 操作 | Get/Set/Trap | 增加GetBulk | 同v2c |
+| 错误处理 | 简单 | 改进 | 同v2c |
+| 批量操作 | 无 | GetBulk | 同v2c |
+| 408要求 | 了解即可 | 了解即可 | 了解即可 |
+
+### SNMP报文类型
+
+| 操作 | 说明 | 方向 |
+|------|------|------|
+| GetRequest | 获取单个对象值 | 管理站→代理 |
+| GetNextRequest | 获取下一个对象值 | 管理站→代理 |
+| GetBulkRequest | 批量获取（v2c+） | 管理站→代理 |
+| SetRequest | 设置对象值 | 管理站→代理 |
+| Response | 响应请求 | 代理→管理站 |
+| Trap | 主动告警 | 代理→管理站 |
+| InformRequest | 需确认的Trap（v2c+） | 代理→管理站 |
+
+### OID（对象标识符）
+- 使用树形结构标识管理对象
+- 例：1.3.6.1.2.1.1.1 = 系统描述（sysDescr）
+- SNMP管理站通过OID读写代理的MIB
+
+### 408常考要点
+- SNMP使用UDP，端口161（请求）/162（Trap）
+- MIB存储被管理设备信息，使用OID标识
+- Trap是代理主动向管理站发送的告警
+- SNMP不使用TCP（追求简单高效）
+- SNMPv3增加了安全机制（USM）
+
 ## 协议关联
 
 - **SNMP与UDP**：SNMP使用UDP
 - **SNMP与MIB**：MIB存储设备信息
 - **SNMP与TCP**：SNMP不使用TCP（简单、快速）
+- **SNMP与ICMP**：都用于网络管理，但ICMP是网络层
 - **408常见组合**：应用层端口号汇总题中常考SNMP

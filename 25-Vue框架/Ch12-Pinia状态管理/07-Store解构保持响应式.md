@@ -66,6 +66,62 @@ const displayName = computed(() => `${store.name} (${store.age}岁)`)
 </script>
 ```
 
+## 四、解构最佳实践
+
+```vue
+<script setup>
+import { useUserStore } from '@/stores/user'
+import { storeToRefs } from 'pinia'
+import { computed } from 'vue'
+
+const userStore = useUserStore()
+
+// 方式1：storeToRefs 解构（多个属性时推荐）
+const { name, age, token, isLoggedIn } = storeToRefs(userStore)
+const { login, logout, updateProfile } = userStore  // actions 直接解构
+
+// 方式2：computed 包装（单个属性或派生值时推荐）
+const greeting = computed(() => `你好，${userStore.name}`)
+
+// 方式3：直接使用 store（模板中推荐）
+// 模板中 userStore.name 自动解包
+</script>
+
+<template>
+  <!-- 直接使用 store -->
+  <p>{{ userStore.name }}</p>
+  <button @click="userStore.login">登录</button>
+
+  <!-- 使用解构的 ref -->
+  <p>{{ name }}</p>
+  <button @click="login">登录</button>
+
+  <!-- 使用 computed -->
+  <p>{{ greeting }}</p>
+</template>
+```
+
+## 五、错误示例与正确示例
+
+```js
+const store = useCounterStore()
+
+// ❌ 错误：丢失响应式
+const { count, doubled } = store
+// count 是数字，不会随 store 变化而更新
+
+// ✅ 正确：保持响应式
+const { count, doubled } = storeToRefs(store)
+// count 是 Ref<number>，会随 store 变化
+
+// ❌ 错误：action 不需要 storeToRefs
+const { increment } = storeToRefs(store)
+// action 不是响应式的，不需要转 ref
+
+// ✅ 正确：action 直接解构
+const { increment } = store
+```
+
 ## 三、注意事项与常见陷阱
 
 1. **永远不要**直接解构store的state和getter：`const { count } = store`
@@ -73,3 +129,5 @@ const displayName = computed(() => `${store.name} (${store.age}岁)`)
 3. Action是普通函数，可直接解构：`const { increment } = store`
 4. 在模板中使用`store.xxx`自动解包，无需额外处理
 5. `storeToRefs`忽略actions和非响应式属性
+6. `storeToRefs`返回的对象中，getter 被转为 `computed` ref
+7. 如果只用一个属性，直接 `store.xxx` 比 `storeToRefs` 更简洁

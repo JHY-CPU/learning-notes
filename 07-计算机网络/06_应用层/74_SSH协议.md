@@ -76,6 +76,93 @@
 - SSH提供：加密 + 认证 + 完整性
 - "SSH 22安全，TELNET 23不安全"
 
+## 代码示例
+
+### 使用 Python paramiko 进行 SSH 远程操作
+
+```python
+# pip install paramiko
+import paramiko
+
+def ssh_execute(host, username, password, command):
+    """通过SSH执行远程命令"""
+    # 创建SSH客户端
+    client = paramiko.SSHClient()
+
+    # 自动添加未知主机密钥（生产环境应验证）
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+    # 连接SSH服务器（TCP 22端口 + 密钥交换 + 认证）
+    client.connect(host, username=username, password=password)
+    print(f"SSH连接成功: {host}")
+
+    # 执行远程命令
+    stdin, stdout, stderr = client.exec_command(command)
+    print(f"输出: {stdout.read().decode()}")
+    print(f"错误: {stderr.read().decode()}")
+
+    # 关闭连接
+    client.close()
+
+# 使用示例
+ssh_execute('192.168.1.100', 'root', 'password', 'uname -a')
+```
+
+### 使用 paramiko 进行 SSH 文件传输（SFTP）
+
+```python
+import paramiko
+
+def sftp_transfer(host, username, password):
+    """通过SFTP传输文件（基于SSH的安全文件传输）"""
+    transport = paramiko.Transport((host, 22))
+    transport.connect(username=username, password=password)
+
+    # 创建SFTP客户端
+    sftp = paramiko.SFTPClient.from_transport(transport)
+
+    # 上传文件
+    sftp.put('local_file.txt', '/remote/path/file.txt')
+    print("文件上传成功!")
+
+    # 下载文件
+    sftp.get('/remote/path/file.txt', 'downloaded.txt')
+    print("文件下载成功!")
+
+    sftp.close()
+    transport.close()
+
+# 使用示例
+sftp_transfer('192.168.1.100', 'root', 'password')
+```
+
+### 使用 ssh 命令行工具
+
+```bash
+# SSH远程登录（密码认证）
+ssh user@192.168.1.100 -p 22
+
+# SSH执行单条命令
+ssh user@192.168.1.100 'ls -la /var/log'
+
+# SSH密钥认证（更安全）
+ssh-keygen -t rsa -b 4096          # 生成密钥对
+ssh-copy-id user@192.168.1.100     # 将公钥复制到服务器
+ssh user@192.168.1.100             # 免密码登录
+
+# SCP文件传输（基于SSH）
+scp local.txt user@192.168.1.100:/remote/path/    # 上传
+scp user@192.168.1.100:/remote/file.txt ./        # 下载
+
+# SSH端口转发（隧道）
+ssh -L 8080:localhost:80 user@192.168.1.100  # 本地端口转发
+# 将本地8080端口转发到远程服务器的80端口
+
+# 对比：telnet是明文传输（端口23），SSH是加密传输（端口22）
+telnet 192.168.1.100 23  # 不安全，密码明文传输
+ssh user@192.168.1.100   # 安全，所有数据加密
+```
+
 ## 协议关联
 
 - **SSH与TCP**：SSH使用TCP，端口22

@@ -63,10 +63,56 @@ insta = "1"  # 快照测试
 tonic-build = "0.10"  # Proto 生成
 ```
 
-## 三、注意事项与常见陷阱
+### 2.4 测试 crate
 
-1. **版本稳定性**：选择成熟稳定的 crate
-2. **维护状态**：检查 crate 的维护状态
-3. **依赖树大小**：避免引入过多依赖
-4. **许可证兼容**：检查许可证兼容性
-5. **文档质量**：优先选择文档完善的 crate
+```toml
+[dev-dependencies]
+# 单元测试
+criterion = "0.5"        # 基准测试
+mockall = "0.12"         # Mock
+proptest = "1"           # 属性测试
+insta = "1"              # 快照测试
+assert_cmd = "2"         # CLI 测试
+tempfile = "3"           # 临时文件
+wiremock = "0.5"         # HTTP mock
+```
+
+### 2.5 按类别快速查找
+
+```
+Web 框架: axum, actix-web, warp
+HTTP 客户端: reqwest, ureq
+数据库: sqlx, diesel, sea-orm
+序列化: serde, serde_json, toml
+异步运行时: tokio, async-std
+日志: tracing, log, env_logger
+CLI: clap, structopt
+配置: config, figment
+错误处理: thiserror, anyhow
+时间: chrono, time
+正则: regex
+加密: ring, rustls
+JSON: serde_json, simd-json
+```
+
+## 四、Crate 质量评估标准
+
+| 指标 | 权重 | 说明 |
+|------|------|------|
+| 下载量 | 中 | 反映流行度 |
+| Star 数 | 低 | 参考价值有限 |
+| 最近更新 | 高 | 活跃维护 |
+| 文档质量 | 高 | 降低学习成本 |
+| 依赖数量 | 中 | 影响编译时间 |
+| 测试覆盖 | 高 | 代码质量 |
+| MSRV | 中 | 最低 Rust 版本 |
+
+## 五、注意事项与常见陷阱
+
+1. **版本稳定性**：选择成熟稳定的 crate，避免 0.x 版本用于生产
+2. **维护状态**：检查 crate 的维护状态，最后更新时间不应超过 1 年
+3. **依赖树大小**：避免引入过多依赖，增加编译时间和攻击面
+4. **许可证兼容**：检查许可证兼容性，注意 GPL 等传染性许可证
+5. **文档质量**：优先选择文档完善的 crate，文档是最好的入门指南
+6. **替代方案**：了解每个 crate 的替代方案，做出明智选择
+7. **版本升级**：关注依赖的 breaking changes，及时升级

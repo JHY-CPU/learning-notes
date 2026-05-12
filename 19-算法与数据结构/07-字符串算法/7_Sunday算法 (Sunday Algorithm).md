@@ -1,6 +1,6 @@
 # 08 - Sunday 算法 (Sunday Algorithm)
 
-  ## 算法思想
+## 算法思想
 
   Sunday 算法是 Boyer-Moore 算法的简化变体，由 Daniel M. Sunday 在 1990 年提出。它同样**从右向左**比较字符，但在决定跳跃距离时只关注**下一个字符**（即文本串中当前窗口右侧紧邻的字符）。
 
@@ -22,7 +22,7 @@
 
 
 
-  ## 与 Boyer-Moore 的区别
+## 与 Boyer-Moore 的区别
 
 
 
@@ -41,7 +41,7 @@
 | 平均性能 | 非常好 | 接近 BM，有时更好 |
 | 字符集 | 需要构建坏字符表 | 需要构建偏移表 |
 
-  ## 算法实现
+## 算法实现
 
 
 ```
@@ -93,7 +93,7 @@ function sundayMatch(text, pattern) {
 }
   ```
 
-  ## 偏移表计算示例
+## 偏移表计算示例
 
   模式串 P = **"SEARCH"**
 
@@ -115,7 +115,7 @@ function sundayMatch(text, pattern) {
     当字符在模式串中出现多次时，最右的（最靠近末尾的）位置决定 shift，因为 shift[char] 会被后来的覆盖。
 
 
-  ## 复杂度分析
+## 复杂度分析
 
 
 
@@ -130,4 +130,4 @@ function sundayMatch(text, pattern) {
 | 平均匹配时间 | O(n/m) — 对自然语言文本非常高效 |
 | 空间复杂度 | O(Σ) — 字符集大小 |
 
-  ## 交互演示
+## 交互演示

@@ -81,9 +81,86 @@ export default defineConfig({
 })
 ```
 
+## 四、常见库的 Tree Shaking 最佳实践
+
+```js
+// lodash → lodash-es（ESM 版本）
+// ❌
+import _ from 'lodash'
+_.debounce(fn, 300)
+
+// ✅
+import { debounce } from 'lodash-es'
+
+// dayjs → 具名导入插件
+// ❌
+import dayjs from 'dayjs'
+import 'dayjs/locale/zh-cn'  // 副作用导入
+
+// ✅
+import dayjs from 'dayjs'
+import zhCn from 'dayjs/locale/zh-cn'  // 具名导入
+dayjs.locale(zhCn)
+
+// Element Plus → 自动导入
+// 使用 unplugin-vue-components + unplugin-auto-import
+// 无需手动 import，按需自动导入
+
+// Ant Design Vue → 按需导入
+import { Button, Input } from 'ant-design-vue'
+```
+
+## 五、检查 Tree Shaking 效果
+
+```bash
+# 安装分析工具
+npm install -D rollup-plugin-visualizer
+
+# 构建后查看
+npx vite build
+# 打开生成的 stats.html
+```
+
+```js
+// vite.config.js
+import { visualizer } from 'rollup-plugin-visualizer'
+
+export default defineConfig({
+  plugins: [
+    visualizer({
+      open: true,
+      gzipSize: true,
+      brotliSize: true
+    })
+  ]
+})
+```
+
+## 六、Vue 生态的 Tree Shaking
+
+```js
+// Vue 3 天然支持 Tree Shaking
+import { ref, computed } from 'vue'
+// 未使用的 API（如 watch、reactive）不会打包
+
+// Vue Router
+import { createRouter, createWebHistory } from 'vue-router'
+// 只打包使用的功能
+
+// Pinia
+import { defineStore } from 'pinia'
+// 只打包定义的 store
+
+// VueUse
+import { useDebounceFn } from '@vueuse/core'
+// 只打包 useDebounceFn 及其依赖
+```
+
 ## 三、注意事项与常见陷阱
 
 - 使用 ES Module 语法（`import/export`），避免 CommonJS（`require`）
 - 避免 `import *` 和默认导入整个库
 - 确保 `package.json` 中 `sideEffects` 配置正确
 - 某些库（如 lodash v4）需要使用 `lodash-es` 或 `xxx/xxx` 路径导入
+- 自动导入插件（unplugin-auto-import）可以减少代码量但不影响 Tree Shaking
+- CSS 文件要标记为 sideEffects，否则可能被误删

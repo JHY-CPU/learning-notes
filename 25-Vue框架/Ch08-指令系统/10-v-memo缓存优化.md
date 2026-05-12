@@ -61,3 +61,96 @@ const hugeList = ref(Array.from({ length: 10000 }, (_, i) => ({
 - 如果依赖数组中的引用不变，即使对象内部属性变化也不会更新
 - 适合大数据列表优化，普通场景不需要使用
 - 与 v-for 配合使用时，务必包含唯一标识（如 id）
+
+## 四、实际应用场景
+
+### 4.1 大数据表格优化
+```vue
+<template>
+  <table>
+    <tr v-for="row in tableData" :key="row.id"
+        v-memo="[row.id, row.status, selectedRows.has(row.id)]">
+      <td>{{ row.name }}</td>
+      <td>{{ row.email }}</td>
+      <td :class="`status-${row.status}`">{{ row.status }}</td>
+      <td>
+        <input type="checkbox" :checked="selectedRows.has(row.id)" />
+      </td>
+    </tr>
+  </table>
+</template>
+<script setup>
+import { ref, reactive } from 'vue'
+
+const tableData = ref(Array.from({ length: 10000 }, (_, i) => ({
+  id: i,
+  name: `User ${i}`,
+  email: `user${i}@example.com`,
+  status: 'active'
+})))
+const selectedRows = reactive(new Set())
+</script>
+```
+
+### 4.2 虚拟列表中的缓存
+```vue
+<template>
+  <div v-for="item in visibleItems" :key="item.id"
+       v-memo="[item.id, item.isExpanded]">
+    <div class="item-header">{{ item.title }}</div>
+    <div v-if="item.isExpanded" class="item-body">
+      {{ item.content }}
+    </div>
+  </div>
+</template>
+```
+
+### 4.3 与计算属性配合
+```vue
+<script setup>
+import { ref, computed } from 'vue'
+
+const items = ref([])
+const filter = ref('all')
+
+// 先用 computed 过滤，再用 v-memo 缓存渲染
+const filteredItems = computed(() => {
+  if (filter.value === 'all') return items.value
+  return items.value.filter(i => i.category === filter.value)
+})
+</script>
+
+<template>
+  <div v-for="item in filteredItems" :key="item.id"
+       v-memo="[item.id, item.selected]">
+    <span>{{ item.name }}</span>
+    <span v-if="item.selected">✓</span>
+  </div>
+</template>
+```
+
+## 五、v-memo 的注意事项
+
+```vue
+<template>
+  <!-- ⚠️ 依赖数组中引用不变时不会更新 -->
+  <div v-for="item in items" :key="item.id" v-memo="[item]">
+    <!-- 如果 item 是同一个引用，即使 item.name 变了也不会更新 -->
+    {{ item.name }}
+  </div>
+
+  <!-- ✅ 用具体的值作为依赖 -->
+  <div v-for="item in items" :key="item.id" v-memo="[item.id, item.name]">
+    {{ item.name }}
+  </div>
+</template>
+```
+
+## 六、v-memo 与 React.memo 对比
+
+| 特性 | Vue v-memo | React.memo |
+|------|-----------|------------|
+| 使用方式 | 模板指令 | HOC |
+| 依赖声明 | 数组 | 浅比较/自定义 |
+| 作用范围 | DOM 子树 | 组件 |
+| 细粒度 | 更细（模板级别） | 组件级别 |

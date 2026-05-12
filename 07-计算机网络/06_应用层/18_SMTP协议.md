@@ -71,6 +71,88 @@
 - SMTP只负责发送，不负责接收
 - SMTP用7位ASCII，不能发二进制（需要MIME）
 
+## 代码示例
+
+### 使用 Python smtplib 发送邮件
+
+```python
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+
+def send_email(sender, receiver, subject, body, password):
+    """通过SMTP发送邮件"""
+    # 构造邮件
+    msg = MIMEMultipart()
+    msg['From'] = sender
+    msg['To'] = receiver
+    msg['Subject'] = subject
+    msg.attach(MIMEText(body, 'plain', 'utf-8'))
+
+    # 连接SMTP服务器并发送
+    with smtplib.SMTP('smtp.example.com', 25) as server:
+        server.ehlo()                           # HELO/EHLO 握手
+        server.starttls()                       # 启用TLS加密
+        server.login(sender, password)          # 登录认证
+        server.sendmail(sender, [receiver], msg.as_string())
+        print("邮件发送成功!")
+
+# 使用示例
+send_email(
+    sender='alice@example.com',
+    receiver='bob@example.com',
+    subject='测试邮件',
+    body='这是一封通过SMTP协议发送的测试邮件。',
+    password='your_password'
+)
+```
+
+### 使用 telnet 手动体验 SMTP 交互过程
+
+```bash
+# 连接SMTP服务器（手动输入SMTP命令）
+telnet smtp.example.com 25
+
+# 服务器响应: 220 smtp.example.com Service ready
+
+EHLO client.example.com       # 标识自己
+MAIL FROM:<alice@example.com> # 指定发件人
+RCPT TO:<bob@example.com>     # 指定收件人
+DATA                          # 开始传输邮件内容
+From: alice@example.com
+To: bob@example.com
+Subject: Hello
+
+这是一封通过telnet发送的邮件。
+.                             # 单独一行的点号表示结束
+QUIT                          # 关闭连接
+```
+
+### 使用 Python smtplib 直接发送 SMTP 命令
+
+```python
+import smtplib
+
+def send_raw_smtp():
+    """直接使用SMTP命令发送邮件（理解协议过程）"""
+    # 连接 SMTP 服务器的 25 端口
+    server = smtplib.SMTP('localhost', 25)
+    server.set_debuglevel(1)  # 开启调试，可以看到SMTP交互过程
+
+    # SMTP 握手过程
+    server.ehlo('client.example.com')           # HELO/EHLO
+    server.sendmail(
+        'alice@localhost',
+        'bob@localhost',
+        'Subject: SMTP测试\r\n'
+        '\r\n'
+        '直接使用SMTP命令发送邮件。'
+    )
+    server.quit()                                # QUIT 关闭连接
+
+send_raw_smtp()
+```
+
 ## 协议关联
 
 - **SMTP与TCP**：SMTP使用TCP的可靠传输，端口25

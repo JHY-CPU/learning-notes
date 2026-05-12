@@ -113,3 +113,130 @@ $$\text{若算法是栈式的，则} \ m \ \text{个物理块的工作集} \subs
 - 与 OPT、LRU 对比：FIFO 性能最差且有 Belady 异常，是被"批评"最多的算法。
 - 与 55 置换范围：全局置换下更容易出现类似 Belady 的异常行为。
 - 408 常见陷阱：给出序列要求判断某算法是否存在 Belady 异常（答：只有 FIFO 存在）。
+
+## 代码实现
+
+### FIFO 与 LRU 页面置换算法模拟
+
+```c
+#include <stdio.h>
+#include <stdbool.h>
+
+/*
+ * 实现 FIFO 和 LRU 页面置换算法，
+ * 并验证 Belady 异常（FIFO 独有）
+ */
+
+#define MAX_FRAMES 8
+#define MAX_SEQ 100
+
+/* FIFO 算法 */
+int fifo(int pages[], int n, int frame_count) {
+    int frames[MAX_FRAMES];
+    int faults = 0;
+    int head = 0;  /* 队头指针：最早进入的页面位置 */
+
+    for (int i = 0; i < frame_count; i++) frames[i] = -1;
+
+    printf("FIFO 算法（%d 个页框）:\n", frame_count);
+    for (int i = 0; i < n; i++) {
+        bool hit = false;
+        /* 检查是否命中 */
+        for (int j = 0; j < frame_count; j++) {
+            if (frames[j] == pages[i]) { hit = true; break; }
+        }
+        if (!hit) {
+            faults++;
+            frames[head] = pages[i];
+            head = (head + 1) % frame_count;  /* 循环队列 */
+        }
+        /* 打印当前状态 */
+        printf("  访问 %d: [", pages[i]);
+        for (int j = 0; j < frame_count; j++) {
+            printf("%s%d", j ? "," : "", frames[j]);
+        }
+        printf("] %s\n", hit ? "命中" : "缺页");
+    }
+    printf("  总缺页次数: %d\n\n", faults);
+    return faults;
+}
+
+/* LRU 算法 */
+int lru(int pages[], int n, int frame_count) {
+    int frames[MAX_FRAMES];
+    int last_used[MAX_FRAMES];  /* 每个页框中页面的最后使用时间 */
+    int faults = 0;
+
+    for (int i = 0; i < frame_count; i++) {
+        frames[i] = -1;
+        last_used[i] = 0;
+    }
+
+    printf("LRU 算法（%d 个页框）:\n", frame_count);
+    for (int i = 0; i < n; i++) {
+        bool hit = false;
+        for (int j = 0; j < frame_count; j++) {
+            if (frames[j] == pages[i]) {
+                hit = true;
+                last_used[j] = i;  /* 更新最后使用时间 */
+                break;
+            }
+        }
+        if (!hit) {
+            faults++;
+            /* 找空闲页框或淘汰 LRU 页面 */
+            int victim = -1;
+            for (int j = 0; j < frame_count; j++) {
+                if (frames[j] == -1) { victim = j; break; }
+            }
+            if (victim == -1) {
+                int oldest = i;
+                for (int j = 0; j < frame_count; j++) {
+                    if (last_used[j] < oldest) {
+                        oldest = last_used[j];
+                        victim = j;
+                    }
+                }
+            }
+            frames[victim] = pages[i];
+            last_used[victim] = i;
+        }
+        printf("  访问 %d: [", pages[i]);
+        for (int j = 0; j < frame_count; j++)
+            printf("%s%d", j ? "," : "", frames[j]);
+        printf("] %s\n", hit ? "命中" : "缺页");
+    }
+    printf("  总缺页次数: %d\n\n", faults);
+    return faults;
+}
+
+int main() {
+    /* 经典 Belady 序列 */
+    int belady_seq[] = {1, 2, 3, 4, 1, 2, 5, 1, 2, 3, 4, 5};
+    int n = 12;
+
+    printf("=== Belady 异常验证 ===\n");
+    printf("访问序列: ");
+    for (int i = 0; i < n; i++) printf("%d ", belady_seq[i]);
+    printf("\n\n");
+
+    int f3 = fifo(belady_seq, n, 3);
+    int f4 = fifo(belady_seq, n, 4);
+
+    printf("=== Belady 异常检查 ===\n");
+    if (f4 > f3) {
+        printf("检测到 Belady 异常！\n");
+        printf("3 个页框缺页 %d 次，4 个页框缺页 %d 次\n", f3, f4);
+        printf("页框数增加，缺页次数反而增加！\n\n");
+    }
+
+    /* LRU 不会有 Belady 异常 */
+    printf("=== LRU 算法验证（无 Belady 异常）===\n");
+    int l3 = lru(belady_seq, n, 3);
+    int l4 = lru(belady_seq, n, 4);
+    printf("LRU: 3 页框缺页 %d 次，4 页框缺页 %d 次\n", l3, l4);
+    printf("LRU 是栈式算法，不会出现 Belady 异常\n");
+
+    return 0;
+}
+```

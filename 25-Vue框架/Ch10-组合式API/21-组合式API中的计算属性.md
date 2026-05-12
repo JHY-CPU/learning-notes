@@ -77,3 +77,79 @@ console.log(firstName.value)  // 'Jane'
 3. 不要在getter中产生副作用（修改其他状态、异步操作）
 4. 计算属性是只读的（除非定义setter）
 5. 计算属性可以依赖其他计算属性，形成链式关系
+
+## 四、在 Composable 中使用 computed
+
+```js
+import { ref, computed } from 'vue'
+
+export function useShoppingCart() {
+  const items = ref([])
+
+  const totalPrice = computed(() =>
+    items.value.reduce((sum, item) => sum + item.price * item.quantity, 0)
+  )
+
+  const discountedPrice = computed(() =>
+    totalPrice.value > 200 ? totalPrice.value * 0.9 : totalPrice.value
+  )
+
+  const itemCount = computed(() =>
+    items.value.reduce((sum, item) => sum + item.quantity, 0)
+  )
+
+  function addItem(item) {
+    const existing = items.value.find(i => i.id === item.id)
+    if (existing) {
+      existing.quantity++
+    } else {
+      items.value.push({ ...item, quantity: 1 })
+    }
+  }
+
+  return { items, totalPrice, discountedPrice, itemCount, addItem }
+}
+```
+
+## 五、computed 的调试
+
+```js
+import { ref, computed } from 'vue'
+
+const count = ref(0)
+
+// 使用 getter 追踪
+const doubled = computed(() => {
+  const result = count.value * 2
+  console.log(`[computed] ${count.value} * 2 = ${result}`)
+  return result
+})
+
+// 使用 onTrack/onTrigger（开发工具）
+const tracked = computed({
+  get() { return count.value * 2 },
+  onTrack(e) {
+    console.log('依赖被追踪:', e)
+  },
+  onTrigger(e) {
+    console.log('计算被触发:', e)
+  }
+})
+```
+
+## 六、computed 的注意事项
+
+```js
+// ❌ 不要在 computed 中产生副作用
+const bad = computed(() => {
+  saveToServer(count.value)  // 副作用！
+  return count.value * 2
+})
+
+// ❌ 不要让 computed 依赖非响应式数据
+let localCount = 0
+const bad2 = computed(() => localCount * 2)  // 不会更新
+
+// ✅ 正确的 computed
+const good = computed(() => count.value * 2)
+```

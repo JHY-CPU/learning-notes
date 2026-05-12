@@ -104,5 +104,75 @@ $$\text{AMAT} = t_h + m \times t_p$$
 ### 408考点
 
 - 选择题：增大某个因素对性能的影响方向
+## 代码/模拟
+
+### Python计算Cache性能指标
+
+```python
+"""Cache性能分析计算 - 适用于408考研复习"""
+
+def amat(hit_time, miss_rate, miss_penalty):
+    """
+    计算平均访存时间 AMAT = HitTime + MissRate × MissPenalty
+    """
+    return hit_time + miss_rate * miss_penalty
+
+def cache_performance_analysis():
+    """Cache性能五大因素分析"""
+
+    print("=== AMAT基本公式 ===")
+    print("AMAT = HitTime + MissRate × MissPenalty\n")
+
+    # 示例计算
+    print("=== 示例: L1 Cache ===")
+    ht = 1       # 命中时间 1ns
+    mr = 0.05    # 缺失率 5%
+    mp = 50      # 缺失代价 50ns
+    result = amat(ht, mr, mp)
+    print(f"  HitTime={ht}ns, MissRate={mr:.1%}, MissPenalty={mp}ns")
+    print(f"  AMAT = {ht} + {mr:.2%} × {mp} = {result:.2f}ns\n")
+
+    # 两级Cache分析
+    print("=== 两级Cache的AMAT ===")
+    ht_l1 = 1; mr_l1 = 0.05;  # L1
+    ht_l2 = 10; mr_l2 = 0.20;  # L2 (L1缺失时访问)
+    mp_mem = 100                # 主存访问
+
+    amat_l2 = ht_l2 + mr_l2 * mp_mem
+    amat_total = ht_l1 + mr_l1 * amat_l2
+    print(f"  L1: HitTime={ht_l1}ns, MissRate={mr_l1:.1%}")
+    print(f"  L2: HitTime={ht_l2}ns, MissRate={mr_l2:.1%}")
+    print(f"  主存MissPenalty={mp_mem}ns")
+    print(f"  AMAT(L2) = {ht_l2} + {mr_l2:.1%} × {mp_mem} = {amat_l2:.1f}ns")
+    print(f"  AMAT(总) = {ht_l1} + {mr_l1:.1%} × {amat_l2:.1f} = {amat_total:.2f}ns\n")
+
+    # 因素影响分析
+    print("=== 各因素影响方向 ===")
+    factors = [
+        ("增大Cache容量", "命中率↑", "命中时间↑", "AMAT可能↓"),
+        ("增大块大小",   "缺失率↓(先)", "缺失代价↑", "有最优值"),
+        ("提高相联度",   "缺失率↓",    "命中时间↑", "有最优值"),
+        ("使用LRU",      "缺失率↓",    "硬件复杂度↑", "AMAT↓"),
+        ("使用写回法",   "写速度↑",    "一致性复杂",  "AMAT↓"),
+    ]
+    print(f"{'因素':<15} {'命中率':<14} {'命中时间/代价':<14} {'AMAT':<10}")
+    print("-" * 55)
+    for f in factors:
+        print(f"{f[0]:<15} {f[1]:<14} {f[2]:<14} {f[3]:<10}")
+
+cache_performance_analysis()
+
+# CPI与Cache的关系
+print("\n=== Cache对CPI的影响 ===")
+base_cpi = 1.0
+lw_sw_ratio = 0.35  # 访存指令比例
+for miss_rate in [0.01, 0.05, 0.10, 0.20]:
+    miss_penalty_cycles = 50  # 缺失代价50周期
+    extra = lw_sw_ratio * miss_rate * miss_penalty_cycles
+    cpi = base_cpi + extra
+    print(f"  MissRate={miss_rate:.0%}: CPI = {base_cpi} + "
+          f"{lw_sw_ratio}×{miss_rate:.0%}×{miss_penalty_cycles} = {cpi:.2f}")
+```
+
 - 综合题：给定参数计算AMAT
 - 分析题：分析为何实际系统选择某种参数配置

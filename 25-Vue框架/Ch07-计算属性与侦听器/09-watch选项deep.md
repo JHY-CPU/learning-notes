@@ -65,3 +65,65 @@ watch(() => largeData.specificField, cb)
 - `ref` 包装的对象需要加 `deep: true` 才能侦听嵌套属性
 - 深度侦听有性能开销，大对象慎用
 - 优先使用 getter 函数精确侦听特定属性，而非深度侦听整个对象
+
+## 四、deep 的性能影响与优化
+
+### 4.1 性能测试对比
+```js
+import { ref, watch } from 'vue'
+
+// 小对象：deep 影响不大
+const smallObj = ref({ name: 'test', value: 42 })
+watch(smallObj, cb, { deep: true })  // OK
+
+// 大对象：deep 有明显开销
+const largeObj = ref({
+  items: Array.from({ length: 10000 }, (_, i) => ({
+    id: i, data: { nested: { value: i } }
+  }))
+})
+// ❌ 深度侦听 10000 个嵌套对象
+watch(largeObj, cb, { deep: true })
+
+// ✅ 只侦听需要的部分
+watch(() => largeObj.value.items.length, cb)
+```
+
+### 4.2 使用 shallowRef 替代
+```vue
+<script setup>
+import { shallowRef, triggerRef } from 'vue'
+
+// shallowRef 不会深度追踪
+const state = shallowRef({ nested: { value: 1 } })
+
+// 修改嵌套属性不会触发更新
+state.value.nested.value = 2  // 不触发
+
+// 需要手动触发
+state.value = { nested: { value: 2 } }  // 触发
+// 或
+triggerRef(state)  // 强制触发
+</script>
+```
+
+### 4.3 自定义深比较
+```vue
+<script setup>
+import { ref, watch } from 'vue'
+
+const config = ref({ theme: 'dark', fontSize: 14 })
+
+// 使用自定义比较函数代替 deep
+watch(config, (newVal, oldVal) => {
+  if (newVal.theme !== oldVal?.theme) {
+    applyTheme(newVal.theme)
+  }
+  if (newVal.fontSize !== oldVal?.fontSize) {
+    applyFontSize(newVal.fontSize)
+  }
+}, {
+  deep: false  // 不用 deep，手动比较
+})
+</script>
+```

@@ -2,7 +2,7 @@
 
 ## 一、概念说明
 
-类型别名（Type Alias）通过 `type` 关键字为任何类型创建新名称。它可以代表原始类型、对象类型、联合类型、交叉类型、元组类型、函数类型等，是 TypeScript 中最灵活的类型定义方式。
+类型别名（Type Alias）通过 `type` 关键字为任何类型创建新名称。它可以代表原始类型、对象类型、联合类型、交叉类型、元组类型、函数类型等，是 TypeScript 中最灵活的类型定义方式。类型别名在 IDE 中显示名称便于理解，但编译时会展开为底层类型。
 
 ## 二、具体用法
 
@@ -68,9 +68,45 @@ console.log(point, range);
 // 输出: [10, 20] [0, 100]
 ```
 
+### 2.5 条件类型别名
+
+```typescript
+// type 的独有能力：条件类型
+type IsString<T> = T extends string ? "yes" : "no";
+
+type A = IsString<string>;  // "yes"
+type B = IsString<number>;  // "no"
+
+// 分布式条件类型
+type ToArray<T> = T extends unknown ? T[] : never;
+type StrOrNumArray = ToArray<string | number>;
+// string[] | number[]
+```
+
+### 2.6 与 interface 的选择指南
+
+```typescript
+// 用 type 定义：联合类型、元组、工具类型
+type Status = "pending" | "active" | "inactive"; // interface 做不到
+type Pair = [string, number];                     // interface 做不到
+type Nullable<T> = T | null;                      // interface 做不到
+
+// 用 interface 定义：可扩展的对象
+interface User {
+  id: number;
+  name: string;
+}
+// 声明合并：自动合并
+interface User {
+  email?: string;
+}
+```
+
 ## 三、注意事项与常见陷阱
 
 1. **`type` 不能声明合并**：同名 `type` 会报重复定义错误
-2. **不能 `implements`**：类不能实现类型别名，只能实现接口
-3. **更灵活**：联合类型、元组类型只能用 `type` 定义
+2. **不能 `implements`**：类不能实现类型别名，只能实现接口（联合类型除外）
+3. **更灵活**：联合类型、元组类型、条件类型只能用 `type` 定义
 4. **调试中显示别名**：IDE 中显示的是别名名称，便于理解
+5. **性能考虑**：复杂递归类型别名可能影响类型检查性能
+6. **映射类型只能用 type**：`type Mapped = { [K in keyof T]: T[K] }` 只能用 `type`

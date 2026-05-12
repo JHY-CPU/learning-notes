@@ -1,7 +1,7 @@
 # 类型状态与Session类型
 
 
-# 类型状态与Session类型
+## 类型状态与Session类型
 
 一、类型状态
 

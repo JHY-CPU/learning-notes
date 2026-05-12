@@ -65,11 +65,38 @@ const store = useMessageStore()
 ```js
 store.$subscribe((mutation, state) => {
   console.log('状态变化:', mutation.type, state)
+  // mutation.type: 'direct' | 'patch object' | 'patch function'
 })
 ```
 
-## 三、注意事项与常见陷阱
+### 2.5 storeToRefs 解构
+```vue
+<script setup>
+import { storeToRefs } from 'pinia'
+import { useMessageStore } from '@/stores/message'
+
+const store = useMessageStore()
+// 解构保持响应式
+const { messages, unread } = storeToRefs(store)
+// 方法可以直接解构
+const { addMessage, clearUnread } = store
+</script>
+```
+
+## 三、常见用例
+
+| 场景 | Store 设计 |
+|------|-----------|
+| 用户认证 | `useAuthStore` |
+| 购物车 | `useCartStore` |
+| 消息通知 | `useNotificationStore` |
+| 全局配置 | `useConfigStore` |
+
+## 四、注意事项与常见陷阱
+
 - Pinia store 中的 ref 会被自动解包，不需要 `.value`
 - 适合跨多个组件共享的状态，局部状态仍用 ref/reactive
 - `$subscribe` 在组件卸载时自动取消，无需手动清理
 - 避免在 store 中存储 UI 状态（如弹窗显隐），保持 store 专注于业务数据
+- 使用 `storeToRefs` 解构 store 避免丢失响应式
+- Pinia 支持多个 store 之间互相引用

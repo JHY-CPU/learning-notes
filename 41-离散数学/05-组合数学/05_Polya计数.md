@@ -1,7 +1,7 @@
 # Polya计数
 
 
-# Polya 计数理论
+## Polya 计数理论
 
 
 离散数学 · 组合数学 · 第5节
@@ -266,5 +266,122 @@ $$
     - 关键公式：N=(1/|G|)Σk^(#循环), 轨道-稳定子定理, 循环指标
     - 适用：离散数学组合数学课程复习与参考
 
+
+## Python实现
+
+### Burnside 引理与 Polya 计数
+
+```python
+from itertools import permutations
+
+def cycle_decomposition(perm):
+    """计算置换的循环分解"""
+    n = len(perm)
+    visited = [False] * n
+    cycles = []
+    for i in range(n):
+        if not visited[i]:
+            cycle = []
+            j = i
+            while not visited[j]:
+                visited[j] = True
+                cycle.append(j)
+                j = perm[j]
+            cycles.append(cycle)
+    return cycles
+
+def burnside_count(group_perms, n_positions, k_colors):
+    """
+    Burnside 引理: N = (1/|G|) Σ |X^g|
+    group_perms: 群元素的置换列表 (每个是位置的排列)
+    """
+    total = 0
+    for perm in group_perms:
+        cycles = cycle_decomposition(perm)
+        # 每个循环内位置必须同色, 共 len(cycles) 个独立选择
+        fixed = k_colors ** len(cycles)
+        total += fixed
+    return total // len(group_perms)
+
+# 示例: 正方形4顶点2色染色 (旋转群 C4)
+print("=== 正方形 4 顶点 2 色染色 (旋转) ===")
+# 顶点编号: 0=左上, 1=右上, 2=右下, 3=左下
+rotations = [
+    [0, 1, 2, 3],  # 恒等 (0°)
+    [3, 0, 1, 2],  # 旋转90°
+    [2, 3, 0, 1],  # 旋转180°
+    [1, 2, 3, 0],  # 旋转270°
+]
+
+print("各旋转的循环分解:")
+for i, perm in enumerate(rotations):
+    cycles = cycle_decomposition(perm)
+    angle = i * 90
+    print(f"  {angle}°: {len(cycles)}个循环 = {cycles}")
+
+result = burnside_count(rotations, 4, 2)
+print(f"不等价染色方案数: {result}")
+
+# 二面体群 D4 (旋转 + 翻转)
+print("\n=== 二面体群 D4 (旋转 + 翻转) ===")
+dihedral = [
+    [0, 1, 2, 3],  # 恒等
+    [3, 0, 1, 2],  # 旋转90°
+    [2, 3, 0, 1],  # 旋转180°
+    [1, 2, 3, 0],  # 旋转270°
+    [1, 0, 3, 2],  # 水平翻转
+    [3, 2, 1, 0],  # 垂直翻转
+    [0, 3, 2, 1],  # 对角翻转
+    [2, 1, 0, 3],  # 反对角翻转
+]
+result_d4 = burnside_count(dihedral, 4, 2)
+print(f"不等价染色方案数 (含翻转): {result_d4}")
+
+# Polya 定理: N = (1/|G|) Σ k^(#循环)
+print("\n=== Polya 定理 ===")
+def polya_count(group_perms, k_colors):
+    total = sum(k_colors ** len(cycle_decomposition(p)) for p in group_perms)
+    return total // len(group_perms)
+
+for k in range(1, 5):
+    n_c4 = polya_count(rotations, k)
+    n_d4 = polya_count(dihedral, k)
+    print(f"  k={k}色: 旋转群 C4 = {n_c4}, 二面体群 D4 = {n_d4}")
+
+# 循环指标多项式
+print("\n=== 循环指标 ===")
+print("正方形旋转群 C4:")
+print("  P_G = (1/4)(z1^4 + 2*z4 + z2^2)")
+print("  k=2: (16 + 4 + 4)/4 = 6 ✓")
+print("二面体群 D4:")
+print("  P_G = (1/8)(z1^4 + 2*z4 + 3*z2^2 + 2*z1^2*z2)")
+print("  k=2: (16 + 4 + 12 + 8)/8 = 5")
+```
+
+### 项链问题
+
+```python
+def necklace_count(n_beads, k_colors):
+    """项链染色 (旋转+翻转, 二面体群 Dn)"""
+    # 旋转
+    rotations = []
+    for r in range(n_beads):
+        perm = [(i + r) % n_beads for i in range(n_beads)]
+        rotations.append(perm)
+
+    # 翻转
+    reflections = []
+    for axis in range(n_beads):
+        perm = [(axis - i) % n_beads for i in range(n_beads)]
+        reflections.append(perm)
+
+    dihedral = rotations + reflections
+    return polya_count(dihedral, k_colors)
+
+print("=== 项链染色 ===")
+for n, k in [(4, 2), (4, 3), (6, 2), (6, 3)]:
+    count = necklace_count(n, k)
+    print(f"  {n}颗珠子{k}种颜色: {count}种不等价项链")
+```
 
 <!-- Converted from: 05_Polya计数.html -->

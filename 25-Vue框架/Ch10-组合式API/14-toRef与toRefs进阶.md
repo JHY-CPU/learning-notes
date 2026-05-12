@@ -80,3 +80,72 @@ const { name, age } = useUser()  // 保持响应式
 3. `toRefs`只处理**一层**属性，嵌套对象的属性仍需单独处理
 4. 对`ref`使用`toRef`无意义，它已经是一个独立ref
 5. **模板中解构props**时常用`toRefs`保持响应式：`const { title } = toRefs(props)`
+
+## 四、toRef 的特殊行为
+
+```js
+import { reactive, toRef } from 'vue'
+
+const state = reactive({ name: '张三' })
+
+// 为不存在的属性创建 ref
+const age = toRef(state, 'age')  // 不报错，值为 undefined
+console.log(age.value)  // undefined
+
+// 修改 age 会同步到 state
+age.value = 25
+console.log(state.age)  // 25
+
+// state 中添加该属性也会同步
+state.age = 30
+console.log(age.value)  // 30
+```
+
+## 五、toRefs 与解构赋值的陷阱
+
+```js
+import { reactive, toRefs } from 'vue'
+
+const state = reactive({
+  user: { name: '张三', age: 20 },
+  count: 0
+})
+
+const { user, count } = toRefs(state)
+
+// count 是 ref，保持响应式
+count.value++  // OK，同步到 state.count
+
+// user 也是 ref，但引用的是原始对象
+// 修改 user.value 的属性不会触发新的响应式追踪
+user.value.name = '李四'  // 修改成功但可能触发问题
+
+// ✅ 正确使用
+const userName = computed(() => user.value.name)
+```
+
+## 六、在组合式函数中的最佳实践
+
+```js
+// ✅ 推荐：返回 ref
+export function useFeature() {
+  const state = reactive({ x: 0, y: 0 })
+  return {
+    x: toRef(state, 'x'),
+    y: toRef(state, 'y')
+  }
+}
+
+// ✅ 推荐：直接返回 ref
+export function useFeature2() {
+  const x = ref(0)
+  const y = ref(0)
+  return { x, y }
+}
+
+// ❌ 不推荐：返回 reactive 然后解构
+export function useFeature3() {
+  const state = reactive({ x: 0, y: 0 })
+  return state  // 调用方解构后丢失响应式
+}
+```

@@ -63,3 +63,46 @@ const dynamicData = ref('会变化的数据')
 - 适用于纯静态内容：Logo、页脚、固定文案等
 - 与 computed 的区别：computed 是缓存值，v-once 是缓存 DOM
 - 不要对需要响应式更新的元素使用 v-once
+
+## 四、性能优化场景
+
+### 4.1 复杂静态组件
+```vue
+<template>
+  <!-- 包含大量 DOM 的静态页脚 -->
+  <footer v-once>
+    <div class="footer-links">
+      <a v-for="link in footerLinks" :key="link.id" :href="link.url">
+        {{ link.text }}
+      </a>
+    </div>
+    <div class="copyright">© 2024 Company</div>
+  </footer>
+
+  <!-- 其他动态内容正常更新 -->
+  <main>{{ dynamicContent }}</main>
+</template>
+```
+
+### 4.2 大型列表中的静态行
+```vue
+<template>
+  <tr v-for="item in items" :key="item.id">
+    <!-- 静态列只渲染一次 -->
+    <td v-once>{{ item.createdAt }}</td>
+    <td v-once>{{ item.category }}</td>
+    <!-- 动态列正常更新 -->
+    <td>{{ item.status }}</td>
+    <td>{{ item.count }}</td>
+  </tr>
+</template>
+```
+
+## 五、v-once vs v-memo vs computed
+
+| 特性 | v-once | v-memo | computed |
+|------|--------|--------|----------|
+| 作用对象 | DOM 子树 | DOM 子树 | 数据 |
+| 更新 | 永不 | 条件性 | 依赖变化 |
+| 适用 | 纯静态 | 大列表优化 | 派生数据 |
+| Vue 版本 | 所有 | 3.2+ | 所有 |

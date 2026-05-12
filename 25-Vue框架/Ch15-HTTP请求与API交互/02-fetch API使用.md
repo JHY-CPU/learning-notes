@@ -79,8 +79,70 @@ fetch('/api/data', { signal: controller.signal })
 controller.abort()
 ```
 
+## 四、fetch 封装
+
+```js
+// utils/fetch.js
+async function request(url, options = {}) {
+  const defaultOptions = {
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include'
+  }
+
+  const config = { ...defaultOptions, ...options }
+
+  // 添加 Token
+  const token = localStorage.getItem('token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+
+  const res = await fetch(url, config)
+
+  if (!res.ok) {
+    const error = new Error(`HTTP ${res.status}`)
+    error.status = res.status
+    try {
+      error.data = await res.json()
+    } catch {}
+    throw error
+  }
+
+  const contentType = res.headers.get('content-type')
+  if (contentType?.includes('application/json')) {
+    return res.json()
+  }
+  return res.text()
+}
+
+export const api = {
+  get: (url, params) => {
+    const query = new URLSearchParams(params).toString()
+    return request(query ? `${url}?${query}` : url)
+  },
+  post: (url, data) => request(url, { method: 'POST', body: JSON.stringify(data) }),
+  put: (url, data) => request(url, { method: 'PUT', body: JSON.stringify(data) }),
+  delete: (url) => request(url, { method: 'DELETE' })
+}
+```
+
+## 五、fetch vs Axios 对比
+
+| 特性 | fetch | Axios |
+|------|-------|-------|
+| 安装 | 内置，无需安装 | 需要 npm install |
+| JSON 解析 | 手动 `res.json()` | 自动解析 `res.data` |
+| 错误处理 | 不 reject 4xx/5xx | 4xx/5xx 自动 reject |
+| 拦截器 | 不支持 | 支持请求/响应拦截器 |
+| 请求取消 | AbortController | AbortController |
+| 超时控制 | 需自己实现 | 内置 `timeout` |
+| 进度监听 | 不支持 | 支持上传/下载进度 |
+| 体积 | 0 KB | ~13 KB |
+
 ## 三、注意事项与常见陷阱
 
 - `fetch` **不会**对 HTTP 4xx/5xx 错误抛出异常，必须检查 `res.ok`
 - `fetch` 在网络错误（如断网）时才会 reject
 - 默认不携带 cookie，需要设置 `credentials: 'include'`
+- `res.json()` 和 `res.text()` 都是消耗流的方法，只能调用一次
+- 生产项目建议使用 Axios 或对 fetch 做统一封装

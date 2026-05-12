@@ -166,4 +166,59 @@ $$
 例题1中：η² = 93.33/127.33 = 0.73（大效应，饲料因素解释了73%的变异）
 
 
+## Python实现
+
+### 单因素方差分析
+
+```python
+import numpy as np
+from scipy import stats
+
+np.random.seed(42)
+
+# 三种饲料对动物体重的影响
+feed_A = np.random.normal(50, 5, 10)
+feed_B = np.random.normal(55, 5, 10)
+feed_C = np.random.normal(52, 5, 10)
+
+# 单因素 ANOVA
+F_stat, p_value = stats.f_oneway(feed_A, feed_B, feed_C)
+print(f"=== 单因素 ANOVA ===")
+print(f"组A: 均值={feed_A.mean():.2f}, 方差={feed_A.var():.2f}")
+print(f"组B: 均值={feed_B.mean():.2f}, 方差={feed_B.var():.2f}")
+print(f"组C: 均值={feed_C.mean():.2f}, 方差={feed_C.var():.2f}")
+print(f"F = {F_stat:.4f}, p = {p_value:.4f}")
+print(f"α=0.05 下 {'拒绝' if p_value < 0.05 else '不拒绝'} H0")
+
+# 手动计算 ANOVA 表
+groups = [feed_A, feed_B, feed_C]
+k = len(groups)
+N = sum(len(g) for g in groups)
+grand_mean = np.concatenate(groups).mean()
+
+SSB = sum(len(g) * (g.mean() - grand_mean)**2 for g in groups)
+SSW = sum(np.sum((g - g.mean())**2) for g in groups)
+SST = SSB + SSW
+
+MSB = SSB / (k - 1)
+MSW = SSW / (N - k)
+F_manual = MSB / MSW
+
+print(f"\n=== ANOVA 表 ===")
+print(f"{'来源':<8} {'SS':>10} {'df':>5} {'MS':>10} {'F':>8}")
+print(f"{'组间':<8} {SSB:>10.2f} {k-1:>5} {MSB:>10.2f} {F_manual:>8.2f}")
+print(f"{'组内':<8} {SSW:>10.2f} {N-k:>5} {MSW:>10.2f}")
+print(f"{'总计':<8} {SST:>10.2f} {N-1:>5}")
+
+# 效应量 η²
+eta_squared = SSB / SST
+print(f"\nη² = {eta_squared:.4f}")
+
+# 事后 Tukey HSD (用 scipy)
+from scipy.stats import tukey_hsd
+result = tukey_hsd(feed_A, feed_B, feed_C)
+print(f"\n=== Tukey HSD ===")
+print(result)
+```
+
 <!-- Converted from: 04_方差分析ANOVA.html -->

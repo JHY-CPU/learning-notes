@@ -1,6 +1,6 @@
 # 11 - Trie 字典树实现 (Trie Implementation)
 
-  ## 完整 JavaScript 实现
+## 完整 JavaScript 实现
 
   以下是一个功能完整的 Trie 实现，包含插入、查找、前缀检查、删除和遍历操作：
 
@@ -142,9 +142,10 @@ class Trie {
     }
   }
 }
-  ```
+  
+```
 
-  ## 核心操作详解
+## 核心操作详解
 
   ### 插入操作
 
@@ -161,7 +162,8 @@ Step 4: t.isEnd = true      (标记 t 为单词结尾)
 
 最终:
   root → c → a → t(isEnd=true)
-  ```
+  
+```
 
   ### 删除操作
 
@@ -180,9 +182,10 @@ Step 4: t.isEnd = true      (标记 t 为单词结尾)
 
 最终:
   root → a → n → t(isEnd=true)
-  ```
+  
+```
 
-  ## 交互：完整 Trie 操作演示
+## 交互：完整 Trie 操作演示
 
 
 

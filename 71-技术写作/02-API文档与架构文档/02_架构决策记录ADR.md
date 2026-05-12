@@ -1,7 +1,7 @@
 # 架构决策记录 ADR - 技术写作笔记
 
 
-# 架构决策记录 (ADR - Architecture Decision Record)
+## 架构决策记录 (ADR - Architecture Decision Record)
 
 
 ## 一、什么是 ADR

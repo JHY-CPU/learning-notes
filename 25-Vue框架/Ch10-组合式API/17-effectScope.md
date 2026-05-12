@@ -88,3 +88,65 @@ outerScope.run(() => {
 3. 主要用于库开发和复杂组合式函数
 4. 在组件的setup中通常不需要手动创建scope（Vue自动管理）
 5. 与`getCurrentScope()`配合可获取当前活跃的effect scope
+
+## 四、高级用法
+
+### 4.1 条件性副作用管理
+```vue
+<script setup>
+import { effectScope, ref, watch } from 'vue'
+
+const isEnabled = ref(true)
+let scope = null
+
+function startWatching() {
+  if (scope) return
+  scope = effectScope()
+  scope.run(() => {
+    watch(isEnabled, (val) => {
+      console.log('enabled:', val)
+    })
+  })
+}
+
+function stopWatching() {
+  scope?.stop()
+  scope = null
+}
+</script>
+```
+
+### 4.2 共享 scope 的状态
+```js
+// 创建一个可复用的 scope 工厂
+export function createSharedScope() {
+  const scope = effectScope(true)  // true = detached scope
+
+  return {
+    scope,
+    run(fn) {
+      return scope.run(fn)
+    },
+    stop() {
+      scope.stop()
+    }
+  }
+}
+```
+
+### 4.3 在非 setup 环境中使用
+```js
+import { effectScope, ref, watch } from 'vue'
+
+// 可以在任意地方创建 scope
+const scope = effectScope()
+
+scope.run(() => {
+  const count = ref(0)
+  watch(count, () => console.log('changed'))
+  // 这些副作用受 scope 管理
+})
+
+// 后续清理
+scope.stop()
+```

@@ -62,7 +62,6 @@ const props = defineProps<{
   modelValue: string
   modelModifiers?: { trim?: boolean }
 }>()
-
 const emit = defineEmits(['update:modelValue'])
 
 function onInput(e) {
@@ -73,8 +72,31 @@ function onInput(e) {
 </script>
 ```
 
-## 三、注意事项与常见陷阱
+### 2.5 defineModel（Vue 3.3+）
+```vue
+<script setup>
+const model = defineModel()
+</script>
+
+<template>
+  <input v-model="model" />
+</template>
+```
+
+## 三、常见用例
+
+| 场景 | 实现方式 |
+|------|---------|
+| 自定义输入框 | v-model + input 事件 |
+| 开关组件 | v-model + boolean |
+| 下拉选择器 | v-model + change 事件 |
+| 带格式化的输入 | v-model + 修饰符 |
+
+## 四、注意事项与常见陷阱
+
 - Vue 3.3+ 支持 `defineModel()` 宏简化实现
 - v-model 默认绑定的 prop 名是 `modelValue`
 - 修饰符需要子组件自行处理，不会自动生效
 - 简单表单控件可直接用 v-model，复杂逻辑建议用 computed 包装
+- v-model 不会自动处理复杂对象的深层变更
+- 避免在 v-model 的 setter 中执行异步操作

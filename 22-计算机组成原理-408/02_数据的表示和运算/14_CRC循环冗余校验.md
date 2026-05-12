@@ -122,6 +122,121 @@ CRC就像给信件贴上一个"校验标签"：
 | CRC-16 | $x^{16} + x^{15} + x^2 + 1$ | Modbus通信 |
 | CRC-32 | 多项式 | 以太网、ZIP |
 
+## 代码/模拟
+
+### Python实现CRC编码与检错
+
+```python
+"""CRC循环冗余校验模拟 - 适用于408考研复习"""
+
+def xor_bits(a, b):
+    """模2减法 = 异或（无借位）"""
+    return [x ^ y for x, y in zip(a, b)]
+
+def crc_encode(data_bits, generator_bits):
+    """
+    CRC编码
+    :param data_bits: 数据位列表, 如 [1,1,0,1,0,1,1]
+    :param generator_bits: 生成多项式系数, 如 [1,0,1,1] 对应 x^3+x+1
+    :return: CRC编码 (数据 + 余数)
+    """
+    r = len(generator_bits) - 1  # 生成多项式的次数
+
+    # Step 1: 数据末尾补r个0
+    dividend = data_bits + [0] * r
+
+    # Step 2: 模2除法
+    working = dividend.copy()
+    for i in range(len(data_bits)):
+        if working[i] == 1:
+            # 当前位为1, 做异或
+            for j in range(len(generator_bits)):
+                working[i + j] ^= generator_bits[j]
+
+    # 余数在最后r位
+    remainder = working[-r:]
+    codeword = data_bits + remainder
+
+    return codeword, remainder
+
+def crc_check(received_bits, generator_bits):
+    """CRC检错: 重新做模2除法, 余数为0则无错"""
+    r = len(generator_bits) - 1
+    working = received_bits.copy()
+
+    for i in range(len(received_bits) - r):
+        if working[i] == 1:
+            for j in range(len(generator_bits)):
+                working[i + j] ^= generator_bits[j]
+
+    remainder = working[-r:]
+    return all(b == 0 for b in remainder), remainder
+
+# 笔记中的示例: 数据1101011, 生成多项式1011 (x^3+x+1)
+print("=== CRC编码示例 ===")
+data = [1, 1, 0, 1, 0, 1, 1]
+generator = [1, 0, 1, 1]  # x^3 + x + 1
+
+print(f"数据: {''.join(str(b) for b in data)}")
+print(f"生成多项式: {''.join(str(b) for b in generator)} (x^3+x+1)")
+
+# 编码
+codeword, remainder = crc_encode(data, generator)
+print(f"余数: {''.join(str(b) for b in remainder)}")
+print(f"CRC编码: {''.join(str(b) for b in codeword)}")
+
+# 检错验证
+valid, rem = crc_check(codeword, generator)
+print(f"\n验证(无错误): 余数={''.join(str(b) for b in rem)}, "
+      f"{'无错 ✓' if valid else '有错 ✗'}")
+
+# 模拟1位错误
+corrupted = codeword.copy()
+corrupted[3] = 1 - corrupted[3]  # 翻转一位
+valid2, rem2 = crc_check(corrupted, generator)
+print(f"验证(1位错误): 余数={''.join(str(b) for b in rem2)}, "
+      f"{'无错 ✓' if valid2 else '有错 ✗'}")
+
+# 模拟2位错误
+corrupted2 = codeword.copy()
+corrupted2[2] = 1 - corrupted2[2]
+corrupted2[5] = 1 - corrupted2[5]
+valid3, rem3 = crc_check(corrupted2, generator)
+print(f"验证(2位错误): 余数={''.join(str(b) for b in rem3)}, "
+      f"{'无错 ✓' if valid3 else '有错 ✗'}")
+```
+
+### 手动模2除法过程演示
+
+```python
+def crc_step_by_step(data, generator):
+    """逐步展示模2除法过程"""
+    r = len(generator) - 1
+    dividend = data + [0] * r
+    working = dividend.copy()
+
+    print(f"数据: {''.join(str(b) for b in data)}, 补{r}个0")
+    print(f"生成多项式: {''.join(str(b) for b in generator)}")
+    print(f"被除数: {''.join(str(b) for b in dividend)}\n")
+
+    for i in range(len(data)):
+        if working[i] == 1:
+            old = working[i:i+len(generator)]
+            result = xor_bits(old, generator)
+            working[i:i+len(generator)] = result
+            print(f"第{i+1}步: 商1, 异或{''.join(str(b) for b in generator)}"
+                  f" → {''.join(str(b) for b in working)}")
+        else:
+            print(f"第{i+1}步: 商0, 不做操作")
+
+    remainder = working[-r:]
+    print(f"\n余数 = {''.join(str(b) for b in remainder)}")
+    return data + remainder
+
+print("\n=== 手动模2除法过程 ===")
+crc_step_by_step([1,1,0,1,0,1,1], [1,0,1,1])
+```
+
 ### 408考试要点
 - 模2除法的正确执行（最核心技能）
 - 补零数量 = 生成多项式次数（最高次幂）

@@ -14,13 +14,10 @@ const time = ref(0)
 let timer = null
 
 onMounted(() => {
-  timer = setInterval(() => {
-    time.value++
-  }, 1000)
+  timer = setInterval(() => { time.value++ }, 1000)
 })
 
 onBeforeUnmount(() => {
-  // 必须清理，否则内存泄漏
   clearInterval(timer)
   timer = null
 })
@@ -66,8 +63,41 @@ onBeforeUnmount(() => {
 </script>
 ```
 
+### 2.4 关闭 WebSocket 连接
+```vue
+<script setup>
+import { onMounted, onBeforeUnmount } from 'vue'
+
+let ws = null
+
+onMounted(() => {
+  ws = new WebSocket('wss://example.com')
+  ws.onmessage = (e) => console.log(e.data)
+})
+
+onBeforeUnmount(() => {
+  if (ws) { ws.close(); ws = null }
+})
+</script>
+```
+
 ## 三、注意事项与常见陷阱
 - 所有 `addEventListener`、`setInterval`、`setTimeout` 都应在此清理
 - 第三方库创建的实例需要调用其 `destroy`/`dispose` 方法
 - WebSocket 连接应在此阶段关闭
 - 此钩子中组件仍可正常访问，可以读取最终状态
+- 使用 AbortController 取消未完成的 fetch 请求
+
+## 四、清理清单
+
+```
+onBeforeUnmount 清理清单：
+  [ ] clearInterval / clearTimeout
+  [ ] removeEventListener
+  [ ] ws.close()
+  [ ] chart.destroy()
+  [ ] abortController.abort()
+  [ ] observer.disconnect()  // IntersectionObserver, MutationObserver
+  [ ] editor.dispose()       // Monaco Editor, CodeMirror 等
+  [ ] map.remove()           // 地图库
+```

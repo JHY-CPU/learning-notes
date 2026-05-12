@@ -83,3 +83,69 @@ const slotName = ref('header')
 - 默认插槽的内容不能同时使用缩写和具名插槽语法
 - 动态插槽名用方括号：`#[dynamicName]`
 - 作用域插槽使子组件成为"渲染器"
+
+## 四、v-slot 的完整语法
+
+```
+v-slot:slotName="slotProps"
+  │        │         │
+  │        │         └── 插槽作用域数据（可解构）
+  │        └── 插槽名
+  └── 指令
+
+简写: #slotName="slotProps"
+```
+
+## 五、实际场景
+
+### 5.1 数据表格组件
+```vue
+<!-- Table.vue -->
+<template>
+  <table>
+    <thead>
+      <tr>
+        <th v-for="col in columns" :key="col.key">{{ col.label }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr v-for="(row, rowIndex) in data" :key="row.id">
+        <td v-for="col in columns" :key="col.key">
+          <slot :name="`cell-${col.key}`" :row="row" :value="row[col.key]" :index="rowIndex">
+            {{ row[col.key] }}  <!-- 默认渲染 -->
+          </slot>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</template>
+```
+
+```vue
+<!-- 使用 -->
+<template>
+  <Table :columns="cols" :data="users">
+    <template #cell-name="{ row, value }">
+      <strong>{{ value }}</strong>
+    </template>
+    <template #cell-status="{ value }">
+      <span :class="`status-${value}`">{{ statusLabels[value] }}</span>
+    </template>
+    <!-- 其他列使用默认渲染 -->
+  </Table>
+</template>
+```
+
+### 5.2 条件插槽
+```vue
+<template>
+  <Card>
+    <template v-if="showHeader" #header>
+      <h2>{{ title }}</h2>
+    </template>
+    <template #default>
+      <p>内容</p>
+    </template>
+  </Card>
+</template>
+```

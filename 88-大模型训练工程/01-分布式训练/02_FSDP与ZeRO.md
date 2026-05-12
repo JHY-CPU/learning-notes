@@ -3,7 +3,7 @@
 *完全分片数据并行：ZeRO 三个阶段与 PyTorch FSDP 实战*
 
 
-# FSDP 与 ZeRO
+## FSDP 与 ZeRO
 
 
 完全分片数据并行：ZeRO 三个阶段与 PyTorch FSDP 实战

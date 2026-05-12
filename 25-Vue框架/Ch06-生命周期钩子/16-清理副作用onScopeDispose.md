@@ -8,17 +8,16 @@
 ### 2.1 基本用法
 ```vue
 <script setup>
-import { onScopeDispose, effectScope } from 'vue'
+import { onScopeDispose, effectScope, watch } from 'vue'
 
 const scope = effectScope()
+const someRef = ref(0)
 
 scope.run(() => {
-  // 在 scope 内创建的响应式副作用
   watch(someRef, () => { /* ... */ })
 })
 
 onScopeDispose(() => {
-  // scope 销毁时清理
   scope.stop()
   console.log('effect scope 已清理')
 })
@@ -41,7 +40,6 @@ export function useMouse() {
 
   window.addEventListener('mousemove', update)
 
-  // 组件卸载或 scope 销毁时自动清理
   onScopeDispose(() => {
     window.removeEventListener('mousemove', update)
   })
@@ -58,10 +56,30 @@ export function useMouse() {
 export function useTimer() {
   const timer = setInterval(() => {}, 1000)
 
-  // ✅ 可以在 composable 中使用
+  // 可以在 composable 中使用
   onScopeDispose(() => clearInterval(timer))
 
-  // ❌ onUnmounted 在 setup 外不可用
+  // onUnmounted 在 setup 外不可用
+}
+```
+
+### 2.4 effectScope 管理多个副作用
+```js
+import { effectScope, watch, computed, onScopeDispose } from 'vue'
+
+export function useDashboard() {
+  const scope = effectScope()
+
+  scope.run(() => {
+    const doubled = computed(() => count.value * 2)
+    watch(count, () => updateChart())
+    // 所有副作用都在 scope 内
+  })
+
+  // 一次性清理所有副作用
+  onScopeDispose(() => scope.stop())
+
+  return { doubled }
 }
 ```
 
@@ -70,3 +88,11 @@ export function useTimer() {
 - 如果 effect scope 被手动停止，`onScopeDispose` 回调会立即执行
 - 推荐在 composable 中使用 `onScopeDispose` 而非 `onUnmounted`
 - 与 VueUse 库的清理机制一致
+
+## 四、选择指南
+
+| 场景 | 使用 |
+| --- | --- |
+| 在组件 `<script setup>` 中清理 | `onBeforeUnmount` |
+| 在 composable 函数中清理 | `onScopeDispose` |
+| 手动管理 effect scope | `scope.stop()` + `onScopeDispose` |

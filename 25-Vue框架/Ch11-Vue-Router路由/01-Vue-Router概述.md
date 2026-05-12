@@ -69,3 +69,91 @@ src/
 3. Hash模式无需服务器配置，但URL带有`#`
 4. 路由组件应放在`views/`目录，普通组件放在`components/`
 5. 每个路由映射一个组件，组件在路由切换时被销毁/重建
+
+## 四、完整项目结构示例
+
+```
+src/
+  router/
+    index.js          # 路由主配置
+    guards.js         # 路由守卫
+    modules/          # 按模块拆分路由
+      admin.js
+      user.js
+  views/
+    Home.vue
+    About.vue
+    user/
+      Profile.vue
+      Settings.vue
+    admin/
+      Dashboard.vue
+  components/         # 非路由组件
+    Header.vue
+    Footer.vue
+```
+
+```js
+// router/index.js
+import { createRouter, createWebHistory } from 'vue-router'
+
+const router = createRouter({
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes: [
+    {
+      path: '/',
+      component: () => import('@/views/Home.vue'),
+      meta: { title: '首页' }
+    },
+    {
+      path: '/about',
+      component: () => import('@/views/About.vue'),
+      meta: { title: '关于' }
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      component: () => import('@/views/NotFound.vue'),
+      meta: { title: '404' }
+    }
+  ],
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    return { top: 0 }
+  }
+})
+
+// 页面标题
+router.afterEach((to) => {
+  document.title = to.meta.title ? `${to.meta.title} - My App` : 'My App'
+})
+
+export default router
+```
+
+## 五、路由模式的选择
+
+| 场景 | 推荐模式 | 原因 |
+|------|---------|------|
+| 生产环境 | History | URL 美观，SEO 友好 |
+| 无服务器配置 | Hash | 无需 fallback |
+| SSR | Memory | 服务端无浏览器环境 |
+| 开发环境 | History | Vite 默认支持 |
+
+## 六、服务器配置（History 模式）
+
+```nginx
+# Nginx
+location / {
+  try_files $uri $uri/ /index.html;
+}
+```
+
+```js
+// Apache (.htaccess)
+// RewriteEngine On
+// RewriteBase /
+// RewriteRule ^index\.html$ - [L]
+// RewriteCond %{REQUEST_FILENAME} !-f
+// RewriteCond %{REQUEST_FILENAME} !-d
+// RewriteRule . /index.html [L]
+```

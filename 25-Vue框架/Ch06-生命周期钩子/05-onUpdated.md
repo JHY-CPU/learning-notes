@@ -50,3 +50,33 @@ onUpdated(() => {
 - 子组件的 `onUpdated` 先于父组件执行
 - 此钩子在服务端渲染中不会被调用
 - 如果需要在更新后执行操作，优先使用 `watch` + `nextTick`
+
+## 四、与 nextTick 的对比
+
+```vue
+<script setup>
+import { ref, onUpdated, nextTick, watch } from 'vue'
+
+const items = ref([])
+
+// 方式 1：onUpdated（每次更新都执行）
+onUpdated(() => {
+  console.log('DOM 更新了')
+})
+
+// 方式 2：watch + nextTick（只有 items 变化时执行）
+watch(items, async () => {
+  await nextTick()
+  console.log('items 更新后的 DOM')
+})
+</script>
+```
+
+## 五、实际使用场景
+
+| 场景 | 说明 |
+| --- | --- |
+| 聊天自动滚动 | 新消息后滚动到底部 |
+| 列表高度测量 | 列表变化后重新计算高度 |
+| 第三方库刷新 | 数据变化后通知库重新渲染 |
+| 动画触发 | 列表增删后的入场/出场动画 |

@@ -79,3 +79,91 @@ EXEC
 3. **无原子性**：Pipeline不保证原子性
 4. **返回顺序**：结果按命令发送顺序返回
 5. **错误处理**：部分命令失败不影响其他命令执行
+
+## 五、各语言Pipeline示例
+
+### Java (Lettuce)
+
+```java
+RedisClient client = RedisClient.create("redis://localhost");
+StatefulRedisConnection<String, String> connection = client.connect();
+RedisCommands<String, String> commands = connection.sync();
+
+// Pipeline批处理
+List<RedisFuture<?>> futures = new ArrayList<>();
+connection.setAutoFlushCommands(false);
+
+for (int i = 0; i < 1000; i++) {
+    futures.add(asyncCommands.set("key:" + i, "value:" + i));
+}
+
+connection.flushCommands();
+RedisFutures.awaitAll(futures);
+```
+
+### Go (go-redis)
+
+```go
+pipe := rdb.Pipeline()
+
+for i := 0; i < 1000; i++ {
+    pipe.Set(ctx, fmt.Sprintf("key:%d", i), fmt.Sprintf("value:%d", i), 0)
+}
+
+cmds, err := pipe.Exec(ctx)
+if err != nil {
+    log.Fatal(err)
+}
+
+for _, cmd := range cmds {
+    fmt.Println(cmd)
+}
+```
+
+### Node.js (ioredis)
+
+```javascript
+const pipeline = redis.pipeline();
+
+// 批量设置
+for (let i = 0; i < 1000; i++) {
+    pipeline.set(`key:${i}`, `value:${i}`);
+}
+
+// 批量获取
+for (let i = 0; i < 1000; i++) {
+    pipeline.get(`key:${i}`);
+}
+
+const results = await pipeline.exec();
+// results: [[null, 'OK'], [null, 'OK'], ..., [null, 'value:0'], ...]
+```
+
+## 六、Pipeline最佳实践
+
+```bash
+# 1. 批量大小选择
+# 太小（<10）：网络开销减少不明显
+# 太大（>1000）：客户端内存占用增加
+# 推荐：100-500个命令
+
+# 2. 内存控制
+# Pipeline命令会缓存在客户端
+# 1000个SET命令约占用几MB内存
+# 需要根据Value大小调整
+
+# 3. 错误处理
+results = pipe.execute()
+for i, result in enumerate(results):
+    if isinstance(result, Exception):
+        print(f"命令 {i} 失败: {result}")
+
+# 4. 超时设置
+# Pipeline执行时间 = 所有命令中最慢的那个
+# 设置合理的socket_timeout
+
+# 5. 监控Pipeline效果
+# 对比Pipeline前后的QPS和延迟
+redis-benchmark -t set -n 100000
+redis-benchmark -t set -n 100000 -P 100
+```

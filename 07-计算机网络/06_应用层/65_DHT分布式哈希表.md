@@ -61,9 +61,48 @@
 - Kademlia = "XOR距离 + K桶"
 - 查找复杂度 = O(log N)
 
+### DHT与Tracker对比
+
+| 特性 | Tracker | DHT |
+|------|---------|-----|
+| 中心化 | 是（中心服务器） | 否（去中心化） |
+| 健壮性 | 低（单点故障） | 高（无单点） |
+| 查找效率 | O(1) | O(log N) |
+| 隐私性 | 低（Tracker知道所有节点） | 高（只知道邻居） |
+| 维护成本 | 低 | 高（路由表维护） |
+
+### 其他DHT实现
+
+| 协议 | 距离度量 | 路由表 | 特点 |
+|------|----------|--------|------|
+| Kademlia | XOR | K桶 | 最常用，BT/eMule |
+| Chord | 环形距离 | 指指针表 | 简单直观 |
+| Pastry | 前缀匹配 | 叶子集+路由集 | 局部性好 |
+| CAN | 多维空间 | 邻居表 | 高维空间 |
+
+### DHT在BitTorrent中的应用
+1. 传统BT：Tracker服务器管理peer列表
+2. 无Tracker模式：纯DHT发现peer
+3. 混合模式：Tracker + DHT同时使用
+4. Magnet链接：通过info_hash在DHT中查找资源
+
+### DHT的局限性
+- 查找效率低于中心化方案（O(log N) vs O(1)）
+- 路由表维护需要持续通信
+- 冷门资源可能难以找到
+- 安全性挑战（Sybil攻击、Eclipse攻击）
+
+### 408常考要点
+- DHT是去中心化的节点发现机制
+- 查找复杂度O(log N)
+- Kademlia使用XOR距离和K桶
+- DHT是Tracker的去中心化替代方案
+- DHT用于BitTorrent、IPFS、区块链等
+
 ## 协议关联
 
 - **DHT与P2P**：DHT是P2P的发现机制
 - **DHT与BitTorrent**：BitTorrent使用DHT替代Tracker
 - **DHT与区块链**：区块链使用DHT进行节点发现
+- **DHT与CDN**：DHT可用于内容定位
 - **408考点**：DHT的基本概念、去中心化特性

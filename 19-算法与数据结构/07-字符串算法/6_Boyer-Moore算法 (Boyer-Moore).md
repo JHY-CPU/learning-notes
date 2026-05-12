@@ -1,6 +1,6 @@
 # 07 - Boyer-Moore 算法 (Boyer-Moore)
 
-  ## 算法思想
+## 算法思想
 
   Boyer-Moore（BM）算法是实践中最高效的字符串匹配算法之一。它的核心思想是：**从右向左**扫描模式串，利用两种启发式规则跳过尽可能多的字符。
 
@@ -19,7 +19,7 @@
 
 
 
-  ## 坏字符规则（Bad Character Rule）
+## 坏字符规则（Bad Character Rule）
 
   当 T[i+j]（文本字符）与 P[j]（模式字符）不匹配时：
 
@@ -45,7 +45,7 @@ function buildBadCharTable(P) {
 }
   ```
 
-  ## 好后缀规则（Good Suffix Rule）
+## 好后缀规则（Good Suffix Rule）
 
   当模式串的后缀 P[j+1..m-1] 已经匹配，但 P[j] 与 T[i+j] 不匹配时：
 
@@ -58,7 +58,7 @@ function buildBadCharTable(P) {
 
 
 
-  ## 完整实现
+## 完整实现
 
 
 ```
@@ -127,7 +127,7 @@ function boyerMoore(text, pattern) {
 }
   ```
 
-  ## 复杂度分析
+## 复杂度分析
 
 
 
@@ -149,6 +149,6 @@ function boyerMoore(text, pattern) {
     **实践中的性能：** 对于英文章节文本，BM 算法通常只需要检查约 n/m 个字符，远快于 KMP。这也是为什么许多文本编辑器的"查找"功能使用 BM 算法或其变体。
 
 
-  ## 交互演示
+## 交互演示
 
   BM 算法匹配演示（带坏字符和好后缀跟踪）：

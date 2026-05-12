@@ -26,7 +26,7 @@
 
 # 尾递归优化
 
-## 什么是尾递归
+# 什么是尾递归
 
 尾递归（Tail Recursion）是指递归调用发生在函数的最后一步（即 return 语句中只有递归调用，没有额外的计算操作）。
 
@@ -41,7 +41,8 @@ function factorial(n) {
 function factorialTail(n, acc = 1) {
     if (n <= 1) return acc;
     return factorialTail(n - 1, n * acc);  // 直接返回递归结果
-}```
+}
+```
 
 ## 尾递归优化（TCO）
 

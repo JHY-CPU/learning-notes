@@ -69,3 +69,112 @@ PUBLISH config:updates "reload"
 3. **阻塞订阅**：SUBSCRIBE会阻塞客户端
 4. **性能影响**：大量订阅者会影响发布性能
 5. **替代方案**：需要可靠消息使用Stream
+
+## 五、Python Pub/Sub示例
+
+```python
+import redis
+import threading
+
+r = redis.Redis()
+
+def subscriber():
+    """订阅者线程"""
+    pubsub = r.pubsub()
+    pubsub.subscribe('notifications')
+
+    for message in pubsub.listen():
+        if message['type'] == 'message':
+            print(f"收到消息: {message['data'].decode()}")
+        elif message['type'] == 'subscribe':
+            print(f"已订阅: {message['channel'].decode()}")
+
+# 启动订阅者
+thread = threading.Thread(target=subscriber, daemon=True)
+thread.start()
+
+# 发布消息
+r.publish('notifications', '系统维护通知')
+r.publish('notifications', '服务已恢复')
+```
+
+### 模式订阅
+
+```python
+pubsub = r.pubsub()
+
+# 订阅多个频道
+pubsub.subscribe('channel1', 'channel2')
+
+# 模式订阅
+pubsub.psubscribe('news:*')
+pubsub.psubscribe('user:*:notifications')
+
+for message in pubsub.listen():
+    if message['type'] == 'pmessage':
+        print(f"频道: {message['channel'].decode()}")
+        print(f"模式: {message['pattern'].decode()}")
+        print(f"消息: {message['data'].decode()}")
+```
+
+## 六、Pub/Sub vs Stream对比
+
+```bash
+# Pub/Sub特点
+# 1. 消息即发即弃，不持久化
+# 2. 不支持消费者组
+# 3. 不支持消息确认
+# 4. 适合实时通知
+
+# Stream特点（Redis 5.0+）
+# 1. 消息持久化
+# 2. 支持消费者组
+# 3. 支持消息确认（ACK）
+# 4. 支持消息回溯
+# 5. 适合可靠消息传递
+
+# 选择建议
+# 实时聊天、通知 → Pub/Sub
+# 任务队列、日志 → Stream
+# 需要消息可靠性 → Stream
+# 简单通知场景 → Pub/Sub
+```
+
+## 七、Node.js Pub/Sub
+
+```javascript
+const Redis = require('ioredis');
+
+const subscriber = new Redis();
+const publisher = new Redis();
+
+// 订阅
+subscriber.subscribe('notifications', (err, count) => {
+    if (err) console.error(err);
+    console.log(`已订阅 ${count} 个频道`);
+});
+
+// 接收消息
+subscriber.on('message', (channel, message) => {
+    console.log(`频道 ${channel}: ${message}`);
+});
+
+// 模式订阅
+subscriber.psubscribe('news:*');
+subscriber.on('pmessage', (pattern, channel, message) => {
+    console.log(`模式 ${pattern}, 频道 ${channel}: ${message}`);
+});
+
+// 发布
+publisher.publish('notifications', 'Hello World');
+```
+
+## 八、生产环境注意事项
+
+```bash
+# 1. 使用Redis Stream替代Pub/Sub处理关键消息
+# 2. Pub/Sub适合实时性要求高但允许丢失的场景
+# 3. 监控订阅者数量，防止消息无人消费
+# 4. 使用TLS加密敏感消息
+# 5. 在Sentinel/Cluster模式下，Pub/Sub可正常工作
+```

@@ -1,7 +1,7 @@
 # Scrum框架详解
 
 
-# Scrum框架详解
+## Scrum框架详解
 
 一、Scrum概述
 

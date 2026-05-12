@@ -63,6 +63,86 @@ pinia.use(({ store }) => {
 })
 ```
 
+## 四、状态重置插件
+
+```js
+// plugins/resetPlugin.js
+export function resetPlugin({ store }) {
+  // 保存初始状态
+  const initialState = JSON.parse(JSON.stringify(store.$state))
+
+  // 添加 $resetAll 方法
+  store.$resetAll = () => {
+    store.$patch(initialState)
+  }
+}
+
+// 使用
+const store = useUserStore()
+store.$resetAll()
+```
+
+## 五、开发调试插件
+
+```js
+// plugins/devtools.js
+export function devtoolsPlugin({ store, app }) {
+  if (!import.meta.env.DEV) return
+
+  // 记录所有状态变化
+  store.$subscribe((mutation, state) => {
+    console.group(`[Pinia] ${mutation.storeId} - ${mutation.type}`)
+    console.log('State:', JSON.parse(JSON.stringify(state)))
+    console.groupEnd()
+  })
+
+  // 记录所有 action 调用
+  store.$onAction(({ name, args, after, onError }) => {
+    const start = Date.now()
+    console.log(`[Action] ${store.$id}.${name}`, args)
+
+    after((result) => {
+      console.log(`[Action] ${store.$id}.${name} 完成 (${Date.now() - start}ms)`)
+    })
+
+    onError((error) => {
+      console.error(`[Action] ${store.$id}.${name} 失败:`, error)
+    })
+  })
+}
+```
+
+## 六、插件工厂函数
+
+```js
+// plugins/persistPlugin.js
+export function createPersistPlugin(options = {}) {
+  const { key = 'pinia', paths = [] } = options
+
+  return ({ store }) => {
+    // 从 localStorage 恢复
+    const saved = localStorage.getItem(`${key}:${store.$id}`)
+    if (saved) {
+      store.$patch(JSON.parse(saved))
+    }
+
+    // 订阅变化并保存
+    store.$subscribe((mutation, state) => {
+      const toSave = paths.length
+        ? Object.fromEntries(paths.map(p => [p, state[p]]))
+        : state
+      localStorage.setItem(`${key}:${store.$id}`, JSON.stringify(toSave))
+    })
+  }
+}
+
+// 使用
+pinia.use(createPersistPlugin({
+  key: 'myapp',
+  paths: ['token', 'theme']  // 只持久化指定字段
+}))
+```
+
 ## 三、注意事项与常见陷阱
 
 1. 插件在`app.use(pinia)`之前注册
@@ -70,3 +150,5 @@ pinia.use(({ store }) => {
 3. 插件添加的属性需在TypeScript中声明扩展类型
 4. 避免在插件中产生副作用导致无限循环
 5. 复杂插件考虑封装为工厂函数接受配置
+6. `$subscribe`的`detached: true`确保组件卸载后仍然监听
+7. 持久化插件只保存指定字段，避免存储不必要的数据

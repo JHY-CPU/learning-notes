@@ -2,28 +2,16 @@
 
 *从CRNN到PaddleOCR — 光学字符识别技术全解析*
 
+## 一、OCR 概述
 
 **OCR（Optical Character Recognition，光学字符识别）**是将图像中的文字转换为可编辑文本的技术。现代OCR系统通常分为两个阶段：
 
-输入图像
-→
-文字检测
-(Text Detection)
-→
-文字识别
-(Text Recognition)
-→
-输出文本
+输入图像 → 文字检测(Text Detection) → 文字识别(Text Recognition) → 输出文本
 
-- **文字检测**
-   ：定位图像中文字区域的位置（边界框或多边形）
-- **文字识别**
-   ：将裁剪出的文字图像转为文本序列
-- 端到端方法可同时完成检测和识别
-
+- **文字检测**：定位图像中文字区域的位置（边界框或多边形）
+- **文字识别**：将裁剪出的文字图像转为文本序列
 
 ### OCR的挑战
-
 
 | 挑战 | 说明 |
 | --- | --- |
@@ -33,81 +21,30 @@
 | 低质量 | 模糊、遮挡、低分辨率 |
 | 版面复杂 | 表格、多栏、竖排文字 |
 
+## 二、文字检测方法
 
-### 2.1 基于分割的检测
+### 基于分割的检测
 
+- **PSENet**：从文字核心区域逐步扩展，分离相邻文本
+- **DBNet（Differentiable Binarization）**：可微分二值化，端到端学习阈值
 
-将文字检测视为像素级分割问题，预测每个像素是否属于文字区域：
+### 基于回归的检测
 
+- **EAST**：直接回归文字框的四角坐标或旋转框
+- **CRAFT**：检测文字的字符级区域和亲和力，擅长弯曲文字
 
-- **语义分割**
-   ：使用FCN、U-Net等网络输出文字/非文字mask
-- **PSENet（Progressive Scale Expansion Network）**
-   ：从文字核心区域逐步扩展，分离相邻文本
-- **DBNet（Differentiable Binarization）**
-   ：可微分二值化，端到端学习阈值
-
-
-> **Note:** **DBNet核心创新：**
-> 传统方法使用固定阈值将概率图二值化，DBNet将二值化过程变为可微分的，让网络自适应学习最佳阈值，显著提升检测精度和速度。
-
-
-### 2.2 基于回归的检测
-
-
-- **EAST（Efficient and Accurate Scene Text detector）**
-   ：直接回归文字框的四角坐标或旋转框
-- **TextBoxes**
-   ：修改SSD的anchor为长条形，适配文字特点
-- **CRAFT**
-   ：检测文字的字符级区域和亲和力，擅长弯曲文字
-
-
-### 3.1 架构
-
+## 三、CRNN 文字识别
 
 CRNN（Convolutional Recurrent Neural Network, 2015）将CNN、RNN和CTC结合，是文字识别的经典架构：
 
-文字图像
-H×W×3
-→
-CNN特征提取
-(VGG/ResNet)
-→
-序列化
-(按列切分)
-→
-BiLSTM
-序列建模
-→
-CTC解码
-输出文本
+文字图像 H×W×3 → CNN特征提取 → 序列化(按列切分) → BiLSTM → CTC解码 → 输出文本
 
-### 3.2 各组件详解
+```python
+import torch.nn as nn
 
-
-**CNN特征提取器：**
-
-
-- 通常使用VGG-like或ResNet浅层网络
-- 将高度H压缩到1，宽度W保留为序列长度
-- 输出特征图: 1×T×C（T为时间步数，C为特征维度）
-
-
-**双向LSTM：**
-
-
-- 捕获上下文依赖关系
-- 2层BiLSTM，隐藏层维度256
-- 输出: T×V（V为字符表大小）
-
-
-```
-# CRNN PyTorch实现
 class CRNN(nn.Module):
     def __init__(self, num_classes):
         super().__init__()
-        # CNN部分
         self.cnn = nn.Sequential(
             nn.Conv2d(1, 64, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2, 2),
             nn.Conv2d(64, 128, 3, padding=1), nn.ReLU(), nn.MaxPool2d(2, 2),
@@ -117,9 +54,7 @@ class CRNN(nn.Module):
             nn.Conv2d(512, 512, 3, padding=1), nn.ReLU(), nn.MaxPool2d((2,1), (2,1)),
             nn.Conv2d(512, 512, 2), nn.BatchNorm2d(512), nn.ReLU(),
         )
-        # RNN部分
         self.rnn = nn.LSTM(512, 256, num_layers=2, bidirectional=True, batch_first=True)
-        # 输出层
         self.fc = nn.Linear(512, num_classes)
 
     def forward(self, x):
@@ -131,70 +66,27 @@ class CRNN(nn.Module):
         return output.permute(1, 0, 2)  # [T, B, num_classes] for CTC
 ```
 
+## 四、CTC 对齐机制
 
-### 4.1 问题
+文字识别面临**对齐问题**：输入序列长度T与输出文本长度不一致。
 
+CTC引入**空白符（blank）**，允许网络在不同时刻输出相同字符：
 
-文字识别面临**对齐问题**：输入序列长度T（特征图宽度）与输出文本长度不一致，且没有明确的字符级对齐标注。
-
-
-### 4.2 CTC（Connectionist Temporal Classification）
-
-
-CTC引入**空白符（blank）**，允许网络在不同时刻输出相同字符，并通过合并规则将输出序列映射为最终文本：
-
-
-- 合并连续重复字符：hh-e-l-l-o → hello
+- 合并连续重复字符：h-h-e-l-l-o → hello
 - 移除空白符：h-blank-e-blank-l-l-o → hello
-- 路径概率 = 所有能映射到目标文本的路径概率之和
-
 
 $$
 L_CTC = -log P(y|x) = -log Σ_{π∈B⁻¹(y)} P(π|x)
 $$
 
-
-```
-# CTC解码示例
-# 路径: "h--ee-ll-lo" → 合并重复 → "heello" → 去blank → "hello"
-# 前向-后向算法高效计算所有路径的概率和
-
-# PyTorch CTC Loss
+```python
 ctc_loss = nn.CTCLoss(blank=0)
 loss = ctc_loss(log_probs, targets, input_lengths, target_lengths)
-# log_probs: [T, B, C] (需要log_softmax)
-# targets: [B, S] (目标序列)
-# input_lengths: [B] (每个样本的输入长度)
-# target_lengths: [B] (每个样本的目标长度)
 ```
 
+## 五、Attention 与现代 OCR
 
-### 5.1 注意力机制在OCR中的应用
-
-
-CTC假设输出之间条件独立，无法建模字符间的依赖关系。**Attention机制**允许解码器在每一步动态关注输入的不同位置：
-
-
-```
-# Encoder-Decoder with Attention
-编码器: CNN → 特征序列 [T, D]
-解码器: 每一步 t:
-  1. 计算注意力权重: α_t = Attention(h_{t-1}, 特征序列)
-  2. 上下文向量: c_t = Σ α_t · 特征序列
-  3. 预测字符: y_t = Decoder(h_{t-1}, y_{t-1}, c_t)
-```
-
-
-### 5.2 SAR（Show, Attend and Read）
-
-
-- 2D注意力机制，在特征图的空间位置上计算注意力
-- 适合不规则文字（弯曲、旋转）
-- 解码器使用LSTM + Attention
-
-
-### 5.3 CTC vs Attention对比
-
+### CTC vs Attention 对比
 
 | 特性 | CTC | Attention |
 | --- | --- | --- |
@@ -202,108 +94,171 @@ CTC假设输出之间条件独立，无法建模字符间的依赖关系。**Att
 | 字符依赖 | 假设条件独立 | 可建模依赖 |
 | 解码速度 | 更快（贪心解码） | 较慢（自回归） |
 | 长序列 | 更稳定 | 可能出现注意力漂移 |
-| 精度 | 中等 | 通常更高 |
 
+### 现代方法
 
-### 6.1 ABINet
+- **ABINet**：双向注意力语言模型增强视觉特征
+- **TrOCR**：编码器ViT + 解码器RoBERTa，预训练OCR模型
+- **PARSeq**：基于排列语言模型的场景文字识别
 
+## 六、PaddleOCR
 
-使用双向注意力语言模型增强视觉特征：
-
-
-- 视觉模型提取字符特征
-- 语言模型（Transformer编码器）建模字符间关系
-- 迭代精化：视觉→语言→视觉→...
-
-
-### 6.2 TrOCR
-
-
-微软提出的预训练OCR模型：
-
-
-- 编码器：预训练的ViT/BEiT（图像理解）
-- 解码器：预训练的RoBERTa/DeBERTa（语言生成）
-- 大规模合成数据预训练 + 真实数据微调
-
-
-### 6.3 PARSeq
-
-
-基于Permutation Language Modeling的场景文字识别：
-
-
-- 训练时随机排列字符顺序，增强泛化能力
-- 支持自回归和非自回归解码
-- 处理不规则文字效果好
-
-
-### 7.1 系统架构
-
-
-PaddleOCR是百度开源的实用OCR工具套件，包含完整的检测、方向分类、识别三阶段流程：
-
-输入图像
-→
-DB检测
-(PP-OCR)
-→
-方向分类
-(文本旋转)
-→
-SVTR识别
-(CRNN)
-→
-后处理
-
-### 7.2 PP-OCR系列
-
-
-| 版本 | 检测模型 | 识别模型 | 特点 |
-| --- | --- | --- | --- |
-| PP-OCRv2 | DB + LKPAN | SVTR-LCNet | 轻量化，移动端友好 |
-| PP-OCRv3 | DB + LKPAN | SVTR-LCNet v2 | GTC策略，精度提升 |
-| PP-OCRv4 | DB + LKPAN | SVTRv2 | 更高精度，多语言支持 |
-
-
-```
-# PaddleOCR使用示例
+```python
 from paddleocr import PaddleOCR
 
 ocr = PaddleOCR(use_angle_cls=True, lang='ch')
 result = ocr.ocr('image.jpg', cls=True)
 
 for line in result[0]:
-    bbox = line[0]          # 文字框坐标 [[x1,y1], [x2,y2], ...]
+    bbox = line[0]          # 文字框坐标
     text = line[1][0]       # 识别文本
     confidence = line[1][1] # 置信度
     print(f'{text}: {confidence:.4f}')
 ```
 
+## 七、Python 实战：OCR 模型训练
 
-### 8.1 弯曲文字检测
+### 示例：CRNN + CTC 训练完整流程
+
+```python
+import torch
+import torch.nn as nn
+from torch.utils.data import Dataset, DataLoader
+from PIL import Image
+import string
+
+class OCRDataset(Dataset):
+    """OCR文字识别数据集"""
+
+    def __init__(self, image_paths, labels, char_to_idx, max_len=25, transform=None):
+        self.image_paths = image_paths
+        self.labels = labels
+        self.char_to_idx = char_to_idx
+        self.max_len = max_len
+        self.transform = transform
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        # 加载图像
+        img = Image.open(self.image_paths[idx]).convert('L')  # 灰度
+        if self.transform:
+            img = self.transform(img)
+
+        # 编码标签
+        label = self.labels[idx]
+        label_encoded = [self.char_to_idx[c] for c in label if c in self.char_to_idx]
+        label_length = len(label_encoded)
+
+        # Padding
+        label_encoded = label_encoded + [0] * (self.max_len - label_length)
+        return img, torch.tensor(label_encoded), torch.tensor(label_length)
 
 
-自然场景中的文字经常呈弯曲或不规则形状：
+def train_crnn_ocr():
+    # 构建字符表
+    chars = string.ascii_letters + string.digits + " .,-:;!?\"'"
+    char_to_idx = {c: i + 1 for i, c in enumerate(chars)}  # 0 保留给 blank
+    num_classes = len(chars) + 1
 
+    model = CRNN(num_classes=num_classes)
+    criterion = nn.CTCLoss(blank=0, zero_infinity=True)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
 
-- **基于分割**
-   ：预测文字区域mask后通过最小外接矩形或多边形拟合
-- **基于回归**
-   ：直接预测文字边界的多个控制点（如Bezier曲线、多边形顶点）
-- **ABCNet**
-   ：使用Bezier曲线参数化文字边界，自适应Bezier RoI Align提取特征
+    # 模拟数据
+    from torchvision import transforms
+    transform = transforms.Compose([
+        transforms.Resize((32, 128)),
+        transforms.ToTensor(),
+        transforms.Normalize(0.5, 0.5),
+    ])
 
+    for epoch in range(50):
+        model.train()
+        # 模拟一个batch
+        images = torch.randn(16, 1, 32, 128)  # [B, C, H, W]
+        targets = torch.randint(1, num_classes, (16, 10))
+        target_lengths = torch.full((16,), 10, dtype=torch.long)
+        input_lengths = torch.full((16,), 32, dtype=torch.long)
 
-### 8.2 端到端检测识别
+        optimizer.zero_grad()
+        output = model(images)  # [T, B, C]
+        log_probs = output.log_softmax(2)
 
+        loss = criterion(log_probs, targets, input_lengths, target_lengths)
+        loss.backward()
+        optimizer.step()
 
-- **FOTS**
-   ：共享特征的检测和识别，RoIRotate对齐文字区域
-- **Mask TextSpotter**
-   ：实例分割 + 字符级识别
-- **ABCNet v2**
-   ：Bezier曲线检测 + 自适应特征提取 + 识别
+        if (epoch + 1) % 10 == 0:
+            print(f"Epoch {epoch+1}/50, CTC Loss: {loss.item():.4f}")
+
+    return model
+```
+
+### 示例：DBNet 文字检测
+
+```python
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class DBNet(nn.Module):
+    """Differentiable Binarization Network for text detection"""
+
+    def __init__(self, backbone_channels=[64, 128, 256, 512]):
+        super().__init__()
+        # 简化版特征金字塔
+        self.conv1 = nn.Conv2d(backbone_channels[3], 64, 3, padding=1)
+        self.conv2 = nn.Conv2d(backbone_channels[2], 64, 3, padding=1)
+        self.conv3 = nn.Conv2d(backbone_channels[1], 64, 3, padding=1)
+
+        # 预测头
+        self.binarize = nn.Sequential(
+            nn.Conv2d(64, 32, 3, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(32, 32, 2, stride=2),
+            nn.Conv2d(32, 1, 1),
+            nn.Sigmoid()
+        )
+
+        self.threshold = nn.Sequential(
+            nn.Conv2d(64, 32, 3, padding=1),
+            nn.BatchNorm2d(32),
+            nn.ReLU(inplace=True),
+            nn.ConvTranspose2d(32, 32, 2, stride=2),
+            nn.Conv2d(32, 1, 1),
+            nn.Sigmoid()
+        )
+
+    def step_function(self, x, y):
+        """可微分二值化"""
+        return torch.reciprocal(1 + torch.exp(-50 * (x - y)))
+
+    def forward(self, features):
+        # features: 来自骨干网络的多尺度特征
+        p = self.conv1(features[3])
+        p = F.interpolate(p, size=features[2].shape[2:]) + self.conv2(features[2])
+        p = F.interpolate(p, size=features[1].shape[2:]) + self.conv3(features[1])
+
+        binary = self.binarize(p)
+        threshold = self.threshold(p)
+
+        # 可微分二值化
+        approx_binary = self.step_function(binary, threshold)
+
+        return binary, threshold, approx_binary
+```
+
+## 总结
+
+- 现代OCR分为文字检测和文字识别两个阶段
+- CRNN + CTC 是经典的文字识别方案，适合规则文本
+- Attention 机制在弯曲、不规则文字上表现更好
+- DBNet 的可微分二值化是文字检测的重要创新
+- PaddleOCR 是目前最流行的开源OCR工具，支持多语言
+- TrOCR 等基于Transformer的预训练模型代表了OCR的最新方向
 
 
 <!-- Converted from: 01_OCR文字识别.html -->

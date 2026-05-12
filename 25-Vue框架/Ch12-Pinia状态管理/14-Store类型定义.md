@@ -60,6 +60,93 @@ import type { useUser } from '@/stores/user'
 type UserStore = ReturnType<typeof useUser>
 ```
 
+## 四、通用Store类型
+
+```ts
+// types/store.ts
+import type { Store } from 'pinia'
+
+// 通用Store类型
+export type AppStore = Store<string, any>
+
+// Store状态类型
+export type StoreState<S> = S extends Store<any, infer T> ? T : never
+
+// 使用
+import type { StoreState } from '@/types/store'
+import { useUserStore } from '@/stores/user'
+
+type UserState = StoreState<ReturnType<typeof useUserStore>>
+// { name: string, age: number, ... }
+```
+
+## 五、插件扩展类型
+
+```ts
+// plugins/env.d.ts
+import 'pinia'
+
+declare module 'pinia' {
+  export interface PiniaCustomProperties {
+    $env: 'development' | 'production' | 'test'
+    $resetAll: () => void
+  }
+
+  export interface PiniaCustomStateProperties<S> {
+    _lastUpdated: number
+  }
+}
+```
+
+## 六、Setup式Store完整类型示例
+
+```ts
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+
+interface UserProfile {
+  id: number
+  name: string
+  email: string
+  role: 'admin' | 'user' | 'editor'
+}
+
+export const useUserStore = defineStore('user', () => {
+  const profile = ref<UserProfile | null>(null)
+  const token = ref<string | null>(null)
+  const loading = ref(false)
+
+  const isLoggedIn = computed(() => !!token.value)
+  const isAdmin = computed(() => profile.value?.role === 'admin')
+  const displayName = computed(() => profile.value?.name ?? '未登录')
+
+  async function login(creds: { username: string; password: string }) {
+    loading.value = true
+    try {
+      const res = await api.login(creds)
+      token.value = res.token
+      profile.value = res.user
+    } finally {
+      loading.value = false
+    }
+  }
+
+  function logout() {
+    token.value = null
+    profile.value = null
+  }
+
+  return { profile, token, loading, isLoggedIn, isAdmin, displayName, login, logout }
+})
+
+// 类型推断结果：
+// profile: Ref<UserProfile | null>
+// token: Ref<string | null>
+// loading: Ref<boolean>
+// isLoggedIn: ComputedRef<boolean>
+// login: (creds: { username: string; password: string }) => Promise<void>
+```
+
 ## 三、注意事项与常见陷阱
 
 1. Setup式Store类型推断最准确，优先使用
@@ -67,3 +154,5 @@ type UserStore = ReturnType<typeof useUser>
 3. `ReturnType<typeof useStore>`获取Store类型
 4. 选项式Store的泛型写法较繁琐
 5. 插件添加的属性需要扩展类型定义
+6. `PiniaCustomProperties` 扩展 store 实例属性
+7. `PiniaCustomStateProperties` 扩展 state 中的属性

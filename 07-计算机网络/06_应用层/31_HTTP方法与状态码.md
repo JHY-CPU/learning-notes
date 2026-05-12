@@ -95,6 +95,87 @@
 - "2成功3重定向4客户端5服务器"
 - "200成功301永重302临重404没有500错误"
 
+## 代码示例
+
+### 使用 Python requests 体验各种 HTTP 方法
+
+```python
+import requests
+
+base_url = 'http://httpbin.org'
+
+# GET - 获取资源（安全、幂等）
+resp = requests.get(f'{base_url}/get', params={'page': 1, 'size': 10})
+print(f"GET 状态码: {resp.status_code}")          # 200
+print(f"请求URL: {resp.url}")                      # 包含查询参数
+
+# POST - 提交数据（非安全、非幂等）
+resp = requests.post(f'{base_url}/post', json={'name': '张三', 'age': 20})
+print(f"POST 状态码: {resp.status_code}")          # 201 或 200
+
+# PUT - 完整更新资源（非安全、幂等）
+resp = requests.put(f'{base_url}/put', json={'name': '李四', 'age': 22})
+print(f"PUT 状态码: {resp.status_code}")           # 200
+
+# DELETE - 删除资源（非安全、幂等）
+resp = requests.delete(f'{base_url}/delete')
+print(f"DELETE 状态码: {resp.status_code}")        # 200
+
+# HEAD - 只获取响应头部（安全、幂等）
+resp = requests.head(f'{base_url}/get')
+print(f"HEAD 状态码: {resp.status_code}")          # 200
+print(f"Content-Length: {resp.headers.get('Content-Length')}")
+print(f"响应体(为空): {resp.text}")                 # HEAD 不返回正文
+```
+
+### 常见 HTTP 状态码演示
+
+```python
+import requests
+
+# 200 OK - 请求成功
+resp = requests.get('http://httpbin.org/status/200')
+print(f"200 OK: {resp.status_code}")
+
+# 301 永久重定向
+resp = requests.get('http://httpbin.org/redirect-to',
+                     params={'url': 'http://example.com', 'status_code': 301},
+                     allow_redirects=False)
+print(f"301 Location: {resp.headers.get('Location')}")
+
+# 302 临时重定向
+resp = requests.get('http://httpbin.org/redirect-to',
+                     params={'url': 'http://example.com', 'status_code': 302},
+                     allow_redirects=False)
+print(f"302 Location: {resp.headers.get('Location')}")
+
+# 404 Not Found - 资源不存在
+resp = requests.get('http://httpbin.org/status/404')
+print(f"404 Not Found: {resp.status_code}")
+
+# 500 Internal Server Error
+resp = requests.get('http://httpbin.org/status/500')
+print(f"500 Server Error: {resp.status_code}")
+```
+
+### 使用 curl 测试 HTTP 方法和状态码
+
+```bash
+# GET 请求
+curl -X GET http://httpbin.org/get
+
+# POST 请求（带 JSON 数据）
+curl -X POST -H "Content-Type: application/json" \
+     -d '{"name":"test"}' http://httpbin.org/post
+
+# 查看 404 状态码
+curl -I http://httpbin.org/status/404
+# 输出: HTTP/1.1 404 NOT FOUND
+
+# 跟踪 301 重定向（-L 自动跟随）
+curl -v -L http://httpbin.org/redirect-to?url=http://example.com&status_code=301
+```
+
 ## 协议关联
 
 - **HTTP方法与REST**：RESTful API使用GET/POST/PUT/DELETE

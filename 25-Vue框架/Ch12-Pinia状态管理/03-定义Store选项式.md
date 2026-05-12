@@ -66,6 +66,72 @@ const store = useStore()
 store.getUserById(123)  // 返回id为123的用户
 ```
 
+## 四、完整选项式Store示例
+
+```js
+import { defineStore } from 'pinia'
+
+export const useProductStore = defineStore('products', {
+  state: () => ({
+    items: [],
+    categories: [],
+    filter: { category: '', priceRange: [0, 1000] },
+    sortBy: 'name',
+    loading: false
+  }),
+
+  getters: {
+    filteredItems: (state) => {
+      let result = state.items
+
+      if (state.filter.category) {
+        result = result.filter(item => item.category === state.filter.category)
+      }
+
+      result = result.filter(item =>
+        item.price >= state.filter.priceRange[0] &&
+        item.price <= state.filter.priceRange[1]
+      )
+
+      // 排序
+      result.sort((a, b) => {
+        if (state.sortBy === 'price') return a.price - b.price
+        return a.name.localeCompare(b.name)
+      })
+
+      return result
+    },
+
+    totalPrice: (state) => state.items.reduce((sum, item) => sum + item.price, 0),
+
+    // 带参数的 getter
+    getById: (state) => (id) => state.items.find(item => item.id === id)
+  },
+
+  actions: {
+    async fetchProducts() {
+      this.loading = true
+      try {
+        const { data } = await api.getProducts()
+        this.items = data
+      } finally {
+        this.loading = false
+      }
+    },
+
+    // 使用 $patch 批量修改
+    setFilter(filter) {
+      this.$patch({ filter })
+    },
+
+    // $reset 重置到初始状态
+    resetFilters() {
+      this.$reset()
+    }
+  }
+})
+```
+
 ## 三、注意事项与常见陷阱
 
 1. `state`必须是函数（返回对象），保证每个Store实例独立
@@ -73,3 +139,5 @@ store.getUserById(123)  // 返回id为123的用户
 3. `actions`中用`this`访问整个store（state + getters + actions）
 4. Pinia没有`mutations`，直接在actions中修改状态
 5. getter返回的函数需要再调用一次才能获取值
+6. `$patch`可以批量修改多个属性，性能更优
+7. 选项式写法可用`this.$patch`、`this.$reset`等方法

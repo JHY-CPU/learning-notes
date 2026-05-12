@@ -68,3 +68,61 @@ export default {
 - `beforeDestroy` 和 `destroyed` 在 Vue 3 中已重命名为 `beforeUnmount`/`unmounted`
 - 不要混用选项式和组合式 API 的生命周期钩子
 - 选项式 API 仍然完全支持，但新项目推荐使用组合式 API
+
+## 四、选项式 API 中的 this 上下文
+
+```vue
+<script>
+export default {
+  data() {
+    return { count: 0, items: [] }
+  },
+  computed: {
+    doubleCount() { return this.count * 2 }
+  },
+  methods: {
+    increment() { this.count++ },
+    async loadItems() {
+      this.items = await fetch('/api/items').then(r => r.json())
+    }
+  },
+  watch: {
+    count(newVal, oldVal) {
+      console.log(`count 从 ${oldVal} 变为 ${newVal}`)
+    }
+  },
+  created() {
+    console.log('count:', this.count)
+  },
+  mounted() {
+    this.$refs.myElement.focus()
+  },
+  beforeUnmount() {
+    clearInterval(this.timer)
+  }
+}
+</script>
+```
+
+## 五、Vue 2 vs Vue 3 命名变化
+
+| Vue 2 | Vue 3 | 说明 |
+| --- | --- | --- |
+| beforeCreate | beforeCreate | 未变 |
+| created | created | 未变 |
+| beforeMount | beforeMount | 未变 |
+| mounted | mounted | 未变 |
+| beforeUpdate | beforeUpdate | 未变 |
+| updated | updated | 未变 |
+| beforeDestroy | **beforeUnmount** | 重命名 |
+| destroyed | **unmounted** | 重命名 |
+| activated | activated | 未变 |
+| deactivated | deactivated | 未变 |
+| errorCaptured | errorCaptured | 未变 |
+
+## 六、注意事项补充
+
+- Vue 3 中 `beforeDestroy` 和 `destroyed` 仍然可用但已废弃
+- 选项式 API 的钩子在 `<script setup>` 中不可用
+- 不要在选项式 API 的 methods 中使用箭头函数，`this` 不会指向组件实例
+- mixin 的钩子与组件钩子合并执行

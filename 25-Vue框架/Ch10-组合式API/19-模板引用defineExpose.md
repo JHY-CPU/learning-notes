@@ -72,3 +72,84 @@ defineExpose({
 3. 暴露`ref`时父组件通过`.value`访问
 4. 避免暴露过多内部实现，保持组件封装性
 5. 父组件访问子组件ref时，需要在`onMounted`之后才可用
+
+## 四、defineExpose 的最佳实践
+
+### 4.1 只暴露公共 API
+```vue
+<script setup>
+import { ref, computed } from 'vue'
+
+// 内部状态（不暴露）
+const formData = ref({ name: '', email: '', password: '' })
+const internalErrors = ref({})
+
+// 内部方法（不暴露）
+function validateField(field) { /* ... */ }
+
+// 公共方法（暴露）
+function validate() {
+  return Object.keys(internalErrors.value).length === 0
+}
+function reset() {
+  formData.value = { name: '', email: '', password: '' }
+  internalErrors.value = {}
+}
+function submit() {
+  if (validate()) {
+    emit('submit', { ...formData.value })
+  }
+}
+
+// 只暴露公共 API，保持封装性
+defineExpose({ validate, reset, submit })
+</script>
+```
+
+### 4.2 异步方法暴露
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const loading = ref(false)
+
+async function refresh() {
+  loading.value = true
+  try {
+    // 异步操作
+  } finally {
+    loading.value = false
+  }
+}
+
+defineExpose({ refresh, loading })
+</script>
+```
+
+```vue
+<!-- 父组件使用 -->
+<template>
+  <DataList ref="listRef" />
+  <button @click="handleRefresh">刷新</button>
+</template>
+
+<script setup>
+import { ref, onMounted } from 'vue'
+
+const listRef = ref(null)
+
+onMounted(async () => {
+  // 调用子组件方法
+  await listRef.value?.refresh()
+})
+</script>
+```
+
+## 五、defineExpose vs expose（setup context）
+
+| 特性 | defineExpose | expose |
+|------|-------------|--------|
+| 使用场景 | `<script setup>` | 普通 `setup()` |
+| 语法 | 编译宏 | 函数调用 |
+| TypeScript | 完整支持 | 部分支持 |
+| 默认行为 | 默认私有 | 默认公开 |

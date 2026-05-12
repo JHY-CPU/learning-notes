@@ -74,9 +74,76 @@ const name = ref('Vue')
 </section>
 ```
 
+## 四、性能收益分析
+
+```vue
+<!-- 假设一个有 1000 行静态文本的组件 -->
+
+<!-- 没有 v-once：每次父组件更新都会 diff 1000 个节点 -->
+<div>
+  <p v-for="i in 1000" :key="i">静态文本 {{ i }}</p>
+  <p>动态内容: {{ dynamicValue }}</p>
+</div>
+
+<!-- 使用 v-once：1000 个静态节点只 diff 一次 -->
+<div v-once>
+  <p v-for="i in 1000" :key="i">静态文本 {{ i }}</p>
+</div>
+<p>动态内容: {{ dynamicValue }}</p>
+```
+
+## 五、v-once 与 v-show 对比
+
+| 特性 | v-once | v-show |
+|------|--------|--------|
+| 首次渲染 | 正常 | 正常 |
+| 数据变化 | 不更新 | 更新 |
+| DOM 节点 | 保留 | 保留（display:none） |
+| 适用场景 | 永不变化的内容 | 频繁切换显示 |
+| 性能收益 | 跳过后续 diff | 只跳过 DOM 创建/销毁 |
+
+## 六、实际应用示例
+
+```vue
+<template>
+  <!-- 静态页脚 -->
+  <footer v-once>
+    <nav>
+      <a href="/about">关于我们</a>
+      <a href="/contact">联系方式</a>
+      <a href="/privacy">隐私政策</a>
+    </nav>
+    <p>Copyright 2024</p>
+  </footer>
+
+  <!-- 静态表单布局 -->
+  <form>
+    <div v-once>
+      <label>用户名</label>
+      <label>邮箱</label>
+      <label>密码</label>
+    </div>
+    <div>
+      <input v-model="username" />
+      <input v-model="email" />
+      <input v-model="password" />
+    </div>
+  </form>
+
+  <!-- 静态侧边栏内容 -->
+  <aside v-once>
+    <h3>帮助中心</h3>
+    <p>常见问题...</p>
+    <p>使用指南...</p>
+  </aside>
+</template>
+```
+
 ## 三、注意事项与常见陷阱
 
 - `v-once` 内的所有响应式数据都会失去响应性
 - 不要在 `v-once` 内放置用户需要交互的表单元素
 - 过度使用 `v-once` 可能导致数据不更新的 bug
 - 需要条件性缓存时使用 `v-memo` 更灵活
+- `v-once` 的性能收益在大块静态内容时最明显
+- 小片段使用 `v-once` 反而增加代码复杂度，不值得

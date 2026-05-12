@@ -72,6 +72,82 @@
 - 两个连接：控制通道发命令，数据通道传文件
 - "21管说话，20管干活"
 
+## 代码示例
+
+### 使用 Python ftplib 传输文件
+
+```python
+from ftplib import FTP
+
+def ftp_demo(host, username, password):
+    """通过FTP协议传输文件"""
+    # 连接FTP服务器的21端口（控制连接）
+    ftp = FTP(host)
+    ftp.login(username, password)       # USER + PASS
+    print(f"欢迎消息: {ftp.getwelcome()}")
+
+    # LIST - 列出当前目录文件
+    print("\n目录列表:")
+    ftp.dir()                           # LIST 命令
+
+    # PWD - 查看当前目录
+    print(f"\n当前目录: {ftp.pwd()}")
+
+    # CWD - 切换目录
+    ftp.cwd('/pub/documents')           # CWD 命令
+
+    # RETR - 下载文件（数据连接传输）
+    with open('downloaded.txt', 'wb') as f:
+        ftp.retrbinary('RETR readme.txt', f.write)  # 二进制下载
+    print("文件下载完成!")
+
+    # STOR - 上传文件
+    with open('local_file.txt', 'rb') as f:
+        ftp.storbinary('STOR upload.txt', f.write)  # 二进制上传
+    print("文件上传完成!")
+
+    # QUIT - 关闭连接
+    ftp.quit()
+
+# 使用示例
+ftp_demo('ftp.example.com', 'anonymous', '')
+```
+
+### 使用 ftp 命令行工具
+
+```bash
+# 连接FTP服务器
+ftp ftp.example.com
+# 输入用户名和密码
+
+# 常用命令
+ftp> dir               # 列出文件（LIST）
+ftp> cd /pub           # 切换目录（CWD）
+ftp> get file.txt      # 下载文件（RETR）
+ftp> put local.txt     # 上传文件（STOR）
+ftp> binary            # 切换二进制传输模式
+ftp> ascii             # 切换ASCII传输模式
+ftp> quit              # 退出（QUIT）
+
+# 也可以使用 curl 传输FTP文件
+curl -u username:password ftp://ftp.example.com/pub/file.txt -o local.txt
+curl -u username:password -T local.txt ftp://ftp.example.com/pub/upload.txt
+```
+
+### 使用 telnet 手动体验 FTP 控制连接
+
+```bash
+# 连接FTP控制端口21
+telnet ftp.example.com 21
+# 服务器响应: 220 FTP Server ready
+
+USER anonymous          # 331 Password required
+PASS guest@             # 230 User logged in
+PWD                     # 257 "/" is current directory
+LIST                    # 150 Opening data connection (建立数据连接)
+QUIT                    # 221 Goodbye
+```
+
 ## 协议关联
 
 - **FTP与TCP**：FTP依赖TCP的可靠传输，端口20和21

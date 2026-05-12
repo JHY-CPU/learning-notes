@@ -60,6 +60,83 @@
 - 端口53：DNS字母D是第4个字母，N是第14个，S是第19个，53=5*3+...算了，直接记"域53"
 - DNS主要用UDP（快），但大报文用TCP（可靠）
 
+## 代码示例
+
+### 使用 dig 和 nslookup 查询 DNS 记录
+
+```bash
+# dig 查询 A 记录（域名 → IPv4 地址）
+dig www.example.com A
+# 输出中 ANSWER SECTION 包含: www.example.com.  IN  A  93.184.216.34
+
+# dig 查询 MX 记录（邮件交换记录）
+dig example.com MX
+
+# dig 查询 CNAME 记录（别名）
+dig www.example.com CNAME
+
+# nslookup 查询（交互式）
+nslookup www.example.com
+# Server:     8.8.8.8
+# Address:    8.8.8.8#53
+# Non-authoritative answer:
+# Name:       www.example.com
+# Address:    93.184.216.34
+
+# 指定 DNS 服务器查询
+nslookup www.example.com 8.8.8.8
+
+# 查询所有记录类型
+dig example.com ANY
+```
+
+### 使用 Python socket 进行 DNS 解析
+
+```python
+import socket
+
+# 域名解析为 IP 地址
+ip_address = socket.gethostbyname('www.example.com')
+print(f"www.example.com → {ip_address}")
+
+# 获取完整信息
+host_info = socket.gethostbyname_ex('www.google.com')
+print(f"正式名: {host_info[0]}")
+print(f"别名列表: {host_info[1]}")
+print(f"IP地址列表: {host_info[2]}")
+
+# 反向解析：IP → 域名
+domain = socket.gethostbyaddr('93.184.216.34')
+print(f"93.184.216.34 → {domain[0]}")
+```
+
+### 使用 dnspython 库进行高级 DNS 查询
+
+```python
+# pip install dnspython
+import dns.resolver
+
+# 查询 A 记录
+answers = dns.resolver.resolve('example.com', 'A')
+for rdata in answers:
+    print(f"A 记录: {rdata}")
+
+# 查询 MX 记录
+answers = dns.resolver.resolve('example.com', 'MX')
+for rdata in answers:
+    print(f"MX 优先级:{rdata.preference} 邮件服务器:{rdata.exchange}")
+
+# 查询 NS 记录（权威 DNS 服务器）
+answers = dns.resolver.resolve('example.com', 'NS')
+for rdata in answers:
+    print(f"NS 记录: {rdata}")
+
+# 查询 CNAME 记录
+answers = dns.resolver.resolve('www.github.com', 'CNAME')
+for rdata in answers:
+    print(f"CNAME: {rdata}")
+```
+
 ## 协议关联
 
 - **DNS与HTTP**：用户输入URL时，浏览器先调用DNS解析域名，再发起HTTP请求

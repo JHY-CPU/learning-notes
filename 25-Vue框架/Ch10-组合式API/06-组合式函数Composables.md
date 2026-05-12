@@ -74,3 +74,105 @@ const { count, doubled, increment, reset } = useCounter(10)
 4. 返回值推荐使用`ref`而非`reactive`，避免解构丢失响应式
 5. 组合式函数**不是组件**，不包含模板
 6. 确保生命周期钩子在正确的上下文中（setup执行时）调用
+
+## 四、实用 Composable 示例
+
+### 4.1 本地存储
+```js
+// composables/useLocalStorage.js
+import { ref, watch } from 'vue'
+
+export function useLocalStorage(key, defaultValue) {
+  const stored = localStorage.getItem(key)
+  const data = ref(stored ? JSON.parse(stored) : defaultValue)
+
+  watch(data, (val) => {
+    localStorage.setItem(key, JSON.stringify(val))
+  }, { deep: true })
+
+  return data
+}
+```
+
+### 4.2 异步数据获取
+```js
+// composables/useFetch.js
+import { ref, watchEffect } from 'vue'
+
+export function useFetch(url) {
+  const data = ref(null)
+  const error = ref(null)
+  const loading = ref(false)
+
+  watchEffect(async (onInvalidate) => {
+    let cancelled = false
+    onInvalidate(() => { cancelled = true })
+
+    loading.value = true
+    error.value = null
+
+    try {
+      const res = await fetch(url.value || url)
+      if (!cancelled) {
+        data.value = await res.json()
+      }
+    } catch (e) {
+      if (!cancelled) error.value = e
+    } finally {
+      if (!cancelled) loading.value = false
+    }
+  })
+
+  return { data, error, loading }
+}
+```
+
+### 4.3 防抖值
+```js
+// composables/useDebounce.js
+import { ref, watch } from 'vue'
+
+export function useDebounce(value, delay = 300) {
+  const debouncedValue = ref(value.value)
+  let timer = null
+
+  watch(value, (newVal) => {
+    clearTimeout(timer)
+    timer = setTimeout(() => {
+      debouncedValue.value = newVal
+    }, delay)
+  })
+
+  return debouncedValue
+}
+```
+
+## 五、Composable 的组织规范
+
+```
+src/
+  composables/
+    useMouse.js         # 鼠标位置追踪
+    useFetch.js         # 数据获取
+    useLocalStorage.js  # 本地存储
+    useDebounce.js      # 防抖
+    useAuth.js          # 认证逻辑
+    index.js            # 统一导出
+```
+
+```js
+// composables/index.js
+export { useMouse } from './useMouse'
+export { useFetch } from './useFetch'
+export { useLocalStorage } from './useLocalStorage'
+```
+
+## 六、Composable vs Mixins 对比
+
+| 特性 | Composables | Mixins |
+|------|-------------|--------|
+| 命名冲突 | 无（函数作用域） | 有（合并冲突） |
+| 数据来源 | 清晰（返回值） | 隐式（混入） |
+| TypeScript | 良好支持 | 支持差 |
+| 可组合性 | 高（互相调用） | 低 |
+| 代码可读性 | 高 | 低 |

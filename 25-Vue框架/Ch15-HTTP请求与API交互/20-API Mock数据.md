@@ -72,8 +72,110 @@ http.get('/api/users/:id', ({ params }) => {
 })
 ```
 
+## 四、复杂 Mock 场景
+
+```js
+// mocks/handlers.js
+import { http, HttpResponse, delay } from 'msw'
+import { faker } from '@faker-js/faker'
+
+// 生成随机数据
+function generateUsers(count) {
+  return Array.from({ length: count }, (_, i) => ({
+    id: i + 1,
+    name: faker.person.fullName(),
+    email: faker.internet.email(),
+    avatar: faker.image.avatar(),
+    createdAt: faker.date.recent().toISOString()
+  }))
+}
+
+const users = generateUsers(100)
+
+export const handlers = [
+  // 分页查询
+  http.get('/api/users', ({ request }) => {
+    const url = new URL(request.url)
+    const page = Number(url.searchParams.get('page') || 1)
+    const pageSize = Number(url.searchParams.get('pageSize') || 10)
+    const keyword = url.searchParams.get('keyword') || ''
+
+    let filtered = users
+    if (keyword) {
+      filtered = users.filter(u => u.name.includes(keyword))
+    }
+
+    const start = (page - 1) * pageSize
+    const list = filtered.slice(start, start + pageSize)
+
+    return HttpResponse.json({
+      list,
+      total: filtered.length,
+      page,
+      pageSize
+    })
+  }),
+
+  // 模拟延迟
+  http.get('/api/slow', async () => {
+    await delay(2000)
+    return HttpResponse.json({ data: 'slow response' })
+  }),
+
+  // 模拟随机错误
+  http.get('/api/flaky', async () => {
+    await delay(500)
+    if (Math.random() > 0.7) {
+      return HttpResponse.json({ message: '随机失败' }, { status: 500 })
+    }
+    return HttpResponse.json({ success: true })
+  }),
+
+  // 模拟文件上传
+  http.post('/api/upload', async ({ request }) => {
+    const formData = await request.formData()
+    const file = formData.get('file')
+    return HttpResponse.json({
+      url: `/uploads/${file.name}`,
+      size: file.size
+    })
+  })
+]
+```
+
+## 五、与 Vitest 集成
+
+```js
+// __tests__/api.test.js
+import { setupServer } from 'msw/node'
+import { handlers } from '../mocks/handlers'
+
+const server = setupServer(...handlers)
+
+beforeAll(() => server.listen())
+afterEach(() => server.resetHandlers())
+afterAll(() => server.close())
+
+test('获取用户列表', async () => {
+  const { data } = await axios.get('/api/users?page=1&pageSize=5')
+  expect(data.list).toHaveLength(5)
+  expect(data.total).toBe(100)
+})
+```
+
+## 六、Mock 方案对比
+
+| 方案 | 侵入性 | 真实网络层 | 生产安全 | 学习成本 |
+|------|--------|-----------|---------|---------|
+| MSW | 零侵入 | 是 | 安全 | 中 |
+| json-server | 低 | 是 | 需移除 | 低 |
+| 本地 Mock 文件 | 中 | 否 | 需移除 | 低 |
+| 代理转发 | 低 | 是 | 安全 | 中 |
+
 ## 三、注意事项与常见陷阱
 
 - MSW 拦截的是真实的网络请求，不影响业务代码
 - 生产环境不会加载 MSW，不需要条件判断删除 mock
 - `public/` 目录下必须有 `mockServiceWorker.js` 文件
+- `faker` 库可以生成逼真的随机数据，便于演示和测试
+- MSW 也可以用于单元测试（`msw/node`），统一前后端 mock 方案

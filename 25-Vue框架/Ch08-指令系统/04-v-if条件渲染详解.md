@@ -70,3 +70,89 @@ const showComponent = ref(true)
 - v-if 有更高的切换开销（销毁/重建组件）
 - 频繁切换用 v-show，很少改变用 v-if
 - v-if 和 v-for 不要在同一元素上使用（v-for 优先级更高）
+
+## 四、v-if 的性能影响
+
+### 4.1 切换成本分析
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const showHeavy = ref(true)
+
+// 每次切换 v-if，HeavyComponent 会被完整销毁和重建
+// 包括：组件实例、DOM 节点、子组件、状态
+// 如果组件有大量初始化逻辑（如图表），切换成本很高
+
+// ❌ 频繁切换时用 v-if
+// <HeavyChart v-if="showHeavy" />
+
+// ✅ 频繁切换时用 v-show
+// <HeavyChart v-show="showHeavy" />
+</script>
+```
+
+### 4.2 与 v-show 的选择指南
+```
+使用 v-if：
+  - 条件很少变化
+  - 初始条件为 false 时不想渲染（节省初始开销）
+  - 需要触发组件的创建/销毁生命周期
+  - 需要配合 <template> 分组
+
+使用 v-show：
+  - 频繁切换
+  - 组件初始化开销大
+  - 不需要触发组件销毁
+```
+
+## 五、常见模式
+
+### 5.1 权限控制
+```vue
+<template>
+  <div>
+    <button v-if="isAdmin">管理面板</button>
+    <button v-if="isAdmin || isEditor">编辑内容</button>
+    <p v-if="!isLoggedIn">请先登录</p>
+    <template v-else>
+      <UserProfile />
+      <Dashboard />
+    </template>
+  </div>
+</template>
+```
+
+### 5.2 加载状态
+```vue
+<template>
+  <div v-if="loading" class="skeleton">加载中...</div>
+  <div v-else-if="error" class="error">{{ error.message }}</div>
+  <div v-else-if="data.length === 0" class="empty">暂无数据</div>
+  <DataList v-else :items="data" />
+</template>
+```
+
+### 5.3 v-if + v-for 的正确用法
+```vue
+<template>
+  <!-- ❌ 错误：v-if 和 v-for 在同一元素 -->
+  <li v-for="item in items" v-if="item.active" :key="item.id">
+    {{ item.name }}
+  </li>
+
+  <!-- ✅ 正确：用 computed 过滤 -->
+  <li v-for="item in activeItems" :key="item.id">
+    {{ item.name }}
+  </li>
+
+  <!-- ✅ 正确：用 <template> 包裹 -->
+  <template v-for="item in items" :key="item.id">
+    <li v-if="item.active">{{ item.name }}</li>
+  </template>
+</template>
+<script setup>
+import { computed } from 'vue'
+const activeItems = computed(() => items.value.filter(i => i.active))
+</script>
+```

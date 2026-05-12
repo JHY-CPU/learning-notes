@@ -1,4 +1,4 @@
-## 18-双向链表 (Doubly Linked List)
+# 18-双向链表 (Doubly Linked List)
 
 双向链表的每个节点包含 prev 和 next 两个指针，可以从两个方向遍历。插入和删除操作比单链表更灵活。
 

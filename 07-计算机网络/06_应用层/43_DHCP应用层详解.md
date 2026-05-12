@@ -87,6 +87,96 @@
 - DHCP使用UDP（不是TCP）
 - DHCP = "动态分配IP地址"
 
+## 代码示例
+
+### 使用 dhclient 获取 DHCP 分配的 IP 地址
+
+```bash
+# 查看当前网络接口
+ip addr show                    # Linux
+ifconfig                        # macOS / 旧版Linux
+
+# 使用 dhclient 请求DHCP分配IP（DORA过程）
+sudo dhclient -v eth0           # -v 详细模式，可以看到4个阶段
+# 输出示例（对应DORA四步）：
+# DHCPDISCOVER on eth0 to 255.255.255.255 port 67   → Discover
+# DHCPOFFER from 192.168.1.1                         → Offer
+# DHCPREQUEST on eth0 to 255.255.255.255 port 67    → Request
+# DHCPACK from 192.168.1.1                           → ACK
+# bound to 192.168.1.100 -- renewal in 3600 seconds
+
+# 释放当前IP地址
+sudo dhclient -r eth0
+
+# 在Windows上使用ipconfig
+ipconfig /renew                 # 请求新的DHCP租约
+ipconfig /release               # 释放当前IP
+ipconfig /all                   # 查看DHCP分配的详细信息
+```
+
+### 使用 tcpdump 抓取 DHCP 报文
+
+```bash
+# 抓取DHCP报文（端口67和68），观察DORA四步过程
+sudo tcpdump -i eth0 -n port 67 or port 68 -v
+
+# 输出示例：
+# DHCP Discover: IP 0.0.0.0.68 > 255.255.255.255.67
+# DHCP Offer:    IP 192.168.1.1.67 > 255.255.255.255.68
+# DHCP Request:  IP 0.0.0.0.68 > 255.255.255.255.67
+# DHCP ACK:      IP 192.168.1.1.67 > 255.255.255.255.68
+
+# 使用Wireshark过滤器查看DHCP
+# 过滤表达式: bootp (DHCP基于BOOTP协议)
+# 可以看到完整的DORA交互过程
+```
+
+### 使用 Python 构造简单的 DHCP Discover 报文
+
+```python
+import socket
+import struct
+
+def create_dhcp_discover():
+    """构造DHCP Discover报文（简化版，理解报文结构）"""
+    # DHCP报文基于BOOTP格式
+    op = 1           # 1=请求(BOOTREQUEST), 2=响应(BOOTREPLY)
+    htype = 1        # 硬件类型: 1=以太网
+    hlen = 6         # 硬件地址长度: MAC地址6字节
+    hops = 0
+    xid = 0x12345678 # 事务ID（随机生成）
+    secs = 0
+    flags = 0x8000   # 广播标志
+
+    # 封装报文头部（236字节 + 选项）
+    packet = struct.pack('!BBBBIHH',
+        op, htype, hlen, hops, xid, secs, flags)
+
+    # 填充 ciaddr, yiaddr, siaddr, giaddr（各4字节，全0）
+    packet += b'\x00' * 16
+
+    # chaddr: 客户端MAC地址（16字节，前6字节为MAC）
+    mac = b'\xaa\xbb\xcc\xdd\xee\xff'
+    packet += mac + b'\x00' * 10
+
+    # sname, file 域填0
+    packet += b'\x00' * 192
+
+    # DHCP Magic Cookie
+    packet += b'\x63\x82\x53\x63'
+
+    # DHCP选项：Discover消息类型
+    packet += b'\x35\x01\x01'   # Option 53, 长度1, 值1(Discover)
+
+    # DHCP选项结束
+    packet += b'\xff'
+
+    print(f"DHCP Discover报文大小: {len(packet)} 字节")
+    return packet
+
+discover = create_dhcp_discover()
+```
+
 ## 协议关联
 
 - **DHCP与UDP**：DHCP使用UDP，端口67/68

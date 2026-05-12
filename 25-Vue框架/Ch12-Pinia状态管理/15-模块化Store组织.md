@@ -64,6 +64,95 @@ src/stores/
     orders.js
 ```
 
+## 四、大型项目Store目录结构
+
+```
+src/stores/
+  index.ts                  # 创建并导出 pinia 实例
+  types.ts                  # 共享类型定义
+  
+  auth/
+    index.ts                # 导出 useAuth
+    user.ts                 # 用户信息 store
+    permissions.ts          # 权限 store
+    actions.ts              # 认证相关 action
+  
+  shop/
+    index.ts                # 导出所有 shop store
+    products.ts             # 商品 store
+    cart.ts                 # 购物车 store
+    orders.ts               # 订单 store
+  
+  app/
+    index.ts
+    theme.ts                # 主题 store
+    locale.ts               # 语言 store
+    sidebar.ts              # 侧边栏状态 store
+  
+  shared/
+    loading.ts              # 全局加载状态
+    notifications.ts        # 通知 store
+```
+
+## 五、Store组合模式
+
+```ts
+// stores/shop/index.ts
+import { useProductStore } from './products'
+import { useCartStore } from './cart'
+import { useOrderStore } from './orders'
+
+// 组合Store：提供统一接口
+export function useShop() {
+  const products = useProductStore()
+  const cart = useCartStore()
+  const orders = useOrderStore()
+
+  // 业务流程封装
+  async function purchase(productId: number) {
+    const product = products.getById(productId)
+    if (!product) throw new Error('商品不存在')
+
+    cart.addItem(product)
+    const order = await orders.createOrder(cart.items)
+    cart.clearItems()
+
+    return order
+  }
+
+  return {
+    products,
+    cart,
+    orders,
+    purchase
+  }
+}
+```
+
+## 六、Store懒加载
+
+```ts
+// stores/lazy.ts
+import { defineStore } from 'pinia'
+
+// 大型Store可以按需加载
+export const useHeavyStore = defineStore('heavy', () => {
+  const data = ref([])
+
+  async function loadData() {
+    // 只在需要时才加载数据
+    if (data.value.length === 0) {
+      data.value = await api.fetchHeavyData()
+    }
+  }
+
+  return { data, loadData }
+})
+
+// 或者使用动态 import
+const useAnalyticsStore = () => import('./analytics').then(m => m.useAnalyticsStore())
+```
+
 ## 三、注意事项与常见陷阱
 
 1. 每个Store文件只负责一个功能领域
@@ -71,3 +160,5 @@ src/stores/
 3. 使用统一的导出入口（index.js）
 4. Store间引用使用相对路径或别名
 5. 避免Store间过度耦合，保持职责单一
+6. 组合Store模式可以封装复杂业务流程
+7. 懒加载Store适合不常用的大型模块

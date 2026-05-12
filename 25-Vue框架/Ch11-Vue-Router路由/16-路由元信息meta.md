@@ -79,3 +79,68 @@ route.matched.forEach(record => {
 3. `route.meta`是当前匹配路由的meta（已合并）
 4. `route.matched`数组包含所有匹配的路由记录及其meta
 5. TypeScript中可扩展`RouteMeta`接口获得类型支持
+
+## 四、TypeScript 中的 meta 类型
+
+```ts
+// router/index.ts
+import 'vue-router'
+
+declare module 'vue-router' {
+  interface RouteMeta {
+    title?: string
+    requiresAuth?: boolean
+    roles?: string[]
+    icon?: string
+    hidden?: boolean
+    keepAlive?: boolean
+  }
+}
+```
+
+## 五、meta 的实际应用场景
+
+```js
+const routes = [
+  {
+    path: '/dashboard',
+    component: () => import('@/views/Dashboard.vue'),
+    meta: {
+      title: '仪表盘',
+      icon: 'dashboard',
+      requiresAuth: true,
+      keepAlive: true
+    }
+  },
+  {
+    path: '/system',
+    meta: { title: '系统管理', icon: 'setting' },
+    children: [
+      {
+        path: 'users',
+        component: () => import('@/views/system/Users.vue'),
+        meta: { title: '用户管理', roles: ['admin'] }
+      },
+      {
+        path: 'logs',
+        component: () => import('@/views/system/Logs.vue'),
+        meta: { title: '操作日志', roles: ['admin', 'operator'] }
+      }
+    ]
+  }
+]
+```
+
+```js
+// 根据 meta 生成菜单
+function generateMenu(routes, basePath = '') {
+  return routes
+    .filter(r => !r.meta?.hidden)
+    .map(r => ({
+      path: basePath + '/' + r.path,
+      title: r.meta?.title,
+      icon: r.meta?.icon,
+      children: r.children ? generateMenu(r.children, basePath + '/' + r.path) : undefined
+    }))
+}
+```

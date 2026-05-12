@@ -68,4 +68,96 @@ require('/abs/path');  // 绝对路径
 点击按钮查看
 
 
+## 循环依赖详解
+
+```javascript
+// ========== 循环依赖示例 ==========
+// a.js
+const b = require('./b');
+console.log('a 中 b 的值:', b.value);
+exports.done = 'a 完成';
+
+// b.js
+const a = require('./a');
+console.log('b 中 a 的值:', a.done); // undefined! (a 还未导出)
+exports.value = 'b 的值';
+
+// 运行 a.js 输出:
+// b 中 a 的值: undefined    ← 因为 a.js 还在加载中
+// a 中 b 的值: b 的值
+
+// ========== 解决方案 ==========
+// 方案1: 将共享逻辑提取到第三个模块
+// shared.js — a.js 和 b.js 都依赖 shared.js
+
+// 方案2: 延迟加载 (在函数内 require)
+exports.getValue = function() {
+    const b = require('./b'); // 此时 b 已完全加载
+    return b.value;
+};
+```
+
+## 模块缓存与热更新
+
+```javascript
+// ========== 模块缓存机制 ==========
+// require.cache 是一个对象，key 为模块绝对路径
+console.log(Object.keys(require.cache)); // 已加载的模块列表
+
+// 清除单个模块缓存
+function invalidateModule(modulePath) {
+    const resolved = require.resolve(modulePath);
+    delete require.cache[resolved];
+}
+
+// 清除模块及其所有依赖的缓存
+function invalidateWithDeps(modulePath) {
+    const resolved = require.resolve(modulePath);
+    const module = require.cache[resolved];
+    if (module) {
+        // 递归清除引用了该模块的父模块
+        module.children.forEach(child => {
+            invalidateWithDeps(child.id);
+        });
+        delete require.cache[resolved];
+    }
+}
+
+// ========== 实现简易热更新 ==========
+function hotRequire(modulePath) {
+    invalidateModule(modulePath);
+    return require(modulePath);
+}
+// ⚠️ 生产环境不推荐手动管理缓存
+```
+
+## module.exports vs exports 陷阱
+
+```javascript
+// ========== exports 是 module.exports 的引用 ==========
+// 初始时: exports === module.exports (都是 {})
+
+// ✅ 正确 — 添加属性
+exports.foo = 1;
+exports.bar = 2;
+
+// ✅ 正确 — 替换 module.exports
+module.exports = { foo: 1, bar: 2 };
+
+// ❌ 错误 — 直接赋值给 exports 会断开引用
+exports = { foo: 1, bar: 2 }; // 失效！require 得到的是 module.exports
+
+// ========== 类导出 ==========
+// math.js
+class Calculator {
+    add(a, b) { return a + b; }
+}
+module.exports = Calculator;
+
+// app.js
+const Calculator = require('./math');
+const calc = new Calculator();
+console.log(calc.add(1, 2)); // 3
+```
+
 <!-- Converted from: 2_CommonJS模块.html -->

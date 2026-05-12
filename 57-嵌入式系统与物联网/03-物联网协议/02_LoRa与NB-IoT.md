@@ -1,7 +1,7 @@
 # LoRa与NB-IoT
 
 
-# LoRa与NB-IoT
+## LoRa与NB-IoT
 
 一、LPWAN概述
 

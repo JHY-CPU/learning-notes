@@ -1,7 +1,7 @@
 # 通信接口UART/SPI/I2C
 
 
-# 通信接口UART/SPI/I2C
+## 通信接口UART/SPI/I2C
 
 一、通信接口概述
 

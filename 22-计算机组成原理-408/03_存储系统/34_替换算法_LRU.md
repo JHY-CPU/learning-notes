@@ -63,6 +63,92 @@
 **记忆口诀**：
 > "LRU淘汰最近最少用，命中时更新顺序最灵活"
 
+## 代码/模拟
+
+### Python实现LRU替换算法
+
+```python
+"""LRU Cache替换算法模拟 - 适用于408考研复习"""
+
+def lru_cache_simulation(access_sequence, num_ways):
+    """
+    模拟LRU替换算法（计数器实现）
+    :param access_sequence: 访问序列
+    :param num_ways: 组相联路数（Cache行数）
+    :return: 命中次数
+    """
+    cache = {}          # {块号: LRU计数器值}
+    hits = 0
+
+    for i, block in enumerate(access_sequence):
+        if block in cache:
+            # 命中：被访问行计数器清零，比原值小的行计数器+1
+            old_val = cache[block]
+            for b in cache:
+                if cache[b] < old_val:
+                    cache[b] += 1
+            cache[block] = 0
+            hits += 1
+            status = "命中"
+        elif len(cache) < num_ways:
+            # 缺失且有空行：新行计数器=0
+            cache[block] = 0
+            status = "调入"
+        else:
+            # 缺失且满：淘汰计数器最大的行（最久未访问）
+            victim = max(cache, key=cache.get)
+            del cache[victim]
+            # 新行计数器=0，其余行不变
+            cache[block] = 0
+            status = f"替换{victim}"
+
+        # 按计数器值排序显示，方便理解
+        sorted_cache = sorted(cache.items(), key=lambda x: x[1], reverse=True)
+        display = [f"{b}(cnt={c})" for b, c in sorted_cache]
+        print(f"步骤{i+1}: 访问{block:>2} | {display!s:<35} | {status}")
+
+    print(f"\n命中率 = {hits}/{len(access_sequence)} = {hits/len(access_sequence):.2%}")
+    return hits
+
+# 与笔记中的示例一致：4路组相联，序列 A,B,C,D,B,E,A
+print("=== LRU算法模拟 (4路组相联) ===")
+lru_cache_simulation(['A','B','C','D','B','E','A'], num_ways=4)
+```
+
+**预期输出**（与笔记表格一致）：
+- 步骤5访问B：命中，B计数器归0
+- 步骤6访问E：替换C（C计数器最大=2）
+- 步骤7访问A：命中，A计数器归0
+- 命中率 = 2/7 ≈ 28.6%
+
+### LRU堆栈实现
+
+```python
+def lru_stack_simulation(access_sequence, cache_size):
+    """LRU堆栈实现方式 - 更直观"""
+    stack = []  # 栈顶=最近使用，栈底=最久未使用
+    hits = 0
+
+    for block in access_sequence:
+        if block in stack:
+            stack.remove(block)  # 从堆栈中取出
+            stack.append(block)  # 放到栈顶
+            hits += 1
+            print(f"  访问{block:>2}: 命中  | 栈={stack}")
+        elif len(stack) < cache_size:
+            stack.append(block)
+            print(f"  访问{block:>2}: 调入  | 栈={stack}")
+        else:
+            victim = stack.pop(0)  # 弹出栈底（最久未访问）
+            stack.append(block)
+            print(f"  访问{block:>2}: 替换{victim} | 栈={stack}")
+
+    print(f"命中率 = {hits}/{len(access_sequence)} = {hits/len(access_sequence):.2%}")
+
+print("\n=== LRU堆栈实现 ===")
+lru_stack_simulation(['A','B','C','D','B','E','A'], cache_size=4)
+```
+
 ## 知识关联
 
 ### 与FIFO的关键区别

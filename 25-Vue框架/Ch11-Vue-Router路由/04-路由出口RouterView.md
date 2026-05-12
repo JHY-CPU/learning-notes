@@ -69,6 +69,46 @@
 </template>
 ```
 
+## 四、同时使用Transition + KeepAlive
+
+```vue
+<template>
+  <router-view v-slot="{ Component, route }">
+    <transition :name="route.meta.transition || 'fade'" mode="out-in">
+      <keep-alive :include="cachedPages" :max="10">
+        <component :is="Component" :key="route.path" />
+      </keep-alive>
+    </transition>
+  </router-view>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+const cachedPages = ref(['Home', 'Dashboard'])
+</script>
+```
+
+## 五、RouterView的插槽属性
+
+```vue
+<template>
+  <router-view v-slot="{ Component, route }">
+    <!-- Component: 要渲染的组件 -->
+    <!-- route: 当前路由对象 -->
+    <div :key="route.fullPath">
+      <component :is="Component" />
+    </div>
+  </router-view>
+</template>
+```
+
+插槽解构属性：
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `Component` | VNode | 要渲染的路由组件 |
+| `route` | RouteLocationNormalized | 当前路由信息 |
+
 ## 三、注意事项与常见陷阱
 
 1. `<RouterView>`没有根元素，不会渲染额外DOM
@@ -76,3 +116,5 @@
 3. 路由组件被卸载时会触发`onUnmounted`，注意清理副作用
 4. 使用`<keep-alive>`可缓存组件状态，避免重复创建
 5. `v-slot`解构获取的`Component`是动态组件，需用`:is`绑定
+6. KeepAlive包含的路由组件需要设置`name`选项
+7. `key`设为`route.path`时路由参数变化也会重新创建组件

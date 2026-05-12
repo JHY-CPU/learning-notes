@@ -91,10 +91,84 @@ helm history order-service
 helm template order-service ./order-service
 ```
 
-## 五、注意事项
+## 五、Helmfile 多环境管理
 
-1. **values.yaml 管理环境差异**
-2. **Chart 版本遵循语义化版本**
-3. **使用条件渲染支持可选组件**
-4. **Helmfile 管理多环境部署**
-5. **Chart 仓库统一管理**
+```yaml
+# helmfile.yaml - 多环境统一管理
+repositories:
+  - name: stable
+    url: https://charts.helm.sh/stable
+  - name: bitnami
+    url: https://charts.bitnami.com
+
+releases:
+  - name: order-service
+    namespace: microservices
+    chart: ./charts/order-service
+    values:
+      - ./values/common.yaml
+    {{ if eq .Environment.Name "dev" }}
+      - ./values/dev.yaml
+    {{ else if eq .Environment.Name "staging" }}
+      - ./values/staging.yaml
+    {{ else if eq .Environment.Name "production" }}
+      - ./values/production.yaml
+    {{ end }}
+
+  - name: user-service
+    namespace: microservices
+    chart: ./charts/user-service
+    values:
+      - ./values/common.yaml
+
+environments:
+  dev:
+    values:
+      - env: dev
+  staging:
+    values:
+      - env: staging
+  production:
+    values:
+      - env: production
+```
+
+```bash
+# Helmfile 命令
+helmfile -e dev apply          # 部署到 dev 环境
+helmfile -e production diff    # 查看生产环境变更
+helmfile -e production apply   # 部署到生产环境
+helmfile -e production destroy # 销毁生产环境
+```
+
+## 六、Chart 测试
+
+```yaml
+# templates/tests/test-connection.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ include "order-service.fullname" . }}-test-connection"
+  annotations:
+    "helm.sh/hook": test
+spec:
+  containers:
+    - name: wget
+      image: busybox
+      command: ['wget']
+      args: ['{{ include "order-service.fullname" . }}:{{ .Values.service.port }}/actuator/health']
+  restartPolicy: Never
+```
+
+```bash
+helm test order-service    # 运行 Helm 测试
+```
+
+## 七、注意事项
+
+1. **values.yaml 管理环境差异** - 公共配置 + 环境覆盖
+2. **Chart 版本遵循语义化版本** - major.minor.patch
+3. **使用条件渲染支持可选组件** - `{{- if .Values.mysql.enabled }}`
+4. **Helmfile 管理多环境部署** - 一个文件管理所有环境
+5. **Chart 仓库统一管理** - 使用 Harbor ChartMuseum
+6. **Chart 测试保证质量** - helm test 验证部署成功

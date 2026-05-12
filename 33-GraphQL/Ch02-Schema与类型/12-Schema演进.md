@@ -100,10 +100,90 @@ type User {
 }
 ```
 
-## 四、注意事项
+## 四、Schema 比较工具
+
+```bash
+# GraphQL Inspector - CI 集成
+npx @graphql-inspector/cli diff \
+  old-schema.graphql \
+  new-schema.graphql
+
+# 输出示例:
+# ┌─────────────────────────────────────────────────┐
+# │ Schema Changes                                   │
+# ├─────────────────────────────────────────────────┤
+# │ FAIL  Field 'User.name' was removed              │
+# │ WARN  Field 'User.nickname' was added            │
+# │ FAIL  Argument 'status' was added to field       │
+# │       'Query.users' (required)                   │
+# └─────────────────────────────────────────────────┘
+```
+
+```yaml
+# CI/CD 集成 (GitHub Actions)
+name: Schema Check
+on: [pull_request]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: npx @graphql-inspector/ci introspect schema.graphql --write schema.graphql
+      - run: npx @graphql-inspector/cli diff schema-old.graphql schema-new.graphql --fail-on-breaking
+```
+
+## 五、Apollo Schema Registry
+
+```yaml
+工作流程:
+  1. 开发者提交 Schema 变更
+  2. CI 运行 Schema 检查
+  3. Schema Registry 比较差异
+  4. 检测破坏性变更
+  5. 通知受影响的客户端
+  6. 合并或修改变更
+```
+
+```bash
+# 注册 Schema
+npx rover subgraph publish \
+  my-graph@prod \
+  --schema ./schema.graphql \
+  --name users
+```
+
+## 六、变更审计日志
+
+```graphql
+# 在 Resolver 中记录变更
+const resolvers = {
+  Mutation: {
+    updateUser: async (_, { id, input }, context) => {
+      const before = await db.users.findById(id);
+      const after = await db.users.update(id, input);
+
+      // 记录审计日志
+      await auditLog.record({
+        entity: 'User',
+        entityId: id,
+        action: 'UPDATE',
+        changes: diff(before, after),
+        userId: context.currentUser.id,
+        timestamp: new Date(),
+      });
+
+      return after;
+    },
+  },
+};
+```
+
+## 七、注意事项
 
 1. **永远优先新增而非修改**
 2. **废弃字段要有使用率监控**
 3. **给客户端足够迁移时间**
 4. **破坏性变更需要大版本号**
 5. **Schema Registry 帮助追踪变更**
+6. **CI 中集成 Schema 比较**，阻止破坏性变更合并
+7. **定期清理废弃字段**，使用率为零后移除

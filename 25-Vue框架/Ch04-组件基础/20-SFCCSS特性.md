@@ -10,20 +10,16 @@ import { ref } from 'vue'
 
 const color = ref('#42b883')
 const size = ref(16)
-const visible = ref(true)
 </script>
 
 <template>
-  <p class="dynamic-text" :class="{ hidden: !visible }">动态样式</p>
+  <p class="dynamic-text">动态样式</p>
 </template>
 
 <style scoped>
 .dynamic-text {
-  color: v-bind(color);           /* 使用 JS 变量 */
-  font-size: v-bind(size + 'px'); /* 表达式 */
-}
-.hidden {
-  opacity: 0;
+  color: v-bind(color);
+  font-size: v-bind(size + 'px');
 }
 </style>
 ```
@@ -50,7 +46,33 @@ const theme = reactive({
 </style>
 ```
 
-### 2.2 预处理器支持
+### 2.2 CSS Modules
+
+```vue
+<template>
+  <p :class="$style.text">CSS Modules 示例</p>
+  <p :class="classes.active">活动状态</p>
+</template>
+
+<style module>
+.text {
+  color: #42b883;
+  font-size: 14px;
+}
+.active {
+  font-weight: bold;
+}
+</style>
+
+<!-- 命名模块 -->
+<style module="classes">
+.active {
+  color: red;
+}
+</style>
+```
+
+### 2.3 预处理器支持
 
 ```vue
 <style lang="scss" scoped>
@@ -68,11 +90,13 @@ $primary-color: #42b883;
 ```
 
 ```bash
-# 需要安装预处理器
-pnpm add -D sass
+# 安装预处理器
+pnpm add -D sass     # SCSS
+pnpm add -D less     # Less
+pnpm add -D stylus   # Stylus
 ```
 
-### 2.3 CSS 变量注入
+### 2.4 CSS 变量注入
 
 ```vue
 <script setup>
@@ -93,10 +117,41 @@ const themeColor = ref('#42b883')
 </style>
 ```
 
-## 三、注意事项与常见陷阱
+### 2.5 多个 style 块
+
+```vue
+<!-- 全局基础样式 -->
+<style>
+:root {
+  --primary: #42b883;
+  --text: #333;
+}
+</style>
+
+<!-- 组件 scoped 样式 -->
+<style scoped>
+.title {
+  color: var(--primary);
+}
+</style>
+```
+
+## 三、常见用例
+
+| 特性 | 场景 |
+|------|------|
+| `scoped` | 样式隔离 |
+| `:deep()` | 修改子组件/第三方库样式 |
+| `v-bind()` | JS 变量控制 CSS |
+| `module` | 类型安全的样式隔离 |
+| `lang="scss"` | 使用预处理器 |
+
+## 四、注意事项与常见陷阱
 
 - `v-bind()` 在 CSS 中生成 CSS 变量，有轻微性能开销
 - `v-bind()` 中的值变化会触发样式重新计算
 - 预处理器（sass/less）需要单独安装依赖
 - `<style scoped>` 和 `<style module>` 可以同时使用
 - `v-bind()` 在 CSS 中的表达式会被限制为单个表达式
+- CSS Modules 的类名在 JS 中通过 `$style.xxx` 访问
+- `v-bind()` 支持响应式数据，数据变化时样式会自动更新

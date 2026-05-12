@@ -61,6 +61,70 @@ router.beforeEach(async (to) => {
 })
 ```
 
+## 四、路由参数与Store同步
+
+```js
+// composables/useRouteStore.js
+import { watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+
+export function useRouteStore(store, fieldMap) {
+  const route = useRoute()
+  const router = useRouter()
+
+  // 路由参数 → Store
+  Object.entries(fieldMap).forEach(([queryKey, storeKey]) => {
+    watch(
+      () => route.query[queryKey],
+      (val) => {
+        if (val && store[storeKey] !== val) {
+          store[storeKey] = val
+        }
+      },
+      { immediate: true }
+    )
+  })
+
+  // Store → 路由参数
+  Object.entries(fieldMap).forEach(([queryKey, storeKey]) => {
+    watch(
+      () => store[storeKey],
+      (val) => {
+        if (val !== route.query[queryKey]) {
+          router.replace({ query: { ...route.query, [queryKey]: val } })
+        }
+      }
+    )
+  })
+}
+
+// 使用
+const store = useSearchStore()
+useRouteStore(store, {
+  q: 'keyword',
+  page: 'page',
+  sort: 'sortBy'
+})
+```
+
+## 五、页面离开时保存Store状态
+
+```js
+router.beforeEach((to, from) => {
+  // 离开搜索页时保存搜索状态
+  if (from.path === '/search') {
+    const search = useSearchStore()
+    search.saveState()
+  }
+
+  // 进入搜索页时恢复状态
+  if (to.path === '/search') {
+    const search = useSearchStore()
+    search.restoreState()
+  }
+})
+```
+
 ## 三、注意事项与常见陷阱
 
 1. 在路由守卫中调用store，确保Pinia已初始化
@@ -68,3 +132,5 @@ router.beforeEach(async (to) => {
 3. 导航守卫中获取数据时注意异步和错误处理
 4. 路由参数变化不触发组件重建时，需watch监听
 5. Store中的数据可用于路由守卫的判断逻辑
+6. 双向同步路由和Store时注意避免循环更新
+7. 保存/恢复状态功能适合搜索、筛选等场景

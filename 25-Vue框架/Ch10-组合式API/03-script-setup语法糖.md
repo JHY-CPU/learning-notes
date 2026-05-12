@@ -76,3 +76,110 @@ defineExpose({ count, reset })
 3. 可以与普通`<script>`共存（用于声明name、inheritAttrs等）
 4. 默认情况下，`<script setup>`中的顶层变量不是全局的，仅当前组件可用
 5. 自动注册组件，无需在`components`选项中声明
+
+## 四、`<script setup>` 的进阶用法
+
+### 4.1 defineProps 的 TypeScript 写法
+
+```vue
+<script setup lang="ts">
+// 运行时声明
+const props = defineProps({
+  title: { type: String, required: true },
+  count: { type: Number, default: 0 }
+})
+
+// 基于类型的声明（Vue 3.2+）
+interface Props {
+  title: string
+  count?: number
+  items?: string[]
+}
+const props = defineProps<Props>()
+
+// 带默认值（Vue 3.3+）
+const props = withDefaults(defineProps<Props>(), {
+  count: 0,
+  items: () => []
+})
+</script>
+```
+
+### 4.2 defineEmits 的 TypeScript 写法
+
+```vue
+<script setup lang="ts">
+// 运行时声明
+const emit = defineEmits(['update', 'delete'])
+
+// 基于类型的声明
+const emit = defineEmits<{
+  update: [id: number, value: string]
+  delete: [id: number]
+}>()
+
+// 使用
+function handleUpdate() {
+  emit('update', 1, 'new value')
+}
+</script>
+```
+
+### 4.3 defineModel（Vue 3.4+）
+
+```vue
+<script setup>
+// 自动定义 modelValue prop 和 update:modelValue 事件
+const modelValue = defineModel()
+
+// 带类型和默认值
+const modelValue = defineModel({ default: '' })
+
+// 多个 v-model
+const title = defineModel('title')
+const count = defineModel('count', { default: 0 })
+</script>
+```
+
+### 4.4 与普通 `<script>` 共存
+
+```vue
+<!-- 声明组件名和 inheritAttrs -->
+<script lang="ts">
+export default {
+  name: 'MyComponent',
+  inheritAttrs: false
+}
+</script>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+const count = ref(0)
+</script>
+```
+
+### 4.5 useSlots 和 useAttrs
+
+```vue
+<script setup>
+import { useSlots, useAttrs } from 'vue'
+
+const slots = useSlots()
+const attrs = useAttrs()
+
+// 检查插槽是否存在
+const hasHeader = computed(() => !!slots.header)
+
+// 非 prop 的 attribute
+console.log(attrs.class, attrs.id)
+</script>
+```
+
+## 五、`<script setup>` 的限制
+
+| 限制 | 解决方案 |
+|------|---------|
+| 不能动态组件名 | 使用 `defineOptions`（3.3+）|
+| 不能声明额外选项 | 与普通 `<script>` 共存 |
+| 没有 this | 使用 context 参数 |
+| 默认私有暴露 | `defineExpose` 显式暴露 |

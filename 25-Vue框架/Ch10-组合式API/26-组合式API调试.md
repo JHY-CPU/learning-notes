@@ -75,3 +75,64 @@ function debugState() {
 3. 使用`console.trace()`追踪状态变更的调用栈
 4. Vue DevTools需要Vue 3.2+支持setup状态展示
 5. 生产环境移除调试钩子，避免性能损耗
+
+## 四、响应式系统的调试工具
+
+### 4.1 使用 reactive 调试
+```js
+import { reactive, watch } from 'vue'
+
+const state = reactive({ count: 0, user: null })
+
+// 监听所有属性变化
+watch(state, (newVal, oldVal) => {
+  console.log('状态变化:', JSON.stringify(newVal))
+}, { deep: true })
+```
+
+### 4.2 追踪不必要的渲染
+```vue
+<script setup>
+import { ref, onRenderTriggered } from 'vue'
+
+const count = ref(0)
+const name = ref('test')
+
+// 只在开发模式下生效
+onRenderTriggered((event) => {
+  console.log('触发渲染:', {
+    key: event.key,
+    type: event.type,
+    oldValue: event.oldValue,
+    newValue: event.newValue
+  })
+  // 如果某个不需要变化的数据触发了渲染，说明有性能问题
+})
+</script>
+```
+
+### 4.3 性能测量 Composable
+```js
+export function usePerformance(label) {
+  const start = () => performance.mark(`${label}-start`)
+  const end = () => {
+    performance.mark(`${label}-end`)
+    performance.measure(label, `${label}-start`, `${label}-end`)
+    const measure = performance.getEntriesByName(label)[0]
+    console.log(`[Performance] ${label}: ${measure.duration.toFixed(2)}ms`)
+    performance.clearMarks()
+    performance.clearMeasures()
+  }
+  return { start, end }
+}
+```
+
+## 五、常见调试场景
+
+| 问题 | 调试方式 |
+|------|---------|
+| 状态不更新 | 检查是否为 ref，是否使用 .value |
+| 不必要的渲染 | onRenderTriggered |
+| 内存泄漏 | 检查 onUnmounted 中是否清理 |
+| 响应式丢失 | 避免解构 reactive，使用 toRefs |
+| computed 不更新 | 检查依赖是否响应式 |

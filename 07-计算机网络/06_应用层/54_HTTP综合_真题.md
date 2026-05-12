@@ -58,8 +58,64 @@
 - 计算RTT时注意是否有缓存
 - 结合DNS和TCP的总时间
 
+### 真题5（HTTP/2与HTTP/3）
+
+**题目**：HTTP/2相比HTTP/1.1有哪些改进？
+
+**参考答案**：
+1. **多路复用**：同一TCP连接上并行传输多个请求/响应
+2. **头部压缩**：HPACK算法压缩HTTP头部
+3. **服务器推送**：服务器主动推送资源
+4. **二进制分帧**：将消息分解为帧，提高传输效率
+
+**HTTP/3**：
+- 基于QUIC（UDP），解决TCP队头阻塞
+- 内置TLS 1.3，0-RTT连接建立
+- 连接迁移（切换网络不中断）
+
+### 真题6（Cookie与Session）
+
+**题目**：Cookie的作用是什么？HTTP本身是无状态的，如何实现状态管理？
+
+**参考答案**：
+- HTTP本身无状态，通过Cookie实现状态管理
+- 服务器通过Set-Cookie头部向客户端发送Cookie
+- 客户端后续请求通过Cookie头部携带Cookie
+- 服务器根据Cookie识别用户，维护会话状态
+- Session通常配合Cookie使用（Cookie存Session ID）
+
+### 真题7（HTTP方法对比）
+
+**题目**：比较HTTP的GET和POST方法。
+
+**参考答案**：
+| 特性 | GET | POST |
+|------|-----|------|
+| 参数位置 | URL查询字符串 | 请求体 |
+| 幂等性 | 幂等 | 非幂等 |
+| 可缓存 | 可缓存 | 默认不缓存 |
+| 安全性 | 参数可见 | 参数在请求体中 |
+| 数据长度 | 受URL长度限制 | 无限制 |
+| 用途 | 获取资源 | 提交数据 |
+
+### HTTP状态码分类
+- 1xx：信息性（100 Continue）
+- 2xx：成功（200 OK, 201 Created）
+- 3xx：重定向（301永久, 302临时, 304未修改）
+- 4xx：客户端错误（400 Bad Request, 403 Forbidden, 404 Not Found）
+- 5xx：服务器错误（500 Internal Server Error, 503 Service Unavailable）
+
+### 408常考要点
+- HTTP/1.0默认非持久连接，HTTP/1.1默认持久连接
+- RTT计算：非持久=2RTT/对象，持久非流水线=1+1+对象数，持久流水线=3
+- HTTP无状态，通过Cookie管理状态
+- HTTP/2多路复用解决HTTP层队头阻塞
+- HTTP/3基于QUIC（UDP）
+- GET幂等，POST非幂等
+
 ## 协议关联
 
 - **HTTP + TCP + DNS** = Web访问完整时间
 - **HTTP + Cookie** = 状态管理
+- **HTTP + SSL/TLS** = HTTPS
 - **408常见组合**：HTTP版本 + RTT计算 = 综合题

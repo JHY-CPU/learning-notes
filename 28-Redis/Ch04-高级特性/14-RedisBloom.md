@@ -70,3 +70,86 @@ CMS.QUERY mycms "item1"
 3. **内存效率**：比Set节省大量内存
 4. **容量规划**：预估准确的元素数量
 5. **Redis 4.0+**：需要加载RedisBloom模块
+
+## 五、Python操作RedisBloom
+
+```python
+from redis import Redis
+from redisbloom.client import Client
+
+rb = Client()
+
+# 布隆过滤器
+rb.bfCreate('users', 0.01, 1000000)
+rb.bfAdd('users', 'user:1001')
+rb.bfMAdd('users', 'user:1002', 'user:1003', 'user:1004')
+exists = rb.bfExists('users', 'user:1001')  # True
+not_exists = rb.bfExists('users', 'user:9999')  # False
+
+# Cuckoo过滤器
+rb.cfCreate('items', 1000000)
+rb.cfAdd('items', 'item:1001')
+rb.cfExists('items', 'item:1001')  # True
+rb.cfDel('items', 'item:1001')
+rb.cfExists('items', 'item:1001')  # False
+
+# Count-Min Sketch
+rb.cmsInitByDim('freq', 1000, 10)
+rb.cmsIncrBy('freq', 'page:1', 5)
+rb.cmsIncrBy('freq', 'page:2', 3)
+count = rb.cmsQuery('freq', 'page:1')  # [5]
+
+# Top-K
+rb.topkReserve('hot', 50, 2000, 7, 0.925)
+rb.topkAdd('hot', 'item:1', 'item:2', 'item:1', 'item:3')
+top_items = rb.topkList('hot')
+```
+
+## 六、布隆过滤器容量规划
+
+```bash
+# 容量规划公式
+# n = 预期元素数量
+# p = 期望误判率
+# m = 位数组大小（bits）= -n * ln(p) / (ln2)^2
+# k = 哈希函数数量 = m/n * ln2
+
+# 示例
+# n = 100万, p = 0.01 (1%)
+# m = 1000000 * 4.605 / 0.480 = 9.6M bits ≈ 1.2MB
+# k = 9.6M/1M * 0.693 ≈ 7
+
+# 内存使用对比
+# 布隆过滤器：1.2MB存储100万元素
+# Set：约40MB存储100万元素（40字节/元素）
+# 节省约97%的内存
+```
+
+## 七、实际应用案例
+
+```bash
+# 案例1：防止缓存穿透
+# 1. 用户注册时添加到布隆过滤器
+BF.ADD user:ids "user:1001"
+# 2. 查询时先检查布隆过滤器
+BF.EXISTS user:ids "user:9999"
+# 返回0表示一定不存在，直接返回
+
+# 案例2：爬虫去重
+# 1. 爬取URL时检查是否已访问
+BF.ADD visited:urls "https://example.com/page1"
+# 2. 如果已存在则跳过
+BF.EXISTS visited:urls "https://example.com/page1"
+
+# 案例3：垃圾邮件过滤
+# 1. 已知垃圾邮件地址添加到过滤器
+BF.ADD spam:emails "spam@example.com"
+# 2. 收到邮件时检查
+BF.EXISTS spam:emails "new@example.com"
+
+# 案例4：推荐系统去重
+# 1. 已推荐内容添加到过滤器
+BF.ADD rec:user:1001 "item:2001"
+# 2. 生成推荐时过滤已推荐内容
+BF.EXISTS rec:user:1001 "item:2002"
+```

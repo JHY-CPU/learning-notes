@@ -69,3 +69,62 @@ sudo gitlab-runner register
 2. **语法正确**：YAML语法必须正确
 3. **Runner可用**：确保有可用的Runner
 4. **缓存配置**：配置依赖缓存加速构建
+
+## 六、GitLab CI完整工作流程
+
+```
+开发者推送代码
+    │
+    ▼
+GitLab检测到.gitlab-ci.yml
+    │
+    ▼
+创建Pipeline
+    │
+    ├─ Stage: build (Job 1, Job 2...)
+    ├─ Stage: test (Job 1, Job 2...)
+    ├─ Stage: deploy (Job 1, Job 2...)
+    │
+    ▼
+选择可用Runner执行Job
+    │
+    ├─ Shell Executor → 直接执行
+    ├─ Docker Executor → 容器内执行
+    ├─ Kubernetes Executor → Pod内执行
+    │
+    ▼
+收集结果、制品、报告
+```
+
+## 七、GitLab CI/CD架构
+
+```
+┌──────────────────────────────────────────────────────┐
+│                   GitLab Server                       │
+│  ┌──────────┐  ┌──────────┐  ┌────────────────────┐ │
+│  │   Git     │  │ CI/CD    │  │ Container Registry │ │
+│  │  仓库     │  │ 调度器    │  │ (镜像仓库)         │ │
+│  └────┬─────┘  └────┬─────┘  └────────────────────┘ │
+│       │              │                                │
+└───────┼──────────────┼────────────────────────────────┘
+        │              │
+   ┌────▼──────────────▼────┐
+   │      Runner Pool        │
+   │  ┌───────┐  ┌────────┐ │
+   │  │Runner1│  │Runner2 │ │
+   │  │(Linux)│  │(Docker)│ │
+   │  └───────┘  └────────┘ │
+   └────────────────────────┘
+```
+
+## 八、GitLab CI与GitHub Actions对比
+
+| 特性 | GitLab CI | GitHub Actions |
+|------|-----------|----------------|
+| 配置文件 | .gitlab-ci.yml | .github/workflows/*.yml |
+| Runner | GitLab Runner | GitHub Runner |
+| 内置注册表 | GitLab Registry | GHCR |
+| 安全扫描 | 内置SAST/DAST | 需第三方Action |
+| 环境管理 | Environments | Environments |
+| 制品管理 | Artifacts + Packages | Artifacts |
+| 免费额度 | 400分钟/月 | 2000分钟/月 |

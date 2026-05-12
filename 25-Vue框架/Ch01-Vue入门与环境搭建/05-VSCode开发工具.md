@@ -68,10 +68,72 @@ export default [
 }
 ```
 
-## 三、注意事项与常见陷阱
+### 2.5 推荐的 VS Code 快捷键
 
-- 必须**禁用 Vetur**插件，否则与 Volar 冲突导致语法错误
+| 快捷键 | 功能 |
+|--------|------|
+| `Ctrl+P` | 快速打开文件 |
+| `Ctrl+Shift+P` | 命令面板 |
+| `Ctrl+`` ` | 打开终端 |
+| `Alt+Shift+F` | 格式化文档 |
+| `F12` | 跳转到定义 |
+| `Ctrl+.` | 快速修复 |
+| `Ctrl+Shift+V` | 预览 Markdown |
+
+## 三、常见用例
+
+### 3.1 代码片段配置
+
+```json
+// .vscode/vue.code-snippets
+{
+  "Vue 3 SFC": {
+    "prefix": "v3",
+    "body": [
+      "<script setup>",
+      "import { ref } from 'vue'",
+      "",
+      "const ${1:state} = ref(${2:null})",
+      "</script>",
+      "",
+      "<template>",
+      "  <div>${3:content}</div>",
+      "</template>",
+      "",
+      "<style scoped>",
+      "</style>"
+    ],
+    "description": "Vue 3 单文件组件模板"
+  }
+}
+```
+
+### 3.2 调试配置
+
+```json
+// .vscode/launch.json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "chrome",
+      "request": "launch",
+      "name": "Vue: Chrome",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/src",
+      "sourceMapPathOverrides": {
+        "webpack:///src/*": "${webRoot}/*"
+      }
+    }
+  ]
+}
+```
+
+## 四、注意事项与常见陷阱
+
+- 必须**禁用 Vetur** 插件，否则与 Volar 冲突导致语法错误
 - ESLint 9 使用 Flat Config 格式，与旧版 `.eslintrc` 不同
 - Prettier 和 ESLint 规则可能冲突，使用 `@vue/eslint-config-prettier` 解决
 - `lang="ts"` 的模板需要 TypeScript 插件支持类型推断
 - 建议开启 `Volar: Take Over Mode` 以获得最佳性能
+- 大型项目中 Volar 可能较慢，可增加 `typescript.tsserver.maxTsServerMemory`

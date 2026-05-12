@@ -83,4 +83,111 @@ async def main():
 1. **decode_responses**：自动解码为字符串
 2. **连接池**：多线程使用连接池
 3. **异常处理**：捕获ConnectionError
-4. **超时设置**：设置socket_timeout
+## 七、Pub/Sub使用
+
+```python
+import redis
+import threading
+import json
+
+r = redis.Redis()
+
+def subscribe_handler():
+    """订阅处理"""
+    pubsub = r.pubsub()
+    pubsub.subscribe('notifications')
+    
+    for message in pubsub.listen():
+        if message['type'] == 'message':
+            data = json.loads(message['data'])
+            print(f"收到通知: {data}")
+
+# 启动订阅线程
+thread = threading.Thread(target=subscribe_handler, daemon=True)
+thread.start()
+
+# 发布消息
+r.publish('notifications', json.dumps({
+    'type': 'info',
+    'message': '系统维护通知'
+}))
+```
+
+## 八、Stream消费者组
+
+```python
+import redis
+import json
+
+r = redis.Redis()
+
+# 创建消费者组
+try:
+    r.xgroup_create('orders', 'order_group', id='0', mkstream=True)
+except redis.ResponseError:
+    pass  # 组已存在
+
+def consume_orders():
+    """消费订单消息"""
+    while True:
+        messages = r.xreadgroup(
+            'order_group', 'consumer1',
+            {'orders': '>'},
+            count=10, block=5000
+        )
+        
+        for stream, msgs in messages:
+            for msg_id, data in msgs:
+                try:
+                    order = json.loads(data[b'data'])
+                    print(f"处理订单: {order}")
+                    
+                    # 确认消息
+                    r.xack('orders', 'order_group', msg_id)
+                except Exception as e:
+                    print(f"处理失败: {e}")
+
+# 启动消费
+consume_orders()
+```
+
+## 九、Redis锁实现
+
+```python
+import redis
+import time
+from uuid import uuid4
+
+r = redis.Redis()
+
+class RedisLock:
+    def __init__(self, key, expire=30):
+        self.key = f"lock:{key}"
+        self.expire = expire
+        self.token = str(uuid4())
+    
+    def acquire(self, timeout=10):
+        end_time = time.time() + timeout
+        while time.time() < end_time:
+            if r.set(self.key, self.token, nx=True, ex=self.expire):
+                return True
+            time.sleep(0.1)
+        return False
+    
+    def release(self):
+        lua = """
+        if redis.call('get', KEYS[1]) == ARGV[1] then
+            return redis.call('del', KEYS[1])
+        end
+        return 0
+        """
+        return r.eval(lua, 1, self.key, self.token)
+
+# 使用
+lock = RedisLock("resource:1001")
+if lock.acquire():
+    try:
+        print("获取锁成功")
+    finally:
+        lock.release()
+```

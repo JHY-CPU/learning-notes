@@ -70,6 +70,104 @@
 - 迭代 = "你告诉我找谁，我自己去"（客户端负担大）
 - 实际 = 主机对本地DNS递归，本地DNS对其他服务器迭代（折中方案）
 
+## 代码示例
+
+### 使用 dig +trace 追踪 DNS 迭代查询过程
+
+```bash
+# +trace 模拟本地DNS的迭代查询过程（408考试重点）
+dig +trace www.example.com
+
+# 输出示例（逐级查询）：
+# ① 从根DNS服务器(.)开始
+# .           518400  IN  NS  a.root-servers.net.
+# ② 查询 .com 的TLD服务器
+# com.        172800  IN  NS  a.gtld-servers.net.
+# ③ 查询 example.com 的权威DNS服务器
+# example.com. 172800 IN  NS  a.iana-servers.net.
+# ④ 权威DNS返回最终IP
+# www.example.com. 86400 IN A  93.184.216.34
+```
+
+### 使用 Python 模拟 DNS 递归解析过程
+
+```python
+import dns.resolver
+
+def trace_dns_resolution(domain):
+    """模拟DNS解析过程，理解递归/迭代查询"""
+    print(f"正在解析: {domain}")
+    print("=" * 50)
+
+    # 1. 查询根服务器（根提示文件）
+    print("[步骤1] 查询根DNS服务器 → 获取TLD服务器地址")
+
+    # 2. 查询TLD服务器（如 .com）
+    tld = domain.split('.')[-1]
+    ns_records = dns.resolver.resolve(f'{tld}', 'NS')
+    print(f"[步骤2] 查询 .{tld} TLD服务器:")
+    for ns in ns_records:
+        print(f"  → {ns}")
+
+    # 3. 查询权威DNS服务器
+    try:
+        ns_records = dns.resolver.resolve(domain, 'NS')
+        print(f"[步骤3] 查询 {domain} 权威DNS服务器:")
+        for ns in ns_records:
+            print(f"  → {ns}")
+    except Exception as e:
+        print(f"[步骤3] 权威DNS查询: {e}")
+
+    # 4. 获取最终IP地址
+    a_records = dns.resolver.resolve(domain, 'A')
+    print(f"[步骤4] 获取A记录:")
+    for ip in a_records:
+        print(f"  → {domain} → {ip}")
+
+# 执行追踪
+trace_dns_resolution('www.example.com')
+```
+
+### 使用 Python 实现简单的 DNS 缓存模拟
+
+```python
+import time
+
+class SimpleDNSCache:
+    """模拟本地DNS服务器的缓存机制"""
+    def __init__(self):
+        self.cache = {}  # {domain: (ip, expire_time)}
+
+    def resolve(self, domain, ttl=300):
+        """带缓存的DNS解析"""
+        now = time.time()
+
+        # 检查缓存是否命中
+        if domain in self.cache:
+            ip, expire_time = self.cache[domain]
+            if now < expire_time:
+                print(f"[缓存命中] {domain} → {ip}")
+                return ip
+            else:
+                print(f"[缓存过期] {domain} TTL已到，重新查询")
+                del self.cache[domain]
+
+        # 缓存未命中，模拟向DNS服务器查询
+        import socket
+        ip = socket.gethostbyname(domain)
+
+        # 存入缓存
+        self.cache[domain] = (ip, now + ttl)
+        print(f"[查询并缓存] {domain} → {ip} (TTL={ttl}s)")
+        return ip
+
+# 演示
+cache = SimpleDNSCache()
+cache.resolve('www.example.com')      # 第一次：查询并缓存
+cache.resolve('www.example.com')      # 第二次：缓存命中
+cache.resolve('www.google.com')       # 另一个域名：查询并缓存
+```
+
 ## 协议关联
 
 - **DNS与UDP**：查询使用UDP，端口53，减少TCP握手开销

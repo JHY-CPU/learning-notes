@@ -66,3 +66,45 @@ watch(count, (newVal, oldVal) => {
 - 需要初始化数据时用 `immediate` 比在 `onMounted` 中手动调用更简洁
 - `immediate` 和 `watchEffect` 的区别：watchEffect 没有 oldVal
 - 不要过度依赖 `immediate`，有时 onMounted 更直观
+
+## 五、immediate vs 其他初始化方式
+
+```vue
+<script setup>
+import { ref, watch, onMounted } from 'vue'
+
+const userId = ref(1)
+const userData = ref(null)
+
+// 方式一：watch + immediate
+// 优点：数据变化时自动重新请求
+// 缺点：首次执行时 oldVal 是 undefined
+watch(userId, async (id) => {
+  userData.value = await fetch(`/api/users/${id}`).then(r => r.json())
+}, { immediate: true })
+
+// 方式二：onMounted + watch
+// 优点：更清晰地分离初始化和响应逻辑
+// 缺点：代码稍多
+onMounted(async () => {
+  userData.value = await fetch(`/api/users/${userId.value}`).then(r => r.json())
+})
+watch(userId, async (id) => {
+  userData.value = await fetch(`/api/users/${id}`).then(r => r.json())
+})
+
+// 方式三：watchEffect
+// 优点：最简洁
+// 缺点：无法获取 oldVal
+import { watchEffect } from 'vue'
+watchEffect(async () => {
+  userData.value = await fetch(`/api/users/${userId.value}`).then(r => r.json())
+})
+</script>
+```
+
+| 方式 | 代码量 | oldVal | 自动追踪 | 初始加载 |
+|------|--------|--------|----------|----------|
+| watch + immediate | 中 | undefined 首次 | 手动指定 | 是 |
+| onMounted + watch | 多 | 正常 | 手动指定 | 手动 |
+| watchEffect | 少 | 无 | 自动 | 是 |

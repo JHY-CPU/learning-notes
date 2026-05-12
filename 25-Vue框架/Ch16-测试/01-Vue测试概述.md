@@ -50,3 +50,56 @@ describe('Counter', () => {
 - 不要追求 100% 覆盖率，关注关键业务逻辑
 - 测试行为而非实现，避免测试内部细节
 - 每个测试应该独立，不依赖其他测试的结果
+
+## 四、测试配置
+
+```js
+// vitest.config.ts
+import { defineConfig } from 'vitest/config'
+import vue from '@vitejs/plugin-vue'
+
+export default defineConfig({
+  plugins: [vue()],
+  test: {
+    environment: 'jsdom',            // 模拟浏览器环境
+    globals: true,                   // 全局使用 describe/it/expect
+    include: ['**/*.{test,spec}.{js,ts,jsx,tsx}'],
+    coverage: {
+      reporter: ['text', 'html'],    // 覆盖率报告
+      exclude: ['node_modules/']
+    }
+  }
+})
+```
+
+## 五、测试优先级
+
+```
+优先测试：
+  1. 业务逻辑（纯函数、计算属性）
+  2. 用户交互（表单提交、按钮点击）
+  3. 条件渲染（v-if 分支）
+  4. 数据展示（props 传递）
+
+次要测试：
+  5. 样式变化
+  6. 动画效果
+  7. 第三方库集成
+```
+
+## 六、测试命名规范
+
+```js
+// ✅ 好的命名
+describe('UserForm', () => {
+  it('当邮箱为空时显示错误提示', () => {})
+  it('提交成功后清空表单', () => {})
+  it('密码少于8位时禁用提交按钮', () => {})
+})
+
+// ❌ 不好的命名
+describe('UserForm', () => {
+  it('测试验证', () => {})
+  it('测试提交', () => {})
+})
+```

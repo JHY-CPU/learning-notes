@@ -1,7 +1,7 @@
 # Self-Attention 计算详解
 
 
-# Self-Attention 计算详解
+## Self-Attention 计算详解
 
 
 #### 核心思想

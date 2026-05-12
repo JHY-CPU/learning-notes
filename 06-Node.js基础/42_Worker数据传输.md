@@ -43,4 +43,95 @@ Atomics.notify(view, 0, 1); // 通知
 点击按钮查看
 
 
+## Worker 池与实战
+
+```javascript
+// ========== Worker 池 ==========
+class WorkerPool {
+    constructor(script, size = navigator.hardwareConcurrency || 4) {
+        this.workers = [];
+        this.queue = [];
+        this.activeWorkers = 0;
+
+        for (let i = 0; i < size; i++) {
+            const worker = new Worker(script);
+            worker.available = true;
+            worker.onmessage = (e) => {
+                worker.available = true;
+                this.activeWorkers--;
+                if (worker.resolve) worker.resolve(e.data);
+                this._processQueue();
+            };
+            this.workers.push(worker);
+        }
+    }
+
+    exec(data) {
+        return new Promise((resolve) => {
+            const task = { data, resolve };
+            const worker = this.workers.find(w => w.available);
+            if (worker) {
+                this._runTask(worker, task);
+            } else {
+                this.queue.push(task);
+            }
+        });
+    }
+
+    _runTask(worker, task) {
+        worker.available = false;
+        worker.resolve = task.resolve;
+        this.activeWorkers++;
+        worker.postMessage(task.data);
+    }
+
+    _processQueue() {
+        if (this.queue.length === 0) return;
+        const worker = this.workers.find(w => w.available);
+        if (worker) this._runTask(worker, this.queue.shift());
+    }
+
+    terminate() {
+        this.workers.forEach(w => w.terminate());
+    }
+}
+
+// ========== SharedArrayBuffer 原子操作 ==========
+// main.js
+const shared = new SharedArrayBuffer(4); // 4字节
+const view = new Int32Array(shared);
+view[0] = 0;
+
+const worker1 = new Worker('counter.js');
+const worker2 = new Worker('counter.js');
+worker1.postMessage(shared);
+worker2.postMessage(shared);
+
+// counter.js
+self.onmessage = (e) => {
+    const view = new Int32Array(e.data);
+    for (let i = 0; i < 100000; i++) {
+        Atomics.add(view, 0, 1); // 原子加1
+    }
+    self.postMessage('done');
+};
+
+// 等待所有 worker 完成后
+// view[0] === 200000 (保证正确性)
+
+// ========== 流式数据传输 ==========
+async function streamToWorker(file, worker) {
+    const stream = file.stream();
+    const reader = stream.getReader();
+
+    while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        // 使用 Transferable 零拷贝传输
+        worker.postMessage(value.buffer, [value.buffer]);
+    }
+    worker.postMessage('DONE');
+}
+```
+
 <!-- Converted from: 42_Worker数据传输.html -->

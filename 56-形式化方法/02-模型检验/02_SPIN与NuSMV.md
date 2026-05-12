@@ -1,7 +1,7 @@
 # SPIN与NuSMV
 
 
-# SPIN与NuSMV模型检验工具
+## SPIN与NuSMV模型检验工具
 
 一、SPIN模型检验器
 

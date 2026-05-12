@@ -65,3 +65,64 @@ const theme = inject('theme')
 - 不要用 Provide/Inject 做内容分发（应该用插槽）
 - 不要用插槽做深层数据传递（应该用 Provide/Inject）
 - 选择原则：数据传递用数据方案，内容分发用插槽
+
+## 四、混合使用示例
+
+```vue
+<!-- ThemeProvider.vue：用 provide 传递主题数据，用插槽传递内容 -->
+<script setup>
+import { provide, ref } from 'vue'
+
+const theme = ref('dark')
+const toggleTheme = () => {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark'
+}
+
+provide('theme', theme)
+provide('toggleTheme', toggleTheme)
+</script>
+
+<template>
+  <div :class="`theme-${theme}`">
+    <slot :theme="theme" :toggle="toggleTheme" />
+  </div>
+</template>
+```
+
+```vue
+<!-- 使用 -->
+<template>
+  <ThemeProvider v-slot="{ theme, toggle }">
+    <!-- 可以通过插槽 props 使用 -->
+    <button @click="toggle">当前主题: {{ theme }}</button>
+    <!-- 深层组件通过 inject 使用 -->
+    <DeepComponent />
+  </ThemeProvider>
+</template>
+
+<script setup>
+const theme = inject('theme')  // 深层组件通过 inject 获取
+</script>
+```
+
+## 五、Ant Design / Element Plus 的实践
+
+大型 UI 库通常同时使用两者：
+- **插槽**：自定义渲染内容（表格列、下拉菜单项）
+- **provide/inject**：传递全局配置（语言、尺寸、主题）
+
+```vue
+<!-- ElConfigProvider：provide 全局配置 -->
+<ElConfigProvider :locale="zhCn" :size="'large'">
+  <App />
+</ElConfigProvider>
+
+<!-- ElTable：插槽自定义列渲染 -->
+<ElTable :data="data">
+  <ElTableColumn prop="name" label="姓名">
+    <template #default="{ row }">
+      <strong>{{ row.name }}</strong>
+    </template>
+  </ElTableColumn>
+</ElTable>
+```

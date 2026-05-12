@@ -89,3 +89,100 @@ export const useUser = defineStore('user', () => {
 3. action中可调用其他store的action
 4. 不要在组件中直接修改state，通过action修改（保持可追踪性）
 5. action可以有返回值
+
+## 四、Action 的高级用法
+
+### 4.1 带错误处理的异步 Action
+```js
+export const useUserStore = defineStore('user', {
+  state: () => ({
+    user: null,
+    loading: false,
+    error: null
+  }),
+  actions: {
+    async fetchUser(id) {
+      this.loading = true
+      this.error = null
+      try {
+        this.user = await api.getUser(id)
+        return this.user
+      } catch (e) {
+        this.error = e.message
+        throw e
+      } finally {
+        this.loading = false
+      }
+    }
+  }
+})
+```
+
+### 4.2 使用 $onAction 监听 Action 调用
+```js
+const store = useUserStore()
+
+store.$onAction(({ name, args, after, onError }) => {
+  const start = Date.now()
+
+  after((result) => {
+    console.log(`${name} 完成，耗时 ${Date.now() - start}ms`)
+  })
+
+  onError((error) => {
+    console.error(`${name} 失败:`, error)
+    // 上报错误
+    reportError({ action: name, args, error })
+  })
+})
+```
+
+### 4.3 组合多个 Store 的 Action
+```js
+export const useOrderStore = defineStore('order', {
+  actions: {
+    async createOrder(items) {
+      const cartStore = useCartStore()
+      const userStore = useUserStore()
+
+      if (!userStore.isLoggedIn) {
+        throw new Error('请先登录')
+      }
+
+      const order = await api.createOrder({
+        userId: userStore.user.id,
+        items: cartStore.items
+      })
+
+      cartStore.clearCart()
+      return order
+    }
+  }
+})
+```
+
+## 五、Setup 风格的 Action
+
+```js
+export const useUser = defineStore('user', () => {
+  const user = ref(null)
+  const token = ref(localStorage.getItem('token'))
+
+  async function login(credentials) {
+    const result = await api.login(credentials)
+    token.value = result.token
+    user.value = result.user
+    localStorage.setItem('token', result.token)
+  }
+
+  function logout() {
+    token.value = null
+    user.value = null
+    localStorage.removeItem('token')
+  }
+
+  const isLoggedIn = computed(() => !!token.value)
+
+  return { user, token, isLoggedIn, login, logout }
+})
+```

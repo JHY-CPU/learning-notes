@@ -1,6 +1,6 @@
 # 06 - KMP 算法实现与优化 (KMP Implementation)
 
-  ## 标准实现（含完整注释）
+## 标准实现（含完整注释）
 
   以下是一个完整、健壮的 KMP 算法实现，包含边界处理：
 
@@ -43,7 +43,7 @@ function computePrefixFunction(P) {
 }
   ```
 
-  ## 优化：next 数组改进版
+## 优化：next 数组改进版
 
   经典 KMP 的 next 数组有一个优化：当 P[i] !== P[j] 回退后，如果 P[j] === P[next[j]]，可以继续回退，避免不必要的比较。
 
@@ -79,7 +79,7 @@ function computeNextOptimized(P) {
 }
   ```
 
-  ## 多种语言实现
+## 多种语言实现
 
   ### JavaScript
 
@@ -146,7 +146,7 @@ def kmp_search(text, pattern):
     return positions
   ```
 
-  ## 边界情况处理
+## 边界情况处理
 
 
 
@@ -165,4 +165,4 @@ def kmp_search(text, pattern):
 | 无匹配 | 返回 [] |
 | Unicode 字符 | charCodeAt() 可处理，但需要确保基数足够大 |
 
-  ## 前缀函数可视化计算器
+## 前缀函数可视化计算器

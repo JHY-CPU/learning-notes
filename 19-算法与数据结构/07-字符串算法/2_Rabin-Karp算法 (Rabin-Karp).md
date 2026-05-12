@@ -1,6 +1,6 @@
 # 03 - Rabin-Karp 算法 (Rabin-Karp)
 
-  ## 算法思想
+## 算法思想
 
   Rabin-Karp 算法利用**哈希函数**将字符串映射为数值，通过比较哈希值来快速判断子串是否可能匹配。
 
@@ -19,7 +19,7 @@
 
 
 
-  ## 滚动哈希公式
+## 滚动哈希公式
 
   使用基数进制（base = d，通常取 256 或一个大质数），模数 q（一个大质数，如 109+7）：
 
@@ -34,7 +34,7 @@ new_hash = ((old_hash - T[i]*d^(m-1)) * d + T[i+m]) mod q
 // 如果 new_hash < 0，需要加 q 调整
   ```
 
-  ## 算法步骤
+## 算法步骤
 
 
     - **预处理：**计算模式串哈希 hashP，计算 dm-1 mod q
@@ -54,7 +54,7 @@ new_hash = ((old_hash - T[i]*d^(m-1)) * d + T[i+m]) mod q
 
 
 
-  ## 复杂度分析
+## 复杂度分析
 
 
 
@@ -69,7 +69,7 @@ new_hash = ((old_hash - T[i]*d^(m-1)) * d + T[i+m]) mod q
 | 平均匹配时间 | O(n+m)（良好哈希函数下） |
 | 空间复杂度 | O(1) |
 
-  ## JavaScript 实现
+## JavaScript 实现
 
 
 ```
@@ -109,4 +109,4 @@ function rabinKarp(text, pattern) {
 }
   ```
 
-  ## 交互演示
+## 交互演示

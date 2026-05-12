@@ -58,19 +58,51 @@ const props = defineProps<{ msg: string }>()
 // props.msg = '新值'
 
 // 正确做法：用 props 初始化本地数据
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 const localMsg = ref(props.msg)
+
+// 或者使用计算属性
+watch(() => props.msg, (newVal) => {
+  localMsg.value = newVal
+})
 </script>
 ```
 
 ### 2.4 传递非原始类型
 ```vue
-<!-- 父组件传递对象和数组 -->
-<ListView :items="productList" :config="{ showPrice: true }" />
+<ListView :items="productList" :config="{ showPrice: true } />
 ```
 
-## 三、注意事项与常见陷阱
+### 2.5 withDefaults 设置默认值（TypeScript）
+```vue
+<script setup lang="ts">
+interface Props {
+  title: string
+  size?: 'sm' | 'md' | 'lg'
+  count?: number
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  size: 'md',
+  count: 0
+})
+</script>
+```
+
+## 三、常见用例
+
+| 场景 | 示例 |
+|------|------|
+| 配置子组件行为 | `:disabled="true"` |
+| 传递渲染数据 | `:items="list"` |
+| 控制显示状态 | `:visible="show"` |
+| 传递样式主题 | `:theme="'dark'"` |
+
+## 四、注意事项与常见陷阱
+
 - props 是只读的，子组件中不应直接修改
 - 传递对象/数组时，子组件修改其属性不会报错但会导致数据流混乱
 - 使用 `defineProps` 时不需要导入，它是编译器宏
 - 数字类型需要使用 `:age="25"` 而非 `age="25"`（后者是字符串）
+- 对象和数组的 props 传递引用，子组件中的修改会影响父组件（虽然不推荐）
+- `defineProps` 不能引用 `<script setup>` 中的局部变量

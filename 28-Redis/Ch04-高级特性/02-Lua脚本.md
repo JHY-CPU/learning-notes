@@ -95,3 +95,104 @@ lua-time-limit 5000
 3. 集群限制：脚本中的key必须在同一个槽位
 4. 脚本缓存：EVALSHA更高效，避免重复传输脚本
 5. 无状态：脚本不能访问外部状态
+
+## 五、常用Lua脚本模式
+
+### 限流脚本
+
+```lua
+-- 令牌桶限流
+local key = KEYS[1]
+local rate = tonumber(ARGV[1])    -- 每秒生成令牌数
+local capacity = tonumber(ARGV[2]) -- 桶容量
+local now = tonumber(ARGV[3])      -- 当前时间戳(毫秒)
+local requested = tonumber(ARGV[4]) -- 请求令牌数
+
+local last = tonumber(redis.call('hget', key, 'last') or 0)
+local tokens = tonumber(redis.call('hget', key, 'tokens') or capacity)
+
+-- 计算新令牌
+local elapsed = math.max(0, now - last)
+tokens = math.min(capacity, tokens + elapsed * rate / 1000)
+
+if tokens >= requested then
+    tokens = tokens - requested
+    redis.call('hmset', key, 'tokens', tokens, 'last', now)
+    redis.call('pexpire', key, math.floor(capacity / rate * 1000 * 2))
+    return 1
+else
+    redis.call('hmset', key, 'tokens', tokens, 'last', now)
+    return 0
+end
+```
+
+### 乐观锁更新
+
+```lua
+-- CAS更新：仅当值等于预期值时才更新
+local current = redis.call('GET', KEYS[1])
+if current == ARGV[1] then
+    redis.call('SET', KEYS[1], ARGV[2])
+    return 1
+else
+    return 0
+end
+```
+
+### 批量删除（前缀匹配）
+
+```lua
+-- 批量删除指定前缀的Key
+local prefix = ARGV[1]
+local count = 0
+local cursor = '0'
+repeat
+    local result = redis.call('SCAN', cursor, 'MATCH', prefix .. '*', 'COUNT', 100)
+    cursor = result[1]
+    for _, key in ipairs(result[2]) do
+        redis.call('DEL', key)
+        count = count + 1
+    end
+until cursor == '0'
+return count
+```
+
+## 六、Python中使用Lua脚本
+
+```python
+import redis
+
+r = redis.Redis()
+
+# 加载脚本
+limit_script = """
+local current = redis.call('INCR', KEYS[1])
+if current == 1 then
+    redis.call('EXPIRE', KEYS[1], ARGV[1])
+end
+return current
+"""
+
+# 注册脚本（自动缓存SHA1）
+limit = r.register_script(limit_script)
+
+# 使用
+count = limit(keys=['rate:user:1001'], args=[60])
+if count > 100:
+    print("限流")
+```
+
+## 七、调试Lua脚本
+
+```bash
+# 使用redis-cli --eval
+redis-cli --eval script.lua key1 key2 , arg1 arg2
+
+# script.lua内容
+local val = redis.call('GET', KEYS[1])
+return val
+
+# 日志输出
+redis.log(redis.LOG_NOTICE, "Key: " .. KEYS[1])
+redis.log(redis.LOG_WARNING, "Value: " .. ARGV[1])
+```

@@ -74,3 +74,138 @@ wasm-strip dist/module.wasm -o dist/module.min.wasm
 3. **验证重要性**：始终验证生成的 WASM
 4. **性能**：大型 WASM 文件处理可能较慢
 5. **平台支持**：WABT 跨平台支持良好
+
+## 四、wasm-objdump 深入用法
+
+```bash
+# 查看模块头部信息
+wasm-objdump -h module.wasm
+
+# 查看完整的导入/导出表
+wasm-objdump -x module.wasm
+
+# 输出示例：
+# Section Details:
+#
+# Type[2]:
+#  - type[0] (i32, i32) -> i32
+#  - type[1] (i32) -> i32
+# Function[3]:
+#  - func[0] sig=0 <add>
+#  - func[1] sig=1 <factorial>
+#  - func[2] sig=0 <multiply>
+# Memory[1]:
+#  - memory[0] pages: initial=1 max=10
+# Export[2]:
+#  - func[0] <add> -> "add"
+#  - memory[0] -> "memory"
+
+# 反汇编指定函数
+wasm-objdump -d module.wasm | grep -A 20 "func\[0\]"
+
+# 查看自定义段（调试信息）
+wasm-objdump -j name -x module.wasm
+
+# 查看数据段内容
+wasm-objdump -j data -x module.wasm
+```
+
+## 五、wast2json 用于测试
+
+```bash
+# WAST 文件是 WASM 的测试格式
+# test.wast
+(assert_return (invoke "add" (i32.const 1) (i32.const 2)) (i32.const 3))
+(assert_return (invoke "factorial" (i32.const 5)) (i32.const 120))
+(assert_trap (invoke "divide" (i32.const 1) (i32.const 0)) "integer divide by zero")
+
+# 转换为 JSON 格式
+wast2json test.wast -o test.json
+
+# 输出：test.json + 多个 .wasm 文件
+# 适用于自动化测试框架
+
+# 运行官方测试套件
+# 克隆 spec 仓库
+git clone https://github.com/WebAssembly/spec
+cd spec
+# 运行测试
+make test
+```
+
+## 六、wasm-interp 解释执行
+
+```bash
+# 不经过编译，直接解释执行 WASM
+wasm-interp module.wasm
+
+# 带参数调用
+wasm-interp module.wasm --invoke add 1 2
+# 输出: 3
+
+# 启用 WASI 支持
+wasm-interp module.wasm --wasi
+
+# 跟踪执行（调试用）
+wasm-interp module.wasm --trace
+# 输出每条指令的执行日志
+
+# 运行多模块
+wasm-interp module1.wasm module2.wasm
+```
+
+## 七、wasm2c 转换为 C 代码
+
+```bash
+# 将 WASM 转换为可编译的 C 代码
+wasm2c module.wasm -o module.c
+
+# 编译生成的 C 代码
+gcc -O2 -o program module.c wasm-rt-impl.c -lm
+
+# 用途：
+# 1. 在不支持 WASM 的平台上运行
+# 2. 使用 C 编译器进一步优化
+# 3. 安全审计（检查生成的 C 代码）
+```
+
+## 八、WAT 语法参考速查
+
+```wat
+;; 注释
+(; 块注释 ;)
+
+;; 模块声明
+(module ...)
+
+;; 类型定义
+(type (func (param i32 i32) (result i32)))
+
+;; 导入
+(import "module" "name" (func $name (param i32) (result i32)))
+(import "env" "memory" (memory 1 10))
+(import "env" "table" (table 10 funcref))
+(import "env" "global" (global $g (mut i32)))
+
+;; 导出
+(export "name" (func $name))
+(export "memory" (memory 0))
+(export "table" (table 0))
+(export "global" (global $g))
+
+;; 全局变量
+(global $g (mut i32) (i32.const 0))
+(global $const f64 (f64.const 3.141592653589793))
+
+;; 表和元素
+(table 10 funcref)
+(elem (i32.const 0) $func1 $func2)
+
+;; 内存和数据
+(memory 1 10)
+(data (i32.const 0) "hello\00")
+(data $d1 "world")
+
+;; 起始函数
+(start $init)
+```

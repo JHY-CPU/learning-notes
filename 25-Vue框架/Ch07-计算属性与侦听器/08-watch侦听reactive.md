@@ -77,3 +77,63 @@ watch(() => state.items, (newVal, oldVal) => {
 - 需要旧值时，使用 getter 函数 `watch(() => state.prop, cb)`
 - reactive 对象默认深度侦听，无需加 `deep: true`
 - 推荐尽量用 getter 函数而非直接侦听整个 reactive 对象
+
+## 四、深层嵌套对象的侦听
+
+```vue
+<script setup>
+import { reactive, watch } from 'vue'
+
+const form = reactive({
+  user: {
+    name: '张三',
+    address: {
+      city: '北京',
+      district: '朝阳'
+    }
+  }
+})
+
+// ❌ 侦听整个对象：oldVal === newVal，无法获取旧值
+watch(form, (newVal, oldVal) => {
+  console.log(newVal === oldVal)  // true
+})
+
+// ✅ 使用 getter 侦听特定嵌套属性
+watch(
+  () => form.user.address.city,
+  (newCity, oldCity) => {
+    console.log(`城市从 ${oldCity} 变为 ${newCity}`)
+  }
+)
+
+// ✅ 使用 getter 获取浅拷贝以获取旧值
+watch(
+  () => ({ ...form.user }),
+  (newUser, oldUser) => {
+    console.log('新:', newUser, '旧:', oldUser)
+  }
+)
+</script>
+```
+
+## 五、性能对比
+
+```js
+import { reactive, watch } from 'vue'
+
+const largeState = reactive({
+  users: Array.from({ length: 10000 }, (_, i) => ({ id: i, name: `User${i}` })),
+  config: { theme: 'light', lang: 'zh' },
+  metadata: { /* 大量数据 */ }
+})
+
+// ❌ 深度侦听整个大对象 — 性能差
+watch(largeState, cb, { deep: true })
+
+// ✅ 只侦听需要的属性 — 性能好
+watch(() => largeState.config.theme, cb)
+
+// ✅ 侦听数组长度变化
+watch(() => largeState.users.length, cb)
+```

@@ -75,10 +75,74 @@ shared = { path = "../shared" }
 core = { path = "../core" }
 ```
 
-## 三、注意事项与常见陷阱
+### 2.5 虚拟工作空间
 
-1. **版本同步**：使用 workspace 版本保持同步
-2. **依赖共享**：避免重复依赖声明
-3. **构建顺序**：Cargo 自动处理构建顺序
-4. **CI 配置**：CI 中构建整个工作空间
-5. **发布顺序**：按依赖顺序发布 crate
+```toml
+# Cargo.toml - 虚拟工作空间（无 [package]）
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+# 共享元数据
+[workspace.package]
+version = "1.0.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/user/repo"
+
+# 共享依赖
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1", features = ["full"] }
+```
+
+### 2.6 工作空间工具
+
+```bash
+# 构建特定 crate
+cargo build -p my-server
+
+# 测试所有 crate
+cargo test --workspace
+
+# 查看依赖图
+cargo tree --workspace --depth 1
+
+# 发布（按依赖顺序）
+cargo release --workspace
+
+# 仅检查
+cargo check --workspace
+```
+
+## 四、工作空间结构示例
+
+```
+my-project/
+├── Cargo.toml          # workspace root
+├── crates/
+│   ├── core/           # 核心逻辑
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   ├── server/         # Web 服务器
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   ├── client/         # 客户端
+│   │   ├── Cargo.toml
+│   │   └── src/
+│   └── shared/         # 共享类型
+│       ├── Cargo.toml
+│       └── src/
+└── shared-config/      # 共享配置
+    └── deny.toml
+```
+
+## 五、注意事项与常见陷阱
+
+1. **版本同步**：使用 workspace 版本保持同步，避免版本碎片
+2. **依赖共享**：使用 workspace.dependencies 避免重复声明
+3. **构建顺序**：Cargo 自动处理构建顺序，按依赖关系
+4. **CI 配置**：CI 中构建整个工作空间，使用 `--workspace` 标志
+5. **发布顺序**：按依赖顺序发布 crate，先发布被依赖的 crate
+6. **路径引用**：使用 `path = "../shared"` 引用内部 crate
+7. **feature 传播**：理解 feature 如何在工作空间内传播

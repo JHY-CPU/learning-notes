@@ -142,5 +142,131 @@ Booth算法在乘数包含长串 1 时效率更高。
 
 - 补码一位乘（第49节）是Booth算法的理论基础
 - 原码一位乘（第46节）是Booth算法的对比对象
+## 代码/模拟
+
+### Python实现Booth算法
+
+```python
+"""Booth补码乘法算法模拟 - 适用于408考研复习"""
+
+def booth_multiply(x, y, n_bits=8):
+    """
+    Booth算法实现补码乘法
+    :param x: 被乘数（有符号整数）
+    :param y: 乘数（有符号整数）
+    :param n_bits: 操作位数
+    :return: 2n位补码乘积
+    """
+    def to_twos_comp(val, bits):
+        """整数转补码（无符号表示）"""
+        if val < 0:
+            val = (1 << bits) + val
+        return val & ((1 << bits) - 1)
+
+    def from_twos_comp(val, bits):
+        """补码转有符号整数"""
+        if val & (1 << (bits - 1)):
+            val -= (1 << bits)
+        return val
+
+    def arithmetic_right_shift(acc, mq, y_extra, bits):
+        """算术右移: (ACC, MQ, y_{n+1}) 联合右移一位"""
+        # 新的y_{n+1} = MQ最低位
+        new_y_extra = mq & 1
+        # MQ右移：高位由ACC最低位补入
+        new_mq = ((acc & 1) << (bits - 1)) | (mq >> 1)
+        # ACC算术右移：高位补符号位
+        sign = acc & (1 << bits)  # 保留符号位
+        new_acc = (acc >> 1) & ((1 << bits) - 1)
+        if sign:
+            new_acc |= (1 << (bits - 1))  # 补符号位
+        return new_acc, new_mq, new_y_extra
+
+    mask = (1 << n_bits) - 1
+
+    # 初始化
+    acc = 0                            # ACC = 0 (n位)
+    mq = to_twos_comp(y, n_bits)       # MQ = 乘数补码
+    x_comp = to_twos_comp(x, n_bits)   # [x]补
+    neg_x_comp = to_twos_comp(-x, n_bits)  # [-x]补
+    y_extra = 0                        # 附加位 y_{n+1} = 0
+
+    print(f"被乘数 x={x}, [x]补 = {x_comp:0{n_bits}b} = 0x{x_comp:02X}")
+    print(f"乘数   y={y}, [y]补 = {mq:0{n_bits}b} = 0x{mq:02X}")
+    print(f"[-x]补 = {neg_x_comp:0{n_bits}b} = 0x{neg_x_comp:02X}")
+    print(f"\n{'步骤':<4} {'(y0,y1)':<10} {'操作':<20} {'ACC':>10} {'MQ':>10} {'y+1':>4}")
+    print("-" * 62)
+
+    for step in range(n_bits):
+        y0 = mq & 1  # MQ最低位
+        pair = (y0, y_extra)
+
+        # 判断操作
+        if pair == (0, 0) or pair == (1, 1):
+            operation = "不加（只右移）"
+            acc = acc  # 不变
+        elif pair == (0, 1):
+            operation = f"ACC + [x]补"
+            acc = (acc + x_comp) & mask
+        elif pair == (1, 0):
+            operation = f"ACC + [-x]补"
+            acc = (acc + neg_x_comp) & mask
+
+        print(f" {step+1:<3} ({y0},{y_extra})     {operation:<20} "
+              f"{acc:0{n_bits}b}   {mq:0{n_bits}b}   {y_extra}")
+
+        # 算术右移
+        acc, mq, y_extra = arithmetic_right_shift(acc, mq, y_extra, n_bits)
+
+    # 最终结果：ACC(高位) MQ(低位) = 2n位补码
+    result = (acc << n_bits) | mq
+    expected = x * y
+    print(f"\n结果: ACC={acc:0{n_bits}b}, MQ={mq:0{n_bits}b}")
+    print(f"乘积 = {acc:0{n_bits}b}_{mq:0{n_bits}b} = {from_twos_comp(result, 2*n_bits)}")
+    print(f"验证: {x} × {y} = {expected} ✓" if from_twos_comp(result, 2*n_bits) == expected
+          else f"验证失败: 期望{expected}")
+    return result
+
+# 示例：与笔记中一致的计算
+print("=== Booth算法示例: (-3) × (+5) ===")
+booth_multiply(-3, 5, n_bits=4)
+
+print("\n=== Booth算法示例: (+7) × (-2) ===")
+booth_multiply(7, -2, n_bits=4)
+```
+
+### Booth编码优化说明
+
+```python
+def booth_encoding_demo(y, n_bits=8):
+    """展示Booth编码如何减少连续1串的加法次数"""
+    y_bin = format(y & ((1 << n_bits) - 1), f'0{n_bits}b')
+    print(f"\n乘数 y={y}, 二进制: {y_bin}0 (附加位0)")
+
+    print("Booth编码 (从低位到高位, 检查相邻两位):")
+    print(f"  位对:   ", end='')
+    pairs = []
+    extended = y_bin + '0'  # 加上附加位
+    for i in range(n_bits):
+        pair = (int(extended[i+1]), int(extended[i]))
+        pairs.append(pair)
+        print(f"({extended[i+1]},{extended[i]}) ", end='')
+    print()
+
+    print(f"  操作:   ", end='')
+    for pair in pairs:
+        if pair == (0, 0) or pair == (1, 1):
+            print(f"  0   ", end='')
+        elif pair == (0, 1):
+            print(f" +x   ", end='')
+        elif pair == (1, 0):
+            print(f" -x   ", end='')
+    print()
+
+booth_encoding_demo(0b01010101)  # 常规模式
+booth_encoding_demo(0b11111111)  # 全1串 - Booth编码只需2次操作!
+booth_encoding_demo(0b10000000)  # 单个1
+```
+
 - Booth算法是408考试的**高频考点**，常以大题形式出现
 - 算术右移与逻辑右移的区别（第1章已学）

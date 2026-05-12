@@ -69,3 +69,60 @@ router.beforeEach(async (to) => {
 3. 登录后使用`router.push(redirect)`跳转回原页面
 4. store中不要直接引用router（循环依赖），在守卫中调用
 5. 异步获取用户信息时，确保只请求一次（避免守卫重复触发）
+
+## 四、store 中使用 router 的替代方案
+
+```js
+// ❌ 不推荐：store 中直接使用 router（循环依赖风险）
+// stores/auth.js
+import router from '@/router'  // 可能导致循环依赖
+
+// ✅ 推荐：在组件/守卫中调用 router
+// stores/auth.js
+export const useAuthStore = defineStore('auth', () => {
+  const token = ref(null)
+  const login = async (creds) => {
+    token.value = await api.login(creds)
+    // 不在这里做路由跳转
+  }
+  const logout = () => { token.value = null }
+  return { token, login, logout }
+})
+
+// 在组件中处理跳转
+const router = useRouter()
+const authStore = useAuthStore()
+await authStore.login(credentials)
+router.push(redirect)
+```
+
+## 五、store 与路由参数同步
+
+```js
+// stores/filters.js
+export const useFilterStore = defineStore('filters', () => {
+  const keyword = ref('')
+  const category = ref('')
+  const page = ref(1)
+
+  // 从路由参数初始化
+  function initFromRoute(route) {
+    keyword.value = route.query.q || ''
+    category.value = route.query.cat || ''
+    page.value = Number(route.query.page) || 1
+  }
+
+  // 同步到路由
+  function syncToRoute(router) {
+    router.replace({
+      query: {
+        q: keyword.value || undefined,
+        cat: category.value || undefined,
+        page: page.value > 1 ? page.value : undefined
+      }
+    })
+  }
+
+  return { keyword, category, page, initFromRoute, syncToRoute }
+})
+```

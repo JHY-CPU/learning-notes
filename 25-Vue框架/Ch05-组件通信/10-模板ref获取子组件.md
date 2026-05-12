@@ -25,7 +25,6 @@ function focus() {
   inputRef.value?.focus()
 }
 
-// 暴露给父组件的方法和数据
 defineExpose({ validate, focus, value })
 </script>
 ```
@@ -62,13 +61,39 @@ import { ref, onMounted } from 'vue'
 const inputRefs = ref([])
 
 onMounted(() => {
-  inputRefs.value.forEach(el => console.log(el))
+  inputRefs.value.forEach(el => el.focus())
 })
 </script>
 ```
 
-## 三、注意事项与常见陷阱
+### 2.4 函数模板 ref
+```vue
+<template>
+  <input :ref="(el) => setItemRef(el, index)" />
+</template>
+<script setup>
+const itemRefs = {}
+
+function setItemRef(el, index) {
+  if (el) itemRefs[index] = el
+}
+</script>
+```
+
+## 三、常见用例
+
+| 场景 | 说明 |
+|------|------|
+| 表单验证 | 调用子组件的 validate 方法 |
+| 聚焦输入框 | 调用 focus 方法 |
+| 滚动控制 | 调用 scrollTo 方法 |
+| 播放器控制 | 调用 play/pause 方法 |
+
+## 四、注意事项与常见陷阱
+
 - **必须使用 `defineExpose`**，否则父组件无法访问子组件内部成员
 - 避免过度依赖模板 ref，它破坏了组件的封装性
 - ref 在 `onMounted` 之后才可用，模板中使用需要加 `v-if` 保护
 - 尽量只暴露方法而非内部状态
+- 在 `<script setup>` 中 ref 变量名会自动关联同名模板 ref
+- 组件卸载后 ref 自动变为 null

@@ -185,4 +185,76 @@ $$
 | 正交对角化 | A = QΛQᵀ | 实对称矩阵 | 二次型、正交变换 |
 
 
+## Python实现
+
+### SVD 奇异值分解
+
+```python
+import numpy as np
+
+A = np.array([[1, 2, 3],
+              [4, 5, 6],
+              [7, 8, 9],
+              [10, 11, 12]], dtype=float)
+
+# SVD 分解: A = U Σ V^T
+U, sigma, Vt = np.linalg.svd(A, full_matrices=False)
+print(f"U 的形状: {U.shape}")       # (4, 3)
+print(f"奇异值 σ: {sigma}")          # 降序排列
+print(f"V^T 的形状: {Vt.shape}")    # (3, 3)
+
+# 验证 A = U Σ V^T
+Sigma = np.diag(sigma)
+A_reconstructed = U @ Sigma @ Vt
+print(f"A 重构验证: {np.allclose(A, A_reconstructed)}")
+
+# 用 SVD 计算矩阵的秩
+rank = np.sum(sigma > 1e-10)
+print(f"矩阵的秩 (通过SVD): {rank}")
+```
+
+### SVD 数据压缩
+
+```python
+import numpy as np
+
+# 用前 k 个奇异值近似矩阵
+def svd_compress(A, k):
+    """用前 k 个奇异值做截断 SVD 压缩"""
+    U, sigma, Vt = np.linalg.svd(A, full_matrices=False)
+    A_approx = U[:, :k] @ np.diag(sigma[:k]) @ Vt[:k, :]
+    compression_ratio = (U.shape[0] * k + k + k * Vt.shape[1]) / (A.shape[0] * A.shape[1])
+    error = np.linalg.norm(A - A_approx) / np.linalg.norm(A)
+    return A_approx, error, compression_ratio
+
+A = np.random.randn(100, 50)
+for k in [1, 5, 10, 20]:
+    _, error, ratio = svd_compress(A, k)
+    print(f"k={k:2d}: 相对误差={error:.4f}, 压缩率={ratio:.2%}")
+```
+
+### LU 分解与 QR 分解
+
+```python
+import numpy as np
+from scipy.linalg import lu, qr
+
+A = np.array([[2, 1, 1],
+              [4, 3, 3],
+              [8, 7, 9]], dtype=float)
+
+# LU 分解: PA = LU
+P, L, U = lu(A)
+print(f"L =\n{np.round(L, 4)}")
+print(f"U =\n{np.round(U, 4)}")
+print(f"PA = LU 验证: {np.allclose(P @ A, L @ U)}")
+
+# QR 分解: A = QR
+Q, R = qr(A)
+print(f"\nQ =\n{np.round(Q, 4)}")
+print(f"R =\n{np.round(R, 4)}")
+print(f"Q 正交验证: {np.allclose(Q.T @ Q, np.eye(3))}")
+print(f"A = QR 验证: {np.allclose(A, Q @ R)}")
+```
+
 <!-- Converted from: 03_SVD与Jordan标准形.html -->

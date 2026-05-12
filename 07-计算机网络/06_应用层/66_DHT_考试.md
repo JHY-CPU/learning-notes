@@ -49,8 +49,63 @@ D. Web浏览
 - DHT查找 = O(log N)
 - DHT用于P2P
 
+### 典型考题3：Kademlia
+
+**题目**：Kademlia协议中，两个节点之间的距离定义为（  ）
+A. 物理距离
+B. 跳数
+C. XOR（异或）距离
+D. 延迟
+
+**答案**：C
+
+**解析**：
+- Kademlia使用XOR距离度量两个节点ID的"距离"
+- XOR距离满足三角不等式
+- 每次查找将距离范围缩小一半
+
+### 典型考题4：DHT与Tracker
+
+**题目**：与Tracker相比，DHT的优势是（  ）
+A. 查找效率更高
+B. 无单点故障
+C. 实现更简单
+D. 不需要路由表
+
+**答案**：B
+
+**解析**：
+- DHT去中心化，无单点故障（B正确）
+- Tracker查找效率O(1)，DHT查找效率O(log N)（A错误）
+- DHT实现比Tracker复杂（C错误）
+- DHT需要维护路由表（D错误）
+
+### 典型考题5：DHT应用场景
+
+**题目**：以下哪些应用使用DHT？（多选）
+A. BitTorrent
+B. IPFS
+C. HTTP
+D. 区块链
+
+**答案**：A, B, D
+
+**解析**：
+- BitTorrent使用DHT替代Tracker（A正确）
+- IPFS使用DHT定位内容（B正确）
+- HTTP不使用DHT（C错误）
+- 区块链使用DHT进行节点发现（D正确）
+
+### 408易错点
+- DHT是数据结构/机制，不是单一协议
+- Kademlia是DHT的一种实现协议
+- DHT查找复杂度是O(log N)，不是O(1)
+- DHT去中心化但不是完全没有基础设施
+- XOR距离不等于物理距离
+
 ## 协议关联
 
 - **DHT与P2P**：DHT是P2P的发现机制
 - **DHT与BitTorrent**：BitTorrent使用DHT
+- **DHT与Tracker**：DHT是去中心化替代方案
 - **408考点**：DHT的基本概念

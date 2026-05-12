@@ -67,3 +67,38 @@ const dynamicValue = ref('会更新')
 - 可以减少编译开销，适合纯静态内容区块
 - 不要在 v-pre 中放置需要响应式的元素
 - 常用于文档网站、技术博客中展示 Vue 代码
+
+## 四、v-pre 的性能影响
+
+```vue
+<template>
+  <!-- 大段静态内容使用 v-pre 可减少编译开销 -->
+  <article v-pre>
+    <h1>纯静态文章</h1>
+    <p>这些内容不包含任何 Vue 模板语法，跳过编译可减少运行时开销。</p>
+    <p>在内容密集型页面（如博客、文档）中有明显收益。</p>
+    <!-- 包含花括号的内容会被原样显示 -->
+    <code>{{ notAVariable }}</code>
+  </article>
+
+  <!-- 只有需要动态内容的部分被编译 -->
+  <aside>
+    <p>评论数: {{ commentCount }}</p>
+    <button @click="like">点赞 {{ likes }}</button>
+  </aside>
+</template>
+```
+
+## 五、v-pre 与 SSR
+
+在服务端渲染（SSR）中，v-pre 可以减少服务端的模板编译开销。对于不包含动态内容的页面段落，使用 v-pre 可以提升 SSR 渲染速度。
+
+```vue
+<template>
+  <!-- SSR 中跳过编译的静态内容 -->
+  <div v-pre v-html="prerenderedContent" />
+
+  <!-- 动态部分正常编译 -->
+  <div>{{ dynamicData }}</div>
+</template>
+```

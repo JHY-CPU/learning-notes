@@ -97,6 +97,84 @@
 - **DMA**：请搬家公司，你只管吩咐(预处理)和验收(后处理)，搬家公司自己搬(DMA控制器)
 - 搬家过程中你可以做其他事情(CPU执行其他程序)
 
+## 代码/模拟
+
+### Python模拟DMA传送过程
+
+```python
+"""DMA传送过程模拟 - 适用于408考研复习"""
+
+class DMAController:
+    """DMA控制器模拟"""
+
+    def __init__(self):
+        self.MAR = 0       # 主存地址寄存器
+        self.DAR = 0       # 设备地址寄存器
+        self.WC = 0        # 字计数器
+        self.data_buffer = 0
+
+    def preload(self, mem_addr, device_addr, word_count):
+        """预处理: CPU设置DMA控制器参数"""
+        self.MAR = mem_addr
+        self.DAR = device_addr
+        self.WC = word_count
+        print(f"【预处理 - CPU设置DMA参数】")
+        print(f"  MAR(主存起始地址) ← {mem_addr:#06x}")
+        print(f"  DAR(设备地址)    ← {device_addr:#06x}")
+        print(f"  WC(传送字数)     ← {word_count}")
+
+    def transfer_block(self, memory, device_data):
+        """数据传送阶段 - DMA控制器自动完成"""
+        print(f"\n【数据传送 - DMA自动完成, 不需CPU干预】")
+        transferred = 0
+        for i in range(self.WC):
+            # 模拟: 设备 → 主存
+            data = device_data[i] if i < len(device_data) else 0
+            memory[self.MAR + i] = data
+            transferred += 1
+            print(f"  传送{transferred}: 设备[{self.DAR + i}] → "
+                  f"主存[{self.MAR + i:#06x}] = {data:#04x}")
+            self.WC -= 1
+
+        print(f"\n  传送完成! 共传送{transferred}个字")
+        print(f"  WC = 0, 发出中断请求通知CPU")
+
+    def post_process(self):
+        """后处理: CPU响应DMA中断, 做善后工作"""
+        print(f"\n【后处理 - CPU响应DMA中断】")
+        print(f"  检查传送是否正确")
+        print(f"  更新程序中的缓冲区指针")
+        print(f"  释放DMA控制器")
+
+# 完整DMA传送过程
+print("=" * 50)
+print("DMA传送完整过程模拟")
+print("=" * 50)
+
+dma = DMAController()
+memory = [0] * 0x1000  # 简化主存
+disk_data = [0x41, 0x42, 0x43, 0x44, 0x45]  # 磁盘读出的数据
+
+# Step 1: 预处理 (CPU参与)
+dma.preload(mem_addr=0x100, device_addr=0x00, word_count=5)
+
+# Step 2: 数据传送 (DMA自主完成, CPU可执行其他程序)
+dma.transfer_block(memory, disk_data)
+
+# Step 3: 后处理 (CPU参与)
+dma.post_process()
+
+# 三种I/O方式对比
+print("\n" + "=" * 50)
+print("三种I/O方式CPU开销对比 (传送1000个字)")
+print("=" * 50)
+print(f"{'方式':<12} {'每字CPU开销':<15} {'总CPU开销':<15}")
+print("-" * 45)
+print(f"{'程序查询':<12} {'查询+传送':<15} {'1000 × 20μs = 20ms':<15}")
+print(f"{'程序中断':<12} {'中断响应+传送':<15} {'1000 × 10μs = 10ms':<15}")
+print(f"{'DMA':<12} {'仅预/后处理':<15} {'30μs (几乎为0!)':<15}")
+```
+
 ## 知识关联
 
 ### 跨章节联系

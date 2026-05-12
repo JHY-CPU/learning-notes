@@ -26,7 +26,7 @@
 
 # 剪枝优化
 
-## 什么是剪枝
+# 什么是剪枝
 
 剪枝（Pruning）是在回溯搜索过程中，提前终止对不可能产生有效解的路径的探索。剪枝可以大幅减少搜索空间，提高算法效率。
 
@@ -69,7 +69,8 @@ function combinationSum2(candidates, target) {
     }
     backtrack(0, target, []);
     return result;
-}```
+}
+```
 
 ## 对比实验：有剪枝 vs 无剪枝
 

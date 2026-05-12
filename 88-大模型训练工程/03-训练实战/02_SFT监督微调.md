@@ -3,7 +3,7 @@
 *Full Fine-tuning / LoRA / Packing / Chat Template / 多轮对话*
 
 
-# SFT 监督微调
+## SFT 监督微调
 
 
 Full Fine-tuning / LoRA / Packing / Chat Template / 多轮对话

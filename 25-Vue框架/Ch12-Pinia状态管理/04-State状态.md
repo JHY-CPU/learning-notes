@@ -76,3 +76,55 @@ store.$reset()  // 恢复到初始状态
 3. `$patch`批量修改比逐个修改性能更好
 4. `$reset()`只在选项式Store中可用，Setup式需自行实现
 5. 添加新属性时使用`$patch`或确保属性在state中已定义
+
+## 四、State 的高级操作
+
+### 4.1 $patch 的性能优势
+```js
+// ❌ 逐个修改：每次修改都触发一次响应式更新
+store.name = '新名字'
+store.age = 25
+store.email = 'new@example.com'
+
+// ✅ $patch 批量修改：只触发一次响应式更新
+store.$patch({
+  name: '新名字',
+  age: 25,
+  email: 'new@example.com'
+})
+```
+
+### 4.2 使用 $state 替换整个状态
+```js
+// 替换整个 state（用于从服务端恢复状态）
+store.$state = {
+  theme: 'dark',
+  language: 'en',
+  sidebar: { collapsed: true, width: 200 },
+  notifications: []
+}
+```
+
+### 4.3 订阅 state 变化
+```js
+store.$subscribe((mutation, state) => {
+  // mutation.type: 'direct' | 'patch object' | 'patch function'
+  // mutation.storeId: store 的 ID
+
+  // 自动保存到 localStorage
+  localStorage.setItem('app-state', JSON.stringify(state))
+}, { detached: true })  // detached: 组件卸载后继续监听
+```
+
+### 4.4 State 中的非序列化数据
+```js
+export const useMapStore = defineStore('map', {
+  state: () => ({
+    // Map、Set 等复杂类型
+    markers: new Map(),
+    selectedIds: new Set(),
+    // 正则、日期等
+    filter: { pattern: /^test/, date: new Date() }
+  })
+})
+```

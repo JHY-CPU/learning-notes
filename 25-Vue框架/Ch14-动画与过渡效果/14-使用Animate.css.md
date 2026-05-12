@@ -53,8 +53,86 @@ import 'animate.css'
 .animate__animated { --animate-duration: 0.3s; }
 ```
 
+## 四、动态选择动画效果
+
+```vue
+<script setup>
+import { ref } from 'vue'
+import 'animate.css'
+
+const show = ref(true)
+const enterAnim = ref('fadeIn')
+const leaveAnim = ref('fadeOut')
+
+const animations = [
+  { label: '淡入淡出', enter: 'fadeIn', leave: 'fadeOut' },
+  { label: '弹跳', enter: 'bounceIn', leave: 'bounceOut' },
+  { label: '滑入', enter: 'slideInLeft', leave: 'slideOutRight' },
+  { label: '缩放', enter: 'zoomIn', leave: 'zoomOut' },
+  { label: '翻转', enter: 'flipInX', leave: 'flipOutX' }
+]
+</script>
+
+<template>
+  <div>
+    <select v-for="anim in animations" :key="anim.label">
+      <option @click="enterAnim = anim.enter; leaveAnim = anim.leave">
+        {{ anim.label }}
+      </option>
+    </select>
+    <button @click="show = !show">切换</button>
+  </div>
+
+  <Transition
+    :enter-active-class="`animate__animated animate__${enterAnim}`"
+    :leave-active-class="`animate__animated animate__${leaveAnim}`"
+  >
+    <div v-if="show" class="box">Animate.css 效果</div>
+  </Transition>
+</template>
+```
+
+## 五、自定义动画时长与延迟
+
+```css
+/* 全局覆盖 */
+:root {
+  --animate-duration: 0.5s;
+  --animate-delay: 0.2s;
+}
+
+/* 组件级别覆盖 */
+.my-box.animate__animated {
+  --animate-duration: 0.3s;
+  --animate-delay: 0.1s;
+}
+
+/* 特定动画覆盖 */
+.animate__bounceIn {
+  --animate-duration: 0.8s;
+}
+```
+
+## 六、TransitionGroup 配合 Animate.css
+
+```vue
+<template>
+  <TransitionGroup
+    tag="ul"
+    enter-active-class="animate__animated animate__fadeInUp"
+    leave-active-class="animate__animated animate__fadeOutDown"
+  >
+    <li v-for="item in items" :key="item.id">
+      {{ item.text }}
+    </li>
+  </TransitionGroup>
+</template>
+```
+
 ## 三、注意事项与常见陷阱
 
 - 必须同时包含 `animate__animated` 基础类和具体动画类
 - `enter-active-class` 和 `leave-active-class` 中的类名用**空格**分隔
 - Animate.css v4+ 使用 `animate__` 前缀，v3 使用 `animated` 无前缀
+- 自定义过渡类名会覆盖 `name` 属性的默认类名
+- Animate.css 的移动类名不参与 `TransitionGroup` 的 `move` 过渡
